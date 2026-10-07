@@ -7,6 +7,10 @@
 
 ## Agent skills
 
+### Matt Pocock 工作流程
+
+本專案使用 `.agents/skills/` 的 Matt Pocock 工程技能。開始任務時讀取 `docs/agents/matt-pocock.md`，依任務與使用者選定的流程載入相關 `SKILL.md` 及其相依文件。
+
 ### Issue tracker
 
 工作事項與規格使用 sarekoubeYohane/quiet-hours-npc 的 GitHub Issues。見 `docs/agents/issue-tracker.md`。
