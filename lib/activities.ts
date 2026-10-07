@@ -1,4 +1,5 @@
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type World } from './world';
+import { learnHabit } from './habits';
 
 export type ActivityDecision = { action: Action; durationMinutes: number };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
@@ -72,6 +73,8 @@ export async function advanceActivities(world: World, options: {
       continue;
     }
     delete character.plan;
+    const respondingToUser = pendingInterventions(world, character).length > 0;
+    const from = character.location;
     let decision: ActivityDecision;
     if (ai) {
       if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) throw new BudgetExceeded();
@@ -84,6 +87,7 @@ export async function advanceActivities(world: World, options: {
     }
     try {
       resolve(world, character, decision.action);
+      if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
       const duration = activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
       if (sustained.has(decision.action.type) && duration > minutes) {
         character.plan = { action: decision.action, startedAt: world.minute - minutes,

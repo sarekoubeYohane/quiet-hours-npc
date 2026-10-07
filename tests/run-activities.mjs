@@ -6,9 +6,9 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/world.ts', 'world'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['app/api/world/route.ts', 'route']]) {
+  for (const [source, output] of [['lib/world.ts', 'world'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['app/api/world/route.ts', 'route']]) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|activities|models)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|habits|activities|models)"\)/g, 'require("./$1.cjs")')
       .replace('require("@/app/chatgpt-auth")', 'require("./auth.cjs")').replace('require("@/lib/store")', 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
   }

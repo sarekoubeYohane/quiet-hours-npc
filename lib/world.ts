@@ -1,6 +1,7 @@
 export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];plan?:ActivityPlan};
+export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];plan?:ActivityPlan;habits?:Habit[]};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string}};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};

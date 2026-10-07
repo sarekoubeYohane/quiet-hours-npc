@@ -5,6 +5,7 @@ const fromBuild = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, 
 const { seedWorld, record, resolve } = fromBuild('world');
 const { advanceActivities, currentUsage, canContinue, BudgetExceeded } = fromBuild('activities');
 const { aiDecision } = fromBuild('models');
+const { learnHabit, habitViews, habitsForDecision, habitStrength } = fromBuild('habits');
 const { POST } = fromBuild('route');
 const store = fromBuild('store');
 const options = (decide, extras = {}) => ({ minutes: 15, mode: 'openai', modelKey: 'openai:test', limits: { calls: 120, tokens: 500000 }, decide, ...extras });
@@ -100,4 +101,62 @@ test('model payload includes only recent memories and reports usage even with in
   assert.equal(JSON.parse(payload.messages[1].content).self.memories.length, 12);
   assert.equal(payload.response_format.json_schema.strict, true);
   assert.deepEqual(tokens, { inputTokens: 42, outputTokens: 8 });
+});
+
+test('a habit needs three different world days, not repeated actions in one day', () => {
+  const world = seedWorld(), character = world.characters[0];
+  for (let i = 0; i < 10; i++) learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  assert.equal(habitViews(world, character)[0].days, 1);
+  assert.equal(habitsForDecision(world, character).length, 0);
+  world.minute += 1440; learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  assert.equal(habitViews(world, character)[0].established, false);
+  world.minute += 1440; learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  assert.equal(habitViews(world, character)[0].established, true);
+  assert.equal(habitsForDecision(world, character)[0].observedDays, 3);
+  assert.equal(JSON.parse(JSON.stringify(character)).habits[0].observedDays.length, 3);
+});
+
+test('habit relevance respects time and place, and unused habits weaken', () => {
+  const world = seedWorld(), character = world.characters[0];
+  for (let i = 0; i < 3; i++) { world.minute = 1260 + i * 1440; learnHabit(world, character, { type: 'rest' }, character.location); }
+  const strength = habitStrength(character.habits[0], world.minute);
+  assert.equal(habitsForDecision(world, character).length, 1);
+  character.location = 'cafe'; assert.equal(habitsForDecision(world, character).length, 0);
+  character.location = 'kris-home';
+  world.minute += 360; assert.equal(habitsForDecision(world, character).length, 0);
+  world.minute = 4140 + 7 * 1440;
+  assert.equal(habitViews(world, character)[0].fading, true);
+  assert.ok(Math.abs(habitStrength(character.habits[0], world.minute) - strength / 2) < 0.00001);
+  world.minute += 7 * 1440; assert.equal(habitsForDecision(world, character).length, 0);
+});
+
+test('continuation, demo mode, invalid actions and observer requests do not create habit evidence', async () => {
+  const demo = seedWorld(); await advanceActivities(demo, options(restful, { mode: 'demo', modelKey: 'demo' }));
+  assert.ok(demo.characters.every(c => !c.habits));
+  const invalid = seedWorld(); await advanceActivities(invalid, options(async () => ({ action: { type: 'work', target: 'invalid-task' }, durationMinutes: 60 })));
+  assert.ok(invalid.characters.every(c => !c.habits));
+  const world = seedWorld(); record(world, 'observer', '請休息', 'intervention', ['cass']);
+  await advanceActivities(world, options(restful));
+  assert.equal(world.characters[0].habits, undefined);
+  const prior = JSON.stringify(world.characters[1].habits);
+  await advanceActivities(world, options(restful));
+  assert.equal(JSON.stringify(world.characters[1].habits), prior);
+});
+
+test('model receives only its own established habits, without raw statistics or other private patterns', async () => {
+  const world = seedWorld(), cass = world.characters[0], vera = world.characters[1];
+  for (let i = 0; i < 3; i++) {
+    world.minute = 1260 + i * 1440;
+    learnHabit(world, cass, { type: 'work', target: 'tidy' }, cass.location);
+    learnHabit(world, vera, { type: 'work', target: 'craft' }, vera.location);
+  }
+  let payload;
+  const fakeFetch = async (url, init) => { payload = JSON.parse(init.body); return Response.json({ choices: [{ message: { content: JSON.stringify({ type: 'rest', durationMinutes: 60 }) } }] }); };
+  await aiDecision(world, cass, 'unit-test-key', 'gpt-6-luna', 'openai', fakeFetch);
+  const data = JSON.parse(payload.messages[1].content);
+  assert.equal(data.learnedHabits.length, 1);
+  assert.equal(data.self.habits, undefined);
+  assert.match(data.learnedHabits[0].tendency, /整理/);
+  assert.equal(data.learnedHabits.some(h => h.tendency.includes('畫髮飾')), false);
+  assert.equal(JSON.stringify(data.learnedHabits).includes('lastSeen'), false);
 });
