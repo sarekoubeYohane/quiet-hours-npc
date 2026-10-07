@@ -85,6 +85,6 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
       <span className="map-playback">{playing ? <MessageCircle size={14}/> : <Pause size={14}/>} {playing ? `${actor?.name || ''} 的行動` : '點角色查看狀態'}</span>
     </div>
     <div className="pixel-locations">{locations.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}><span style={{background:c.color}}/>{c.name}</button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
-    <div className="scene-caption" aria-live="polite">{active ? `${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨「推進時間」行動。當面對話顯示在地圖上；完整紀錄在下方。`}</div>
+    <div className="scene-caption" aria-live="polite">{active ? `${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨回合行動。延續活動不重新詢問 AI；當面對話顯示在地圖上。`}</div>
   </>;
 }

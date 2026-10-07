@@ -30,7 +30,7 @@ export function bubbleText(event: WorldEvent, characters: Character[]): string {
     move: `前往${({ 'kris-home': 'Kris 的住處', 'vera-home': 'Vera 的房間', cafe: '街角咖啡館' } as Record<string, string>)[event.scene?.to || ''] || '另一個地點'}`,
     rest: '休息一會兒', reflect: '留點時間給自己…', observe: '看看周圍',
     work: event.scene?.target === 'tea' ? '泡一壺茶' : event.scene?.target === 'craft' ? '畫下髮飾的想法' : '整理眼前的小東西',
-    blocked: '暫時留在原地',
+    blocked: '暫時留在原地', continue: '繼續原本的活動',
   };
   return labels[event.kind] || '安靜待著';
 }
