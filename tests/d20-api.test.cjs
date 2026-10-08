@@ -200,3 +200,21 @@ test('the NPC decision input sees the experienced outcome but not the private ro
   assert.ok(!JSON.stringify(view).includes('"roll"'));
   assert.ok(!JSON.stringify(view).includes('"dc"'));
 });
+
+test('an obvious clue from an actual work mishap reaches only nearby observers and later entrants', async () => {
+  store.install(seedWorld());
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'work', target: 'craft-challenge', content: '花朵' } }))).status, 200);
+  const original = Math.random;
+  Math.random = () => 0.001;
+  try { assert.equal((await POST(request('advance'))).status, 200); }
+  finally { Math.random = original; }
+  let saved = (await (await GET()).json()).world;
+  assert.ok(saved.clues.some(clue => clue.visibility === 'obvious' && clue.location === 'cafe'));
+  assert.ok(!saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('散落的髮飾草稿')));
+  assert.equal((await POST(request('intervene', { target: 'kris', text: '去咖啡館' }))).status, 200);
+  assert.equal((await POST(request('advance'))).status, 200);
+  saved = (await (await GET()).json()).world;
+  assert.equal(saved.characters.find(c => c.id === 'kris').location, 'cafe');
+  assert.ok(saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('散落的髮飾草稿')));
+  assert.ok(!saved.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('散落的髮飾草稿')));
+});
