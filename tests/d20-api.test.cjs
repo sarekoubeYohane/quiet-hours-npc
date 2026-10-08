@@ -350,3 +350,29 @@ test('rephrasing the same persuasion in unchanged conditions does not earn anoth
   assert.equal(saved.events.filter(e => e.actor === 'owner' && e.resolution && e.scene?.target === 'kris').length, 1);
   assert.ok(saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('再考慮')));
 });
+
+test('NPC attention from the current intent changes subtle observation resolution without a new attribute meter', async () => {
+  const check = async focused => {
+    const world = seedWorld();
+    if (focused) world.characters.find(c => c.id === 'owner').intents = [{
+      id: 'inspect', content: '仔細尋找現場線索',
+      intensity: 'medium', importance: 'medium', urgency: 'low', context: ''
+    }];
+    world.clues = [{ id: 'evidence', sourceEventId: 'original', location: 'cafe',
+      text: '紙張角落有一點墨跡。', visibility: 'subtle', noticedBy: [] }];
+    store.install(world);
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'observe' } }))).status, 200);
+    const random = Math.random;
+    Math.random = () => (14 - 0.5) / 20;
+    try { assert.equal((await POST(request('advance'))).status, 200); }
+    finally { Math.random = random; }
+    const saved = (await (await GET()).json()).world;
+    return saved.events.findLast(e => e.kind === 'perception' && e.audience.includes('owner'));
+  };
+  const unfocused = await check(false);
+  const focused = await check(true);
+  assert.equal(unfocused.resolution.modifier, 0);
+  assert.equal(unfocused.resolution.outcome, 'mixed');
+  assert.equal(focused.resolution.modifier, 2);
+  assert.equal(focused.resolution.outcome, 'success');
+});
