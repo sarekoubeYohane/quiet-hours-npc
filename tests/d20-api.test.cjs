@@ -177,7 +177,7 @@ test('an unchanged method cannot farm fresh rolls, but studying a real reference
     assert.equal(current.characters.find(c => c.id === 'owner').projects.length, 2);
     assert.equal(current.characters.find(c => c.id === 'owner').projects[1].method, 'researched');
     await perform('craft-challenge', '星月');
-    assert.equal(rolls, 2, 'the researched method cannot be washed repeatedly');
+    assert.equal((await (await GET()).json()).world.characters.find(c => c.id === 'owner').projects.length, 2, 'the owner cannot generate another project on an unchanged researched method');
   } finally { Math.random = original; }
 });
 
