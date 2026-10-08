@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           (action.target !== undefined && typeof action.target !== 'string') ||
           (action.mood !== undefined && (typeof action.mood !== 'string' || action.mood.length > 20))) throw Error('行動格式無效');
         const check = structuredClone(world);
-        resolve(check, check.characters.find(c => c.id === 'owner')!, action);
+        resolve(check, check.characters.find(c => c.id === 'owner')!, action, { dryRun: true });
       } catch (e) { return reply({ error: e instanceof Error ? e.message : '指定行動無效。' }, 400); }
     }
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
