@@ -202,7 +202,14 @@ if(project){
     const clue:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'桌面有散落的髮飾草稿和墨跡。',visibility:'obvious',noticedBy:[]};
     const subtle:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'紙張背面有一道深色墨線。',visibility:'subtle',noticedBy:[],misleading:'紙張彷彿已經裂開一道口子。'};
     w.clues=[...(w.clues||[]),clue,subtle].slice(-40);
-    for(const nearby of w.characters.filter(other=>other.location===c.location))revealObviousClues(w,nearby);
+    for(const nearby of w.characters.filter(other=>other.location===c.location)){
+      revealObviousClues(w,nearby);
+      // Passive checks are event-driven and only for a character who was
+      // already paying attention to observable clues when the event occurred.
+      if(nearby.id!==c.id&&nearby.intents?.some(intent=>/(觀察|尋找|檢查|線索)/.test(intent.content))){
+        noticeSubtleClues(w,nearby);
+      }
+    }
   }
 }
 }
