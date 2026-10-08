@@ -46,4 +46,4 @@ NPC 意圖與行動已依 implement-spec 完成，正式規格為 [Issue #1](htt
 
 接手驗證或發布此功能時，先讀取 [合併後驗證紀錄](../verification/npc-playbook-2026-10-08.md)，確認測試提交、網站版本及未驗證項目，再查最新來源。功能與上下文限制見 README.md 及 docs/design/npc-action-model.md。
 
-獨立測試環境另列為 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)。使用者指定在新對話先以 `grill-with-docs` 釐清，再整理規格與執行；方案尚未確認，工作票未標記 `ready-for-agent`。開始該工作前讀取最新 Issue 及留言。
+獨立測試環境另列為 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)。規格已於 2026-10-08 以 to-spec 確認並標記 `ready-for-agent`，再以 to-tickets 拆為工作票 #21–#32，拆分與相依見 [Infra 工作拆分](../design/infra-environments-ticket-plan.md)。#21 由使用者本人建立帳號與 OAuth App，不標 `ready-for-agent`。開始任一工作前讀取最新 Issue、留言與原生 blocked-by 關係，並確認阻擋項目已關閉。

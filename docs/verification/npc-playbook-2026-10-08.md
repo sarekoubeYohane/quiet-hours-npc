@@ -33,4 +33,6 @@
 
 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 記錄獨立測試網址、資料庫隔離、登入、PR 自動檢查與驗證／部署流程。使用者指定在新對話先 `grill-with-docs`，再執行；目前是待釐清工作，Cloudflare Workers＋獨立 D1 是候選而非已確認方案。
 
+更新（2026-10-08）：#19 已於同日完成需求釐清與 to-spec，並拆為工作票 #21–#32，見 [Infra 工作拆分](../design/infra-environments-ticket-plan.md)。上段保留為當次快照。
+
 另需補上 UI 實際操作及真實模型決策紀錄的驗證。技術流程、發布狀態與模型表現分別記錄，按當次實際證據更新。

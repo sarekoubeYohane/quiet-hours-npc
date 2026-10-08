@@ -38,7 +38,7 @@
 
 依 Sites 執行環境安裝依賴。修改資料庫結構後執行 `pnpm db:generate`，使用 Sites build 與 publishing 流程部署。生產 migrations 由部署平台套用。
 
-獨立測試站與驗證／部署流程已開立 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)，等待 `grill-with-docs` 釐清後執行。固定測試網址、資料隔離、登入及自動部署方式尚未選定；Cloudflare Workers＋獨立 D1 是候選方案，尚未建立測試站。
+獨立測試站與驗證／部署流程的規格為 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)，已於 2026-10-08 確認並拆成 12 項工作票 #21–#32，拆分與相依見 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。方案為自己的 Cloudflare 帳號、免費 Workers 與 D1、GitHub 登入；目前尚未實作，也尚未建立測試站。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
 
