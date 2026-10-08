@@ -49,7 +49,11 @@ function noticeSubtleClues(w:World,c:Character){
   if(clue.attempts[c.id].includes(method))continue;
   clue.attempts[c.id].push(method);
   const tags=c.abilityTags||[];
-  const advantage:Advantage=tags.includes('非常善於觀察')?4:tags.includes('不擅長觀察')?-2:2;
+  const attentive=c.intents?.some(i=>/(觀察|尋找|檢查|線索)/.test(i.content))||false;
+  const advantage:Advantage=tags.includes('非常善於觀察')?4:
+    tags.includes('完全不擅長觀察')?-4:
+    tags.includes('不擅長觀察')?-2:
+    tags.includes('善於觀察')||attentive?2:0;
   const resolution=judgeD20(rollD20(),advantage,16);
   const noticed=resolution.outcome==='success'||resolution.outcome==='critical-success';
   if(noticed)clue.noticedBy.push(c.id);
