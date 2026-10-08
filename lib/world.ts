@@ -5,13 +5,11 @@ export type ActivityPlan={action:Action;startedAt:number;until:number;attention:
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
-export type NPCMemory={id?:string;time:number;text:string;kind?:'observation'|'inference'|'hearsay';source?:string;correctedBy?:string};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:NPCMemory[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution;attemptKey?:string};
-export type WorldClue={id:string;sourceEventId:string;location:string;text:string;visibility:'obvious'|'subtle';noticedBy:string[];attempts?:Record<string,string[]>;misleading?:string};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];clues?:WorldClue[];lastMode:string;aiUsage?:AIUsage};
-export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe'|'reconsider';target?:string;content?:string;mood?:string};
+export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
+export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -28,53 +26,7 @@ export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',cha
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,sourceOverride?:string){
-const id=crypto.randomUUID();
-w.events=[...w.events,{id,time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);
-if(kind==='continue')return;
-const memoryKind:NPCMemory['kind']=['reflect','belief','belief-correction'].includes(kind)?'inference':['say','message','intervention'].includes(kind)?'hearsay':'observation';
-const source=sourceOverride||(memoryKind==='hearsay'||memoryKind==='inference'?actor:id);
-for(const c of w.characters)if(audience.includes(c.id)){
- const ownSpeech=c.id===actor&&memoryKind==='hearsay';
- const memory:NPCMemory={id,time:w.minute,text,kind:ownSpeech?'observation':memoryKind,source:ownSpeech?id:source};
- c.memories=[...c.memories,memory].slice(-80);
- if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);
-}
-}
-function noticeSubtleClues(w:World,c:Character){
- for(const clue of w.clues||[]){
-  if(clue.visibility!=='subtle'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
-  clue.attempts??={};
-  clue.attempts[c.id]??=[];
-  const method='active-observation';
-  if(clue.attempts[c.id].includes(method))continue;
-  clue.attempts[c.id].push(method);
-  const tags=c.abilityTags||[];
-  const attentive=c.intents?.some(i=>/(觀察|尋找|檢查|線索)/.test(i.content))||false;
-  const advantage:Advantage=tags.includes('非常善於觀察')?4:
-    tags.includes('完全不擅長觀察')?-4:
-    tags.includes('不擅長觀察')?-2:
-    tags.includes('善於觀察')||attentive?2:0;
-  const resolution=judgeD20(rollD20(),advantage,16);
-  const noticed=resolution.outcome==='success'||resolution.outcome==='critical-success';
-  if(noticed)clue.noticedBy.push(c.id);
-  const message=noticed?'仔細看見：'+clue.text:
-    resolution.outcome==='mixed'?'察覺附近有些異樣，但還沒有看清細節。':
-    '觀察了一會兒，還是沒有找到那個不明顯的線索。';
-  record(w,'world',message,'perception',[c.id],undefined,resolution,clue.id);
-  if(resolution.outcome==='critical-failure'&&clue.misleading){
-    // This is an individual's interpretation of real evidence, not an objective event.
-    record(w,'world','我看到的線索讓我以為：'+clue.misleading,'belief',[c.id],undefined,undefined,clue.id);
-  }
- }
-}
-function revealObviousClues(w:World,c:Character){
- for(const clue of w.clues||[]){
-  if(clue.visibility!=='obvious'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
-  clue.noticedBy.push(c.id);
-  record(w,'world','現場可以看見：'+clue.text,'clue',[c.id],undefined,undefined,clue.id);
- }
-}
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
 export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{...c,projects:undefined},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&x.location===c.location).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
@@ -164,54 +116,15 @@ if(a.target==='study-craft'){
 audience=witnesses;
 }
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
-else if(a.type==='observe'){
-if(a.target&&a.target!=='general-observe'&&a.target!=='inspect-paper')throw Error('觀察方法無效');
-if(a.target==='inspect-paper'&&!w.clues?.some(clue=>clue.location===c.location&&clue.visibility==='subtle'))throw Error('現場沒有可翻查的草稿');
-c.activity=a.target==='inspect-paper'?'仔細翻過現場的草稿。':'留意周圍的動靜。';
-text=c.name+' '+c.activity;
-}
-else if(a.type==='reconsider'){
-if(!content)throw Error('請說明修正後的看法');
-const index=c.memories.findIndex(item=>item.id===a.target&&item.kind==='inference'&&!item.correctedBy);
-if(index<0)throw Error('沒有可修正的個人推測');
-const old=c.memories[index];
-const evidence=c.memories.slice(index+1).findLast(item=>item.kind==='observation'&&item.source===old.source&&
-  (item.text.includes('翻過紙張')||item.text.includes('仔細看見')));
-if(!evidence?.id)throw Error('目前沒有足以重新檢視這段推測的新觀察');
-if(options.dryRun)return;
-old.correctedBy=evidence.id;
-c.activity='重新檢視了自己先前的推測。';
-record(w,c.id,c.name+' 改變了看法：「'+content+'」','belief-correction',[c.id],{from,to:c.location,target:a.target},undefined,evidence.id);
-return;
-}
-else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
+else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
+else throw Error('未知行動');
+if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
+record(w,c.id,text,resolution?'attempt':a.type,audience,
+  {from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
-if(a.type==='move')revealObviousClues(w,c);
-if(a.type==='observe'&&!options.dryRun){
-  if(a.target==='inspect-paper'){
-    const clue=w.clues?.find(item=>item.location===c.location&&item.visibility==='subtle');
-    if(clue&&!clue.noticedBy.includes(c.id)){
-      clue.noticedBy.push(c.id);
-      record(w,'world','翻過紙張後看見：'+clue.text,'perception',[c.id],undefined,undefined,clue.id);
-    }
-  }else noticeSubtleClues(w,c);
-}
 if(project){
-  const resultId=w.events.at(-1)!.id;
-  c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);
-  if(project.status==='spoiled'){
-    const clue:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'桌面有散落的髮飾草稿和墨跡。',visibility:'obvious',noticedBy:[]};
-    const subtle:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'紙張背面有一道深色墨線。',visibility:'subtle',noticedBy:[],misleading:'紙張彷彿已經裂開一道口子。'};
-    w.clues=[...(w.clues||[]),clue,subtle].slice(-40);
-    for(const nearby of w.characters.filter(other=>other.location===c.location)){
-      revealObviousClues(w,nearby);
-      // Passive checks are event-driven and only for a character who was
-      // already paying attention to observable clues when the event occurred.
-      if(nearby.id!==c.id&&nearby.intents?.some(intent=>/(觀察|尋找|檢查|線索)/.test(intent.content))){
-        noticeSubtleClues(w,nearby);
-      }
-    }
-  }
+ const resultId=w.events.at(-1)!.id;
+ c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);
 }
 }
 export function demoDecision(w:World,c:Character):Action{
