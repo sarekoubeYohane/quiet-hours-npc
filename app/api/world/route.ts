@@ -1,6 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { loadWorld, database } from '@/lib/store';
-import { record } from '@/lib/world';
+import { record, normalizeWorld, resolve, type Action } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
 import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, type BudgetLimits } from '@/lib/activities';
 
@@ -13,7 +13,7 @@ export async function GET() {
   if (!id) return reply({ error: '網站登入尚未完成，請按「用 ChatGPT 重新登入」。', signInRequired: true }, 401);
   try {
     const loaded = await loadWorld(id);
-    for (const character of loaded.world.characters) character.intents ??= [];
+    normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
     return reply(loaded);
   } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    const b = JSON.parse(raw) as { operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits };
-    if (!['advance', 'intervene'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    const b = JSON.parse(raw) as { operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
+    if (!['advance', 'intervene', 'direct'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     const limits = b.limits || defaultLimits;
     if (!Number.isInteger(limits.calls) || limits.calls < 3 || limits.calls > 120 || !Number.isInteger(limits.tokens) || limits.tokens < 1000 || limits.tokens > 500000) return reply({ error: '請設定每小時 3–120 次呼叫、1,000–500,000 token 的上限。' }, 400);
@@ -38,15 +38,29 @@ export async function POST(request: Request) {
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
     }
     const { world, version } = await loadWorld(id);
-    for (const character of world.characters) character.intents ??= [];
+    normalizeWorld(world);
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
+    if (b.operation === 'direct') {
+      try {
+        if (b.target !== undefined && b.target !== 'owner') throw Error('只能直接控制咖啡店主');
+        const action = b.action;
+        if (!action || typeof action !== 'object' || Object.keys(action).some(k => !['type', 'target', 'content', 'mood'].includes(k)) ||
+          (action.content !== undefined && (typeof action.content !== 'string' || action.content.length > 500)) ||
+          (action.target !== undefined && typeof action.target !== 'string') ||
+          (action.mood !== undefined && (typeof action.mood !== 'string' || action.mood.length > 20))) throw Error('行動格式無效');
+        const check = structuredClone(world);
+        resolve(check, check.characters.find(c => c.id === 'owner')!, action);
+      } catch (e) { return reply({ error: e instanceof Error ? e.message : '指定行動無效。' }, 400); }
+    }
     const db = database();
     lease = Date.now() + 120000;
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ? WHERE owner = ? AND locked_until < ? AND version = ?').bind(lease, id, Date.now(), version).run();
     if (!acquired.meta.changes) return reply({ error: '世界正處理另一個回合，請稍候再試。' }, 409);
     locked = true;
     let failure: Error | undefined;
-    if (b.operation === 'intervene') {
+    if (b.operation === 'direct') {
+      world.characters.find(c => c.id === 'owner')!.control!.pending = b.action!;
+    } else if (b.operation === 'intervene') {
       const targets = b.target === 'all' ? world.characters.map(c => c.id) : [b.target!];
       const name = world.characters.find(c => c.id === b.target)?.name;
       record(world, 'observer', b.target === 'all' ? `共同事件：${b.text!.trim()}` : `觀察者對 ${name} 說：「${b.text!.trim()}」`, 'intervention', targets);

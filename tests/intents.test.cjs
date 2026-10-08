@@ -26,7 +26,7 @@ test('world API persists NPC-selected queue order, including a waiting intent, i
   await withModel(id => { calls++; return decision(id === 'cass' ? queue : []); }, async () => {
     assert.equal((await advance()).status, 200);
     assert.deepEqual((await (await GET()).json()).world.characters[0].intents, queue);
-    assert.equal(calls, 3);
+    assert.equal(calls, 4);
   });
 });
 
@@ -44,7 +44,7 @@ test('every NPC receives the shared Playbook and only its own private queue and 
     return decision(data.self.intents);
   }, async () => {
     assert.equal((await advance()).status, 200);
-    assert.equal(prompts.length, 3);
+    assert.equal(prompts.length, 4);
     assert.ok(prompts.every(p => p === prompts[0]));
     assert.match(prompts[0], /意圖強度|越強烈的意圖/);
     assert.match(prompts[0], /輕重緩急/);
@@ -110,8 +110,8 @@ test('continuing an activity retains its queue without additional model decision
     assert.equal((await advance()).status, 200);
     for (let i = 0; i < 5; i++) assert.equal((await advance()).status, 200);
     const saved = (await (await GET()).json()).world;
-    assert.equal(calls, 3);
-    assert.deepEqual(saved.characters.map(c => c.intents), [queue, queue, queue]);
+    assert.equal(calls, 4);
+    assert.deepEqual(saved.characters.map(c => c.intents), [queue, queue, queue, queue]);
   });
 });
 

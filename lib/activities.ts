@@ -38,7 +38,7 @@ export function canContinue(world: World, character: Character, modelKey: string
 
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = { ...world, minute: world.minute + minutes };
-  return next.characters.filter(character => !canContinue(next, character, modelKey)).length;
+  return next.characters.filter(character => !character.control?.pending && !character.control?.active && !canContinue(next, character, modelKey)).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -59,12 +59,33 @@ export async function advanceActivities(world: World, options: {
     const needed = plannedCalls(world, minutes, modelKey);
     // Any new dialogue can interrupt later characters in this same round. Reserve a full round.
     if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens ||
-      (needed > 0 && usage.calls + world.characters.length > limits.calls)) throw new BudgetExceeded();
+      (needed > 0 && usage.calls + world.characters.filter(c => !c.control?.pending && !c.control?.active).length > limits.calls)) throw new BudgetExceeded();
   }
   world.minute += minutes; world.lastMode = mode;
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
+    const control = character.control;
+    if (control?.pending) {
+      const action = control.pending;
+      delete control.pending; delete control.active; delete character.plan;
+      try {
+        resolve(world, character, action);
+        if (sustained.has(action.type) && minutes < 60) {
+          control.active = true;
+          character.plan = { action, startedAt: world.minute - minutes, until: world.minute - minutes + 60, attention: attentionMarker(world, character), modelKey };
+        }
+      } catch {
+        record(world, character.id, `${character.name} 的指定行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
+      }
+      continue;
+    }
+    if (control?.active && character.plan) {
+      const left = Math.max(0, character.plan.until - world.minute);
+      record(world, character.id, `${character.name} 繼續指定活動${left ? `，還有約 ${left} 分鐘` : '，這段活動已完成'}。`, 'continue', [character.id], { from: character.location, to: character.location });
+      if (!left) { delete control.active; delete character.plan; }
+      continue;
+    }
     if (canContinue(world, character, modelKey)) {
       const left = Math.max(0, character.plan!.until - world.minute);
       // Do not repeatedly say the same line, produce new thoughts, or add duplicate memories.

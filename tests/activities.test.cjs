@@ -17,10 +17,10 @@ test('90-minute activities reuse five later rounds without calls or duplicate me
   await advanceActivities(world, opts);
   const memories = world.characters.map(c => c.memories.length);
   for (let i = 0; i < 5; i++) await advanceActivities(world, opts);
-  assert.equal(calls, 3); assert.equal(world.turn, 6);
-  assert.equal(world.aiUsage.savedDecisions, 15);
+  assert.equal(calls, 4); assert.equal(world.turn, 6);
+  assert.equal(world.aiUsage.savedDecisions, 20);
   assert.deepEqual(world.characters.map(c => c.memories.length), memories);
-  await advanceActivities(world, opts); assert.equal(calls, 6);
+  await advanceActivities(world, opts); assert.equal(calls, 8);
 });
 
 test('an intervention interrupts only its recipient and is consumed by the next action', async () => {
@@ -55,13 +55,13 @@ test('a witnessed departure interrupts an activity and changing models invalidat
 
 test('budget prevents new requests, survives a reload, and resets its hourly window', async () => {
   const world = seedWorld(); const now = Date.now(); let calls = 0;
-  const opts = options(async (...args) => { calls++; return restful(...args); }, { now, limits: { calls: 3, tokens: 30000 } });
+  const opts = options(async (...args) => { calls++; return restful(...args); }, { now, limits: { calls: 4, tokens: 30000 } });
   await advanceActivities(world, opts);
   const reloaded = JSON.parse(JSON.stringify(world));
   await assert.rejects(advanceActivities(reloaded, opts), BudgetExceeded);
-  assert.equal(calls, 3); assert.equal(reloaded.turn, 1);
+  assert.equal(calls, 4); assert.equal(reloaded.turn, 1);
   const fresh = currentUsage(reloaded, now + 3600001);
-  assert.equal(fresh.calls, 0); assert.equal(fresh.totalCalls, 3);
+  assert.equal(fresh.calls, 0); assert.equal(fresh.totalCalls, 4);
 });
 
 test('API failure rolls back a partial round but persists attempts and reported tokens', async () => {
@@ -82,13 +82,13 @@ test('API failure rolls back a partial round but persists attempts and reported 
 test('API persists a completed round and rejects origin mismatch before requesting AI', async () => {
   store.install(seedWorld()); const originalFetch = global.fetch; let calls = 0;
   global.fetch = async () => { calls++; return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] }) } }] }); };
-  const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', key: 'unit-test-key', limits: { calls: 3, tokens: 30000 } }) });
+  const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', key: 'unit-test-key', limits: { calls: 4, tokens: 30000 } }) });
   try {
     assert.equal((await POST(request('https://other.invalid'))).status, 403); assert.equal(calls, 0);
     const first = await POST(request('https://test.invalid')); assert.equal(first.status, 200);
     assert.equal((await first.json()).limitReached, true); assert.equal(store.snapshot().turn, 1);
     const second = await POST(request('https://test.invalid')); assert.equal(second.status, 429);
-    assert.equal(calls, 3); assert.equal(store.snapshot().turn, 1);
+    assert.equal(calls, 4); assert.equal(store.snapshot().turn, 1);
   } finally { global.fetch = originalFetch; }
 });
 

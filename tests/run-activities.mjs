@@ -26,6 +26,6 @@ try {
       return { meta: { changes: 1 } };
     } }; } }; } });
   `);
-  const result = spawnSync(process.execPath, ['--test', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs'], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
+  const result = spawnSync(process.execPath, ['--test', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs'], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }
