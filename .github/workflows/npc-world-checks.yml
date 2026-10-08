@@ -1,0 +1,24 @@
+name: NPC world checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/d20-npc-action-resolution]
+
+jobs:
+  world:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@11.25.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit --incremental false
+      - name: World API integration tests
+        run: node tests/run-activities.mjs
