@@ -1,7 +1,7 @@
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[] };
+export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -72,7 +72,6 @@ export async function advanceActivities(world: World, options: {
       if (ai) usage.savedDecisions++;
       continue;
     }
-    delete character.plan;
     const respondingToUser = pendingInterventions(world, character).length > 0;
     const from = character.location;
     let decision: ActivityDecision;
@@ -85,7 +84,17 @@ export async function advanceActivities(world: World, options: {
       const action = demoDecision(world, character);
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
+    if (decision.continueExisting) {
+      if (!character.plan || !sustained.has(character.plan.action.type) || character.plan.modelKey !== modelKey || world.minute > character.plan.until) {
+        throw Error('沒有可延續的原活動，請選擇新行動。');
+      }
+      if (decision.intents) character.intents = decision.intents;
+      character.plan.attention = attentionMarker(world, character);
+      record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
+      continue;
+    }
     if (decision.intents) character.intents = decision.intents;
+    delete character.plan;
     try {
       resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
