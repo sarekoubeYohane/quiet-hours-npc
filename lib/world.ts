@@ -8,7 +8,7 @@ export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'fin
 export type NPCMemory={id?:string;time:number;text:string;kind?:'observation'|'inference'|'hearsay';source?:string;correctedBy?:string};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
 export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:NPCMemory[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
-export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
+export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution;attemptKey?:string};
 export type WorldClue={id:string;sourceEventId:string;location:string;text:string;visibility:'obvious'|'subtle';noticedBy:string[];attempts?:Record<string,string[]>;misleading?:string};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];clues?:WorldClue[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe'|'reconsider';target?:string;content?:string;mood?:string};
@@ -89,13 +89,19 @@ return 0;
 }
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;
-const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined;
+const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
 if(a.type==='move'){const dest=locations.find(x=>x.id===a.target);if(!dest||dest.id===c.location)throw Error('目的地無效');audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.activity=`剛走到${dest.name}。`;text=`${c.name} 步行前往${dest.name}，在這段時間結束時抵達。`;}
 else if(a.type==='say'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||target.location!==c.location)throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} 說：「${content}」`;}}
 else if(a.type==='persuade'){
 if(!target||target.id===c.id||target.location!==c.location||!content)throw Error('只能向同地點的角色提出說服請求');
 if(options.dryRun)return;
 const relationship=target.relationships[c.id]||'';
+attemptKey=JSON.stringify(['persuade',c.id,target.id,c.location,target.mood,relationship]);
+if(w.events.some(e=>e.attemptKey===attemptKey)){
+  c.activity='再次試著向 '+target.name+' 解釋自己的請求。';
+  record(w,c.id,c.name+' 又對 '+target.name+' 說：「'+content+'」；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,target:a.target,content});
+  return;
+}
 const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;
 resolution=judgeD20(rollD20(),socialAdvantage(c),dc);
 const effects:Record<Resolution['outcome'],string>={
@@ -174,6 +180,7 @@ record(w,c.id,c.name+' 改變了看法：「'+content+'」','belief-correction',
 return;
 }
 else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
+if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(a.type==='move')revealObviousClues(w,c);
 if(a.type==='observe'&&!options.dryRun){
   if(a.target==='inspect-paper'){
