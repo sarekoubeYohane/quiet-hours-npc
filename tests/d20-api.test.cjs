@@ -116,3 +116,37 @@ test('all five outcomes persist different concrete craft project progress withou
   assert.equal(failed.world.characters.find(c => c.id === 'owner').projects[0].status, 'spoiled');
   assert.ok(failed.world.characters.every(c => c.intents.length === 0));
 });
+
+test('the speaker alone rolls to persuade, while the listener keeps its own intentions', async () => {
+  const world = seedWorld();
+  const kris = world.characters.find(c => c.id === 'kris');
+  kris.location = 'cafe';
+  kris.relationships.owner = '不太想替對方工作';
+  kris.intents = [{ id: 'my-intent', content: '先照顧自己的生活', intensity: 'high', importance: 'high', urgency: 'low', context: '' }];
+  store.install(world);
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'persuade', target: 'kris', content: '能幫我代班嗎？' } }))).status, 200);
+  let rolls = 0;
+  const original = Math.random;
+  Math.random = () => { rolls++; return 0.9999; };
+  try { assert.equal((await POST(request('advance'))).status, 200); }
+  finally { Math.random = original; }
+  const saved = (await (await GET()).json()).world;
+  const result = saved.events.findLast(e => e.actor === 'owner' && e.scene?.target === 'kris');
+  assert.equal(rolls, 1);
+  assert.ok(result.resolution);
+  assert.match(result.text, /能幫我代班嗎/);
+  assert.ok(!result.text.includes('Kris 答應代班'));
+  assert.deepEqual(saved.characters.find(c => c.id === 'kris').intents, kris.intents);
+  assert.ok(saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('能幫我代班嗎')));
+});
+
+test('persuasion requires a real co-located listener and never rolls on invalid preflight', async () => {
+  store.install(seedWorld());
+  const original = Math.random;
+  Math.random = () => { throw Error('Invalid social request must not roll'); };
+  try {
+    const response = await POST(request('direct', { target: 'owner', action: { type: 'persuade', target: 'vera', content: '幫忙一下？' } }));
+    assert.equal(response.status, 400);
+    assert.equal((await (await GET()).json()).world.turn, 0);
+  } finally { Math.random = original; }
+});
