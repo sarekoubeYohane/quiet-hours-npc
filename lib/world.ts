@@ -1,11 +1,11 @@
-import { judgeD20, rollD20, type Resolution } from './d20';
+import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string};
 export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
@@ -21,12 +21,20 @@ export const timeLabel=(m:number)=>`${String(Math.floor((m%1440)/60)).padStart(2
 export function cafeOwner(minute:number):Character{return {id:'owner',name:'店主',color:'#a5c9b3',location:'cafe',mood:'平靜',personality:'務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。',goal:'整理咖啡館，照顧自己的生活與來訪的客人。',activity:'在吧台整理杯子。',relationships:{},memories:[{time:minute,text:'我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。'}],intents:[],control:{mode:'autonomous'}};}
 export function normalizeWorld(w:World){for(const c of w.characters)c.intents??=[];if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};return w;}
 export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',characters:[
-{id:'cass',intents:[],name:'Cass',color:'#eb9e79',location:'kris-home',mood:'疲憊',personality:'努力保持冷靜；害怕被留下，但也想保有自己的選擇。',goal:'先安頓自己，慢慢想清楚接下來的生活。',activity:'坐在客廳，捧著一杯溫水。',relationships:{vera:'在乎她，也需要幾天空間。',kris:'暫時借住；信任她務實的支持。'},memories:[{time:1260,text:'與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。'}]},
-{id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
+{id:'cass',intents:[],name:'Cass',color:'#eb9e79',location:'kris-home',mood:'疲憊',personality:'努力保持冷靜；害怕被留下，但也想保有自己的選擇。',abilityTags:['不擅長髮飾設計'],goal:'先安頓自己，慢慢想清楚接下來的生活。',activity:'坐在客廳，捧著一杯溫水。',relationships:{vera:'在乎她，也需要幾天空間。',kris:'暫時借住；信任她務實的支持。'},memories:[{time:1260,text:'與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。'}]},
+{id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
 export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
 export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:c,home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&x.location===c.location).map(x=>({id:x.id,name:x.name}))};}
+function craftAdvantage(c:Character):Advantage {
+const tags=c.abilityTags||[];
+if(tags.includes('完全不懂髮飾設計'))return -4;
+if(tags.includes('不擅長髮飾設計'))return -2;
+if(tags.includes('精通髮飾設計'))return 4;
+if(tags.includes('擅長髮飾設計'))return 2;
+return 0;
+}
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;
 const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined;
@@ -35,12 +43,13 @@ else if(a.type==='say'){if(!content)throw Error('說話內容不能為空');if(a
 else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
-const tasks:Record<string,string>={tea:'泡了一壺茶，放在桌上。',tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。'};
+const tasks:Record<string,string>={tea:'泡了一壺茶，放在桌上。',tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。','craft-easy-challenge':'嘗試設計一個簡單的髮飾變化。','craft-expert-challenge':'嘗試設計非常複雜的髮飾樣式。'};
 if(!a.target||!tasks[a.target])throw Error('工作無效');
-if(a.target==='craft-challenge'){
+const challenges:Record<string,Difficulty>={'craft-easy-challenge':8,'craft-challenge':12,'craft-expert-challenge':16};
+if(a.target in challenges){
   // A direct-control preflight validates the request without spending a die.
   if(options.dryRun)return;
-  resolution=judgeD20(rollD20(),0,12);
+  resolution=judgeD20(rollD20(),craftAdvantage(c),challenges[a.target]);
   const consequences:Record<Resolution['outcome'],string>={
     'critical-success':'完成精緻的髮飾草圖，還想出一種額外配色。',
     success:'完成一幅讓自己滿意的髮飾設計草圖。',
