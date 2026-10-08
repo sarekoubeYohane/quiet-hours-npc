@@ -13,6 +13,7 @@ export async function GET() {
   if (!id) return reply({ error: '網站登入尚未完成，請按「用 ChatGPT 重新登入」。', signInRequired: true }, 401);
   try {
     const loaded = await loadWorld(id);
+    for (const character of loaded.world.characters) character.intents ??= [];
     loaded.world.aiUsage = currentUsage(loaded.world);
     return reply(loaded);
   } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
     }
     const { world, version } = await loadWorld(id);
+    for (const character of world.characters) character.intents ??= [];
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
     const db = database();
     lease = Date.now() + 120000;

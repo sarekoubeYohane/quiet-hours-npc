@@ -1,7 +1,7 @@
-import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type World } from './world';
+import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { action: Action; durationMinutes: number };
+export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[] };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -85,6 +85,7 @@ export async function advanceActivities(world: World, options: {
       const action = demoDecision(world, character);
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
+    if (decision.intents) character.intents = decision.intents;
     try {
       resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
