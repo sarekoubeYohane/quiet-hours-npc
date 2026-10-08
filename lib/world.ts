@@ -28,6 +28,25 @@ export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',cha
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
 export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
+function noticeSubtleClues(w:World,c:Character){
+ for(const clue of w.clues||[]){
+  if(clue.visibility!=='subtle'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
+  clue.attempts??={};
+  clue.attempts[c.id]??=[];
+  const method='active-observation';
+  if(clue.attempts[c.id].includes(method))continue;
+  clue.attempts[c.id].push(method);
+  const tags=c.abilityTags||[];
+  const advantage:Advantage=tags.includes('非常善於觀察')?4:tags.includes('不擅長觀察')?-2:2;
+  const resolution=judgeD20(rollD20(),advantage,16);
+  const noticed=resolution.outcome==='success'||resolution.outcome==='critical-success';
+  if(noticed)clue.noticedBy.push(c.id);
+  const message=noticed?'仔細看見：'+clue.text:
+    resolution.outcome==='mixed'?'察覺附近有些異樣，但還沒有看清細節。':
+    '觀察了一會兒，還是沒有找到那個不明顯的線索。';
+  record(w,'world',message,'perception',[c.id],undefined,resolution);
+ }
+}
 function revealObviousClues(w:World,c:Character){
  for(const clue of w.clues||[]){
   if(clue.visibility!=='obvious'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
@@ -121,12 +140,14 @@ else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.acti
 else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
 else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
 if(a.type==='move')revealObviousClues(w,c);
+if(a.type==='observe'&&!options.dryRun)noticeSubtleClues(w,c);
 if(project){
   const resultId=w.events.at(-1)!.id;
   c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);
   if(project.status==='spoiled'){
     const clue:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'桌面有散落的髮飾草稿和墨跡。',visibility:'obvious',noticedBy:[]};
-    w.clues=[...(w.clues||[]),clue].slice(-40);
+    const subtle:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'紙張背面有一道深色墨線。',visibility:'subtle',noticedBy:[],misleading:'紙張彷彿已經裂開一道口子。'};
+    w.clues=[...(w.clues||[]),clue,subtle].slice(-40);
     for(const nearby of w.characters.filter(other=>other.location===c.location))revealObviousClues(w,nearby);
   }
 }
