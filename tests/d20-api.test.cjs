@@ -242,3 +242,26 @@ test('a deliberate observation can uncover subtle evidence with one D20, without
     assert.equal(observations, 1, 'identical observation circumstances do not reroll');
   } finally { Math.random = original; }
 });
+
+test('NPC memories retain observation, inference, or hearsay with a source while old plain memories still load', async () => {
+  const { world } = await tryCraft(1);
+  const owner = world.characters.find(c => c.id === 'owner');
+  const clueMemory = owner.memories.find(m => m.text.includes('散落的髮飾草稿'));
+  assert.equal(clueMemory.kind, 'observation');
+  assert.equal(typeof clueMemory.source, 'string');
+  assert.ok(clueMemory.source.length > 0);
+  assert.equal(owner.memories[0].kind, undefined, 'seeded old plain memories stay compatible');
+
+  store.install(seedWorld());
+  assert.equal((await POST(request('intervene', { target: 'owner', text: '我聽說有人打碎杯子' }))).status, 200);
+  let current = (await (await GET()).json()).world;
+  let latest = current.characters.find(c => c.id === 'owner').memories.at(-1);
+  assert.equal(latest.kind, 'hearsay');
+  assert.equal(latest.source, 'observer');
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'reflect', content: '我可能誤會了情況' } }))).status, 200);
+  assert.equal((await POST(request('advance'))).status, 200);
+  current = (await (await GET()).json()).world;
+  latest = current.characters.find(c => c.id === 'owner').memories.findLast(m => m.text.includes('我可能誤會'));
+  assert.equal(latest.kind, 'inference');
+  assert.equal(latest.source, 'owner');
+});
