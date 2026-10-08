@@ -8,7 +8,8 @@ export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'fin
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
 export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
+export type WorldClue={id:string;sourceEventId:string;location:string;text:string;visibility:'obvious'|'subtle';noticedBy:string[];attempts?:Record<string,string[]>;misleading?:string};
+export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];clues?:WorldClue[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
@@ -20,13 +21,20 @@ return w.events.slice(lastAction+1).filter(e=>e.actor==='observer'&&e.kind==='in
 }
 export const timeLabel=(m:number)=>`${String(Math.floor((m%1440)/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
 export function cafeOwner(minute:number):Character{return {id:'owner',name:'店主',color:'#a5c9b3',location:'cafe',mood:'平靜',personality:'務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。',goal:'整理咖啡館，照顧自己的生活與來訪的客人。',activity:'在吧台整理杯子。',relationships:{},memories:[{time:minute,text:'我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。'}],intents:[],control:{mode:'autonomous'}};}
-export function normalizeWorld(w:World){for(const c of w.characters)c.intents??=[];if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};return w;}
+export function normalizeWorld(w:World){w.clues??=[];for(const c of w.characters)c.intents??=[];if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};return w;}
 export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',characters:[
 {id:'cass',intents:[],name:'Cass',color:'#eb9e79',location:'kris-home',mood:'疲憊',personality:'努力保持冷靜；害怕被留下，但也想保有自己的選擇。',abilityTags:['不擅長髮飾設計'],goal:'先安頓自己，慢慢想清楚接下來的生活。',activity:'坐在客廳，捧著一杯溫水。',relationships:{vera:'在乎她，也需要幾天空間。',kris:'暫時借住；信任她務實的支持。'},memories:[{time:1260,text:'與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。'}]},
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
 export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
+function revealObviousClues(w:World,c:Character){
+ for(const clue of w.clues||[]){
+  if(clue.visibility!=='obvious'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
+  clue.noticedBy.push(c.id);
+  record(w,'world','現場可以看見：'+clue.text,'clue',[c.id]);
+ }
+}
 export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{...c,projects:undefined},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&x.location===c.location).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
@@ -112,7 +120,16 @@ audience=witnesses;
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
 else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
 else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
-if(project){const resultId=w.events.at(-1)!.id;c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);}
+if(a.type==='move')revealObviousClues(w,c);
+if(project){
+  const resultId=w.events.at(-1)!.id;
+  c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);
+  if(project.status==='spoiled'){
+    const clue:WorldClue={id:crypto.randomUUID(),sourceEventId:resultId,location:c.location,text:'桌面有散落的髮飾草稿和墨跡。',visibility:'obvious',noticedBy:[]};
+    w.clues=[...(w.clues||[]),clue].slice(-40);
+    for(const nearby of w.characters.filter(other=>other.location===c.location))revealObviousClues(w,nearby);
+  }
+}
 }
 export function demoDecision(w:World,c:Character):Action{
 const recent=c.memories.slice(-2).map(m=>m.text).join(' '),p=w.turn%8;
