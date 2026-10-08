@@ -376,3 +376,21 @@ test('NPC attention from the current intent changes subtle observation resolutio
   assert.equal(focused.resolution.modifier, 2);
   assert.equal(focused.resolution.outcome, 'success');
 });
+
+test('a new subtle clue may catch the attention of a nearby NPC actively looking for signs, but not everyone', async () => {
+  const world = seedWorld();
+  const kris = world.characters.find(c => c.id === 'kris');
+  kris.location = 'cafe';
+  kris.intents = [{ id: 'watch', content: '仔細觀察現場線索', intensity: 'high', importance: 'high', urgency: 'low', context: '' }];
+  store.install(world);
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'work', target: 'craft-challenge' } }))).status, 200);
+  const original = Math.random;
+  let rolls=0;
+  Math.random = () => { rolls++; return rolls===1 ? 0.001 : 0.999; };
+  try { assert.equal((await POST(request('advance'))).status, 200); }
+  finally { Math.random=original; }
+  const saved = (await (await GET()).json()).world;
+  assert.equal(rolls, 2, 'the craft challenge and one already-attentive observer each use a die');
+  assert.ok(saved.characters.find(c=>c.id==='kris').memories.some(m=>m.text.includes('紙張背面')));
+  assert.ok(!saved.characters.find(c=>c.id==='vera').memories.some(m=>m.text.includes('紙張背面')));
+});
