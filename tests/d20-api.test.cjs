@@ -330,3 +330,23 @@ test('new direct evidence lets an NPC choose to correct a belief while preservin
   assert.ok(saved.clues.find(c => c.id === initialBelief.source).text.includes('墨線'));
   assert.equal(saved.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('原來只是墨線')), false);
 });
+
+test('rephrasing the same persuasion in unchanged conditions does not earn another D20 roll', async () => {
+  const world = seedWorld();
+  world.characters.find(c => c.id === 'kris').location = 'cafe';
+  store.install(world);
+  const send = async content => {
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'persuade', target: 'kris', content } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+  };
+  const original = Math.random; let rolls = 0;
+  Math.random = () => { rolls++; return 0.9; };
+  try {
+    await send('能不能幫我代班？');
+    await send('拜託再考慮幫我代班這件事');
+  } finally { Math.random = original; }
+  assert.equal(rolls, 1);
+  const saved = (await (await GET()).json()).world;
+  assert.equal(saved.events.filter(e => e.actor === 'owner' && e.resolution && e.scene?.target === 'kris').length, 1);
+  assert.ok(saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('再考慮')));
+});
