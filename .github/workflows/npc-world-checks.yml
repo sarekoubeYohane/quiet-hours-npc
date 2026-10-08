@@ -3,8 +3,6 @@ name: NPC world checks
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [feat/d20-npc-action-resolution]
 
 jobs:
   world:
@@ -22,3 +20,7 @@ jobs:
         run: pnpm exec tsc --noEmit --incremental false
       - name: World API integration tests
         run: node tests/run-activities.mjs
+      - name: Lint changed runtime modules
+        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts components/world-app.tsx app/api/world/route.ts
+      - name: Production build
+        run: pnpm build
