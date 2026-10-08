@@ -265,3 +265,35 @@ test('NPC memories retain observation, inference, or hearsay with a source while
   assert.equal(latest.kind, 'inference');
   assert.equal(latest.source, 'owner');
 });
+
+test('observation critical failure only creates a false inference when an actual misleading clue exists', async () => {
+  store.install(seedWorld());
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'work', target: 'craft-challenge', content: '星月' } }))).status, 200);
+  const original = Math.random;
+  Math.random = () => 0.001;
+  try {
+    assert.equal((await POST(request('advance'))).status, 200);
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'observe' } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+  } finally { Math.random = original; }
+  const world = (await (await GET()).json()).world;
+  const clue = world.clues.find(clue => clue.visibility === 'subtle');
+  const belief = world.characters.find(c => c.id === 'owner').memories.find(m => m.text.includes('紙張彷彿已經裂開'));
+  assert.ok(belief);
+  assert.equal(belief.kind, 'inference');
+  assert.equal(belief.source, clue.id);
+  assert.ok(clue.text.includes('墨線'), 'world truth is unchanged by mistaken belief');
+  assert.ok(!world.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('紙張彷彿已經裂開')));
+
+  const withoutMisdirection = seedWorld();
+  withoutMisdirection.clues = [{ id: 'plain-evidence', sourceEventId: 'world', location: 'cafe', text: '地上有一張普通紙片。', visibility: 'subtle', noticedBy: [] }];
+  store.install(withoutMisdirection);
+  const previous = Math.random;
+  Math.random = () => 0.001;
+  try {
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'observe' } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+  } finally { Math.random = previous; }
+  const noClue = (await (await GET()).json()).world;
+  assert.ok(!noClue.characters.find(c => c.id === 'owner').memories.some(m => m.kind === 'inference' && m.source === 'plain-evidence'));
+});
