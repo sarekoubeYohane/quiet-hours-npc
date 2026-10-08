@@ -36,9 +36,13 @@ export function canContinue(world: World, character: Character, modelKey: string
     pendingInterventions(world, character).length === 0;
 }
 
+function mayChooseAutonomously(character: Character): boolean {
+  return character.control?.mode !== 'taken-over' && !character.control?.pending && !character.control?.active;
+}
+
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = { ...world, minute: world.minute + minutes };
-  return next.characters.filter(character => !character.control?.pending && !character.control?.active && !canContinue(next, character, modelKey)).length;
+  return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -59,7 +63,7 @@ export async function advanceActivities(world: World, options: {
     const needed = plannedCalls(world, minutes, modelKey);
     // Any new dialogue can interrupt later characters in this same round. Reserve a full round.
     if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens ||
-      (needed > 0 && usage.calls + world.characters.filter(c => !c.control?.pending && !c.control?.active).length > limits.calls)) throw new BudgetExceeded();
+      (needed > 0 && usage.calls + world.characters.filter(mayChooseAutonomously).length > limits.calls)) throw new BudgetExceeded();
   }
   world.minute += minutes; world.lastMode = mode;
   const offset = world.turn % world.characters.length;
@@ -86,6 +90,10 @@ export async function advanceActivities(world: World, options: {
       if (!left) { delete control.active; delete character.plan; }
       continue;
     }
+    if (control?.mode === 'taken-over') {
+      character.activity = '待命，等待下一個指定行動。';
+      continue;
+    }
     if (canContinue(world, character, modelKey)) {
       const left = Math.max(0, character.plan!.until - world.minute);
       // Do not repeatedly say the same line, produce new thoughts, or add duplicate memories.
@@ -101,6 +109,8 @@ export async function advanceActivities(world: World, options: {
       // Count attempts before requesting, including errors whose usage is not returned.
       usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
       decision = await options.decide(world, character, tokens => accountUsage(usage, tokens));
+      // The route rolls this back with the round on later model/save failure.
+      if (control) delete control.experiences;
     } else {
       const action = demoDecision(world, character);
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };

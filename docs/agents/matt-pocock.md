@@ -40,6 +40,8 @@
 
 上游其他技能可在使用者點名時按固定版本補入，包括 triage、wayfinder、research、improve-codebase-architecture、wizard。需要新增設定時再處理相應 setup 分支。
 
-## 目前設計工作
+## 目前工作
 
-NPC 意圖與行動的 grill-with-docs 尚在進行；進度以 docs/design/npc-action-model.md 為準。先釐清剩餘設計，再整理規格與實作；文件中的設計不等於現有功能。
+NPC 意圖與行動已完成 grill-with-docs、to-spec 與 to-tickets；使用者已授權按 implement-spec 實作。正式規格為 [Issue #1](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1)，四張工作票 #2–#5 已在 [整合 PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 實作，尚未合併或部署。
+
+世界 API 的意圖保存、活動續做與切換、店主指定與接管、交還上下文、錯誤回復及用量衝突已有自動驗證。店主介面的瀏覽器操作檢查仍待完成：本工作環境的 CUA 檔案 URL 存取被政策阻擋，沒有繞過或宣稱完成。未發出付費模型請求；實際性格與敘事表現需另以決策紀錄檢視。功能與上下文限制見 README.md 及 docs/design/npc-action-model.md。

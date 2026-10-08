@@ -6,4 +6,4 @@
 
 共用原則見 [NPC Playbook](./npc-playbook.md)，已確認行為見 [行動模式設計](./npc-action-model.md)。
 
-狀態：規格已發布，尚未實作或部署。
+狀態：四項工作已於 [整合 PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 實作並通過世界 API 自動驗證，尚未合併或部署。店主控制介面的瀏覽器操作檢查仍待完成；未發出付費模型請求。上下文保存與用量持久性的界限見 [行動模式設計](./npc-action-model.md)。

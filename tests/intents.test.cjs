@@ -144,5 +144,8 @@ test('a storage conflict leaves no partially saved queue or activity', async () 
     assert.deepEqual(saved.events, world.events);
     assert.equal(saved.minute, world.minute);
     assert.equal(saved.turn, 0);
+    assert.equal(saved.aiUsage.totalCalls, 4);
+    assert.equal(saved.aiUsage.totalInputTokens, 120);
+    assert.equal(saved.aiUsage.totalOutputTokens, 80);
   });
 });
