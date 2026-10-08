@@ -1,8 +1,15 @@
-# NPC Playbook 實作工作拆分（待確認）
+# NPC Playbook 實作工作拆分（已發布）
 
 來源：[正式規格 Issue #1](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1)。
 
-狀態：to-tickets 的工作拆分提案，尚未建立子 Issue，尚未實作。使用者確認粒度與相依關係後，按下列順序發布子工作。
+狀態：使用者已於 2026-10-08 確認拆分，4 張 GitHub 工作票已發布並標記 ready-for-agent；尚未實作。
+
+| 工作 | GitHub Issue | 阻擋項目 |
+| --- | --- | --- |
+| T1 共用 Playbook 與意圖佇列 | [#2](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/2) | 無 |
+| T2 新消息後續做或切換 | [#3](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/3) | #2 |
+| T3 店主與單次指定 | [#4](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/4) | #2 |
+| T4 暫時接管與交還控制 | [#5](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/5) | #4 |
 
 每項工作交付可驗證的完整行為，涵蓋必要的模型、世界狀態、API、儲存及最小介面；驗證沿用已確認的世界 API 入口。自動測試使用模擬模型，性格自然程度以實際決策紀錄檢視。
 
@@ -15,7 +22,7 @@
 
 T2 與 T3 在 T1 完成後都可開始；此處是工作相依關係，不代表自動啟動平行代理。每票包含自己的驗證，所有工作完成後再跑整體回歸，確認原規格全部驗收情境覆蓋。
 
-## 提議工作
+## 已確認工作
 
 ### T1：接入共用 Playbook，保存每位 NPC 的意圖佇列
 
@@ -102,4 +109,4 @@ T2 與 T3 在 T1 完成後都可開始；此處是工作相依關係，不代表
 
 ## 發布方式
 
-確認後，每項建立一個 GitHub Issue，標記 ready-for-agent，並引用母規格 #1。優先使用原生 sub-issue 與 blocking relationships；工具不支援時，在子工作正文使用母規格連結與 Blocked by 連結。依 to-tickets 規定，保持母規格 Issue 原文與開啟狀態。
+每項已建立一個 GitHub Issue，標記 ready-for-agent。GitHub 連接器未提供原生 sub-issue 與 blocking relationships 操作，因此子工作正文以 Part of #1、母規格連結與 Blocked by 連結記錄關係。母規格 Issue #1 原文與開啟狀態保留。
