@@ -297,3 +297,36 @@ test('observation critical failure only creates a false inference when an actual
   const noClue = (await (await GET()).json()).world;
   assert.ok(!noClue.characters.find(c => c.id === 'owner').memories.some(m => m.kind === 'inference' && m.source === 'plain-evidence'));
 });
+
+test('new direct evidence lets an NPC choose to correct a belief while preserving linked history', async () => {
+  store.install(seedWorld());
+  const act = async (action) => {
+    assert.equal((await POST(request('direct', { target: 'owner', action }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+  };
+  const original = Math.random;
+  Math.random = () => 0.001;
+  try {
+    await act({ type: 'work', target: 'craft-challenge', content: '星月' });
+    await act({ type: 'observe' });
+  } finally { Math.random = original; }
+  let saved = (await (await GET()).json()).world;
+  const initialBelief = saved.characters.find(c => c.id === 'owner').memories.find(m => m.kind === 'inference' && m.text.includes('紙張彷彿'));
+  assert.ok(initialBelief?.id);
+  assert.equal(initialBelief.correctedBy, undefined);
+
+  await act({ type: 'observe', target: 'inspect-paper' });
+  saved = (await (await GET()).json()).world;
+  const owner = saved.characters.find(c => c.id === 'owner');
+  const laterEvidence = owner.memories.findLast(m => m.kind === 'observation' && m.source === initialBelief.source && m.text.includes('翻過紙張'));
+  assert.ok(laterEvidence?.id);
+  assert.equal(owner.memories.find(m => m.id === initialBelief.id).correctedBy, undefined, 'new evidence does not automatically force a belief change');
+
+  await act({ type: 'reconsider', target: initialBelief.id, content: '原來只是墨線，不是裂痕。' });
+  saved = (await (await GET()).json()).world;
+  const memories = saved.characters.find(c => c.id === 'owner').memories;
+  assert.equal(memories.find(m => m.id === initialBelief.id).correctedBy, laterEvidence.id);
+  assert.ok(memories.some(m => m.kind === 'inference' && m.source === laterEvidence.id && m.text.includes('原來只是墨線')));
+  assert.ok(saved.clues.find(c => c.id === initialBelief.source).text.includes('墨線'));
+  assert.equal(saved.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('原來只是墨線')), false);
+});
