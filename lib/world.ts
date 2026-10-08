@@ -32,8 +32,8 @@ export function record(w:World,actor:string,text:string,kind:string,audience:str
 const id=crypto.randomUUID();
 w.events=[...w.events,{id,time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);
 if(kind==='continue')return;
-const memoryKind:NPCMemory['kind']=kind==='reflect'?'inference':['say','message','intervention'].includes(kind)?'hearsay':'observation';
-const source=memoryKind==='hearsay'||memoryKind==='inference'?actor:(sourceOverride||id);
+const memoryKind:NPCMemory['kind']=['reflect','belief','belief-correction'].includes(kind)?'inference':['say','message','intervention'].includes(kind)?'hearsay':'observation';
+const source=sourceOverride||(memoryKind==='hearsay'||memoryKind==='inference'?actor:id);
 for(const c of w.characters)if(audience.includes(c.id)){
  const memory:NPCMemory={id,time:w.minute,text,kind:memoryKind,source};
  c.memories=[...c.memories,memory].slice(-80);
@@ -57,6 +57,10 @@ function noticeSubtleClues(w:World,c:Character){
     resolution.outcome==='mixed'?'察覺附近有些異樣，但還沒有看清細節。':
     '觀察了一會兒，還是沒有找到那個不明顯的線索。';
   record(w,'world',message,'perception',[c.id],undefined,resolution,clue.id);
+  if(resolution.outcome==='critical-failure'&&clue.misleading){
+    // This is an individual's interpretation of real evidence, not an objective event.
+    record(w,'world','我看到的線索讓我以為：'+clue.misleading,'belief',[c.id],undefined,undefined,clue.id);
+  }
  }
 }
 function revealObviousClues(w:World,c:Character){
