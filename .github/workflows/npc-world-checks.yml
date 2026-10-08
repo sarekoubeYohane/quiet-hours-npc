@@ -1,0 +1,28 @@
+name: NPC world checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  world:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@11.25.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit --incremental false
+      - name: World API integration tests
+        run: node tests/run-activities.mjs
+      # world-app.tsx has pre-existing React hook/anchor lint violations on main.
+      # Track them separately; keep all other changed runtime modules lint-clean.
+      - name: Lint changed runtime modules (except pre-existing UI violations)
+        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts app/api/world/route.ts
+      - name: Production build
+        run: pnpm build
