@@ -35,7 +35,8 @@ if(kind==='continue')return;
 const memoryKind:NPCMemory['kind']=['reflect','belief','belief-correction'].includes(kind)?'inference':['say','message','intervention'].includes(kind)?'hearsay':'observation';
 const source=sourceOverride||(memoryKind==='hearsay'||memoryKind==='inference'?actor:id);
 for(const c of w.characters)if(audience.includes(c.id)){
- const memory:NPCMemory={id,time:w.minute,text,kind:memoryKind,source};
+ const ownSpeech=c.id===actor&&memoryKind==='hearsay';
+ const memory:NPCMemory={id,time:w.minute,text,kind:ownSpeech?'observation':memoryKind,source:ownSpeech?id:source};
  c.memories=[...c.memories,memory].slice(-80);
  if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);
 }
