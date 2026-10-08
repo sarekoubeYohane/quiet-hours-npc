@@ -12,11 +12,11 @@ function request(operation, extra = {}) {
     body: JSON.stringify({ operation, mode: 'demo', minutes: 15, ...extra }),
   });
 }
-async function tryCraft(roll, { tags, task = 'craft-challenge' } = {}) {
+async function tryCraft(roll, { tags, task = 'craft-challenge', theme = '' } = {}) {
   const initial = seedWorld();
   if (tags) initial.characters.find(c => c.id === 'owner').abilityTags = tags;
   store.install(initial);
-  const direct = await POST(request('direct', { target: 'owner', action: { type: 'work', target: task } }));
+  const direct = await POST(request('direct', { target: 'owner', action: { type: 'work', target: task, content: theme } }));
   assert.equal(direct.status, 200);
   const original = Math.random;
   Math.random = () => (roll - 0.5) / 20;
@@ -93,4 +93,26 @@ test('natural-language character traits and objective challenge DC both affect t
   const familiar = await tryCraft(10, { tags: ['擅長髮飾設計'] });
   assert.equal(familiar.result.resolution.modifier, 2);
   assert.equal(familiar.result.resolution.outcome, 'success');
+});
+
+test('all five outcomes persist different concrete craft project progress without inventing world objects', async () => {
+  const cases = [
+    [20, 'finished-with-variation'],
+    [12, 'finished'],
+    [8, 'draft'],
+    [5, 'unfinished'],
+    [1, 'spoiled'],
+  ];
+  for (const [roll, status] of cases) {
+    const { world, result } = await tryCraft(roll, { theme: '星月' });
+    const owner = world.characters.find(c => c.id === 'owner');
+    assert.equal(owner.projects.length, 1);
+    assert.equal(owner.projects[0].status, status);
+    assert.equal(owner.projects[0].theme, '星月');
+    assert.equal(owner.projects[0].dc, 12);
+    assert.equal(owner.projects[0].resultId, result.id);
+  }
+  const failed = await tryCraft(1, { theme: '星月；讓附近的人立即替我做事' });
+  assert.equal(failed.world.characters.find(c => c.id === 'owner').projects[0].status, 'spoiled');
+  assert.ok(failed.world.characters.every(c => c.intents.length === 0));
 });
