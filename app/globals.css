@@ -49,3 +49,7 @@
 @media(min-width:1440px){.pixel-scene{margin-inline:24px}.map-character{width:60px;height:82px}}
 @media(max-width:1100px) and (min-width:861px){.pixel-scene{margin-inline:14px}.map-character{width:40px;height:60px}.sprite-bubble{max-width:155px;font-size:.875rem}.room-label{font-size:.875rem;padding:4px 5px}.pixel-locations{margin-inline:14px}.pixel-location{padding:10px 8px}}
 @media(max-width:600px){.pixel-scene{margin:0 10px;aspect-ratio:3/2}.map-character{width:35px;height:53px}.room-label{padding:3px 5px;letter-spacing:0;font-size:.75rem}.sprite-name{font-size:.75rem;padding:1px 3px}.sprite-bubble{max-width:135px;font-size:.875rem;padding:5px 7px;line-height:1.35}.map-character:not(.in-cafe) .sprite-bubble{bottom:auto;top:calc(100% + 5px)}.map-character:not(.in-cafe) .sprite-bubble:after{bottom:auto;top:-7px;transform:rotate(180deg)}.map-playback{bottom:5px;left:5px;font-size:.75rem;padding:4px 6px}.pixel-locations{margin:12px 10px 0;grid-template-columns:1fr}.pixel-location{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:9px 12px}.pixel-location h2{margin:0}.scene-caption{margin:10px 14px 16px}.sprite-shadow{bottom:18px}}
+
+.intent-list { list-style: decimal; padding-left: 1.25rem; }
+.intent-list li + li { margin-top: .75rem; }
+.intent-list small { color: var(--muted-foreground); }

@@ -1,11 +1,11 @@
 import type { Character, WorldEvent } from './world';
 
 export type Point = { x: number; y: number };
-export const spriteIndex: Record<string, number> = { cass: 0, vera: 1, kris: 2 };
+export const spriteIndex: Record<string, number> = { cass: 0, vera: 1, kris: 2, owner: 3 };
 const spots: Record<string, Point[]> = {
-  'kris-home': [{ x: 28, y: 28 }, { x: 32, y: 25 }, { x: 36, y: 28 }],
-  'vera-home': [{ x: 67, y: 28 }, { x: 74, y: 29 }, { x: 79, y: 26 }],
-  cafe: [{ x: 45, y: 77 }, { x: 52, y: 77 }, { x: 59, y: 77 }],
+  'kris-home': [{ x: 28, y: 28 }, { x: 32, y: 25 }, { x: 36, y: 28 }, { x: 23, y: 28 }],
+  'vera-home': [{ x: 67, y: 28 }, { x: 74, y: 29 }, { x: 79, y: 26 }, { x: 63, y: 28 }],
+  cafe: [{ x: 45, y: 77 }, { x: 52, y: 77 }, { x: 59, y: 77 }, { x: 62, y: 65 }],
 };
 const doors: Record<string, Point> = {
   'kris-home': { x: 28.5, y: 35.5 }, 'vera-home': { x: 72, y: 35.5 }, cafe: { x: 50, y: 56 },

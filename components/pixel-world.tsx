@@ -6,7 +6,7 @@ import { locations, type World, type WorldEvent } from '@/lib/world';
 import { bubbleText, position, walkRoute, type Point } from '@/lib/pixel-scene';
 
 export function PixelSprite({ id, className = '' }: { id: string; className?: string }) {
-  return <span className={`pixel-sprite ${className}`} aria-hidden="true"><img src={`/pixel/${id}.png`} alt="" draggable={false}/></span>;
+  return <span className={`pixel-sprite ${className}`} aria-hidden="true"><img src={`/pixel/${id}.${id==='owner'?'svg':'png'}`} alt="" draggable={false}/></span>;
 }
 
 export default function PixelWorld({ world, selected, onSelect, onPlayingChange }: {

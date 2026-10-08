@@ -1,7 +1,7 @@
-import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type World } from './world';
+import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { action: Action; durationMinutes: number };
+export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -36,9 +36,13 @@ export function canContinue(world: World, character: Character, modelKey: string
     pendingInterventions(world, character).length === 0;
 }
 
+function mayChooseAutonomously(character: Character): boolean {
+  return character.control?.mode !== 'taken-over' && !character.control?.pending && !character.control?.active;
+}
+
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = { ...world, minute: world.minute + minutes };
-  return next.characters.filter(character => !canContinue(next, character, modelKey)).length;
+  return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -59,12 +63,37 @@ export async function advanceActivities(world: World, options: {
     const needed = plannedCalls(world, minutes, modelKey);
     // Any new dialogue can interrupt later characters in this same round. Reserve a full round.
     if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens ||
-      (needed > 0 && usage.calls + world.characters.length > limits.calls)) throw new BudgetExceeded();
+      (needed > 0 && usage.calls + world.characters.filter(mayChooseAutonomously).length > limits.calls)) throw new BudgetExceeded();
   }
   world.minute += minutes; world.lastMode = mode;
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
+    const control = character.control;
+    if (control?.pending) {
+      const action = control.pending;
+      delete control.pending; delete control.active; delete character.plan;
+      try {
+        resolve(world, character, action);
+        if (sustained.has(action.type) && minutes < 60) {
+          control.active = true;
+          character.plan = { action, startedAt: world.minute - minutes, until: world.minute - minutes + 60, attention: attentionMarker(world, character), modelKey };
+        }
+      } catch {
+        record(world, character.id, `${character.name} 的指定行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
+      }
+      continue;
+    }
+    if (control?.active && character.plan) {
+      const left = Math.max(0, character.plan.until - world.minute);
+      record(world, character.id, `${character.name} 繼續指定活動${left ? `，還有約 ${left} 分鐘` : '，這段活動已完成'}。`, 'continue', [character.id], { from: character.location, to: character.location });
+      if (!left) { delete control.active; delete character.plan; }
+      continue;
+    }
+    if (control?.mode === 'taken-over') {
+      character.activity = '待命，等待下一個指定行動。';
+      continue;
+    }
     if (canContinue(world, character, modelKey)) {
       const left = Math.max(0, character.plan!.until - world.minute);
       // Do not repeatedly say the same line, produce new thoughts, or add duplicate memories.
@@ -72,7 +101,6 @@ export async function advanceActivities(world: World, options: {
       if (ai) usage.savedDecisions++;
       continue;
     }
-    delete character.plan;
     const respondingToUser = pendingInterventions(world, character).length > 0;
     const from = character.location;
     let decision: ActivityDecision;
@@ -81,10 +109,23 @@ export async function advanceActivities(world: World, options: {
       // Count attempts before requesting, including errors whose usage is not returned.
       usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
       decision = await options.decide(world, character, tokens => accountUsage(usage, tokens));
+      // The route rolls this back with the round on later model/save failure.
+      if (control) delete control.experiences;
     } else {
       const action = demoDecision(world, character);
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
+    if (decision.continueExisting) {
+      if (!character.plan || !sustained.has(character.plan.action.type) || character.plan.modelKey !== modelKey || world.minute > character.plan.until) {
+        throw Error('沒有可延續的原活動，請選擇新行動。');
+      }
+      if (decision.intents) character.intents = decision.intents;
+      character.plan.attention = attentionMarker(world, character);
+      record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
+      continue;
+    }
+    if (decision.intents) character.intents = decision.intents;
+    delete character.plan;
     try {
       resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
