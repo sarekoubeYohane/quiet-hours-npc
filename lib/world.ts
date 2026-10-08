@@ -11,7 +11,7 @@ export type Character={id:string;name:string;color:string;location:string;mood:s
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type WorldClue={id:string;sourceEventId:string;location:string;text:string;visibility:'obvious'|'subtle';noticedBy:string[];attempts?:Record<string,string[]>;misleading?:string};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];clues?:WorldClue[];lastMode:string;aiUsage?:AIUsage};
-export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
+export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe'|'reconsider';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -153,10 +153,37 @@ if(a.target==='study-craft'){
 audience=witnesses;
 }
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
-else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
+else if(a.type==='observe'){
+if(a.target&&a.target!=='general-observe'&&a.target!=='inspect-paper')throw Error('觀察方法無效');
+if(a.target==='inspect-paper'&&!w.clues?.some(clue=>clue.location===c.location&&clue.visibility==='subtle'))throw Error('現場沒有可翻查的草稿');
+c.activity=a.target==='inspect-paper'?'仔細翻過現場的草稿。':'留意周圍的動靜。';
+text=c.name+' '+c.activity;
+}
+else if(a.type==='reconsider'){
+if(!content)throw Error('請說明修正後的看法');
+const index=c.memories.findIndex(item=>item.id===a.target&&item.kind==='inference'&&!item.correctedBy);
+if(index<0)throw Error('沒有可修正的個人推測');
+const old=c.memories[index];
+const evidence=c.memories.slice(index+1).findLast(item=>item.kind==='observation'&&item.source===old.source&&
+  (item.text.includes('翻過紙張')||item.text.includes('仔細看見')));
+if(!evidence?.id)throw Error('目前沒有足以重新檢視這段推測的新觀察');
+if(options.dryRun)return;
+old.correctedBy=evidence.id;
+c.activity='重新檢視了自己先前的推測。';
+record(w,c.id,c.name+' 改變了看法：「'+content+'」','belief-correction',[c.id],{from,to:c.location,target:a.target},undefined,evidence.id);
+return;
+}
 else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
 if(a.type==='move')revealObviousClues(w,c);
-if(a.type==='observe'&&!options.dryRun)noticeSubtleClues(w,c);
+if(a.type==='observe'&&!options.dryRun){
+  if(a.target==='inspect-paper'){
+    const clue=w.clues?.find(item=>item.location===c.location&&item.visibility==='subtle');
+    if(clue&&!clue.noticedBy.includes(c.id)){
+      clue.noticedBy.push(c.id);
+      record(w,'world','翻過紙張後看見：'+clue.text,'perception',[c.id],undefined,undefined,clue.id);
+    }
+  }else noticeSubtleClues(w,c);
+}
 if(project){
   const resultId=w.events.at(-1)!.id;
   c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);
