@@ -9,7 +9,7 @@ export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?
 export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
-export type Action={type:'move'|'say'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
+export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -36,11 +36,36 @@ if(tags.includes('精通髮飾設計'))return 4;
 if(tags.includes('擅長髮飾設計'))return 2;
 return 0;
 }
+function socialAdvantage(c:Character):Advantage {
+const tags=c.abilityTags||[];
+if(tags.includes('極不擅長說服'))return -4;
+if(tags.includes('不擅長說服'))return -2;
+if(tags.includes('非常擅長說服'))return 4;
+if(tags.includes('擅長說服'))return 2;
+return 0;
+}
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;
 const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined;
 if(a.type==='move'){const dest=locations.find(x=>x.id===a.target);if(!dest||dest.id===c.location)throw Error('目的地無效');audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.activity=`剛走到${dest.name}。`;text=`${c.name} 步行前往${dest.name}，在這段時間結束時抵達。`;}
 else if(a.type==='say'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||target.location!==c.location)throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} 說：「${content}」`;}}
+else if(a.type==='persuade'){
+if(!target||target.id===c.id||target.location!==c.location||!content)throw Error('只能向同地點的角色提出說服請求');
+if(options.dryRun)return;
+const relationship=target.relationships[c.id]||'';
+const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;
+resolution=judgeD20(rollD20(),socialAdvantage(c),dc);
+const effects:Record<Resolution['outcome'],string>={
+'critical-success':'表達得非常清楚，對方認真聽完，但仍由對方自行決定。',
+success:'把自己的理由清楚表達出來，等待對方的想法。',
+mixed:'說出了想法，但還需要補充理由或回答疑慮。',
+failure:'沒能把理由說得有說服力，對方未作出承諾。',
+'critical-failure':'用詞讓場面有些尷尬，對方仍然有權拒絕。'
+};
+c.activity='向 '+target.name+' 提出請求。';
+text=c.name+' 對 '+target.name+' 說：「'+content+'」'+effects[resolution.outcome];
+audience=witnesses;
+}
 else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
@@ -71,7 +96,7 @@ audience=witnesses;
 }
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
 else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
-else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(a.type==='say'?{content}:{})},resolution);
+else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
 if(project){const resultId=w.events.at(-1)!.id;c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);}
 }
 export function demoDecision(w:World,c:Character):Action{
