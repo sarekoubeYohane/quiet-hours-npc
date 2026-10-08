@@ -5,8 +5,9 @@ export type ActivityPlan={action:Action;startedAt:number;until:number;attention:
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
+export type NPCMemory={id?:string;time:number;text:string;kind?:'observation'|'inference'|'hearsay';source?:string;correctedBy?:string};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:NPCMemory[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type WorldClue={id:string;sourceEventId:string;location:string;text:string;visibility:'obvious'|'subtle';noticedBy:string[];attempts?:Record<string,string[]>;misleading?:string};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];clues?:WorldClue[];lastMode:string;aiUsage?:AIUsage};
@@ -27,7 +28,18 @@ export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',cha
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,sourceOverride?:string){
+const id=crypto.randomUUID();
+w.events=[...w.events,{id,time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);
+if(kind==='continue')return;
+const memoryKind:NPCMemory['kind']=kind==='reflect'?'inference':['say','message','intervention'].includes(kind)?'hearsay':'observation';
+const source=memoryKind==='hearsay'||memoryKind==='inference'?actor:(sourceOverride||id);
+for(const c of w.characters)if(audience.includes(c.id)){
+ const memory:NPCMemory={id,time:w.minute,text,kind:memoryKind,source};
+ c.memories=[...c.memories,memory].slice(-80);
+ if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);
+}
+}
 function noticeSubtleClues(w:World,c:Character){
  for(const clue of w.clues||[]){
   if(clue.visibility!=='subtle'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
@@ -44,14 +56,14 @@ function noticeSubtleClues(w:World,c:Character){
   const message=noticed?'仔細看見：'+clue.text:
     resolution.outcome==='mixed'?'察覺附近有些異樣，但還沒有看清細節。':
     '觀察了一會兒，還是沒有找到那個不明顯的線索。';
-  record(w,'world',message,'perception',[c.id],undefined,resolution);
+  record(w,'world',message,'perception',[c.id],undefined,resolution,clue.id);
  }
 }
 function revealObviousClues(w:World,c:Character){
  for(const clue of w.clues||[]){
   if(clue.visibility!=='obvious'||clue.location!==c.location||clue.noticedBy.includes(c.id))continue;
   clue.noticedBy.push(c.id);
-  record(w,'world','現場可以看見：'+clue.text,'clue',[c.id]);
+  record(w,'world','現場可以看見：'+clue.text,'clue',[c.id],undefined,undefined,clue.id);
  }
 }
 export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{...c,projects:undefined},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&x.location===c.location).map(x=>({id:x.id,name:x.name}))};}
