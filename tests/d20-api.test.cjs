@@ -12,9 +12,11 @@ function request(operation, extra = {}) {
     body: JSON.stringify({ operation, mode: 'demo', minutes: 15, ...extra }),
   });
 }
-async function tryCraft(roll) {
-  store.install(seedWorld());
-  const direct = await POST(request('direct', { target: 'owner', action: { type: 'work', target: 'craft-challenge' } }));
+async function tryCraft(roll, { tags, task = 'craft-challenge' } = {}) {
+  const initial = seedWorld();
+  if (tags) initial.characters.find(c => c.id === 'owner').abilityTags = tags;
+  store.install(initial);
+  const direct = await POST(request('direct', { target: 'owner', action: { type: 'work', target: task } }));
   assert.equal(direct.status, 200);
   const original = Math.random;
   Math.random = () => (roll - 0.5) / 20;
@@ -68,4 +70,27 @@ test('unknown work target is rejected before any roll or world mutation', async 
     assert.equal(response.status, 400);
     assert.equal((await (await GET()).json()).world.turn, 0);
   } finally { Math.random = original; }
+});
+
+test('natural-language character traits and objective challenge DC both affect the same D20 attempt', async () => {
+  const expert = await tryCraft(10, { tags: ['精通髮飾設計'], task: 'craft-expert-challenge' });
+  assert.equal(expert.result.resolution.modifier, 4);
+  assert.equal(expert.result.resolution.dc, 16);
+  assert.equal(expert.result.resolution.total, -2);
+  assert.equal(expert.result.resolution.outcome, 'mixed');
+
+  const beginner = await tryCraft(10, { tags: ['不擅長髮飾設計'], task: 'craft-easy-challenge' });
+  assert.equal(beginner.result.resolution.modifier, -2);
+  assert.equal(beginner.result.resolution.dc, 8);
+  assert.equal(beginner.result.resolution.total, 0);
+  assert.equal(beginner.result.resolution.outcome, 'success');
+
+  const unknown = await tryCraft(20, { tags: ['完全不懂髮飾設計'], task: 'craft-expert-challenge' });
+  assert.equal(unknown.result.resolution.modifier, -4);
+  assert.equal(unknown.result.resolution.total, 0);
+  assert.equal(unknown.result.resolution.outcome, 'success');
+
+  const familiar = await tryCraft(10, { tags: ['擅長髮飾設計'] });
+  assert.equal(familiar.result.resolution.modifier, 2);
+  assert.equal(familiar.result.resolution.outcome, 'success');
 });
