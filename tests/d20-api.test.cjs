@@ -218,3 +218,27 @@ test('an obvious clue from an actual work mishap reaches only nearby observers a
   assert.ok(saved.characters.find(c => c.id === 'kris').memories.some(m => m.text.includes('散落的髮飾草稿')));
   assert.ok(!saved.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('散落的髮飾草稿')));
 });
+
+test('a deliberate observation can uncover subtle evidence with one D20, without repeated scanning', async () => {
+  store.install(seedWorld());
+  assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'work', target: 'craft-challenge', content: '星月' } }))).status, 200);
+  const original = Math.random;
+  try {
+    Math.random = () => 0.001;
+    assert.equal((await POST(request('advance'))).status, 200);
+    let saved = (await (await GET()).json()).world;
+    assert.ok(saved.clues.some(c => c.visibility === 'subtle' && c.location === 'cafe'));
+    assert.ok(!saved.characters.find(c => c.id === 'owner').memories.some(m => m.text.includes('紙張背面')));
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'observe' } }))).status, 200);
+    let observations = 0;
+    Math.random = () => { observations++; return 0.999; };
+    assert.equal((await POST(request('advance'))).status, 200);
+    saved = (await (await GET()).json()).world;
+    assert.equal(observations, 1);
+    assert.ok(saved.characters.find(c => c.id === 'owner').memories.some(m => m.text.includes('紙張背面')));
+    assert.ok(!saved.characters.find(c => c.id === 'vera').memories.some(m => m.text.includes('紙張背面')));
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'observe' } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+    assert.equal(observations, 1, 'identical observation circumstances do not reroll');
+  } finally { Math.random = original; }
+});
