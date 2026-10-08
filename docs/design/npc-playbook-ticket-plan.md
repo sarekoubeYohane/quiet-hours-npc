@@ -2,7 +2,7 @@
 
 來源：[正式規格 Issue #1](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1)。
 
-狀態：使用者已於 2026-10-08 確認拆分，4 張 GitHub 工作票已發布，實作已整合於 [PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6)，尚未合併、部署或關閉工作票。世界 API 自動驗證完成；店主介面的操作檢查待完成，因本環境 CUA 檔案 URL 被政策阻擋，未繞過。未發出付費模型請求。
+狀態：使用者已於 2026-10-08 確認拆分；4 項工作已由 [PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 合併至 `main`，規格與工作票 #1–#5 已關閉。合併後驗證及發布狀態見 [驗證紀錄](../verification/npc-playbook-2026-10-08.md)。下列介面點按驗收仍保留未勾選，關閉工作票不代表完成 UI 或真實模型驗證。
 
 | 工作 | GitHub Issue | 阻擋項目 |
 | --- | --- | --- |

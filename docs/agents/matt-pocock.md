@@ -42,6 +42,8 @@
 
 ## 目前工作
 
-NPC 意圖與行動已完成 grill-with-docs、to-spec 與 to-tickets；使用者已授權按 implement-spec 實作。正式規格為 [Issue #1](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1)，四張工作票 #2–#5 已在 [整合 PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 實作，尚未合併或部署。
+NPC 意圖與行動已依 implement-spec 完成，正式規格為 [Issue #1](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1)。[PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 已於 2026-10-08 合併至 `main`，規格與工作票 #1–#5 已關閉。
 
-世界 API 的意圖保存、活動續做與切換、店主指定與接管、交還上下文、錯誤回復及用量衝突已有自動驗證。店主介面的瀏覽器操作檢查仍待完成：本工作環境的 CUA 檔案 URL 存取被政策阻擋，沒有繞過或宣稱完成。未發出付費模型請求；實際性格與敘事表現需另以決策紀錄檢視。功能與上下文限制見 README.md 及 docs/design/npc-action-model.md。
+接手驗證或發布此功能時，先讀取 [合併後驗證紀錄](../verification/npc-playbook-2026-10-08.md)，確認測試提交、網站版本及未驗證項目，再查最新來源。功能與上下文限制見 README.md 及 docs/design/npc-action-model.md。
+
+獨立測試環境另列為 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)。使用者指定在新對話先以 `grill-with-docs` 釐清，再整理規格與執行；方案尚未確認，工作票未標記 `ready-for-agent`。開始該工作前讀取最新 Issue 及留言。

@@ -13,7 +13,7 @@
 
 ## 共用 Playbook、意圖與店主控制
 
-[#1 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1) 的四項工作已在 [整合 PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 實作，尚未合併或部署；以下描述 PR 分支的功能。世界 API 自動驗證完成，店主控制介面的瀏覽器操作檢查仍待完成，實際模型的性格與敘事表現尚未試跑。
+[#1 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1) 的四項工作已由 [PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 於 2026-10-08 合併至 `main`，#1–#5 已關閉。合併後的 48 項測試、型別檢查、建置與跨日模擬通過；店主介面點按及真實模型表現仍待驗證。已合併的程式與正式網站版本分開管理，詳見 [合併後驗證紀錄](docs/verification/npc-playbook-2026-10-08.md)。
 
 所有角色共用 `lib/playbook.ts` 的生活判斷原則，各自保留意圖佇列。模型同次回覆意圖與下一步，按角色性格排列最多 12 個意圖，記錄強度、重要程度、急迫性與等待背景；程式不另作固定評分或過期倒數。角色狀態面板唯讀呈現意圖，舊世界相容載入空佇列並加入獨立測試店主。
 
@@ -24,6 +24,8 @@
 ## 本地與部署
 
 依 Sites 執行環境安裝依賴。修改資料庫結構後執行 `pnpm db:generate`，使用 Sites build 與 publishing 流程部署。生產 migrations 由部署平台套用。
+
+獨立測試站與驗證／部署流程已開立 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)，等待 `grill-with-docs` 釐清後執行。固定測試網址、資料隔離、登入及自動部署方式尚未選定；Cloudflare Workers＋獨立 D1 是候選方案，尚未建立測試站。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
 
