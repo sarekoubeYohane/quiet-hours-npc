@@ -4,8 +4,9 @@ export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';imp
 export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
+export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
@@ -37,7 +38,7 @@ return 0;
 }
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;
-const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined;
+const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined;
 if(a.type==='move'){const dest=locations.find(x=>x.id===a.target);if(!dest||dest.id===c.location)throw Error('目的地無效');audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.activity=`剛走到${dest.name}。`;text=`${c.name} 步行前往${dest.name}，在這段時間結束時抵達。`;}
 else if(a.type==='say'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||target.location!==c.location)throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} 說：「${content}」`;}}
 else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
@@ -57,7 +58,13 @@ if(a.target in challenges){
     failure:'沒能完成想要的髮飾設計，只留下零散的草稿。',
     'critical-failure':'沒畫出滿意的樣式，反而把幾張草稿塗得亂七八糟。'
   };
-  c.activity=consequences[resolution.outcome];
+  // The model may suggest a drawing theme, not arbitrary world changes.
+  const theme=['星月','花朵','緞帶','幾何','蕾絲'].find(word=>content.includes(word))||'自由設計';
+  const statuses:Record<Resolution['outcome'],CraftProject['status']>={
+    'critical-success':'finished-with-variation',success:'finished',mixed:'draft',failure:'unfinished','critical-failure':'spoiled'
+  };
+  project={theme,dc:resolution.dc,status:statuses[resolution.outcome]};
+  c.activity=consequences[resolution.outcome]+'（主題：'+theme+'）';
   text=c.name+' '+c.activity;
 }else{c.activity=tasks[a.target];text=c.name+' '+c.activity;}
 audience=witnesses;
@@ -65,6 +72,7 @@ audience=witnesses;
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
 else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
 else throw Error('未知行動');if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);record(w,c.id,text,resolution?'attempt':a.type,audience,{from,to:c.location,target:a.target,...(a.type==='say'?{content}:{})},resolution);
+if(project){const resultId=w.events.at(-1)!.id;c.projects=[...(c.projects||[]),{...project,resultId}].slice(-12);}
 }
 export function demoDecision(w:World,c:Character):Action{
 const recent=c.memories.slice(-2).map(m=>m.text).join(' '),p=w.turn%8;
