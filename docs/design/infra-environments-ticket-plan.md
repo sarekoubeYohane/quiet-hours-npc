@@ -2,7 +2,7 @@
 
 來源：[正式規格 Issue #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19)。
 
-狀態：使用者已於 2026-10-08 確認拆分；12 項工作票已發布為 #19 的 GitHub sub-issue，阻擋關係以 GitHub 原生 blocked-by 記錄，正文另列 Blocked by 供 CLI 閱讀。全部尚未實作。本文件只記錄拆分、相依與共通規則；驗收條件以各 Issue 正文為準，不在此複製，避免兩處漂移。
+狀態：使用者已於 2026-10-08 確認拆分；12 項工作票已發布為 #19 的 GitHub sub-issue，阻擋關係以 GitHub 原生 blocked-by 記錄，正文另列 Blocked by 供 CLI 閱讀。各票實作進度以 GitHub Issue 與對應 PR 為準。本文件只記錄拆分、相依與共通規則；驗收條件以各 Issue 正文為準，不在此複製，避免兩處漂移。
 
 | 工作 | GitHub Issue | 阻擋項目 |
 | --- | --- | --- |
