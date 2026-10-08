@@ -180,3 +180,23 @@ test('an unchanged method cannot farm fresh rolls, but studying a real reference
     assert.equal(rolls, 2, 'the researched method cannot be washed repeatedly');
   } finally { Math.random = original; }
 });
+
+test('the NPC decision input sees the experienced outcome but not the private roll, DC or observer-only project record', async () => {
+  const { world } = await tryCraft(1);
+  const owner = world.characters.find(c => c.id === 'owner');
+  const { aiDecision } = fromBuild('models');
+  let payload;
+  const fakeFetch = async (url, options) => {
+    payload = JSON.parse(options.body);
+    return Response.json({ choices: [{ message: { content: JSON.stringify({
+      type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: []
+    }) } }] });
+  };
+  await aiDecision(world, owner, 'mock-key', 'gpt-6-luna', 'openai', fakeFetch);
+  const view = JSON.parse(payload.messages[1].content);
+  assert.ok(view.self.memories.some(m => m.text.includes('髮飾')));
+  assert.equal(view.self.projects, undefined);
+  assert.ok(!JSON.stringify(view).includes('"resolution"'));
+  assert.ok(!JSON.stringify(view).includes('"roll"'));
+  assert.ok(!JSON.stringify(view).includes('"dc"'));
+});
