@@ -4,9 +4,9 @@ export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';imp
 export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
-export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled'};
+export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
 export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
@@ -69,12 +69,28 @@ audience=witnesses;
 else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
-const tasks:Record<string,string>={tea:'泡了一壺茶，放在桌上。',tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。','craft-easy-challenge':'嘗試設計一個簡單的髮飾變化。','craft-expert-challenge':'嘗試設計非常複雜的髮飾樣式。'};
+const tasks:Record<string,string>={tea:'泡了一壺茶，放在桌上。',tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。','craft-easy-challenge':'嘗試設計一個簡單的髮飾變化。','craft-expert-challenge':'嘗試設計非常複雜的髮飾樣式。','study-craft':'研究現場能接觸到的髮飾與布料參考。'};
 if(!a.target||!tasks[a.target])throw Error('工作無效');
 const challenges:Record<string,Difficulty>={'craft-easy-challenge':8,'craft-challenge':12,'craft-expert-challenge':16};
-if(a.target in challenges){
+if(a.target==='study-craft'){
+  if(c.location!=='vera-home')throw Error('只有在有髮飾與布料的房間才能研究這些參考');
+  if(options.dryRun)return;
+  c.craftInsights??=[];
+  if(!c.craftInsights.includes('髮飾參考'))c.craftInsights.push('髮飾參考');
+  c.activity='研究了現場的布料與髮飾，找到可以參考的細節。';
+  text=c.name+' '+c.activity;
+}else if(a.target in challenges){
   // A direct-control preflight validates the request without spending a die.
   if(options.dryRun)return;
+  const theme=['星月','花朵','緞帶','幾何','蕾絲'].find(word=>content.includes(word))||'自由設計';
+  const method:'initial'|'researched'=c.craftInsights?.includes('髮飾參考')?'researched':'initial';
+  const prior=c.projects?.find(item=>item.target===a.target&&item.theme===theme&&item.method===method);
+  if(prior){
+    c.activity='繼續思考同一份髮飾設計，但方法與條件沒變，暫時沒有新進展。';
+    text=c.name+' '+c.activity;
+    record(w,c.id,text,'continue',[c.id],{from,to:c.location,target:a.target});
+    return;
+  }
   resolution=judgeD20(rollD20(),craftAdvantage(c),challenges[a.target]);
   const consequences:Record<Resolution['outcome'],string>={
     'critical-success':'完成精緻的髮飾草圖，還想出一種額外配色。',
@@ -84,11 +100,10 @@ if(a.target in challenges){
     'critical-failure':'沒畫出滿意的樣式，反而把幾張草稿塗得亂七八糟。'
   };
   // The model may suggest a drawing theme, not arbitrary world changes.
-  const theme=['星月','花朵','緞帶','幾何','蕾絲'].find(word=>content.includes(word))||'自由設計';
   const statuses:Record<Resolution['outcome'],CraftProject['status']>={
     'critical-success':'finished-with-variation',success:'finished',mixed:'draft',failure:'unfinished','critical-failure':'spoiled'
   };
-  project={theme,dc:resolution.dc,status:statuses[resolution.outcome]};
+  project={theme,dc:resolution.dc,status:statuses[resolution.outcome],target:a.target,method};
   c.activity=consequences[resolution.outcome]+'（主題：'+theme+'）';
   text=c.name+' '+c.activity;
 }else{c.activity=tasks[a.target];text=c.name+' '+c.activity;}
