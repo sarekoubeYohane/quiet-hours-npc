@@ -150,3 +150,33 @@ test('persuasion requires a real co-located listener and never rolls on invalid 
     assert.equal((await (await GET()).json()).world.turn, 0);
   } finally { Math.random = original; }
 });
+
+test('an unchanged method cannot farm fresh rolls, but studying a real reference can unlock one retry', async () => {
+  store.install(seedWorld());
+  const perform = async (task, content = '') => {
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'work', target: task, content } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+  };
+  const original = Math.random;
+  try {
+    let rolls = 0;
+    Math.random = () => { rolls++; return 0.001; };
+    await perform('craft-challenge', '星月');
+    assert.equal(rolls, 1);
+    await perform('craft-challenge', '星月；我更努力試試');
+    assert.equal(rolls, 1, 'same target and world method cannot roll again');
+    let current = (await (await GET()).json()).world;
+    assert.equal(current.characters.find(c => c.id === 'owner').projects.length, 1);
+
+    assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'move', target: 'vera-home' } }))).status, 200);
+    assert.equal((await POST(request('advance'))).status, 200);
+    await perform('study-craft');
+    await perform('craft-challenge', '星月');
+    assert.equal(rolls, 2, 'newly studied local reference unlocks one genuinely changed method');
+    current = (await (await GET()).json()).world;
+    assert.equal(current.characters.find(c => c.id === 'owner').projects.length, 2);
+    assert.equal(current.characters.find(c => c.id === 'owner').projects[1].method, 'researched');
+    await perform('craft-challenge', '星月');
+    assert.equal(rolls, 2, 'the researched method cannot be washed repeatedly');
+  } finally { Math.random = original; }
+});
