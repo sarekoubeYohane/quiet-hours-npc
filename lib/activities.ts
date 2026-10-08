@@ -7,7 +7,7 @@ export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
 export const activityDurations = [15, 30, 60, 90];
 const sustained = new Set<Action['type']>(['rest', 'work', 'reflect', 'observe']);
-const attentionKinds = new Set(['say', 'message', 'intervention', 'move', 'clue']);
+const attentionKinds = new Set(['say', 'message', 'intervention', 'move', 'clue', 'perception']);
 
 export class BudgetExceeded extends Error {
   constructor() { super('已達 AI 用量上限，或剩餘呼叫次數不足以完成一個回合。自動運行已暫停；可調整上限或切換規則試玩。'); }
