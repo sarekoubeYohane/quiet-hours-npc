@@ -194,7 +194,7 @@ test('the NPC decision input sees the experienced outcome but not the private ro
   };
   await aiDecision(world, owner, 'mock-key', 'gpt-6-luna', 'openai', fakeFetch);
   const view = JSON.parse(payload.messages[1].content);
-  assert.ok(view.self.memories.some(m => m.text.includes('髮飾')));
+  assert.ok(view.self.memories.some(m => m.text.includes('草稿')));
   assert.equal(view.self.projects, undefined);
   assert.ok(!JSON.stringify(view).includes('"resolution"'));
   assert.ok(!JSON.stringify(view).includes('"roll"'));
