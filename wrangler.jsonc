@@ -7,21 +7,21 @@
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": "dist/client", "not_found_handling": "none", "binding": "ASSETS" },
-  "vars": { "APP_ENV": "local" },
+  "vars": { "APP_ENV": "local", "AUTH_ORIGIN": "http://localhost:5173", "GITHUB_ALLOWED_IDS": "89203678" },
   "d1_databases": [
     { "binding": "DB", "database_name": "quiet-hours-npc-local", "database_id": "quiet-hours-npc-local", "migrations_dir": "drizzle" }
   ],
   "env": {
     "test": {
       "name": "quiet-hours-npc-test",
-      "vars": { "APP_ENV": "test" },
+      "vars": { "APP_ENV": "test", "AUTH_ORIGIN": "https://quiet-hours-npc-test.houmengkou.workers.dev", "GITHUB_ALLOWED_IDS": "89203678" },
       "d1_databases": [
         { "binding": "DB", "database_name": "quiet-hours-npc-test-world", "database_id": "ecfd3c90-db4c-493d-88ad-ac8dca661d7a", "migrations_dir": "drizzle" }
       ]
     },
     "production": {
       "name": "quiet-hours-npc",
-      "vars": { "APP_ENV": "production" },
+      "vars": { "APP_ENV": "production", "AUTH_ORIGIN": "https://quiet-hours-npc.houmengkou.workers.dev", "GITHUB_ALLOWED_IDS": "89203678" },
       "d1_databases": [
         { "binding": "DB", "database_name": "quiet-hours-npc-world", "database_id": "a2caa468-dcdd-4628-8ead-ded3eba4d10c", "migrations_dir": "drizzle" }
       ]

@@ -10,13 +10,13 @@ try {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
     const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|habits|activities|models|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
       .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
-      .replace('require("@/app/chatgpt-auth")', 'require("./auth.cjs")').replace('require("@/lib/store")', 'require("./store.cjs")');
+      .replace('require("@/lib/auth")', 'require("./auth.cjs")').replace('require("@/lib/store")', 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
   }
   // Test fixtures are generated only in a temporary directory, never included in the Worker.
   // Worker bindings and vars are a mutable stub so tests can set APP_ENV and GIT_COMMIT.
   await writeFile(join(directory, 'cloudflare-workers.cjs'), 'exports.env = {};');
-  await writeFile(join(directory, 'auth.cjs'), 'let userId = "test-owner"; exports.setUserId = id => { userId = id; }; exports.getChatGPTUser = async () => ({ userId });');
+  await writeFile(join(directory, 'auth.cjs'), 'let userId = "test-owner"; exports.setUserId = id => { userId = id; }; exports.getGitHubUser = async () => ({ userId });');
   await writeFile(join(directory, 'store.cjs'), `
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(':memory:');

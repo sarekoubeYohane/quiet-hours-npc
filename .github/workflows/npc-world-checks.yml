@@ -23,6 +23,6 @@ jobs:
       # world-app.tsx has pre-existing React hook/anchor lint violations on main.
       # Track them separately; keep all other changed runtime modules lint-clean.
       - name: Lint changed runtime modules (except pre-existing UI violations)
-        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts lib/environment.ts app/api/world/route.ts app/api/environment/route.ts app/page.tsx tooling/dev-mock-auth.ts vite.config.ts tests/run-activities.mjs tests/environment-api.test.cjs
+        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts lib/environment.ts app/api/world/route.ts app/api/environment/route.ts app/page.tsx lib/auth.ts app/api/auth/github/route.ts app/api/auth/github/callback/route.ts app/api/auth/logout/route.ts tests/run-auth.mjs tests/auth-api.test.cjs vite.config.ts tests/run-activities.mjs tests/environment-api.test.cjs
       - name: Production build with the project's own Wrangler config
         run: pnpm build && test -f dist/server/wrangler.json
