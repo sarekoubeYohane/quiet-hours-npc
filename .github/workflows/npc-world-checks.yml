@@ -25,4 +25,6 @@ jobs:
       - name: Lint changed runtime modules (except pre-existing UI violations)
         run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts lib/environment.ts app/api/world/route.ts app/api/environment/route.ts app/page.tsx lib/auth.ts app/api/auth/github/route.ts app/api/auth/github/callback/route.ts app/api/auth/logout/route.ts tests/run-auth.mjs tests/auth-api.test.cjs vite.config.ts tests/run-activities.mjs tests/environment-api.test.cjs
       - name: Production build with the project's own Wrangler config
-        run: pnpm build && test -f dist/server/wrangler.json
+        run: |
+          pnpm build:production
+          node --input-type=module -e 'import fs from "node:fs"; import assert from "node:assert/strict"; const config = JSON.parse(fs.readFileSync("dist/server/wrangler.json", "utf8")); assert.equal(config.name, "quiet-hours-npc"); assert.equal(config.vars.APP_ENV, "production");'

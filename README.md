@@ -55,6 +55,25 @@ GitHub OAuth App 的回呼網址以上表網址為 origin，路徑固定為 `/ap
 
 修改資料庫結構後執行 `pnpm db:generate` 產生 migration，再跑 `pnpm db:migrate:local`。測試用 `pnpm test`，型別檢查用 `pnpm typecheck`。
 
+### Cloudflare Workers Builds 的環境選擇
+
+`pnpm build` 預設使用本機設定；雲端建置請明確選環境。Vite plugin 在建置時讀取 `CLOUDFLARE_ENV`，不能只在部署指令補 `--env`。建置完成後，部署 `dist/server/wrangler.json`，其中已包含編譯後的入口、靜態資源與該環境的 D1／vars。
+
+現有正式 Worker `quiet-hours-npc` 的 **Settings → Builds** 應設為：
+
+| 欄位 | 設定 |
+| --- | --- |
+| Production branch | `main` |
+| Build command | `pnpm build:production` |
+| Deploy command | `pnpm exec wrangler deploy --config dist/server/wrangler.json` |
+| Builds for non-production branches | 關閉 |
+
+這是現有 Workers Builds 的錯誤排查設定，不代表 #31 的正式發布流程已完成。PR 分支由 GitHub CI 驗證，不使用 Cloudflare 自動分支 preview。測試站的固定網址與自動部署仍依 #28 建立；測試站建置用 `pnpm build:test`，同樣部署該次產生的 `dist/server/wrangler.json`。
+
+2026-10-09 的 PR #36 失敗紀錄是 `npx wrangler preview` 查詢 `quiet-hours-npc-local`，得到 `10007: This Worker does not exist on your account`。這是預設 preview 部署讀到本機 Worker 名稱，不是依賴安裝或程式編譯失敗。不要為了排除此錯誤在雲端建立本機 Worker，或僅以 `--worker-name` 改名：preview 還需要獨立的 bindings、secrets 與 OAuth origin，目前專案沒有配置這套流程。
+
+官方參考：[Workers Builds 分支設定](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/)、[Vite plugin 環境選擇](https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/)。
+
 測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由本 PR 實作；啟用對外網址前仍需填入對應環境的秘密、套用 migration，並完成 #28 的部署與登入驗收。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
