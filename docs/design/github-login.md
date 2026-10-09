@@ -71,7 +71,7 @@ pnpm exec wrangler secret put SESSION_SECRET --env production
 
 `node tests/run-auth.mjs` 使用真實路由、身分驗證及世界儲存模組，GitHub HTTP 與 next request headers 位於外部邊界的測試替身，D1 SQL 在記憶體 SQLite 執行。測試不呼叫真實 GitHub、不發出付費模型請求。舊世界行為測試保留自己的身分 fixture；真實登入隔離由上述整合測試覆蓋。
 
-本 PR 不包含 #26 的模型 Key 24 小時管理、#27 的每日帳本、#29 的多頁面排程或 #28 的雲端部署。建置成功不等於雲端已發布；真實 OAuth 本機登入需站主填入自己的秘密後驗收。
+GitHub 登入的原始 PR 不包含 #26 的模型 Key 24 小時管理、#27 的每日帳本、#29 的多頁面排程或 #28 的雲端部署。模型 Key 的後續修訂與設定見 [帳號模型 Key](account-model-keys.md)。建置成功不等於雲端已發布；真實 OAuth 本機登入需站主填入自己的秘密後驗收。
 
 官方參考：https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 
@@ -90,3 +90,4 @@ pnpm exec wrangler secret put SESSION_SECRET --env production
 請只分享固定代碼與上述診斷欄位，不貼回呼完整 URL、Cookie、Secrets 或其他請求內容。未知 GitHub 錯誤只記為 `other`；網路或 JSON 解析失敗只辨識階段，不輸出原始錯誤內容。
 
 2026-10-09 的正式站曾記錄只有 `AUTH_TOKEN_EXCHANGE`、沒有 `providerStatus` 的失敗。已在相同 compatibility date 的 workerd 重現：`redirect: 'error'` 在建立請求時即拋 TypeError，尚未送至 GitHub。兩個 GitHub 請求改用 `redirect: 'manual'`，明確拒絕 3xx，不轉送 Client Secret 或 Authorization。`tests/auth-workerd.test.mjs` 執行真實登入模組及 Workers Request 建構，涵蓋成功交換與兩階段的轉址拒絕；HTTP 回應與 DB 邊界使用 fixture，不需真實秘密。雲端真人登入仍須在修補部署後驗證。
+

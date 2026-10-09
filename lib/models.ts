@@ -44,16 +44,27 @@ function parseDecision(value: unknown): ActivityDecision {
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void):Promise<ActivityDecision>{
 const direct=provider==='openai';
-const r=await fetcher(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
-method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({model,messages:[{role:'system',content:activityPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify({...perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined}),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute)}:null,learnedHabits:habitsForDecision(w,c)})}],...(direct?{
+let r:Response;
+try { r=await fetcher(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
+method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({model,messages:[{role:'system',content:activityPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify({...perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined}),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute)}:null,learnedHabits:habitsForDecision(w,c)})}],...(direct?{
 store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema:actionSchema}},
-}:{temperature:.8,max_tokens:2048})})});
+}:{temperature:.8,max_tokens:2048})})}); }
+catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
 if(!r.ok)throw Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`);
-const d=await r.json() as {usage?:{prompt_tokens?:number;completion_tokens?:number};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};const choice=d.choices?.[0];
+let d:{usage?:{prompt_tokens?:number;completion_tokens?:number};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};
+try { d=await r.json(); } catch { throw Error('模型服務未回傳有效資料，本回合沒有推進。'); }
+if(!d||typeof d!=='object')throw Error('模型服務未回傳有效資料，本回合沒有推進。');
+const choice=d?.choices?.[0];
 if(typeof d.usage?.prompt_tokens==='number'&&typeof d.usage?.completion_tokens==='number'&&Number.isFinite(d.usage.prompt_tokens)&&Number.isFinite(d.usage.completion_tokens)&&d.usage.prompt_tokens>=0&&d.usage.completion_tokens>=0)onUsage?.({inputTokens:d.usage.prompt_tokens,outputTokens:d.usage.completion_tokens});
 if(choice?.message?.refusal)throw Error('模型未接受這次場景請求，本回合沒有儲存。');
 if(choice?.finish_reason==='length')throw Error('模型回覆超過長度限制，本回合沒有儲存。');
 const raw=choice?.message?.content||'';
-try { return parseDecision(JSON.parse(raw.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, ''))); }
+if(typeof raw==='string'&&raw.includes(key))throw Error('模型回覆包含敏感資料，本回合沒有推進。');
+try {
+  const decision=parseDecision(JSON.parse(raw.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, '')));
+  if(JSON.stringify(decision).includes(key))throw Error();
+  return decision;
+}
 catch { throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
 }
+

@@ -53,6 +53,7 @@ export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
 
 export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
+  beforeDecision?: () => Promise<void>;
   decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
 }): Promise<void> {
   const { minutes, mode, modelKey, limits } = options;
@@ -106,6 +107,7 @@ export async function advanceActivities(world: World, options: {
     let decision: ActivityDecision;
     if (ai) {
       if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) throw new BudgetExceeded();
+      await options.beforeDecision?.();
       // Count attempts before requesting, including errors whose usage is not returned.
       usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
       decision = await options.decide(world, character, tokens => accountUsage(usage, tokens));
@@ -140,3 +142,4 @@ export async function advanceActivities(world: World, options: {
   }
   world.turn++;
 }
+

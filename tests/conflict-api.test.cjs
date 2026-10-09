@@ -7,7 +7,7 @@ const { seedWorld } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'openai', ...body }) });
-const advance = mode => POST(request({ operation: 'advance', mode: mode || 'openai', minutes: 15, model: 'gpt-6-luna', key: 'test-key', limits: { calls: 120, tokens: 500000 } }));
+const advance = async mode => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', mode: mode || 'openai', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const read = async () => (await (await GET()).json());
 const usage = windowStartedAt => ({ windowStartedAt, calls: 5, inputTokens: 150, outputTokens: 100, unknownCalls: 1, totalCalls: 20, totalInputTokens: 600, totalOutputTokens: 400, totalUnknownCalls: 2, savedDecisions: 7 });
 const withModel = async (run, failAt = 0) => {
@@ -109,3 +109,4 @@ test('recovery cannot charge or release a different owner world', async () => {
     } finally { auth.setUserId('test-owner'); }
   });
 });
+

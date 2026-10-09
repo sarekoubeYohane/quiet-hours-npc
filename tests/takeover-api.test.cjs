@@ -10,7 +10,7 @@ const request = body => new Request('https://test.invalid/api/world', { method:'
 const read = async () => (await (await GET()).json()).world;
 const owner = world => world.characters.find(c => c.id === 'owner');
 const queue = [{id:'care',content:'照顧咖啡館',intensity:'high',importance:'medium',urgency:'low',context:'晚點整理'}];
-const advance = (limits={calls:120,tokens:500000}) => POST(request({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',key:'unit-test-key',limits}));
+const advance = async (limits={calls:120,tokens:500000}) => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits})) };
 const withModel = async run => {
   const original = global.fetch; const perceived=[];
   global.fetch = async (_url, init) => {
@@ -155,3 +155,4 @@ test('return context stays bounded at eighty known experiences and survives a fa
     assert.equal(owner(await read()).control.experiences, undefined);
   });
 });
+

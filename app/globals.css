@@ -55,3 +55,6 @@
 .intent-list small { color: var(--muted-foreground); }
 .environment-badge{font-size:.72rem;letter-spacing:.08em;color:#a5c9b3;border:1px solid #2f4a3e;border-radius:999px;padding:4px 10px;white-space:nowrap}
 .environment-note{opacity:.8}
+
+
+.key-management{margin-top:16px;padding:14px 16px;border:1px solid #3b4758;border-radius:6px;background:#151d29}.key-management>span{display:block;font-size:.875rem;color:#cad3df}.key-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}

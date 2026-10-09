@@ -14,5 +14,7 @@ declare namespace Cloudflare {
     GITHUB_CLIENT_SECRET?: string;
     GITHUB_ALLOWED_IDS?: string;
     SESSION_SECRET?: string;
+    MODEL_KEY_ENCRYPTION_SECRET?: string;
   }
 }
+
