@@ -106,9 +106,12 @@ export async function finishGitHubLogin(request: Request) {
           method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, code,
             redirect_uri: settings.origin + githubCallbackPath, code_verifier: attempt.verifier }),
-          signal: AbortSignal.timeout(15000), redirect: 'error',
+          // Workers does not implement redirect:'error'. Never follow a redirect
+          // carrying OAuth secrets; reject its response below instead.
+          signal: AbortSignal.timeout(15000), redirect: 'manual',
         });
         providerStatus = tokenResponse.status;
+        if (tokenResponse.status >= 300 && tokenResponse.status < 400) throw Error('GitHub token redirect rejected');
         const token = await tokenResponse.json() as { access_token?: string; error?: string };
         // Only fixed provider error names are logged, never response bodies or descriptions.
         if (token.error) providerError = ['incorrect_client_credentials', 'redirect_uri_mismatch', 'bad_verification_code'].includes(token.error) ? token.error : 'other';
@@ -116,9 +119,10 @@ export async function finishGitHubLogin(request: Request) {
         failureCode = 'AUTH_IDENTITY'; providerStatus = undefined; providerError = undefined;
         const userResponse = await fetch('https://api.github.com/user', {
           headers: { Authorization: `Bearer ${token.access_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'quiet-hours-npc' },
-          signal: AbortSignal.timeout(15000), redirect: 'error',
+          signal: AbortSignal.timeout(15000), redirect: 'manual',
         });
         providerStatus = userResponse.status;
+        if (userResponse.status >= 300 && userResponse.status < 400) throw Error('GitHub identity redirect rejected');
         const user = await userResponse.json() as { id?: number; login?: string };
         if (!userResponse.ok || !Number.isSafeInteger(user.id) || user.id! <= 0 || typeof user.login !== 'string' || !user.login || user.login.length > 100) throw Error('GitHub identity invalid');
         const userId = String(user.id);
