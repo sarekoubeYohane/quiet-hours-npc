@@ -11,7 +11,7 @@
     "build:test": "CLOUDFLARE_ENV=test vinext build",
     "build:production": "CLOUDFLARE_ENV=production vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1",
-    "test": "node tests/run-activities.mjs && node tests/run-auth.mjs",
+    "test": "node tests/run-activities.mjs && node tests/run-auth.mjs && node --test tests/auth-workerd.test.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
