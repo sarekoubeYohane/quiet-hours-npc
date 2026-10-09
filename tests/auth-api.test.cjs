@@ -133,6 +133,40 @@ test('OAuth state expires at ten minutes', async () => {
   } finally { Date.now = now; }
 });
 
+test('callback token exchange failure provides a safe diagnostic code without provider secrets', async () => {
+  reset();
+  const start = await load('app/api/auth/github/route').GET(authRequest('/api/auth/github'));
+  const state = new URL(start.headers.get('location')).searchParams.get('state');
+  const original = global.fetch;
+  global.fetch = async () => Response.json({ error: 'incorrect_client_credentials', error_description: 'sensitive-provider-description', access_token: 'sensitive-token' }, { status: 401 });
+  try {
+    const response = await load('app/api/auth/github/callback/route').GET(authRequest('/api/auth/github/callback?code=sensitive-code&state=' + state, cookies(start)));
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, 'AUTH_TOKEN_EXCHANGE');
+    assert.ok(!JSON.stringify(body).includes('sensitive'));
+    assert.ok(!JSON.stringify(body).includes(fixture.env.GITHUB_CLIENT_SECRET));
+    assert.ok(!cookies(response).includes('qh_session='));
+  } finally { global.fetch = original; }
+});
+
+test('callback distinguishes GitHub identity failure from token exchange failure', async () => {
+  reset();
+  const start = await load('app/api/auth/github/route').GET(authRequest('/api/auth/github'));
+  const state = new URL(start.headers.get('location')).searchParams.get('state');
+  const original = global.fetch;
+  global.fetch = async url => String(url) === 'https://github.com/login/oauth/access_token'
+    ? Response.json({ access_token: 'sensitive-token' })
+    : Response.json({ message: 'sensitive-provider-description' }, { status: 403 });
+  try {
+    const response = await load('app/api/auth/github/callback/route').GET(authRequest('/api/auth/github/callback?code=x&state=' + state, cookies(start)));
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, 'AUTH_IDENTITY');
+    assert.ok(!JSON.stringify(body).includes('sensitive'));
+  } finally { global.fetch = original; }
+});
+
 test('OAuth and logout refuse wrong origins; foreign-origin cookie signatures do not authenticate', async () => {
   reset();
   const first = cookies(await signIn());

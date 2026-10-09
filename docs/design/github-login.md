@@ -74,3 +74,17 @@ pnpm exec wrangler secret put SESSION_SECRET --env production
 本 PR 不包含 #26 的模型 Key 24 小時管理、#27 的每日帳本、#29 的多頁面排程或 #28 的雲端部署。建置成功不等於雲端已發布；真實 OAuth 本機登入需站主填入自己的秘密後驗收。
 
 官方參考：https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+
+## 回呼失敗診斷
+
+回呼的 503 回應含固定 `code`，可分享這個代碼排查。它不包含 GitHub 回應內容、帳號、token、秘密或 SQL。先在對應 Worker 的即時日誌開啟串流，再重新從首頁登入；伺服器會輸出 `[auth] callback_failed`、相同代碼、GitHub HTTP 狀態與允許的固定錯誤名稱，不記錄原始例外或請求網址。
+
+| 代碼 | 檢查項目 |
+| --- | --- |
+| `AUTH_CONFIG` | 該 Worker 的 OAuth Secrets、SESSION_SECRET 長度及 AUTH_ORIGIN |
+| `AUTH_STATE_STORE` | DB binding 與 oauth_attempts migration |
+| `AUTH_TOKEN_EXCHANGE` | GitHub 憑證交換；incorrect_client_credentials 檢查 Client ID／secret 是否來自同一個正式站 App，redirect_uri_mismatch 檢查 callback URL，bad_verification_code 請從首頁重新登入 |
+| `AUTH_IDENTITY` | GitHub 身分查詢的 HTTP 狀態或回傳格式 |
+| `AUTH_SESSION_STORE` | DB binding 與 auth_sessions migration |
+
+請只分享固定代碼與上述診斷欄位，不貼回呼完整 URL、Cookie、Secrets 或其他請求內容。未知 GitHub 錯誤只記為 `other`；網路或 JSON 解析失敗只辨識階段，不輸出原始錯誤內容。
