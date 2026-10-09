@@ -1,0 +1,4 @@
+# Copy to .dev.vars at the repo root. This example contains no usable secrets.
+GITHUB_CLIENT_ID="replace-with-local-oauth-client-id"
+GITHUB_CLIENT_SECRET="replace-with-local-oauth-client-secret"
+SESSION_SECRET="replace-with-an-independently-generated-random-secret-of-at-least-32-characters"

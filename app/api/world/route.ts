@@ -1,4 +1,4 @@
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resolve, type Action, type AIUsage } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
@@ -6,7 +6,11 @@ import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, type Bu
 
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-const owner = async () => (await getChatGPTUser())?.userId;
+const owner = async () => {
+  try {
+    return (await getGitHubUser())?.userId ?? reply({ error: '網站登入已失效，請用 GitHub 重新登入。', signInRequired: true }, 401);
+  } catch { return reply({ error: '登入驗證服務暫時無法使用，請稍後重試。' }, 503); }
+};
 
 // A confirmed failed CAS did not commit this round. Merge only its paid deltas
 // into the latest owner's row; a thrown save has an unknown outcome and is not replayed.
@@ -38,7 +42,7 @@ async function retainPaidUsage(db: ReturnType<typeof database>, id: string, befo
 
 export async function GET() {
   const id = await owner();
-  if (!id) return reply({ error: '網站登入尚未完成，請按「用 ChatGPT 重新登入」。', signInRequired: true }, 401);
+  if (id instanceof Response) return id;
   try {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
@@ -49,7 +53,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const id = await owner();
-  if (!id) return reply({ error: '網站登入已失效，請重新登入。', signInRequired: true }, 401);
+  if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
   let locked = false, lease = 0;
   try {

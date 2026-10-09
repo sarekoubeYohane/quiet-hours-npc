@@ -44,18 +44,18 @@
 | 測試站 | `env.test` | `quiet-hours-npc-test` | `https://quiet-hours-npc-test.houmengkou.workers.dev` |
 | 正式站 | `env.production` | `quiet-hours-npc` | `https://quiet-hours-npc.houmengkou.workers.dev` |
 
-GitHub OAuth App 的回呼網址以上表網址為 origin，路徑由 [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 定義。
+GitHub OAuth App 的回呼網址以上表網址為 origin，路徑固定為 `/api/auth/github/callback`；完整欄位與秘密設定見 [GitHub 登入設定](docs/design/github-login.md)。
 
 本機啟動：
 
 1. `corepack pnpm install --frozen-lockfile`
 2. `pnpm db:migrate:local`：把 migration 套用到本機 D1。本機資料存在 `.wrangler/state`，重啟後保留。
-3. `pnpm dev`：開 http://localhost:5173 。在 GitHub 登入（#23）完成前，本機以開發用模擬登入進入。
-4. `pnpm build` 產出 `dist/`；`pnpm start` 以 Wrangler 在本機執行建置成品，用來檢查 `/api/environment`、靜態資源與首頁能否服務。建置成品沒有模擬登入，所以無法進入世界；要試玩請用 `pnpm dev`。`CLOUDFLARE_ENV=test pnpm build` 會改以測試站設定建置。
+3. `pnpm dev`：開 http://localhost:5173 。先依 [GitHub 登入設定](docs/design/github-login.md) 填入本機 OAuth 秘密；沒有模擬登入。
+4. `pnpm build` 產出 `dist/`；`pnpm start` 以 Wrangler 在本機執行建置成品，用來檢查 `/api/environment`、靜態資源與首頁能否服務。本機啟動成品也需要 OAuth 秘密與正確回呼網址；OAuth App 以 5173 為回呼時，請用 `pnpm start --port 5173` 啟動成品。`CLOUDFLARE_ENV=test pnpm build` 會改以測試站設定建置。
 
 修改資料庫結構後執行 `pnpm db:generate` 產生 migration，再跑 `pnpm db:migrate:local`。測試用 `pnpm test`，型別檢查用 `pnpm typecheck`。
 
-測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。在 [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 接上 GitHub 登入之前，不得把任何版本部署到對外網址，因為目前的登入仍信任 Sites 的身分 header，在自家 Worker 上可被偽造。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
+測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由本 PR 實作；啟用對外網址前仍需填入對應環境的秘密、套用 migration，並完成 #28 的部署與登入驗收。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
 
@@ -86,13 +86,14 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 
 ## 登入流程
 
-首頁是動態 Server Component，以官方 `getChatGPTUser` helper 檢查網站登入；缺少身分時顯示顶层导航的 Sign in with ChatGPT 按鈕。登入完成才載入觀察室。API 也用同一 helper 驗證身分，401 時介面提供重新登入入口，沒有匿名或共用世界 fallback。
+首頁與世界 API 共用 GitHub 工作階段驗證；未登入時提供「用 GitHub 登入」，API 回 401。第一版僅允許設定白名單中的 GitHub 數字 ID，無匿名／共用世界或 Sites 身分 header 路徑。每環境使用自己的 OAuth App，D1 保存工作階段，24 小時到期，登出立即失效。OAuth callback 固定在 `/api/auth/github/callback`。
+
+本機與雲端的完整設定與驗收步驟見 [GitHub 登入設定](docs/design/github-login.md)。尚需填入自己的秘密並實際驗證 GitHub 登入；模擬測試通過不代表真人登入已完成。
 
 ## 部署相容性
 
-Sites 執行環境可能只提供平台已驗證 email，不提供 user ID。此時以網站 ID 與已驗證 email 的 SHA-256 作為獨立世界鍵，不接收瀏覽器自報的身分。仍優先使用平台 user ID；若之後平台補上 user ID 或 email 改變，既有 fallback 世界需遷移到新身分鍵。
+使用 GitHub 穩定數字 ID 作為世界鍵，不使用 email 或顯示名稱。新增登入資料表不刪除世界；不自動搬移舊 Sites 世界。靜態資源由 `ASSETS` binding 提供，登入入口與登出表單不依賴 JavaScript hydration。
 
-靜態資源由 `wrangler.jsonc` 的 `assets` 設定透過 `ASSETS` binding 直接服務，Worker 本身不再轉交。登入入口使用原生連結，不依賴 JavaScript hydration。
 # 像素觀察室
 
 觀察者的介入以事件順序判斷是否待回應，每位角色只看到自己知情、且在上次行動之後收到的介入。下一次行動後即消費，避免固定回覆重複觸發。規則模式支援回家、前往已知地點、休息、泡茶；在目的地時直接私下回覆觀察者。Cass 的住處為暫住的 Kris 家，Vera 回自己的房間，Kris 回自己的家。GPT 決策收到獨立的 `pendingInterventions` 與 `home`，優先以行動或 `say` / `observer` 回應，也可說明拒絕或延後。觀察者回覆只寫入該角色記憶，不能藉此讓同地點的其他角色知情。既有事件可沿用，無需資料遷移。
