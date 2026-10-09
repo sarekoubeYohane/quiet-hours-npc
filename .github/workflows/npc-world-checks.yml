@@ -17,12 +17,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Typecheck
-        run: pnpm exec tsc --noEmit --incremental false
+        run: pnpm typecheck
       - name: World API integration tests
-        run: node tests/run-activities.mjs
+        run: pnpm test
       # world-app.tsx has pre-existing React hook/anchor lint violations on main.
       # Track them separately; keep all other changed runtime modules lint-clean.
       - name: Lint changed runtime modules (except pre-existing UI violations)
-        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts app/api/world/route.ts
-      - name: Production build
-        run: pnpm build
+        run: pnpm exec eslint lib/d20.ts lib/world.ts lib/models.ts lib/habits.ts lib/activities.ts lib/environment.ts app/api/world/route.ts app/api/environment/route.ts app/page.tsx tooling/dev-mock-auth.ts vite.config.ts tests/run-activities.mjs tests/environment-api.test.cjs
+      - name: Production build with the project's own Wrangler config
+        run: pnpm build && test -f dist/server/wrangler.json

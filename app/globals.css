@@ -53,3 +53,5 @@
 .intent-list { list-style: decimal; padding-left: 1.25rem; }
 .intent-list li + li { margin-top: .75rem; }
 .intent-list small { color: var(--muted-foreground); }
+.environment-badge{font-size:.72rem;letter-spacing:.08em;color:#a5c9b3;border:1px solid #2f4a3e;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.environment-note{opacity:.8}

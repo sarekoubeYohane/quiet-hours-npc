@@ -6,13 +6,16 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/playbook.ts', 'playbook'], ['app/api/world/route.ts', 'route']]) {
+  for (const [source, output] of [['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|habits|activities|models|playbook|d20)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|habits|activities|models|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
+      .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
       .replace('require("@/app/chatgpt-auth")', 'require("./auth.cjs")').replace('require("@/lib/store")', 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
   }
   // Test fixtures are generated only in a temporary directory, never included in the Worker.
+  // Worker bindings and vars are a mutable stub so tests can set APP_ENV and GIT_COMMIT.
+  await writeFile(join(directory, 'cloudflare-workers.cjs'), 'exports.env = {};');
   await writeFile(join(directory, 'auth.cjs'), 'let userId = "test-owner"; exports.setUserId = id => { userId = id; }; exports.getChatGPTUser = async () => ({ userId });');
   await writeFile(join(directory, 'store.cjs'), `
     const { DatabaseSync } = require('node:sqlite');
@@ -45,6 +48,9 @@ try {
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
   `);
-  const result = spawnSync(process.execPath, ['--test', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs'], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
+  const allTests = ['tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
+  // Pass test file paths as arguments to run a subset; the default runs everything.
+  const selected = process.argv.slice(2);
+  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }

@@ -38,8 +38,10 @@ yarn-error.log*
 next-env.d.ts
 /dist/
 /.wrangler/
-# Checkout-local execution profile and tool state; never publish them.
-/.sites-runtime/
+# Local-only Worker secrets and vars.
+.dev.vars
+.dev.vars.*
+# Local agent tool state; never publish it.
 /.agents/*
 !/.agents/skills/
 !/.agents/matt-pocock-LICENSE

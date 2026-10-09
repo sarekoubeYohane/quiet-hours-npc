@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 頂層是本機開發設定；測試站與正式站各在 env 底下，Worker 名稱、D1 與 vars 分開。
+  // 本機 D1 存在 .wrangler/state，先跑 `pnpm db:migrate:local` 套用 migration。
+  "name": "quiet-hours-npc-local",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "dist/client", "not_found_handling": "none", "binding": "ASSETS" },
+  "vars": { "APP_ENV": "local" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "quiet-hours-npc-local", "database_id": "quiet-hours-npc-local", "migrations_dir": "drizzle" }
+  ],
+  "env": {
+    "test": {
+      "name": "quiet-hours-npc-test",
+      "vars": { "APP_ENV": "test" },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "quiet-hours-npc-test-world", "database_id": "ecfd3c90-db4c-493d-88ad-ac8dca661d7a", "migrations_dir": "drizzle" }
+      ]
+    },
+    "production": {
+      "name": "quiet-hours-npc",
+      "vars": { "APP_ENV": "production" },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "quiet-hours-npc-world", "database_id": "a2caa468-dcdd-4628-8ead-ded3eba4d10c", "migrations_dir": "drizzle" }
+      ]
+    }
+  }
+}
