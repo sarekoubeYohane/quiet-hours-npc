@@ -54,8 +54,8 @@ export async function getGitHubUser(): Promise<GitHubUser | null> {
   if (!session || !invited(session.user_id)) return null;
   return { userId: `github:${session.user_id}`, displayName: session.display_name };
 }
-function errorResponse(message: string, status: number) {
-  return Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
+function errorResponse(message: string, status: number, code?: string) {
+  return Response.json({ error: message, ...(code ? { code } : {}) }, { status, headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 function sameOrigin(request: Request, settings: ReturnType<typeof config>) {
   return new URL(request.url).origin === settings.origin;
@@ -84,6 +84,9 @@ export async function startGitHubLogin(request: Request) {
 export async function finishGitHubLogin(request: Request) {
   let secure = true;
   let response: Response;
+  let failureCode = 'AUTH_CONFIG';
+  let providerStatus: number | undefined;
+  let providerError: string | undefined;
   try {
     const settings = config(); secure = settings.secure;
     if (!sameOrigin(request, settings)) return errorResponse('登入回呼網址不符。', 403);
@@ -93,27 +96,35 @@ export async function finishGitHubLogin(request: Request) {
       response = errorResponse('登入驗證失敗或已取消，請重新登入。', 400);
     } else {
       // Consume once before contacting GitHub, so concurrent/replayed callbacks cannot create sessions.
+      failureCode = 'AUTH_STATE_STORE';
       const attempt = await database().prepare('DELETE FROM oauth_attempts WHERE state_hash = ? AND expires_at > ? RETURNING verifier')
         .bind(hash(state), Date.now()).first<{ verifier: string }>();
       if (!attempt) response = errorResponse('登入已過期或使用過，請重新登入。', 400);
       else {
+        failureCode = 'AUTH_TOKEN_EXCHANGE';
         const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
           method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, code,
             redirect_uri: settings.origin + githubCallbackPath, code_verifier: attempt.verifier }),
           signal: AbortSignal.timeout(15000), redirect: 'error',
         });
+        providerStatus = tokenResponse.status;
         const token = await tokenResponse.json() as { access_token?: string; error?: string };
+        // Only fixed provider error names are logged, never response bodies or descriptions.
+        if (token.error) providerError = ['incorrect_client_credentials', 'redirect_uri_mismatch', 'bad_verification_code'].includes(token.error) ? token.error : 'other';
         if (!tokenResponse.ok || token.error || typeof token.access_token !== 'string' || !token.access_token) throw Error('GitHub token exchange failed');
+        failureCode = 'AUTH_IDENTITY'; providerStatus = undefined; providerError = undefined;
         const userResponse = await fetch('https://api.github.com/user', {
           headers: { Authorization: `Bearer ${token.access_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'quiet-hours-npc' },
           signal: AbortSignal.timeout(15000), redirect: 'error',
         });
+        providerStatus = userResponse.status;
         const user = await userResponse.json() as { id?: number; login?: string };
         if (!userResponse.ok || !Number.isSafeInteger(user.id) || user.id! <= 0 || typeof user.login !== 'string' || !user.login || user.login.length > 100) throw Error('GitHub identity invalid');
         const userId = String(user.id);
         if (!invited(userId)) response = errorResponse('這個 GitHub 帳號尚未受邀，請聯絡站主。', 403);
         else {
+          failureCode = 'AUTH_SESSION_STORE'; providerStatus = undefined;
           const db = database();
           const previousTokenHash = verifiedSessionTokenHash(request.headers, settings);
           if (previousTokenHash) await db.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').bind(previousTokenHash).run();
@@ -127,7 +138,11 @@ export async function finishGitHubLogin(request: Request) {
         }
       }
     }
-  } catch { response = errorResponse('GitHub 登入暫時失敗，請回觀察室重新登入。', 503); }
+  } catch {
+    // Do not log raw exceptions: they can contain tokens, callback URLs or SQL bindings.
+    console.error('[auth] callback_failed', JSON.stringify({ code: failureCode, providerStatus, providerError }));
+    response = errorResponse('GitHub 登入暫時失敗，請回觀察室重新登入。', 503, failureCode);
+  }
   response.headers.append('Set-Cookie', cookie(stateCookie, '', 0, secure));
   return response;
 }
