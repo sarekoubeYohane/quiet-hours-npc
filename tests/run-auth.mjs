@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-auth-'));
 try {
-  const sources = ['lib/world.ts', 'lib/d20.ts', 'lib/habits.ts', 'lib/activities.ts', 'lib/models.ts', 'lib/playbook.ts', 'lib/store.ts', 'lib/auth.ts', 'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts'];
+  const sources = ['lib/world.ts', 'lib/d20.ts', 'lib/habits.ts', 'lib/activities.ts', 'lib/models.ts', 'lib/model-keys.ts', 'lib/playbook.ts', 'lib/store.ts', 'lib/auth.ts', 'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts'];
   for (const source of sources) {
     const output = join(directory, source.replace(/\.ts$/, '.cjs'));
     await mkdir(dirname(output), { recursive: true });
@@ -38,6 +38,8 @@ try {
   `);
   const sql = (await Promise.all((await readdir('drizzle')).filter(f => f.endsWith('.sql')).sort().map(f => readFile(join('drizzle', f), 'utf8')))).join('\n');
   await writeFile(join(directory, 'migrations.sql'), sql);
-  const result = spawnSync(process.execPath, ['--test', 'tests/auth-api.test.cjs'], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
+  const selected = process.argv.slice(2);
+  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : ['tests/auth-api.test.cjs', 'tests/model-keys-api.test.cjs'])], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }
+

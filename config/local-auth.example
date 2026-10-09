@@ -2,3 +2,5 @@
 GITHUB_CLIENT_ID="replace-with-local-oauth-client-id"
 GITHUB_CLIENT_SECRET="replace-with-local-oauth-client-secret"
 SESSION_SECRET="replace-with-an-independently-generated-random-secret-of-at-least-32-characters"
+MODEL_KEY_ENCRYPTION_SECRET="replace-with-an-independent-32-byte-random-secret-as-64-hex-characters"
+

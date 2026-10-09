@@ -3,6 +3,7 @@ import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resolve, type Action, type AIUsage } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
 import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, type BudgetLimits } from '@/lib/activities';
+import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable, ModelKeyError } from '@/lib/model-keys';
 
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -47,7 +48,7 @@ export async function GET() {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply(loaded);
+    return reply({ ...loaded, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
   } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
@@ -59,15 +60,26 @@ export async function POST(request: Request) {
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    const b = JSON.parse(raw) as { operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
+    let b: { operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
+    try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
+    if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
+      if (!['ai', 'openai'].includes(b.mode || '')) return reply({ error: '請選擇要設定 Key 的模型服務。' }, 400);
+      const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
+      if (b.operation === 'set-model-key') await saveModelKey(id, provider, b.key);
+      else await clearModelKey(id, provider);
+      return reply({ modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+    }
+    if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
     if (!['advance', 'intervene', 'direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     const limits = b.limits || defaultLimits;
     if (!Number.isInteger(limits.calls) || limits.calls < 3 || limits.calls > 120 || !Number.isInteger(limits.tokens) || limits.tokens < 1000 || limits.tokens > 500000) return reply({ error: '請設定每小時 3–120 次呼叫、1,000–500,000 token 的上限。' }, 400);
     if (b.operation === 'advance') {
       if (![15, 30].includes(b.minutes || 0)) return reply({ error: '請選擇 15 或 30 分鐘。' }, 400);
-      if (b.mode !== 'demo' && (typeof b.key !== 'string' || !b.key.trim() || typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入 API Key 與模型 ID。' }, 400);
+      if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
+      if (b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
     }
     const { world, version } = await loadWorld(id);
     normalizeWorld(world);
@@ -112,9 +124,12 @@ export async function POST(request: Request) {
     } else {
       const before = structuredClone(world);
       try {
+        let dispatchKey = '';
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
-          limits, decide: (w, c, onUsage) => aiDecision(w, c, b.key!.trim(), b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage),
+          limits,
+          beforeDecision: async () => { dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'); },
+          decide: (w, c, onUsage) => aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage),
         });
       } catch (e) {
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
@@ -133,8 +148,10 @@ export async function POST(request: Request) {
     const usage = currentUsage(world);
     return reply({ world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) });
   } catch (e) {
+    if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。' }, 502);
   } finally {
     if (locked) await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run();
   }
 }
+

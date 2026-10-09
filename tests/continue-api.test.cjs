@@ -7,7 +7,7 @@ const { seedWorld, record } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'openai', ...body }) });
-const advance = () => POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', key: 'test-key', limits: { calls: 120, tokens: 500000 } }));
+const advance = async () => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const queue = [{ id: 'reply-later', content: '稍後回覆', intensity: 'medium', importance: 'medium', urgency: 'low', context: '先完成手上工作' }];
 const action = type => ({ type, target: '', content: '', mood: '平靜', durationMinutes: 90, intents: queue });
 async function model(respond, run) {
@@ -115,3 +115,4 @@ test('a later provider failure rolls back a previously selected continuation and
     assert.equal(saved.aiUsage.inputTokens, 30);
   });
 });
+

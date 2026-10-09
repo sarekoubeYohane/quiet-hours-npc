@@ -15,6 +15,13 @@
       "when": 1791533443845,
       "tag": "0001_hard_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791546311948,
+      "tag": "0002_account_model_keys",
+      "breakpoints": true
     }
   ]
 }

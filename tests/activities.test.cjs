@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Tests load a temporary transpiled build. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -68,7 +69,8 @@ test('API failure rolls back a partial round but persists attempts and reported 
   const world = seedWorld(); store.install(world); const originalFetch = global.fetch; let calls = 0;
   global.fetch = async () => ++calls === 1 ? Response.json({ usage: { prompt_tokens: 100, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] }) } }] }) : new Response('', { status: 429 });
   try {
-    const response = await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', key: 'unit-test-key' }) }));
+    await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
+    const response = await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna' }) }));
     assert.equal(response.status, 502);
     const saved = store.snapshot();
     assert.equal(saved.minute, world.minute); assert.equal(saved.turn, 0);
@@ -82,8 +84,9 @@ test('API failure rolls back a partial round but persists attempts and reported 
 test('API persists a completed round and rejects origin mismatch before requesting AI', async () => {
   store.install(seedWorld()); const originalFetch = global.fetch; let calls = 0;
   global.fetch = async () => { calls++; return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] }) } }] }); };
-  const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', key: 'unit-test-key', limits: { calls: 4, tokens: 30000 } }) });
+  const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 4, tokens: 30000 } }) });
   try {
+    await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
     assert.equal((await POST(request('https://other.invalid'))).status, 403); assert.equal(calls, 0);
     const first = await POST(request('https://test.invalid')); assert.equal(first.status, 200);
     assert.equal((await first.json()).limitReached, true); assert.equal(store.snapshot().turn, 1);
@@ -160,3 +163,4 @@ test('model receives only its own established habits, without raw statistics or 
   assert.equal(data.learnedHabits.some(h => h.tendency.includes('畫髮飾')), false);
   assert.equal(JSON.stringify(data.learnedHabits).includes('lastSeen'), false);
 });
+

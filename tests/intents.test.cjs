@@ -8,7 +8,7 @@ const { GET, POST } = build('route');
 const store = build('store');
 const intent = (id, content, context = '') => ({ id, content, intensity: 'high', importance: 'medium', urgency: 'low', context });
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'openai', ...body }) });
-const advance = () => POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', key: 'unit-test-key', limits: { calls: 120, tokens: 500000 } }));
+const advance = async () => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const decision = (intents, action = {}) => ({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents, ...action });
 const withModel = async (respond, run) => {
   const original = global.fetch;
@@ -149,3 +149,4 @@ test('a storage conflict leaves no partially saved queue or activity', async () 
     assert.equal(saved.aiUsage.totalOutputTokens, 80);
   });
 });
+

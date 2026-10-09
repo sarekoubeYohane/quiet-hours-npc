@@ -20,7 +20,7 @@ test('old worlds gain an independent cafe owner without replacing existing progr
   assert.equal(saved.turn, 8); assert.equal(saved.minute, 1380);
 });
 
-const advance = () => POST(request({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', key: 'unit-test-key', limits: { calls: 120, tokens: 500000 } }));
+const advance = async () => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const withModel = async run => {
   const original = global.fetch; const called = [];
   global.fetch = async (_url, init) => {
@@ -79,3 +79,4 @@ test('failed model round restores pending direct action and no action leaks to u
     assert.ok(saved.characters.filter(c => c.id !== 'owner').every(c => !c.memories.some(m => m.text.includes('店主自己的秘密'))));
   });
 });
+
