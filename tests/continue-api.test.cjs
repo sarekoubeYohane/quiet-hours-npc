@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld, record } = build('world');
+const { aiDecision } = build('models');
 const { GET, POST } = build('route');
 const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'openai', ...body }) });
@@ -32,6 +33,7 @@ test('NPC sees its current activity progress when a known message prompts a deci
     assert.deepEqual(data.self.plan, world.characters[0].plan);
     assert.equal(data.currentActivity.elapsedMinutes, 30);
     assert.equal(data.currentActivity.remainingMinutes, 60);
+    assert.equal(data.currentActivity.canContinueExisting, true);
     return action('rest');
   }, async () => assert.equal((await advance()).status, 200));
 });
@@ -98,6 +100,49 @@ test('a continuation without a current activity rolls back the round and retains
     assert.equal(saved.aiUsage.calls, 1);
     assert.equal(saved.aiUsage.inputTokens, 30);
   });
+});
+
+for (const scenario of ['rule mode', 'other model', 'expired activity', 'no activity', 'one-time action']) {
+  test(`OpenAI offers a new action for ${scenario} and saves the round without retries`, async () => {
+    const world = busyWorld();
+    for (const character of world.characters) {
+      if (scenario === 'rule mode') character.plan.modelKey = 'demo';
+      if (scenario === 'other model') character.plan.modelKey = 'openai:gpt-6.1-sol';
+      if (scenario === 'expired activity') character.plan.until = world.minute;
+      if (scenario === 'one-time action') character.plan.action = { type: 'say', target: 'observer', content: '已回覆' };
+      if (scenario === 'no activity') delete character.plan;
+    }
+    store.install(world);
+    let calls = 0;
+    await model((_data, payload) => {
+      calls++;
+      const allowed = payload.response_format.json_schema.schema.properties.type.enum;
+      return action(allowed.includes('continue') ? 'continue' : 'rest');
+    }, async () => {
+      const response = await advance();
+      const body = await response.json();
+      assert.equal(response.status, 200, body.error);
+      const saved = await read();
+      assert.equal(saved.turn, 1);
+      assert.equal(calls, world.characters.length);
+      assert.ok(saved.characters.every(character => character.plan.modelKey === 'openai:gpt-6-luna'));
+    });
+  });
+}
+
+test('OpenRouter continuation eligibility uses its own provider/model and rejects invalid continuation without retry', async () => {
+  const world = busyWorld(), cass = world.characters[0];
+  cass.plan.modelKey = 'ai:fixture/model';
+  let calls = 0;
+  const fetcher = async (_url, init) => {
+    calls++;
+    const payload = JSON.parse(init.body), data = JSON.parse(payload.messages[1].content);
+    assert.equal(data.currentActivity.canContinueExisting, calls === 1);
+    return Response.json({ choices: [{ message: { content: JSON.stringify(action('continue')) } }] });
+  };
+  assert.equal((await aiDecision(world, cass, 'unit-test-key', 'fixture/model', 'openrouter', fetcher)).continueExisting, true);
+  await assert.rejects(aiDecision(world, cass, 'unit-test-key', 'fixture/other', 'openrouter', fetcher), /有效的意圖與行動格式/);
+  assert.equal(calls, 2);
 });
 
 test('a later provider failure rolls back a previously selected continuation and its queue', async () => {
