@@ -1,67 +1,59 @@
 # 感知 PoC 工作拆分
 
-狀態：to-tickets 拆分提案；每張工作票的內容與驗收條件已備妥，待使用者確認粒度與阻擋關係後發布。尚未實作。
+狀態：使用者於 2026-10-10 確認拆分，5 張工作票已發布並標記 ready-for-agent。尚未實作。
 父規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)
 日期：2026-10-10
 
-## 拆分原則
+## 已發布工作票
 
-每張票完成一段可從世界操作、保存、角色決策輸入到畫面驗收的行為。保存、資訊隔離、接管相容與測試隨各切片交付，不另切成資料層、API 層或純 UI 票。
-
-目前沒有必須先做的廣泛機械重構；T1 開始時完成必要的小型責任整理，以既有 API 測試保持行為，再建立直接感知流程。
-
-## 概覽
-
-1. **T1：咖啡館直接感知與知情隔離**
-   - Blocked by：無，可先開始
-   - 交付：在前台／儲藏室移動及開關門後，不同角色只收到各自可直接看見／聽見的內容，使用者能展開比較。
-
-2. **T2：不確定線索的 D20 與結果保存**
-   - Blocked by：T1
-   - 交付：同一事件下，角色依環境、能力與注意力取得清楚、模糊或沒有新線索的結果，重載仍維持同一結果。
-
-3. **T3：關注條件與每輪決策上限**
-   - Blocked by：T1
-   - 交付：NPC 一般收到線索時可繼續活動，相關或重要線索才提前評估；同輪多事件也最多一次模型行動決策。
-
-4. **T4：主動查探與有效重試**
-   - Blocked by：T2
-   - 交付：角色聽見動靜後可查看、聆聽、開門或靠近取得新線索；持續查看及重複相同方法不能刷骰。
-
-5. **T5：情境優先的錯誤感知與自然反應**
-   - Blocked by：T2、T3
-   - 交付：大失敗可讓角色誤聽／誤看，或感覺到不存在的刺激；依期待加權隨機選取，並能影響角色既有關注與反應。
+| 工作票 | 直接阻擋 | 可驗收的交付 |
+| --- | --- | --- |
+| [#42 T1：咖啡館直接感知與知情隔離](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/42) | 無，可先開始 | 在前台／儲藏室移動及開關門後，不同角色只收到各自可直接看見／聽見的內容，使用者能展開比較。 |
+| [#43 T2：不確定線索的 D20 與結果保存](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/43) | [#42](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/42) | 同一事件下，角色依環境、能力與注意力取得清楚、模糊或沒有新線索的結果，重載仍維持同一結果。 |
+| [#44 T3：關注條件與每輪決策上限](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/44) | [#42](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/42) | NPC 一般收到線索時可繼續活動，相關或重要線索才提前評估；同輪多事件也最多一次模型行動決策。 |
+| [#45 T4：主動查探與有效重試](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/45) | [#43](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/43) | 角色聽見動靜後可查看、聆聽、開門或靠近取得新線索；持續查看及重複相同方法不能刷骰。 |
+| [#46 T5：情境優先的錯誤感知與自然反應](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/46) | [#43](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/43)、[#44](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/44) | 大失敗可讓角色誤聽／誤看，或感覺到不存在的刺激；依期待加權隨機選取，並能影響角色既有關注與反應。 |
 
 ```mermaid
 flowchart TD
-  T1["T1 直接感知"] --> T2["T2 D20"]
-  T1 --> T3["T3 關注與決策"]
-  T2 --> T4["T4 主動查探"]
-  T2 --> T5["T5 錯誤感知"]
+  T1["#42 直接感知"] --> T2["#43 D20"]
+  T1 --> T3["#44 關注與決策"]
+  T2 --> T4["#45 主動查探"]
+  T2 --> T5["#46 錯誤感知"]
   T3 --> T5
 ```
 
-T1 是最初可開始的工作。T2／T3 在依賴上互不阻擋，實際並行修改前仍需協調共用介面。T4 不必等待 T3；T5 不必等待 T4。上圖僅列直接阻擋，發布後使用 GitHub 原生子工作票與阻擋關係。
+目前可以開始 #42。#43／#44 在依賴上互不阻擋；#45 不必等 #44，#46 不必等 #45。各票只有在全部阻擋票完成後才能開始。
 
-## 舊工作票處理提案
+目前連接器未提供原生子工作票／阻擋關係寫入，且本機無可用 gh；依專案替代規則，每張票以 Part of #41 及 Blocked by 真實 Issue 編號記錄關係。這些是文字關係，未建立 GitHub 原生父子／阻擋連結。
 
-| 舊票 | 新票對照 | 建議處理 |
+## 拆分與驗收原則
+
+- 每張票完成可從世界操作、保存、角色決策輸入到畫面驗收的完整行為；保存、資訊隔離與接管相容隨切片交付。
+- 沒有獨立的廣泛機械重構前置票；#42 起始完成必要的小型責任整理並保持既有行為。
+- 33 條父規格使用者故事均有工作票涵蓋，直接阻擋圖無循環。
+- 每票沿用世界 API、模型服務替身及固定亂數（適用時），補少量新增畫面驗收；完成 #46 後核對跨票情境。
+- 發布驗證確認 5 張票內容與標籤、文字父規格／阻擋關係及舊票關閉狀態；未執行產品功能測試，尚未開始實作。
+
+## 舊票處理結果
+
+| 舊票 | 承接工作票 | 狀態 |
 | --- | --- | --- |
-| #14 直接觀察 | T1；主動查看部分由 T4 承接 | 新票發布後標示取代關係，關閉為 not_planned，不宣稱已完成實作 |
-| #15 不確定觀察 | T2、T3、T4 | 新票發布後標示取代關係，關閉為 not_planned |
-| #17 錯誤認知 | T5 | 新票取代舊的「只允許真實誤導線索」限制，關閉舊票為 not_planned |
-| #16 主觀記憶分類 | 不納入本輪 | 保持暫停，等待 Memory & Belief Grill |
-| #18 信念修正 | 不納入本輪 | 保持暫停，等待 Memory & Belief Grill |
+| #14 直接觀察 | #42、#45 | 已附取代說明，closed / not_planned |
+| #15 不確定觀察 | #43、#44、#45 | 已附取代說明，closed / not_planned |
+| #17 錯誤認知 | #46 | 已附取代說明，closed / not_planned |
+| #16 主觀記憶分類 | 留待 Memory & Belief | 保持 open、設計暫停 |
+| #18 信念修正 | 留待 Memory & Belief | 保持 open、設計暫停 |
 
-以上舊票尚未變更；新票也尚未建立。發布新票後才處理取代標示，不修改或關閉父規格 #7／#41。既有 Action Resolution 已合併的能力作為程式基線，無須把仍開著的舊行動票狀態當作新工作的額外阻擋。
+關閉舊票表示新規格取代早期草稿，不表示功能已實作。父規格 #7／#41 未修改或關閉；新感知工作不依賴待重新 Grill 的 Memory & Belief 票。
 
-## 可發布的工作票草稿
+## 已發布工作票內容
 
-### T1：咖啡館直接感知與知情隔離
+### [T1：咖啡館直接感知與知情隔離](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/42)
 
 #### Parent
 
-Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）。
+Part of #41（[NPC 感知規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)）。
 
 #### What to build
 
@@ -86,15 +78,19 @@ Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）�
 
 None (can start immediately).
 
-#### Coverage
+#### Further notes
 
-對應父規格使用者故事：1、2、3、4、9、10、26、27、28、29、30、31、32、33。
+- 對應父規格使用者故事：1、2、3、4、9、10、26、27、28、29、30、31、32、33。
+- [已確認工作拆分](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/design/npc-perception-ticket-plan.md)。每個阻擋工作完成後才可開始本票。
+- 目前連接器未提供原生子工作票／阻擋關係寫入，依專案規則使用上述 Parent 與 Blocked by 欄位。
+- 本票建立不代表已實作、部署或進行付費模型試跑。
 
-### T2：不確定線索的 D20 與結果保存
+
+### [T2：不確定線索的 D20 與結果保存](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/43)
 
 #### Parent
 
-Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）。
+Part of #41（[NPC 感知規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)）。
 
 #### What to build
 
@@ -116,17 +112,21 @@ Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）�
 
 #### Blocked by
 
-- T1（發布時換成真實 Issue 並建立原生阻擋關係）
+- #42（T1：咖啡館直接感知與知情隔離）
 
-#### Coverage
+#### Further notes
 
-對應父規格使用者故事：5、6、7、8、11、12、25、29、30、31。
+- 對應父規格使用者故事：5、6、7、8、11、12、25、29、30、31。
+- [已確認工作拆分](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/design/npc-perception-ticket-plan.md)。每個阻擋工作完成後才可開始本票。
+- 目前連接器未提供原生子工作票／阻擋關係寫入，依專案規則使用上述 Parent 與 Blocked by 欄位。
+- 本票建立不代表已實作、部署或進行付費模型試跑。
 
-### T3：關注條件與每輪決策上限
+
+### [T3：關注條件與每輪決策上限](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/44)
 
 #### Parent
 
-Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）。
+Part of #41（[NPC 感知規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)）。
 
 #### What to build
 
@@ -149,17 +149,21 @@ NPC 一般收到線索時可繼續活動，相關或重要線索才提前評估�
 
 #### Blocked by
 
-- T1（發布時換成真實 Issue 並建立原生阻擋關係）
+- #42（T1：咖啡館直接感知與知情隔離）
 
-#### Coverage
+#### Further notes
 
-對應父規格使用者故事：8、18、19、20、21、22、23、27、28、30、31。
+- 對應父規格使用者故事：8、18、19、20、21、22、23、27、28、30、31。
+- [已確認工作拆分](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/design/npc-perception-ticket-plan.md)。每個阻擋工作完成後才可開始本票。
+- 目前連接器未提供原生子工作票／阻擋關係寫入，依專案規則使用上述 Parent 與 Blocked by 欄位。
+- 本票建立不代表已實作、部署或進行付費模型試跑。
 
-### T4：主動查探與有效重試
+
+### [T4：主動查探與有效重試](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/45)
 
 #### Parent
 
-Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）。
+Part of #41（[NPC 感知規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)）。
 
 #### What to build
 
@@ -180,17 +184,21 @@ T2 已間接包含 T1 的場景操作，故只列直接阻擋 T2。此票可由�
 
 #### Blocked by
 
-- T2（發布時換成真實 Issue 並建立原生阻擋關係）
+- #43（T2：不確定線索的 D20 與結果保存）
 
-#### Coverage
+#### Further notes
 
-對應父規格使用者故事：13、24、25、27、28、29、31。
+- 對應父規格使用者故事：13、24、25、27、28、29、31。
+- [已確認工作拆分](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/design/npc-perception-ticket-plan.md)。每個阻擋工作完成後才可開始本票。
+- 目前連接器未提供原生子工作票／阻擋關係寫入，依專案規則使用上述 Parent 與 Blocked by 欄位。
+- 本票建立不代表已實作、部署或進行付費模型試跑。
 
-### T5：情境優先的錯誤感知與自然反應
+
+### [T5：情境優先的錯誤感知與自然反應](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/46)
 
 #### Parent
 
-Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）。
+Part of #41（[NPC 感知規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)）。
 
 #### What to build
 
@@ -213,21 +221,14 @@ Part of #41（NPC 感知規格：咖啡館 PoC、主觀線索與錯誤感知）�
 
 #### Blocked by
 
-- T2（發布時換成真實 Issue 並建立原生阻擋關係）
-- T3（發布時換成真實 Issue 並建立原生阻擋關係）
+- #43（T2：不確定線索的 D20 與結果保存）
+- #44（T3：關注條件與每輪決策上限）
 
-#### Coverage
+#### Further notes
 
-對應父規格使用者故事：14、15、16、17、18、25、26、27、28、29、30、31。
+- 對應父規格使用者故事：14、15、16、17、18、25、26、27、28、29、30、31。
+- [已確認工作拆分](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/design/npc-perception-ticket-plan.md)。每個阻擋工作完成後才可開始本票。
+- 目前連接器未提供原生子工作票／阻擋關係寫入，依專案規則使用上述 Parent 與 Blocked by 欄位。
+- 本票建立不代表已實作、部署或進行付費模型試跑。
 
 
-## 覆蓋與驗證
-
-- 33 條使用者故事均有對應切片；跨票共通約束在各票的驗收中重複列出，避免中間切片洩漏資訊或丟失資料。
-- 每票沿用世界 API 主入口、模型服務替身及固定亂數（適用時），補少量新增畫面操作驗收。
-- 每票需維持既有行動、持續活動、接管與保存規則的相容性；T5 完成時核對父規格跨票案例，但不另開純整合／純測試橫向票。
-- 本次文件驗證只確認內容、故事覆蓋與依賴圖無循環，未執行或宣稱產品功能測試通過。
-
-## 發布條件
-
-依 to-tickets 技能，需讓使用者確認上述粒度、直接阻擋關係與是否合併／拆分。確認後按 T1、T2、T3、T4、T5 順序發布，全部套用 ready-for-agent、連至 #41，並建立原生阻擋關係；若平台能力不足才使用文字阻擋欄位。

@@ -1,6 +1,6 @@
 # NPC 感知規格：咖啡館 PoC
 
-正式規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)。[工作拆分提案](npc-perception-ticket-plan.md)待確認。
+正式規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)。[已發布工作拆分](npc-perception-ticket-plan.md)：#42–#46，全部標記 ready-for-agent。
 
 狀態：正式感知 PoC 規格；使用者已要求進入 to-tickets，沿用下述測試入口。尚未實作。
 日期：2026-10-10
