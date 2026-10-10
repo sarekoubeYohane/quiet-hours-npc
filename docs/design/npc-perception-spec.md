@@ -1,6 +1,8 @@
 # NPC 感知規格：咖啡館 PoC
 
-狀態：to-spec 規格草案已整理；待使用者確認 Testing Decisions 的測試入口後，發布至 GitHub Issues 並標記 ready-for-agent。尚未實作。
+正式規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)。[工作拆分提案](npc-perception-ticket-plan.md)待確認。
+
+狀態：正式感知 PoC 規格；使用者已要求進入 to-tickets，沿用下述測試入口。尚未實作。
 日期：2026-10-10
 程式基準：main 提交 2477af41508dbf6e58fa66ac2d67cf33788634a8。
 設計依據：本次 27 題感知 Grill 與其後的範圍收斂；後續決定優先於早期草稿。
@@ -138,7 +140,7 @@
 
 ## Testing Decisions
 
-測試入口提案：以既有世界操作 API 為主要行為驗收入口，搭配既有模型服務替身檢查實際送出的角色上下文；少量畫面驗收確認接管操作與展開詳情。此提案待使用者確認。
+測試入口：以既有世界操作 API 為主要行為驗收入口，搭配既有模型服務替身檢查實際送出的角色上下文；少量畫面驗收確認接管操作與展開詳情。使用者於 2026-10-10 要求進入 to-tickets，沿用此測試方案。
 
 - 好的測試從世界操作進入，檢查保存後的主觀結果、行為、模型請求與呼叫次數；不以內部函式呼叫順序、資料結構快照或私有輔助函式作主要斷言。
 - 沿用現有 D20 API、持續活動、接管與儲存衝突測試的方式：使用暫存世界資料庫、固定亂數與模型回應替身。感知新增結果可從相同入口驗證，不另建公開骰子控制端點或獨立測試管理系統。
@@ -182,7 +184,7 @@
 - 角色能力養成或自動生成感知專長、通用任意條件語言。
 - 每次感知額外模型呼叫、同輪緊急第二次模型行動決策、獨立待評估事件佇列。
 - 背景自動推進排程、帳號／Key／部署等 Infra 工作。
-- 本階段的任務拆分與程式實作。
+- 本規格發布本身不包含程式實作；工作拆分另依 to-tickets 進行。
 
 ## Further Notes
 
@@ -196,7 +198,7 @@
 | 機會識別、保存與模型輸入隔離 | 納入本次必要工程與驗收，不另開產品訪談 |
 | 記憶與認知 | 另行 Grill；本次只提供帶時間與來源的主觀觀察 |
 | 既有早期工作票 | #14、#15、#17 待之後 to-tickets 對照本規格重寫／取代；#16、#18 留待 Memory & Belief。現在不直接恢復執行或關閉 |
-| 測試入口 | 尚待使用者確認本規格的 API 主入口＋模型輸入檢查＋少量畫面驗收 |
+| 測試入口 | 沿用 API 主入口＋模型輸入檢查＋少量畫面驗收，進入工作拆分 |
 
 ### 設計依據與發布流程
 
@@ -204,4 +206,4 @@
 - [用語表](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/GLOSSARY.md)
 - [關注條件的資訊邊界 ADR](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/docs/perception-grill-20261010/docs/adr/0001-perception-uses-known-clues.md)
 - 舊規格 #7 與早期工作票不可覆蓋本次後續確認的大失敗、主觀感知與成本邊界。
-- 按 to-spec 技能，測試入口確認後發布正式 GitHub Issue，套用 ready-for-agent；不自動開始 to-tickets 或 implement-spec。
+- 正式規格以 GitHub Issue 發布並套用 ready-for-agent；依使用者指示進入 to-tickets，工作拆分確認後才發布子工作票。尚未開始 implement-spec。
