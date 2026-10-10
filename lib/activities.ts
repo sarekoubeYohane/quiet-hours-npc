@@ -29,10 +29,14 @@ export function attentionMarker(world: World, character: Character): string {
   return world.events.findLast(event => event.actor !== character.id && attentionKinds.has(event.kind) && event.audience.includes(character.id))?.id || '';
 }
 
-export function canContinue(world: World, character: Character, modelKey: string): boolean {
+export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;
   return !!plan && sustained.has(plan.action.type) && plan.modelKey === modelKey &&
-    world.minute <= plan.until && plan.attention === attentionMarker(world, character) &&
+    world.minute <= plan.until;
+}
+
+export function canContinue(world: World, character: Character, modelKey: string): boolean {
+  return canResumeActivity(world, character, modelKey) && character.plan!.attention === attentionMarker(world, character) &&
     pendingInterventions(world, character).length === 0;
 }
 
@@ -118,12 +122,12 @@ export async function advanceActivities(world: World, options: {
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
     if (decision.continueExisting) {
-      if (!character.plan || !sustained.has(character.plan.action.type) || character.plan.modelKey !== modelKey || world.minute > character.plan.until) {
+      if (!canResumeActivity(world, character, modelKey)) {
         throw Error('沒有可延續的原活動，請選擇新行動。');
       }
       if (decision.intents) character.intents = decision.intents;
-      character.plan.attention = attentionMarker(world, character);
-      record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
+      character.plan!.attention = attentionMarker(world, character);
+      record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan!.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
       continue;
     }
     if (decision.intents) character.intents = decision.intents;
