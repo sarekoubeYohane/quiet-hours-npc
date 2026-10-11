@@ -30,7 +30,7 @@ function busyWorld() {
 test('NPC sees its current activity progress when a known message prompts a decision', async () => {
   const world = busyWorld(); record(world, 'observer', '稍後想聊聊', 'intervention', ['cass']); store.install(world);
   await model(data => {
-    assert.deepEqual(data.self.plan, world.characters[0].plan);
+    assert.deepEqual(data.self.plan, { action: { type: 'rest' }, startedAt: 1245, until: 1335 });
     assert.equal(data.currentActivity.elapsedMinutes, 30);
     assert.equal(data.currentActivity.remainingMinutes, 60);
     assert.equal(data.currentActivity.canContinueExisting, true);

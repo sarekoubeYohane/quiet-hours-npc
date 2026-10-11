@@ -11,10 +11,13 @@ export function decisionObservations(character: Character) {
   const observations = character.observations || [], cursor = character.observationCursor || 0;
   return observations.slice(Math.max(0, cursor - 12));
 }
+export function matchesAttentionCondition(character: Character, observation: Pick<Observation, 'kind' | 'source' | 'region'>) {
+  return !!character.attentionConditions?.some(condition => condition.kind === observation.kind &&
+    (!condition.source || condition.source === observation.source) && (!condition.region || condition.region === observation.region));
+}
 export function observationAttention(character: Character, observation: Observation): string | undefined {
   if (observation.urgency) return { direct: '直接互動', strong: '強烈刺激', danger: '已察覺危險' }[observation.urgency];
-  if (character.attentionConditions?.some(condition => condition.kind === observation.kind &&
-    (!condition.source || condition.source === observation.source) && (!condition.region || condition.region === observation.region))) return '符合關注條件';
+  if (matchesAttentionCondition(character, observation)) return '符合關注條件';
 }
 export function parseAttention(world: World, character: Character, value: unknown): { conditions: AttentionCondition[]; diagnostics: string[] } {
   if (value === undefined) return { conditions: [], diagnostics: [] };

@@ -31,6 +31,26 @@ const withModel=async(actions,run)=>{
  global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]})}}]});};
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs,()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits:{calls:120,tokens:500000}})));}finally{global.fetch=old;}
 };
+test('quiet speech remains clear under visual occlusion without identifying its speaker or rolling dice',async()=>{
+ const w=seedWorld();w.scene.occluded=['cafe-front'];owner(w).control={mode:'taken-over'};
+ for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region=id==='cass'?'cafe-storeroom':'cafe-front';}
+ store.install(w);const random=Math.random;Math.random=()=>{throw Error('clear words must not roll');};
+ try{await withModel({vera:{type:'say',target:'cass',content:'聽得到但看不見的話'}},async(_inputs,advance)=>{
+  assert.equal((await advance()).status,200);const saved=await read();
+  const event=saved.events.find(e=>e.actor==='vera'&&e.kind==='say');assert.ok(event);
+  const trace=event.perception.find(t=>t.characterId==='owner');assert.equal(trace.status,'direct');
+  assert.equal(trace.resolution,undefined);assert.deepEqual(trace.observations.map(o=>({text:o.text,source:o.source,kind:o.kind,clarity:o.clarity})),[{text:'聽見有人說：「聽得到但看不見的話」',source:undefined,kind:'speech',clarity:'clear'}]);
+ });}finally{Math.random=random;}
+});
+test('direct loud speech shares speech validation and finishes once instead of becoming a sustained activity',async()=>{
+ const w=seedWorld(),cass=w.characters.find(c=>c.id==='cass');cass.location='cafe';cass.region='cafe-front';store.install(w);
+ await POST(req({operation:'takeover'}));
+ for(const action of [{type:'shout',target:'cass',content:''},{type:'shout',target:'vera',content:'太遠了'},{type:'shout',target:'owner',content:'自己'}])assert.equal((await POST(req({operation:'direct',action}))).status,400);
+ const saved=await act({type:'shout',target:'cass',content:'請過來一下！'});assert.equal(owner(saved).plan,undefined);assert.equal(owner(saved).control.pending,undefined);
+ assert.equal(saved.events.filter(e=>e.actor==='owner'&&e.kind==='shout').length,1);
+ assert.equal((await POST(req({operation:'advance',minutes:15}))).status,200);
+ assert.equal((await read()).events.filter(e=>e.actor==='owner'&&e.kind==='shout').length,1);
+});
 test('closed-door arrival gives a waiting owner only anonymous footsteps, persists once and stays subjective after return',async()=>{
  const w=seedWorld();owner(w).region='cafe-storeroom';w.scene={doors:{'cafe-door':'closed'},noise:{},occluded:[]};store.install(w);
  await POST(req({operation:'takeover'}));
@@ -117,10 +137,24 @@ test('uncertain closed-door speech has one saved D20 outcome without revealing w
   assert.deepEqual((await read()).events,saved.events);
  });}finally{Math.random=random;}
 });
+test('sustained observation boosts only the chosen sense and a perceptible target or direction',async()=>{
+ for(const [content,target,visible,attention] of [['hearing','cafe-front',false,2],['sight','',false,0],['hearing','vera',false,0],['hearing','vera',true,2]]){
+  const w=seedWorld();owner(w).region=visible?'cafe-front':'cafe-storeroom';owner(w).control={mode:'taken-over'};
+  w.scene.doors['cafe-door']=visible?'open':'closed';if(visible)w.scene.noise['cafe-front']='loud';
+  owner(w).plan={action:{type:'observe',target,content},startedAt:w.minute,until:w.minute+90,attention:'',modelKey:'openai:gpt-6-luna'};
+  for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
+  store.install(w);const random=Math.random;Math.random=()=>0.475;
+  try{await withModel({vera:{type:'say',target:'cass',content:'注意力不應透露這段話'}},async(_inputs,advance)=>{
+   assert.equal((await advance()).status,200);const event=(await read()).events.find(e=>e.actor==='vera'&&e.kind==='say');
+   const trace=event.perception.find(t=>t.characterId==='owner');assert.equal(trace.factors.attention,attention,JSON.stringify({content,target,visible}));
+   assert.equal(trace.resolution.modifier,attention);assert.equal(JSON.stringify(trace.observations).includes('注意力不應透露這段話'),false);
+  });}finally{Math.random=random;}
+ }
+});
 test('perception uses existing five outcomes, controlled ability and competing attention, and keeps ordinary passive failures silent',async()=>{
  for(const [roll,tags,working,outcome,modifier] of [[20,[],false,'critical-success',0],[12,[],false,'success',0],[6,[],false,'mixed',0],[2,[],false,'failure',0],[1,[],false,'critical-failure',0],[10,['聽覺敏銳','擅長髮飾設計'],false,'success',2],[12,['擅長髮飾設計'],true,'mixed',-2],[10,[],'observe','success',2],[8,['聽覺極敏銳'],'observe','success',4]]){
   const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).abilityTags=tags;w.scene.doors['cafe-door']='closed';
-  if(working)owner(w).plan={action:{type:working===true?'work':'observe',target:'cafe-storeroom',content:'整理杯子'},startedAt:w.minute,until:w.minute+120,attention:'',modelKey:'demo'};
+  if(working)owner(w).plan={action:{type:working===true?'work':'observe',target:working==='observe'?'cafe-front':'cafe-storeroom',content:working==='observe'?'hearing':'整理杯子'},startedAt:w.minute,until:w.minute+120,attention:'',modelKey:'demo'};
   for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
   owner(w).control={mode:'taken-over'};store.install(w);
   // A pre-existing controlled activity competes for attention.

@@ -1,5 +1,6 @@
 import type { Character, World } from './world';
 import type { Observation, SensoryCandidate } from './perception';
+import { matchesAttentionCondition } from './attention';
 
 export type FalsePerceptionTemplate = {
   id: string; type: 'distortion' | 'no-stimulus'; sense: Observation['sense'];
@@ -35,8 +36,7 @@ export function falsePerception(world: World, character: Character, clues: Senso
         text: template.text.replace('{self}', character.name).replace('{source}', contact?.name || ''),
         clarity: 'vague', direct: false, ...(contact ? { source: contact.id } : {}),
         region: template.sense === 'sight' ? clue.region || character.region : character.region, ...(template.urgency ? { urgency: template.urgency } : {}) };
-      const related = character.attentionConditions?.some(condition => condition.kind === candidate.kind &&
-        (!condition.source || condition.source === candidate.source) && (!condition.region || condition.region === candidate.region)) ||
+      const related = matchesAttentionCondition(character, candidate) ||
         contact && character.intents?.some(intent => [intent.content, intent.context].some(text => text.includes(contact.name) || text.includes(contact.id)));
       applicable.push({ candidate, template, weight: related ? falsePerceptionRules.relatedWeight : falsePerceptionRules.otherWeight });
     }

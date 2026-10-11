@@ -66,16 +66,29 @@ export function eventCandidates(world: World, observer: Character, event: import
     const state = world.scene?.doors[door.id] === 'closed' ? '關上' : '打開';
     return [{ sense: visible ? 'sight' : 'hearing', kind: 'door', text: `${door.name}${state}了。`, clarity: 'clear', region: here, ...(visible ? { source: actor.id } : {}), direct: true }];
   }
-  if (['say', 'attempt'].includes(event.kind) && event.scene.content && event.scene.target !== 'observer') {
+  if (['say', 'shout', 'attempt'].includes(event.kind) && event.scene.content && event.scene.target !== 'observer') {
     if (!audible) return [];
-    const clear = visible && world.scene?.noise[here] !== 'loud';
-    return [{ sense: 'hearing', kind: clear ? 'speech' : 'sound', text: clear ? `${actor.name} 說：「${event.scene.content}」` : '聽見模糊的說話聲。', clarity: clear ? 'clear' : 'vague', ...(clear ? { source: actor.id } : {}), region: here, interference: world.scene?.noise[here] === 'loud' && !visible ? 'strong' : 'medium', ...(clear && event.scene.target === observer.id ? { urgency: 'direct' as const } : {}), direct: clear }];
+    const doorway = connectingDoor(here, destination);
+    const content = event.scene.content;
+    const clear = world.scene?.noise[here] !== 'loud' && (here === destination || !!doorway && world.scene?.doors[doorway.id] === 'open');
+    const strong = event.kind === 'shout';
+    // Scheduling urgency derives only from words actually perceived; a warning
+    // remains someone's speech and never creates danger in the scene.
+    const warning = clear && perceptionRules.warningPrefixes.some(prefix => content.startsWith(prefix));
+    const direction = doorway ? `${doorway.name}方向` : '附近';
+    const text = clear ? visible ? `${actor.name} 說：「${content}」` : `聽見有人說：「${content}」` :
+      strong ? `${direction}傳來大聲喊叫。` : visible ? `${actor.name} 的說話聲被噪音蓋住，聽不清內容。` : `${direction}傳來模糊的說話聲。`;
+    return [{ sense: 'hearing', kind: clear ? 'speech' : 'sound', text, clarity: clear ? 'clear' : 'vague',
+      ...(visible ? { source: actor.id } : {}), region: destination,
+      interference: world.scene?.noise[here] === 'loud' && !visible ? 'strong' : 'medium',
+      ...(warning ? { urgency: 'danger' as const } : strong ? { urgency: 'strong' as const } : clear && event.scene.target === observer.id ? { urgency: 'direct' as const } : {}), direct: strong || clear }];
   }
   if (['work', 'rest', 'attempt'].includes(event.kind) && visible) return [{ sense: 'sight', kind: 'activity', text: event.text, clarity: 'clear', source: actor.id, region: destination, direct: true }];
   return [];
 }
 // Controlled configuration: prose personality and model output never grant abilities.
 export const perceptionRules = {
+  warningPrefixes: ['小心！', '小心!', '救命！', '救命!', '失火了！', '失火了!', '快躲開！', '快躲開!'],
   abilities: {
     sight: { '視覺敏銳': 2, '視覺極敏銳': 4, '視力較弱': -2, '視力很弱': -4 },
     hearing: { '聽覺敏銳': 2, '聽覺極敏銳': 4, '聽力較弱': -2, '聽力很弱': -4 },
@@ -91,7 +104,9 @@ export function resolvePerception(world: World, character: Character, eventId: s
     return values.length ? values.reduce((a, b) => Math.abs(a) >= Math.abs(b) ? a : b) : 0;
   }));
   const action = character.plan?.action;
-  const attention = focused ? 2 : action?.type === 'observe' && (!action.target || action.target === here) ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
+  const observing = action?.type === 'observe' && candidates.some(candidate => candidate.sense === (action.content === 'hearing' ? 'hearing' : 'sight') &&
+    (!action.target || action.target === candidate.region || action.target === candidate.source));
+  const attention = focused || observing ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
   const modifier = Math.max(-4, Math.min(4, ability + attention)) as Advantage;
   const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => [c.sense, c.kind, c.text, c.source, c.region]).sort(), interference, ability, attention]);
   const previous = world.perceptionTrials?.[opportunity];
@@ -114,11 +129,22 @@ export function saveObservation(world: World, character: Character, observation:
   character.observations.push(observation);
   remember(world, character, observation.text);
 }
+// Passive events and active probes share the same subjective projection and
+// persistence; only their observer-facing explanations differ.
+function observationTrace(world: World, character: Character, event: import('./world').WorldEvent, candidates: SensoryCandidate[], trial?: PerceptionTrial, active = false): PerceptionTrace {
+  const selected = [...candidates.filter(candidate => candidate.direct), ...(trial?.candidates || [])];
+  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
+  for (const observation of observations) saveObservation(world, character, observation);
+  const status = trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity';
+  const reason = active ? trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索' :
+    trial?.falsePerception ? '取得錯誤主觀感知' : trial ? observations.length ? '察覺可接觸的線索' : '有感知機會但未察覺新線索' : observations.length ? '直接察覺' : '沒有可接觸的線索';
+  return { characterId: character.id, status, observations, reason, ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) };
+}
 // Called only for newly confirmed events. Reload/normalization never replays history.
 export function perceiveEvent(world: World, event: import('./world').WorldEvent) {
   if (event.perception) return;
   normalizePerception(world);
-  if (event.actor && event.scene && ['move', 'work', 'rest', 'reflect', 'observe', 'say', 'attempt', 'door', 'message'].includes(event.kind)) {
+  if (event.actor && event.scene && ['move', 'work', 'rest', 'reflect', 'observe', 'say', 'shout', 'attempt', 'door', 'message'].includes(event.kind)) {
     if (event.kind === 'move') world.currentSensory!.presence[event.actor] = { region: event.scene.toRegion!, clue: event.id };
     world.currentSensory!.activities[event.actor] = { clue: event.id, region: event.scene.toRegion!, action: { type: event.kind as import('./world').Action['type'], target: event.scene.target } };
   }
@@ -135,11 +161,9 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent)
     const candidates = eventCandidates(world, character, event);
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;
-    const selected = [...candidates.filter(item => item.direct), ...(trial?.candidates || [])];
-    const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
-    for (const observation of observations) saveObservation(world, character, observation);
-    if (observations.length) audience.push(character.id);
-    event.perception.push({ characterId: character.id, status: trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity', observations, reason: trial?.falsePerception ? '取得錯誤主觀感知' : trial ? observations.length ? '察覺可接觸的線索' : '有感知機會但未察覺新線索' : observations.length ? '直接察覺' : '沒有可接觸的線索', ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) });
+    const trace = observationTrace(world, character, event, candidates, trial);
+    if (trace.observations.length) audience.push(character.id);
+    event.perception.push(trace);
   }
   // Entering a region or opening its door reveals current visible people, never old events.
   if (event.kind === 'move' || event.kind === 'door') {
@@ -204,10 +228,9 @@ export function probeCurrent(world: World, character: Character, event: import('
   if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return; }
   const uncertain = candidates.filter(c => !c.direct);
   const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort()]), uncertain, true) : undefined;
-  const selected = [...candidates.filter(c => c.direct), ...(trial?.candidates || [])];
-  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
-  for (const observation of observations) saveObservation(world, character, observation);
-  event.perception = [{ characterId: character.id, status: trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity', observations, reason: trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索', ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) }];
+  const trace = observationTrace(world, character, event, candidates, trial, true);
+  const observations = trace.observations;
+  event.perception = [trace];
   (world.probeResults ??= {})[probeKey] = event.perception[0];
   if (!observations.length) remember(world, character, sense === 'hearing' ? '專注聆聽後，沒有聽到新的線索。' : '仔細查看後，沒有發現新的線索。');
 }
