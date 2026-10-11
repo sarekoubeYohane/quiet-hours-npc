@@ -1,6 +1,6 @@
 # 感知 PoC 工作拆分
 
-狀態：使用者於 2026-10-10 確認拆分，5 張工作票已發布並標記 ready-for-agent。尚未實作。
+狀態：使用者於 2026-10-10 確認拆分，5 張工作票以 [PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 交付；工作票在合併時關閉。PR 尚未合併／部署，驗證見 [實作驗證紀錄](../verification/npc-perception-2026-10-11.md)。
 父規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)
 日期：2026-10-10
 

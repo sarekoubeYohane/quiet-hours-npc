@@ -2,7 +2,7 @@
 
 正式規格：[Issue #41](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41)。[已發布工作拆分](npc-perception-ticket-plan.md)：#42–#46，全部標記 ready-for-agent。
 
-狀態：正式感知 PoC 規格；使用者已要求進入 to-tickets，沿用下述測試入口。尚未實作。
+狀態：正式感知 PoC 規格；依 implement-spec 實作於 [PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 整合分支。PR 尚未合併／部署；最新驗證見 [實作驗證紀錄](../verification/npc-perception-2026-10-11.md)。
 日期：2026-10-10
 程式基準：main 提交 2477af41508dbf6e58fa66ac2d67cf33788634a8。
 設計依據：本次 27 題感知 Grill 與其後的範圍收斂；後續決定優先於早期草稿。

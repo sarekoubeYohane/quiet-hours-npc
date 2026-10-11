@@ -1,5 +1,6 @@
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 import type { Character, World } from './world';
+import { falsePerception, type FalsePerceptionDiagnostic } from './false-perception';
 
 export type Region = { id: string; location: string; name: string };
 export type Door = { id: string; name: string; regions: [string, string] };
@@ -11,16 +12,21 @@ export const regions: Region[] = [
   { id: 'cafe-storeroom', location: 'cafe', name: '儲藏室' },
 ];
 export const doors: Door[] = [{ id: 'cafe-door', name: '儲藏室門', regions: ['cafe-front', 'cafe-storeroom'] }];
+export type CurrentSensoryState = { presence: Record<string, { region: string; clue: string }>; activities: Record<string, { clue: string; region: string; action: import('./world').Action }> };
 export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[] };
 export type Observation = { id: string; time: number; sense: 'sight' | 'hearing'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
 export function defaultRegion(location: string) { return regions.find(region => region.location === location)!.id; }
 export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
 export function normalizePerception(world: World) {
+  world.perceptionTrials ??= {};
+  world.probeResults ??= {};
+  world.currentSensory ??= { presence: {}, activities: {} };
   world.scene ??= { doors: {}, noise: {}, occluded: [] };
   for (const door of doors) world.scene.doors[door.id] ??= 'open';
   for (const character of world.characters) {
     if (!regions.some(region => region.id === character.region && region.location === character.location)) character.region = defaultRegion(character.location);
     character.observations ??= [];
+    if (!world.currentSensory.presence[character.id]) world.currentSensory.presence[character.id] = { region: regionOf(character), clue: `initial:${character.id}:${regionOf(character)}` };
   }
 }
 export function connectingDoor(from: string, to: string) { return doors.find(door => door.regions.includes(from) && door.regions.includes(to)); }
@@ -32,7 +38,8 @@ export function canSee(world: World, observer: Character, region: string) {
   return !!door && (world.scene?.doors[door.id] || 'open') === 'open';
 }
 
-export type PerceptionTrace = { characterId: string; status: 'direct' | 'uncertain' | 'no-opportunity' | 'noticed' | 'missed'; observations: Observation[]; reason: string; opportunity?: string; resolution?: Resolution; factors?: { ability: number; attention: number; interference: string } };
+export type PerceptionTrace = { characterId: string; status: 'direct' | 'uncertain' | 'no-opportunity' | 'noticed' | 'missed'; observations: Observation[]; reason: string; opportunity?: string; resolution?: Resolution; falsePerception?: FalsePerceptionDiagnostic; factors?: { ability: number; attention: number; interference: string } };
+export type PerceptionTrial = { opportunity: string; resolution: Resolution; factors: { ability: number; attention: number; interference: string }; candidates: SensoryCandidate[]; falsePerception?: FalsePerceptionDiagnostic };
 export type SensoryCandidate = { sense: Observation['sense']; kind: Observation['kind']; text: string; clarity: Observation['clarity']; source?: string; region?: string; urgency?: Observation['urgency']; direct: boolean; interference?: 'weak' | 'medium' | 'strong' };
 export function canHear(world: World, observer: Character, region: string) {
   return regionOf(observer) === region || !!connectingDoor(regionOf(observer), region);
@@ -75,7 +82,7 @@ export const perceptionRules = {
   } as Record<Observation['sense'], Record<string, number>>,
   difficulty: { weak: 8, medium: 12, strong: 16 } as const,
 };
-export function resolvePerception(world: World, character: Character, eventId: string, candidates: SensoryCandidate[]) {
+export function resolvePerception(world: World, character: Character, eventId: string, candidates: SensoryCandidate[], focused = false) {
   const here = regionOf(character);
   const interference = candidates.reduce<'weak' | 'medium' | 'strong'>((best, candidate) => perceptionRules.difficulty[candidate.interference || 'weak'] < perceptionRules.difficulty[best] ? candidate.interference || 'weak' : best, 'strong');
   const dc: Difficulty = perceptionRules.difficulty[interference];
@@ -84,12 +91,17 @@ export function resolvePerception(world: World, character: Character, eventId: s
     return values.length ? values.reduce((a, b) => Math.abs(a) >= Math.abs(b) ? a : b) : 0;
   }));
   const action = character.plan?.action;
-  const attention = action?.type === 'observe' && (!action.target || action.target === here) ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
+  const attention = focused ? 2 : action?.type === 'observe' && (!action.target || action.target === here) ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
   const modifier = Math.max(-4, Math.min(4, ability + attention)) as Advantage;
+  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => [c.sense, c.kind, c.text, c.source, c.region]).sort(), interference, ability, attention]);
+  const previous = world.perceptionTrials?.[opportunity];
+  if (previous) return previous;
   const resolution = judgeD20(rollD20(), modifier, dc);
-  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => c.sense).sort(), interference, ability, attention]);
+  const falseResult = resolution.outcome === 'critical-failure' ? falsePerception(world, character, candidates) : undefined;
   const selected = ['success', 'critical-success'].includes(resolution.outcome) ? candidates : resolution.outcome === 'mixed' ? candidates.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined })) : [];
-  return { opportunity, resolution, factors: { ability, attention, interference }, candidates: selected };
+  const trial: PerceptionTrial = { opportunity, resolution, factors: { ability, attention, interference }, candidates: falseResult ? [falseResult.candidate] : selected, ...(falseResult ? { falsePerception: falseResult.diagnostic } : {}) };
+  (world.perceptionTrials ??= {})[opportunity] = trial;
+  return trial;
 }
 export function remember(world: World, character: Character, text: string) {
   const memory = { time: world.minute, text };
@@ -105,6 +117,11 @@ export function saveObservation(world: World, character: Character, observation:
 // Called only for newly confirmed events. Reload/normalization never replays history.
 export function perceiveEvent(world: World, event: import('./world').WorldEvent) {
   if (event.perception) return;
+  normalizePerception(world);
+  if (event.actor && event.scene && ['move', 'work', 'rest', 'reflect', 'observe', 'say', 'attempt', 'door', 'message'].includes(event.kind)) {
+    if (event.kind === 'move') world.currentSensory!.presence[event.actor] = { region: event.scene.toRegion!, clue: event.id };
+    world.currentSensory!.activities[event.actor] = { clue: event.id, region: event.scene.toRegion!, action: { type: event.kind as import('./world').Action['type'], target: event.scene.target } };
+  }
   const privateEvent = ['reflect', 'message', 'intervention', 'blocked', 'observe'].includes(event.kind) || event.scene?.target === 'observer';
   if (event.kind === 'continue') return;
   if (privateEvent || !event.scene) {
@@ -122,7 +139,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent)
     const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
     for (const observation of observations) saveObservation(world, character, observation);
     if (observations.length) audience.push(character.id);
-    event.perception.push({ characterId: character.id, status: trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity', observations, reason: trial ? observations.length ? '察覺可接觸的線索' : '有感知機會但未察覺新線索' : observations.length ? '直接察覺' : '沒有可接觸的線索', ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors } : {}) });
+    event.perception.push({ characterId: character.id, status: trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity', observations, reason: trial?.falsePerception ? '取得錯誤主觀感知' : trial ? observations.length ? '察覺可接觸的線索' : '有感知機會但未察覺新線索' : observations.length ? '直接察覺' : '沒有可接觸的線索', ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) });
   }
   // Entering a region or opening its door reveals current visible people, never old events.
   if (event.kind === 'move' || event.kind === 'door') {
@@ -145,4 +162,52 @@ export function knownScene(world: World, character: Character) {
   return { region: regions.find(r => r.id === here),
     exits: doors.filter(d => d.regions.includes(here)).map(d => ({ id: d.id, name: d.name, state: world.scene?.doors[d.id] || 'open', destination: regions.find(r => r.id === d.regions.find(id => id !== here)) })),
   };
+}
+
+export function observationTargets(world: World, character: Character) {
+  const scene = knownScene(world, character);
+  return { regions: [scene.region!, ...scene.exits.map(exit => exit.destination!)], people: world.characters.filter(c => c.id !== character.id).map(c => ({ id: c.id, name: c.name })) };
+}
+export function validateProbe(world: World, character: Character, target?: string) {
+  if (!target) return;
+  const known = observationTargets(world, character);
+  if (!known.regions.some(r => r.id === target) && !known.people.some(c => c.id === target)) throw Error('只能查探已知的附近區域或對象');
+}
+export function probeCurrent(world: World, character: Character, event: import('./world').WorldEvent) {
+  const sense = event.scene?.content === 'hearing' ? 'hearing' : 'sight';
+  const target = event.scene?.target;
+  const here = regionOf(character);
+  const candidates: SensoryCandidate[] = [];
+  const clues: string[] = [];
+  for (const other of world.characters) {
+    const region = regionOf(other);
+    if (other.id === character.id || target && target !== other.id && target !== region) continue;
+    if (sense === 'sight') {
+      const visible = canSee(world, character, region);
+      const doorway = connectingDoor(here, region);
+      const silhouette = world.scene?.occluded.includes(region) && (here === region || doorway && world.scene.doors[doorway.id] === 'open');
+      if (!visible && !silhouette) continue;
+      candidates.push({ sense, kind: 'person', text: visible ? `看見 ${other.name} 在${regions.find(r => r.id === region)?.name}。` : '遮擋處有人影晃動。', clarity: visible ? 'clear' : 'vague', ...(visible ? { source: other.id, region } : {}), direct: visible, interference: 'medium' });
+      clues.push(world.currentSensory!.presence[other.id].clue);
+    } else {
+      const activity = world.currentSensory?.activities[other.id];
+      // Only still-running, externally audible work has a current sound. Speech,
+      // footsteps, private reflection and completed activities are never replayed.
+      if (!activity || activity.action.type !== 'work' || other.plan?.action.type !== 'work' || other.plan.until <= world.minute || !canHear(world, character, region)) continue;
+      const clear = canSee(world, character, region) && world.scene?.noise[here] !== 'loud';
+      candidates.push({ sense, kind: 'sound', text: clear ? `${other.name} 做事時傳來一些動靜。` : '附近傳來做事的動靜。', clarity: clear ? 'clear' : 'vague', ...(clear ? { source: other.id, region } : {}), direct: clear, interference: world.scene?.noise[here] === 'loud' && !canSee(world, character, region) ? 'strong' : 'medium' });
+      clues.push(activity.clue);
+    }
+  }
+  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [c.sense, c.kind, c.text, c.source, c.region, c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
+  const previous = world.probeResults?.[probeKey];
+  if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return; }
+  const uncertain = candidates.filter(c => !c.direct);
+  const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort()]), uncertain, true) : undefined;
+  const selected = [...candidates.filter(c => c.direct), ...(trial?.candidates || [])];
+  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
+  for (const observation of observations) saveObservation(world, character, observation);
+  event.perception = [{ characterId: character.id, status: trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity', observations, reason: trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索', ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) }];
+  (world.probeResults ??= {})[probeKey] = event.perception[0];
+  if (!observations.length) remember(world, character, sense === 'hearing' ? '專注聆聽後，沒有聽到新的線索。' : '仔細查看後，沒有發現新的線索。');
 }

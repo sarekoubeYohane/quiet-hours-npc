@@ -117,7 +117,7 @@ test('uncertain closed-door speech has one saved D20 outcome without revealing w
   assert.deepEqual((await read()).events,saved.events);
  });}finally{Math.random=random;}
 });
-test('perception uses existing five outcomes, controlled ability and competing attention, and never tells passive failures',async()=>{
+test('perception uses existing five outcomes, controlled ability and competing attention, and keeps ordinary passive failures silent',async()=>{
  for(const [roll,tags,working,outcome,modifier] of [[20,[],false,'critical-success',0],[12,[],false,'success',0],[6,[],false,'mixed',0],[2,[],false,'failure',0],[1,[],false,'critical-failure',0],[10,['聽覺敏銳','擅長髮飾設計'],false,'success',2],[12,['擅長髮飾設計'],true,'mixed',-2],[10,[],'observe','success',2],[8,['聽覺極敏銳'],'observe','success',4]]){
   const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).abilityTags=tags;w.scene.doors['cafe-door']='closed';
   if(working)owner(w).plan={action:{type:working===true?'work':'observe',target:'cafe-storeroom',content:'整理杯子'},startedAt:w.minute,until:w.minute+120,attention:'',modelKey:'demo'};
@@ -129,7 +129,8 @@ test('perception uses existing five outcomes, controlled ability and competing a
    assert.equal((await advance()).status,200);const saved=await read();
    const trace=saved.events.find(e=>e.actor==='vera'&&e.kind==='say').perception.find(t=>t.characterId==='owner');
    assert.equal(trace.resolution.outcome,outcome);assert.equal(trace.resolution.modifier,modifier);
-   assert.equal(trace.observations.length,['failure','critical-failure'].includes(outcome)?0:1);
+   assert.equal(trace.observations.length,outcome==='failure'?0:1);
+   if(outcome==='critical-failure')assert.equal(trace.falsePerception.type,'distortion');
    if(outcome==='mixed')assert.match(trace.observations[0].text,/似乎/);
    Math.random=()=>{throw Error('reload must not reroll');};assert.deepEqual((await read()).events,saved.events);
    Math.random=()=>(roll-0.5)/20;
@@ -146,9 +147,10 @@ test('occluded arrival combines sight and hearing in one roll, while failure pre
   try{await withModel({vera:{type:'move',target:'cafe'}},async(_inputs,advance)=>{
    assert.equal((await advance()).status,200);const saved=await read();
    const trace=saved.events.find(e=>e.actor==='vera'&&e.kind==='move').perception.find(t=>t.characterId==='owner');
-   assert.equal(rolls,1);assert.ok(trace.resolution);
-   assert.deepEqual(trace.observations.map(o=>o.sense).sort(),noisy?['hearing','sight']:['hearing']);
-   assert.ok(trace.observations.every(o=>!o.source));
+   assert.equal(rolls,noisy?1:2);assert.ok(trace.resolution);
+   assert.deepEqual(trace.observations.map(o=>o.sense).sort(),['hearing','sight']);
+   if(noisy)assert.ok(trace.observations.every(o=>!o.source));
+   else {assert.equal(trace.observations[0].text,'附近傳來腳步聲。');assert.equal(trace.observations[1].source,'cass');assert.equal(trace.falsePerception.type,'distortion');}
   });}finally{Math.random=random;}
  }
 });

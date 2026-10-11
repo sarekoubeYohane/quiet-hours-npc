@@ -1,5 +1,5 @@
 import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
-import { perceiveEvent, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState } from './perception';
+import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string};
@@ -10,7 +10,7 @@ export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'fin
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
 export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;aiUsage?:AIUsage};
+export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage};
 export type Action={type:'move'|'door'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
@@ -32,7 +32,7 @@ export function record(w:World,actor:string,text:string,kind:string,audience:str
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
 w.events=[...w.events,event].slice(-300);perceiveEvent(w,event);
 }
-export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,scene:knownScene(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
+export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
 if(tags.includes('完全不懂髮飾設計'))return -4;
@@ -135,11 +135,12 @@ if(a.target==='study-craft'){
 audience=witnesses;
 }
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
-else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
+else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return;c.activity=content==='hearing'?'專注聆聽附近的動靜。':'仔細查看附近的情況。';text=`${c.name} ${c.activity}`;}
 else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
-  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
+  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','persuade','observe'].includes(a.type)?{content}:{})},resolution);
+if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){
  const resultId=w.events.at(-1)!.id;
