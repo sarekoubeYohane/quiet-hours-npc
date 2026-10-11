@@ -101,3 +101,67 @@ test('a closed internal door also blocks leaving through the public entrance',as
  assert.equal((await POST(req({operation:'direct',action:{type:'move',target:'kris-home'}}))).status,400);
  assert.equal(owner(await read()).region,'cafe-storeroom');
 });
+test('uncertain closed-door speech has one saved D20 outcome without revealing words or identity',async()=>{
+ const w=seedWorld();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';
+ const vera=w.characters.find(c=>c.id==='vera');vera.location='cafe';vera.region='cafe-front';const cass=w.characters.find(c=>c.id==='cass');cass.location='cafe';cass.region='cafe-front';store.install(w);
+ await POST(req({operation:'takeover'}));
+ const random=Math.random;Math.random=()=>0.95;
+ try{await withModel({vera:{type:'say',target:'cass',content:'SECRET_WORDS'}},async(_inputs,advance)=>{
+  assert.equal((await advance()).status,200);
+  const saved=await read(),event=saved.events.find(e=>e.actor==='vera'&&e.kind==='say');
+  const trace=event.perception.find(t=>t.characterId==='owner');
+  assert.equal(trace.resolution.roll,20);assert.equal(trace.resolution.dc,12);
+  assert.equal(trace.resolution.outcome,'critical-success');
+  assert.equal(trace.observations.length,1);assert.equal(trace.observations[0].source,undefined);
+  assert.equal(JSON.stringify(owner(saved)).includes('SECRET_WORDS'),false);
+  assert.deepEqual((await read()).events,saved.events);
+ });}finally{Math.random=random;}
+});
+test('perception uses existing five outcomes, controlled ability and competing attention, and never tells passive failures',async()=>{
+ for(const [roll,tags,working,outcome,modifier] of [[20,[],false,'critical-success',0],[12,[],false,'success',0],[6,[],false,'mixed',0],[2,[],false,'failure',0],[1,[],false,'critical-failure',0],[10,['聽覺敏銳','擅長髮飾設計'],false,'success',2],[12,['擅長髮飾設計'],true,'mixed',-2],[10,[],'observe','success',2],[8,['聽覺極敏銳'],'observe','success',4]]){
+  const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).abilityTags=tags;w.scene.doors['cafe-door']='closed';
+  if(working)owner(w).plan={action:{type:working===true?'work':'observe',target:'cafe-storeroom',content:'整理杯子'},startedAt:w.minute,until:w.minute+120,attention:'',modelKey:'demo'};
+  for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
+  owner(w).control={mode:'taken-over'};store.install(w);
+  // A pre-existing controlled activity competes for attention.
+  const random=Math.random;Math.random=()=>(roll-0.5)/20;
+  try{await withModel({vera:{type:'say',target:'cass',content:'SECRET_WORDS'}},async(inputs,advance)=>{
+   assert.equal((await advance()).status,200);const saved=await read();
+   const trace=saved.events.find(e=>e.actor==='vera'&&e.kind==='say').perception.find(t=>t.characterId==='owner');
+   assert.equal(trace.resolution.outcome,outcome);assert.equal(trace.resolution.modifier,modifier);
+   assert.equal(trace.observations.length,['failure','critical-failure'].includes(outcome)?0:1);
+   if(outcome==='mixed')assert.match(trace.observations[0].text,/似乎/);
+   Math.random=()=>{throw Error('reload must not reroll');};assert.deepEqual((await read()).events,saved.events);
+   Math.random=()=>(roll-0.5)/20;
+   await POST(req({operation:'return-control'}));assert.equal((await advance()).status,200);
+   const input=JSON.stringify(inputs.find(p=>p.self.id==='owner'));
+   for(const secret of ['SECRET_WORDS','critical-failure','resolution','interference','opportunity'])assert.equal(input.includes(secret),false);
+  });}finally{Math.random=random;}
+ }
+});
+test('occluded arrival combines sight and hearing in one roll, while failure preserves obvious footsteps',async()=>{
+ for(const noisy of [true,false]){
+  const w=seedWorld();w.scene.occluded=['cafe-front'];w.scene.noise['cafe-front']=noisy?'loud':'quiet';owner(w).control={mode:'taken-over'};store.install(w);
+  let rolls=0;const random=Math.random;Math.random=()=>{rolls++;return noisy?0.95:0;};
+  try{await withModel({vera:{type:'move',target:'cafe'}},async(_inputs,advance)=>{
+   assert.equal((await advance()).status,200);const saved=await read();
+   const trace=saved.events.find(e=>e.actor==='vera'&&e.kind==='move').perception.find(t=>t.characterId==='owner');
+   assert.equal(rolls,1);assert.ok(trace.resolution);
+   assert.deepEqual(trace.observations.map(o=>o.sense).sort(),noisy?['hearing','sight']:['hearing']);
+   assert.ok(trace.observations.every(o=>!o.source));
+  });}finally{Math.random=random;}
+ }
+});
+test('uncertain results roll back on conflict and later unrelated events never replay them',async()=>{
+ const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';
+ for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
+ store.install(w);const random=Math.random;let rolls=0;Math.random=()=>{rolls++;return 0.6;};
+ const actions={vera:{type:'say',target:'cass',content:'conflicting words'}};
+ try{await withModel(actions,async(_inputs,advance)=>{
+  store.conflictOnNextSave();assert.equal((await advance()).status,502);
+  const rolledBack=await read();assert.deepEqual(rolledBack.events,w.events);assert.deepEqual(owner(rolledBack).observations,[]);
+  assert.equal((await advance()).status,200);const saved=await read(),count=rolls;
+  actions.vera={type:'rest'};assert.equal((await advance()).status,200);
+  assert.equal(rolls,count);assert.deepEqual(owner(await read()).observations,owner(saved).observations);
+ });}finally{Math.random=random;}
+});

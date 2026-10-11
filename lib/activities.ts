@@ -1,13 +1,14 @@
+import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[]; continueExisting?: boolean };
+export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
 export const activityDurations = [15, 30, 60, 90];
 const sustained = new Set<Action['type']>(['rest', 'work', 'reflect', 'observe']);
-const attentionKinds = new Set(['say', 'message', 'intervention', 'move']);
+const attentionKinds = new Set(['message', 'intervention']);
 
 export class BudgetExceeded extends Error {
   constructor() { super('已達 AI 用量上限，或剩餘呼叫次數不足以完成一個回合。自動運行已暫停；可調整上限或切換規則試玩。'); }
@@ -26,7 +27,7 @@ export function currentUsage(world: World, now = Date.now()): AIUsage {
 
 // Only events this character knows can interrupt their activity. Private thoughts stay private.
 export function attentionMarker(world: World, character: Character): string {
-  return world.events.findLast(event => event.actor !== character.id && attentionKinds.has(event.kind) && event.audience.includes(character.id))?.id || '';
+  return pendingObservations(character).findLast(observation => observationAttention(character, observation))?.id || world.events.findLast(event => event.actor !== character.id && attentionKinds.has(event.kind) && event.audience.includes(character.id))?.id || '';
 }
 
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
@@ -106,6 +107,12 @@ export async function advanceActivities(world: World, options: {
       if (ai) usage.savedDecisions++;
       continue;
     }
+    const observedCount = character.observations?.length || 0;
+    noteAttention(world, character, '正常決策或重新評估時取得待用觀察');
+    for (const observation of pendingObservations(character)) {
+      const reason = observationAttention(character, observation);
+      if (reason) noteAttention(world, character, reason, observation.id);
+    }
     const respondingToUser = pendingInterventions(world, character).length > 0;
     const from = character.location;
     let decision: ActivityDecision;
@@ -121,6 +128,9 @@ export async function advanceActivities(world: World, options: {
       const action = demoDecision(world, character);
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
+    character.observationCursor = observedCount;
+    if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
+    for (const reason of decision.attentionDiagnostics || []) noteAttention(world, character, reason);
     if (decision.continueExisting) {
       if (!canResumeActivity(world, character, modelKey)) {
         throw Error('沒有可延續的原活動，請選擇新行動。');
@@ -143,6 +153,10 @@ export async function advanceActivities(world: World, options: {
     } catch {
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
+  }
+  for (const character of world.characters) for (const observation of pendingObservations(character)) {
+    const reason = observationAttention(character, observation);
+    noteAttention(world, character, character.control?.mode === 'taken-over' || character.control?.active ? '使用者控制，等待指定行動' : reason ? `${reason}；留待下次決策` : '一般線索，等待正常決策', observation.id);
   }
   world.turn++;
 }
