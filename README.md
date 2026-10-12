@@ -11,6 +11,20 @@
 - 世界更新用資料庫租約與版本條件避免平行回合覆蓋。最終保存確認零列衝突時，只把本次已付費嘗試與回報 token 差額原子加入最新世界，不覆蓋角色進度或較新租約；累計用量保留，過期請求不改寫較新的小時計量窗口。資料庫拋錯且提交結果不明時不重播差額，避免重計；資料庫全面中斷或工作程序終止的用量持久性仍需要另行加入冪等帳本。
 - 角色設定來自對話中的概念測試，非小說正史。
 
+## 工作票與驗收狀態（2026-10-12）
+
+| 項目 | 程式狀態 | 仍待驗收／開放工作 |
+| --- | --- | --- |
+| 共用 Playbook／意圖／店主控制 | [PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 已合併，#1–#5 已關閉 | 真人模型與部署環境操作由後續整體驗收追蹤 |
+| D20 行動判定 P1 | [PR #20](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/20) 已合併，#8–#13 已關閉 | 僅限現有髮飾／社交可試玩切片；未涵蓋通用行動與完整真實 GPT 驗收 |
+| 感知咖啡館 PoC | [PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 已合併，#41–#46 已關閉 | 目前是受限地圖與感官 PoC；不含長期信念修正 |
+| GitHub 登入 | [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 與修補 #36／#38 已合併 | [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 保留作本機／測試站及正式登出真人驗收；正式站已回報成功登入 |
+| 帳號模型 Key | [PR #39](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/39) 已合併 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) 依 10/09 修訂為同帳號跨瀏覽器共用，待部署配置與雙瀏覽器真人驗收 |
+| Infra 其餘工作 | #22 已完成 | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、[#24–#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24)、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
+| 長期記憶／信念修正 | 尚未完成 | [#16](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/16)、[#18](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/18) 保持 Open；[#7](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/7)、[#19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 為未全部完成的母規格 |
+
+上述「已合併」不等於已部署到所有環境；以 GitHub PR、部署版本與各 Issue 的驗收紀錄為準。
+
 ## 共用 Playbook、意圖與店主控制
 
 [#1 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/1) 的四項工作已由 [PR #6](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/6) 於 2026-10-08 合併至 `main`，#1–#5 已關閉。合併後的 48 項測試、型別檢查、建置與跨日模擬通過；店主介面點按及真實模型表現仍待驗證。已合併的程式與正式網站版本分開管理，詳見 [合併後驗證紀錄](docs/verification/npc-playbook-2026-10-08.md)。
@@ -23,7 +37,7 @@
 
 ## D20 行動判定
 
-本段描述 [行動判定工作票 #8–#13](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/8) 的受限實作。感知使用同一套 D20 結果門檻，功能與資訊邊界見下節；長期記憶與信念修正仍待另外設計。
+本段描述已由 [PR #20](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/20) 合併、並已關閉的 [行動判定工作票 #8–#13](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/8) 的受限實作。感知使用同一套 D20 結果門檻，功能與資訊邊界見下節；長期記憶與信念修正仍待另外設計。
 
 - 已支援的髮飾設計挑戰與說服使用 D20；容易 DC8、普通 DC12、困難 DC16，能力修正 −4／−2／0／+2／+4。結果按差值分為大成功 ≥8、成功 0～7、部分成功 −6～−1、失敗 −10～−7、大失敗 ≤−11；天然 1、20 無特權。
 - 角色可從設定的自然語言能力標籤取得相應修正；不同挑戰難度與能力分開。普通工作仍直接完成，不擲骰。
@@ -36,7 +50,7 @@
 
 ## 感知咖啡館 PoC
 
-[PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 實作 [#41 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41) 的 #42–#46；此段描述分支功能，合併與部署狀態請以 PR 為準。
+[PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 已合併至 main，實作 [#41 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/41) 的 #42–#46，相關工作票已關閉。驗證包含 129 項自動測試與隔離的桌機／手機 Chromium 操作；未進行付費模型呼叫，亦不代表已部署到所有環境。
 
 咖啡館提供前台、儲藏室與一扇門，其餘場所維持單區域；配置資料可替換。明顯線索直接察覺，不確定線索依環境、受控能力標籤與活動注意力綜合 D20 判定一次。關門阻擋跨區視線；聽到動靜不等於知道是誰或發生什麼事。舊世界補安全預設，不補發歷史事件。
 
@@ -90,7 +104,7 @@ GitHub OAuth App 的回呼網址以上表網址為 origin，路徑固定為 `/ap
 
 官方參考：[Workers Builds 分支設定](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/)、[Vite plugin 環境選擇](https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/)。
 
-測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由本 PR 實作；啟用對外網址前仍需填入對應環境的秘密、套用 migration，並完成 #28 的部署與登入驗收。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
+測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由 [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 及 [PR #38](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/38) 合併實作；正式站於 2026-10-09 已回報可成功登入，但本機／測試站與登出驗收仍記於 #23。各環境須各自核對 OAuth Secrets 與 migration；#28 的測試站自動部署流程尚未完成。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
 
@@ -123,7 +137,7 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 
 首頁與世界 API 共用 GitHub 工作階段驗證；未登入時提供「用 GitHub 登入」，API 回 401。第一版僅允許設定白名單中的 GitHub 數字 ID，無匿名／共用世界或 Sites 身分 header 路徑。每環境使用自己的 OAuth App，D1 保存工作階段，24 小時到期，登出立即失效。OAuth callback 固定在 `/api/auth/github/callback`。
 
-本機與雲端的完整設定與驗收步驟見 [GitHub 登入設定](docs/design/github-login.md)。尚需填入自己的秘密並實際驗證 GitHub 登入；模擬測試通過不代表真人登入已完成。
+本機與雲端的完整設定與驗收步驟見 [GitHub 登入設定](docs/design/github-login.md)。正式站於 2026-10-09 已由使用者確認成功登入；這不代表本機／測試站的真人 OAuth／登出流程已驗收通過，請參考 [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23)。其他環境仍需依設定文件填入各自 Secrets。
 
 ## 部署相容性
 
