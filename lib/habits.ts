@@ -6,9 +6,9 @@ const periodOf = (minute: number) => Math.floor((minute % 1440) / 360);
 
 // Only call after a valid, autonomous AI action. Continuation and user requests are excluded.
 export function learnHabit(world: World, character: Character, action: Action, from: string): void {
-  if (action.target === 'observer') return;
+  if (action.target === 'observer' || action.type === 'door') return;
   const day = dayOf(world.minute), period = periodOf(world.minute);
-  const target = ['move', 'say', 'persuade', 'message', 'work'].includes(action.type) ? action.target || '' : '';
+  const target = ['move', 'say', 'shout', 'persuade', 'message', 'work'].includes(action.type) ? action.target || '' : '';
   const key = `${period}:${from}:${action.type}:${target}`;
   const habits = (character.habits || []).filter(habit => world.minute - habit.lastSeen <= 30 * 1440);
   let habit = habits.find(habit => habit.key === key);
@@ -33,8 +33,8 @@ export function habitLabel(habit: Habit, characters: Character[]): string {
   const destination = locations.find(place => place.id === habit.target)?.name || habit.target;
   const person = characters.find(character => character.id === habit.target)?.name || '朋友';
   const activity = habit.type === 'move' ? `前往${destination}` : habit.type === 'say' ? `與 ${person} 聊聊` :
-    habit.type === 'persuade' ? `嘗試說服 ${person}` : habit.type === 'message' ? `傳訊息給 ${person}` : habit.type === 'work' ? ({ tea: '泡茶', tidy: '整理', craft: '畫髮飾' }[habit.target] || '工作') :
-    ({ rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動');
+    habit.type === 'shout' ? `向 ${person} 大聲說話` : habit.type === 'persuade' ? `嘗試說服 ${person}` : habit.type === 'message' ? `傳訊息給 ${person}` : habit.type === 'work' ? ({ tea: '泡茶', tidy: '整理', craft: '畫髮飾' }[habit.target] || '工作') :
+    ({ door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動');
   return `${habitPeriods[habit.period]}在${place}，常會${activity}`;
 }
 

@@ -1,3 +1,5 @@
+import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
+import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string};
@@ -6,10 +8,10 @@ export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outp
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
-export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;target?:string;content?:string};resolution?:Resolution;attemptKey?:string};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;aiUsage?:AIUsage};
-export type Action={type:'move'|'say'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
+export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
+export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage};
+export type Action={type:'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -20,14 +22,17 @@ return w.events.slice(lastAction+1).filter(e=>e.actor==='observer'&&e.kind==='in
 }
 export const timeLabel=(m:number)=>`${String(Math.floor((m%1440)/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
 export function cafeOwner(minute:number):Character{return {id:'owner',name:'店主',color:'#a5c9b3',location:'cafe',mood:'平靜',personality:'務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。',goal:'整理咖啡館，照顧自己的生活與來訪的客人。',activity:'在吧台整理杯子。',relationships:{},memories:[{time:minute,text:'我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。'}],intents:[],control:{mode:'autonomous'}};}
-export function normalizeWorld(w:World){for(const c of w.characters)c.intents??=[];if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};return w;}
-export function seedWorld():World{return {minute:1260,turn:0,lastMode:'demo',characters:[
+export function normalizeWorld(w:World){for(const c of w.characters){c.intents??=[];c.attentionConditions??=[];c.observationCursor??=0;}if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};normalizePerception(w);return w;}
+export function seedWorld():World{return normalizeWorld({minute:1260,turn:0,lastMode:'demo',characters:[
 {id:'cass',intents:[],name:'Cass',color:'#eb9e79',location:'kris-home',mood:'疲憊',personality:'努力保持冷靜；害怕被留下，但也想保有自己的選擇。',abilityTags:['不擅長髮飾設計'],goal:'先安頓自己，慢慢想清楚接下來的生活。',activity:'坐在客廳，捧著一杯溫水。',relationships:{vera:'在乎她，也需要幾天空間。',kris:'暫時借住；信任她務實的支持。'},memories:[{time:1260,text:'與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。'}]},
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
-,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]};}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){w.events=[...w.events,{id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})}].slice(-300);if(kind!=='continue')for(const c of w.characters)if(audience.includes(c.id)){const memory={time:w.minute,text};c.memories=[...c.memories,memory].slice(-80);if(c.control&&(c.control.mode==='taken-over'||c.control.experiences!==undefined))c.control.experiences=[...(c.control.experiences||[]),memory].slice(-80);}}
-export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{...c,projects:undefined},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&x.location===c.location).map(x=>({id:x.id,name:x.name}))};}
+,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]});}
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){
+const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
+w.events=[...w.events,event].slice(-300);perceiveEvent(w,event);
+}
+export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
 if(tags.includes('完全不懂髮飾設計'))return -4;
@@ -45,18 +50,32 @@ if(tags.includes('擅長說服'))return 2;
 return 0;
 }
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
-if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;
+if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;const fromRegion=regionOf(c);
 const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
-if(a.type==='move'){const dest=locations.find(x=>x.id===a.target);if(!dest||dest.id===c.location)throw Error('目的地無效');audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.activity=`剛走到${dest.name}。`;text=`${c.name} 步行前往${dest.name}，在這段時間結束時抵達。`;}
-else if(a.type==='say'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||target.location!==c.location)throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} 說：「${content}」`;}}
+if(a.type==='move'){
+const region=regions.find(x=>x.id===a.target),dest=locations.find(x=>x.id===(region?.location||a.target));
+if(!dest)throw Error('目的地無效');const nextRegion=region?.id||defaultRegion(dest.id);
+if(dest.id===c.location){const door=connectingDoor(fromRegion,nextRegion);if(!door||(w.scene?.doors[door.id]||'open')!=='open')throw Error('目的地無效或門尚未開啟');}
+else {
+if(region&&region.id!==defaultRegion(dest.id))throw Error('請先前往場所入口');
+if(fromRegion!==defaultRegion(from)){const exit=connectingDoor(fromRegion,defaultRegion(from));if(!exit||(w.scene?.doors[exit.id]||'open')!=='open')throw Error('請先打開通往出口的門');}
+}
+audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.region=nextRegion;c.activity=`剛走到${region?.name||dest.name}。`;text=`${c.name} 步行前往${region?.name||dest.name}，在這段時間結束時抵達。`;
+}
+else if(a.type==='door'){
+const door=doors.find(x=>x.id===a.target);if(!door||!door.regions.includes(fromRegion)||!['open','close'].includes(content))throw Error('門操作無效');
+normalizePerception(w);const next=content==='open'?'open':'closed';if(w.scene!.doors[door.id]===next)throw Error('門已是指定狀態');
+w.scene!.doors[door.id]=next;c.activity=`${next==='open'?'打開':'關上'}${door.name}。`;text=`${c.name} ${c.activity}`;audience=witnesses;
+}
+else if(a.type==='say'||a.type==='shout'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||(target.location!==c.location||!canSee(w,c,regionOf(target))))throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} ${a.type==='shout'?'大聲喊道':'說'}：「${content}」`;}}
 else if(a.type==='persuade'){
-if(!target||target.id===c.id||target.location!==c.location||!content)throw Error('只能向同地點的角色提出說服請求');
+if(!target||target.id===c.id||(target.location!==c.location||!canSee(w,c,regionOf(target)))||!content)throw Error('只能向同地點的角色提出說服請求');
 if(options.dryRun)return;
 const relationship=target.relationships[c.id]||'';
 attemptKey=JSON.stringify(['persuade',c.id,target.id,c.location,target.mood,relationship]);
 if(w.events.some(e=>e.attemptKey===attemptKey)){
   c.activity='再次試著向 '+target.name+' 解釋自己的請求。';
-  record(w,c.id,c.name+' 又對 '+target.name+' 說：「'+content+'」；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,target:a.target,content});
+  record(w,c.id,c.name+' 又對 '+target.name+' 說：「'+content+'」；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,content});
   return;
 }
 const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;
@@ -94,7 +113,7 @@ if(a.target==='study-craft'){
   if(prior){
     c.activity='繼續思考同一份髮飾設計，但方法與條件沒變，暫時沒有新進展。';
     text=c.name+' '+c.activity;
-    record(w,c.id,text,'continue',[c.id],{from,to:c.location,target:a.target});
+    record(w,c.id,text,'continue',[c.id],{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target});
     return;
   }
   resolution=judgeD20(rollD20(),craftAdvantage(c),challenges[a.target]);
@@ -116,11 +135,12 @@ if(a.target==='study-craft'){
 audience=witnesses;
 }
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
-else if(a.type==='observe'){c.activity='留意周圍的動靜。';text=`${c.name} 留意周圍的動靜。`;}
+else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return;c.activity=content==='hearing'?'專注聆聽附近的動靜。':'仔細查看附近的情況。';text=`${c.name} ${c.activity}`;}
 else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
-  {from,to:c.location,target:a.target,...(['say','persuade'].includes(a.type)?{content}:{})},resolution);
+  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution);
+if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){
  const resultId=w.events.at(-1)!.id;
@@ -148,7 +168,7 @@ if(/泡.*茶/.test(body))return {type:'work',target:'tea',mood:'平靜'};
 return {type:'say',target:'observer',content:negated?'知道了，我會先留在這裡。':c.id==='kris'?'我聽到了。你想讓我幫什麼具體的忙？':c.id==='vera'?'嗯，我有聽到。讓我想一想。':'我聽到了，先給我一點時間。',mood:'思考中'};
 }
 if(c.id==='vera'){const actions:Action[]=[{type:'reflect',content:'想知道她好不好。但現在，可以先把手機放下。',mood:'猶豫'},{type:'work',target:'craft',mood:'專注'},{type:'message',target:'cass',content:'不用急著回我。希望你今晚有吃點東西。',mood:'牽掛'},{type:'rest',mood:'稍微放鬆'},{type:'move',target:c.location==='cafe'?'vera-home':'cafe',mood:'平靜'},{type:'observe'},{type:'work',target:'craft-challenge'},{type:'reflect',content:'就算沒有人需要我，也可以做一件自己想做的事。',mood:'平靜'}];return actions[p];}
-const other=w.characters.find(x=>x.id!==c.id&&x.location===c.location);
+const other=w.characters.find(x=>x.id!==c.id&&canSee(w,c,regionOf(x)));
 if(c.id==='cass'){if(p===0&&other)return {type:'say',target:other.id,content:'……我不知道還能怎麼做。',mood:'茫然'};if(p===3&&recent.includes('訊息'))return {type:'message',target:'vera',content:'有吃東西。謝謝你，我還想再想一想。',mood:'疲憊'};if(p===4)return {type:'move',target:c.location==='cafe'?'kris-home':'cafe',mood:'想透透氣'};return p%2?{type:'reflect',content:'不用今晚就決定全部。先想一件我自己想做的事。',mood:'思考中'}:{type:'rest',mood:'疲憊'};}
 if(other&&p%3===0)return {type:'say',target:other.id,content:'這是你自己的事，要自己想。先休息；需要實際幫忙再叫我。',mood:'平靜'};if(p===5)return {type:'move',target:c.location==='cafe'?'kris-home':'cafe'};return {type:'work',target:p%2?'tidy':'tea',mood:'平靜'};
 }

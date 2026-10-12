@@ -46,9 +46,10 @@ test('private thoughts do not interrupt another NPC; messages affect only the re
   assert.equal(canContinue(world, world.characters.find(c => c.id === 'kris'), 'openai:test'), true);
 });
 
-test('a witnessed departure interrupts an activity and changing models invalidates plans', async () => {
+test('a watched departure interrupts an activity and changing models invalidates plans', async () => {
   const world = seedWorld(); await advanceActivities(world, options(restful));
   const kris = world.characters.find(c => c.id === 'kris');
+  kris.attentionConditions = [{ kind: 'person', source: 'cass', region: '' }];
   resolve(world, world.characters.find(c => c.id === 'cass'), { type: 'move', target: 'cafe' });
   assert.equal(canContinue(world, kris, 'openai:test'), false);
   assert.equal(canContinue(world, world.characters.find(c => c.id === 'vera'), 'openai:other'), false);
