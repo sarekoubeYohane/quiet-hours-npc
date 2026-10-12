@@ -48,19 +48,35 @@ export async function GET() {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
   } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
+
+type OperationResult = { status: number; body: Record<string, unknown> };
+const settledReply = (result: OperationResult) => reply({ ...result.body, operationSettled: true }, result.status);
+const uncertainResult: OperationResult = { status: 502, body: { error: '上次操作的結果無法確認，請重新讀取世界；此操作不會再次呼叫模型。', operationUncertain: true } };
+const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
+type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }> };
+function trimJournal(journal: Journal, maxResults: number, protectedId?: string) {
+  const oldest = Object.keys(journal.results).filter(id => id !== protectedId).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
+  while (oldest.length && (Object.keys(journal.results).length > maxResults || new TextEncoder().encode(JSON.stringify(journal)).byteLength > 500000)) {
+    const id = oldest.shift()!;
+    journal.floor = Math.max(journal.floor, Number(id.split(':')[0]));
+    delete journal.results[id];
+  }
+}
+
 
 export async function POST(request: Request) {
   const id = await owner();
   if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
   let locked = false, lease = 0;
+  let journal: Journal = { floor: 0, results: {} }, operationId = '';
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    let b: { operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
+    let b: { operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
@@ -70,6 +86,7 @@ export async function POST(request: Request) {
       else await clearModelKey(id, provider);
       return reply({ modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
     }
+    if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
     if (!['advance', 'intervene', 'direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
@@ -79,9 +96,31 @@ export async function POST(request: Request) {
       if (![15, 30].includes(b.minutes || 0)) return reply({ error: '請選擇 15 或 30 分鐘。' }, 400);
       if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
-      if (b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
+
     }
     const { world, version } = await loadWorld(id);
+    if (typeof b.operationId !== 'string' || !/^\d{13}:[0-9a-f-]{36}$/.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
+    operationId = b.operationId;
+    const issuedAt = Number(operationId.split(':')[0]);
+    if (issuedAt > Date.now() + 60000) return reply({ error: '裝置時間不正確，請校正時間後重試。' }, 400);
+    const stored = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
+    const serializedJournal = stored!.operations;
+    journal = JSON.parse(serializedJournal);
+    const previous = journal.results[operationId];
+    if (previous && 'status' in previous) return settledReply(previous);
+    if (previous && 'pending' in previous) {
+      if (previous.pending > Date.now()) return waiting();
+      await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
+        .bind(`$.results."${operationId}"`, JSON.stringify(uncertainResult), id, `$.results."${operationId}".pending`, previous.pending).run();
+      const latest = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
+      const settled = latest && (JSON.parse(latest.operations) as Journal).results[operationId];
+      if (settled && 'status' in settled) return settledReply(settled);
+      return reply(uncertainResult.body, uncertainResult.status);
+    }
+    if (issuedAt <= journal.floor || issuedAt < Date.now() - 86400000) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
+    trimJournal(journal, 7);
+    if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
+
     normalizeWorld(world);
     const initialUsage = world.aiUsage && { ...world.aiUsage };
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
@@ -100,8 +139,10 @@ export async function POST(request: Request) {
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
     const db = database();
     lease = Date.now() + 120000;
-    const acquired = await db.prepare('UPDATE worlds SET locked_until = ? WHERE owner = ? AND locked_until < ? AND version = ?').bind(lease, id, Date.now(), version).run();
-    if (!acquired.meta.changes) return reply({ error: '世界正處理另一個回合，請稍候再試。' }, 409);
+    journal.results[operationId] = { pending: lease };
+    const pendingJournal = JSON.stringify(journal);
+    const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
+    if (!acquired.meta.changes) return waiting();
     locked = true;
     let failure: Error | undefined;
     if (b.operation === 'takeover') {
@@ -128,7 +169,10 @@ export async function POST(request: Request) {
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,
-          beforeDecision: async () => { dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'); },
+          beforeDecision: async () => {
+            const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
+            if (held?.locked_until !== lease || lease <= Date.now()) throw Error('世界租約已到期，本回合停止新的模型呼叫。');
+            dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'); },
           decide: (w, c, onUsage) => aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage),
         });
       } catch (e) {
@@ -139,19 +183,35 @@ export async function POST(request: Request) {
         failure = e instanceof Error ? e : new Error('模型決策失敗，本回合沒有推進。');
       }
     }
-    const saved = await db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0 WHERE owner = ? AND version = ? AND locked_until = ?').bind(JSON.stringify(world), id, version, lease).run();
+    const usage = currentUsage(world);
+    const result: OperationResult = failure
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
+      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) } };
+    journal.results[operationId] = result;
+    // The current exact response may exceed the historical byte budget by itself.
+    trimJournal(journal, 8, operationId);
+    const saved = await db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > ? AND operations = ?').bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), pendingJournal).run();
     if (!saved.meta.changes) {
       await retainPaidUsage(db, id, initialUsage, world.aiUsage);
       throw Error('儲存衝突，請重新載入再試。');
     }
-    if (failure) return reply({ world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded }, failure instanceof BudgetExceeded ? 429 : 502);
-    const usage = currentUsage(world);
-    return reply({ world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) });
+    return settledReply(result);
   } catch (e) {
+    if (locked && operationId) {
+      const result: OperationResult = { status: 502, body: { error: e instanceof Error ? e.message : '操作失敗，請重新讀取世界。' } };
+      try {
+        await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
+          .bind(`$.results."${operationId}"`, JSON.stringify(result), id, `$.results."${operationId}".pending`, lease).run();
+        const row = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
+        const settled = row && (JSON.parse(row.operations) as Journal).results[operationId];
+        if (settled && 'status' in settled) return settledReply(settled);
+      } catch { /* Durable pending blocks re-execution even when storage is unavailable. */ }
+      return reply(uncertainResult.body, uncertainResult.status);
+    }
     if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。' }, 502);
   } finally {
-    if (locked) await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run();
+    if (locked) try { await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run(); } catch { /* Lease expires; the operation remains durable. */ }
   }
 }
 

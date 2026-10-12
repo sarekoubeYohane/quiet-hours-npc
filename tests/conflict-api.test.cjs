@@ -6,7 +6,7 @@ const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${n
 const { seedWorld } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'openai', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
 const advance = async mode => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', mode: mode || 'openai', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const read = async () => (await (await GET()).json());
 const usage = windowStartedAt => ({ windowStartedAt, calls: 5, inputTokens: 150, outputTokens: 100, unknownCalls: 1, totalCalls: 20, totalInputTokens: 600, totalOutputTokens: 400, totalUnknownCalls: 2, savedDecisions: 7 });
@@ -56,7 +56,7 @@ test('ordinary save counts each paid decision once and ambiguous commit outcome 
   for (const uncertain of [false, true]) {
     store.install(seedWorld()); if (uncertain) store.throwAfterNextSave();
     await withModel(async () => {
-      assert.equal((await advance()).status, uncertain ? 502 : 200);
+      assert.equal((await advance()).status, 200);
       const saved = await read();
       assert.equal(saved.world.turn, 1); assert.equal(saved.version, 1);
       assert.equal(saved.world.aiUsage.totalCalls, 4); assert.equal(saved.world.aiUsage.totalInputTokens, 120);

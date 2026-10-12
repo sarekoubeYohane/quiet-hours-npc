@@ -22,25 +22,29 @@ try {
     const db = new DatabaseSync(':memory:');
     db.exec('CREATE TABLE worlds (owner TEXT PRIMARY KEY, state TEXT NOT NULL, version INTEGER NOT NULL, locked_until INTEGER NOT NULL)');
     db.exec(${JSON.stringify(await readFile('drizzle/0002_account_model_keys.sql', 'utf8'))});
-    let conflict, uncertain;
+    db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
+    let conflict, uncertain, failBefore, failRead;
     exports.install = value => {
-      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false;
-      db.prepare('INSERT INTO worlds VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
+      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
+      db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
+    exports.failNextOperationRead = () => { failRead = true; };
+    exports.throwBeforeNextSave = () => { failBefore = true; };
     exports.throwAfterNextSave = () => { uncertain = true; };
     exports.snapshot = () => JSON.parse(db.prepare('SELECT state FROM worlds WHERE owner = ?').get('test-owner').state);
     exports.loadWorld = async owner => {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async first() { return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
+      if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }
       if (finalSave && conflict) {
         const { replacement, version = 10, lockedUntil = 0, owner = 'test-owner' } = conflict; conflict = undefined;
         if (replacement) {
           db.prepare('DELETE FROM worlds WHERE owner = ?').run('test-owner');
-          db.prepare('INSERT INTO worlds VALUES (?, ?, ?, ?)').run(owner, JSON.stringify(replacement), version, lockedUntil);
+          db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, ?, ?)').run(owner, JSON.stringify(replacement), version, lockedUntil);
         }
         return { meta: { changes: 0 } };
       }
@@ -49,7 +53,7 @@ try {
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
   `);
-  const allTests = ['tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
+  const allTests = ['tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
