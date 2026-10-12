@@ -50,6 +50,10 @@
 
 觀察、機會、抽選結果及決策使用進度跟世界一起保存，模型失敗或保存衝突時一致回復。最小觀察保存不等於長期 Memory & Belief：來源信任、信念確信與認知修正仍留待 #16／#18。這是小型感知原型，沒有完整地圖重做、聲學模擬或背景感知排程。
 
+## 記憶與信念設計（未實作）
+
+[#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 的短期／長期生命週期、工程容量預設與世界 API 驗收計畫見 [記憶實作契約](docs/design/npc-memory-contract.md)。短期滿額可淘汰最舊經歷；長期只依重新評估合併、濃縮或遺忘，不採先進先出。#51 尚有服務／費用與檢視介面待確認，此文件不代表新功能已實作或後續工作票已解除阻擋。
+
 ## 本地與部署
 
 專案以 vinext 與 Cloudflare 的 Vite plugin 建置，執行在 Workers，世界資料存在 D1，不再依賴 OpenAI Sites 的 hosting 設定、受控安裝腳本或 connector 預覽。`wrangler.jsonc` 宣告三組環境，各自綁定獨立的 D1；頁面右上、頁尾與登入卡顯示目前環境與建置時的提交短碼，`/api/environment` 不需登入即可讀到同樣資訊，供部署後從外部核對版本。
