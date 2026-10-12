@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(body)});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body})});
 const read=async()=>(await(await GET()).json()).world;
 async function model(run,actions){const old=global.fetch,inputs=[];global.fetch=async(_,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);inputs.push(input);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[],attentionConditions:[],...actions(input,request)})}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs,()=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,limits:{calls:120,tokens:500000}})));}finally{global.fetch=old;}}
 test('a confirmed shout crosses a closed door as a strong anonymous sound and triggers just one reevaluation',async()=>{

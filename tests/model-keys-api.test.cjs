@@ -25,7 +25,7 @@ async function signIn(id = 123) {
 }
 async function post(cookie, body, originHeader = fixture.env.AUTH_ORIGIN) {
   headers.set(new Headers({ cookie }));
-  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader }, body: JSON.stringify(body) }));
+  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader }, body: JSON.stringify({operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body}) }));
 }
 async function status(cookie) {
   headers.set(new Headers({ cookie }));
@@ -203,7 +203,7 @@ test('expiry between provider dispatches stops new calls without counting an uns
     global.fetch = async () => { calls++; Date.now = () => base + 86400000; return modelReply(); };
     const response = await advance(newerLogin);
     assert.equal(response.status, 502);
-    const body = await response.json();
+    const body = await status(newerLogin);
     assert.equal(calls, 1); assert.equal(body.world.turn, 0);
     assert.equal(body.world.aiUsage.totalCalls, 1);
   } finally { Date.now = now; global.fetch = original; }

@@ -6,7 +6,7 @@ const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${n
 const { seedWorld } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ mode: 'demo', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }) });
 const read = async () => (await (await GET()).json()).world;
 
 test('old worlds gain an independent cafe owner without replacing existing progress', async () => {

@@ -9,7 +9,7 @@ const store = fromBuild('store');
 function request(operation, extra = {}) {
   return new Request('https://test.invalid/api/world', {
     method: 'POST', headers: { origin: 'https://test.invalid' },
-    body: JSON.stringify({ operation, mode: 'demo', minutes: 15, ...extra }),
+    body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation, mode: 'demo', minutes: 15, ...extra }),
   });
 }
 async function tryCraft(roll, { tags, task = 'craft-challenge', theme = '' } = {}) {

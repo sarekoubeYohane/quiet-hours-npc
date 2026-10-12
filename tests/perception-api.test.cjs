@@ -6,7 +6,7 @@ const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.
 const {seedWorld}=build('world');
 const {GET,POST}=build('route');
 const store=build('store');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({mode:'demo',...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await (await GET()).json()).world;
 const owner=w=>w.characters.find(c=>c.id==='owner');
 const act=async action=>{assert.equal((await POST(req({operation:'direct',action}))).status,200);assert.equal((await POST(req({operation:'advance',minutes:15}))).status,200);return read();};
