@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
-for (const name of ['world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
+for (const name of ['daily-usage', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
@@ -18,7 +18,7 @@ test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext 
   const mf = new Miniflare({
     cf: false, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
     bindings: { APP_ENV: 'local', AUTH_ORIGIN: 'http://localhost:5173', GITHUB_CLIENT_ID: 'fixture-client', GITHUB_CLIENT_SECRET: 'fixture-secret', SESSION_SECRET: 'fixture-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) },
-    d1Databases: ['DB'],
+    d1Databases: ['DB', 'USAGE_DB'],
     modules: [{ type: 'ESModule', path: 'worker.js', contents: `
       import { startGitHubLogin, finishGitHubLogin } from './auth.js';
       import { GET, POST } from './world-api.js';
@@ -45,6 +45,8 @@ test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext 
       const sql = await readFile('drizzle/' + file, 'utf8');
       for (const statement of sql.split(';').map(value => value.replace(/--> statement-breakpoint/g, '').trim()).filter(Boolean)) await db.prepare(statement).run();
     }
+    const ledger = await mf.getD1Database('USAGE_DB');
+    for (const statement of (await readFile('drizzle-ledger/0000_daily_usage.sql', 'utf8')).split(';').map(s => s.trim()).filter(Boolean)) await ledger.prepare(statement).run();
     const origin = 'http://localhost:5173';
     const signIn = async () => {
       const start = await mf.dispatchFetch(origin + '/api/auth/github', { redirect: 'manual' });

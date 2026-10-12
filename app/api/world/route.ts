@@ -1,3 +1,4 @@
+import { dailyUsage, reserveDailyUsage, DailyLimitExceeded } from '@/lib/daily-usage';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resolve, type Action, type AIUsage } from '@/lib/world';
@@ -48,7 +49,7 @@ export async function GET() {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+    return reply({ ...loaded, dailyUsage: await dailyUsage(id).catch(() => null), operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
   } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
@@ -166,6 +167,8 @@ export async function POST(request: Request) {
       const before = structuredClone(world);
       try {
         let dispatchKey = '';
+        const reservation = b.mode === 'demo' ? undefined : await reserveDailyUsage(id, world.characters.filter(c => c.control?.mode !== 'taken-over' && !c.control?.pending && !c.control?.active).length, lease);
+        try {
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,
@@ -173,8 +176,9 @@ export async function POST(request: Request) {
             const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
             if (held?.locked_until !== lease || lease <= Date.now()) throw Error('世界租約已到期，本回合停止新的模型呼叫。');
             dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'); },
-          decide: (w, c, onUsage) => aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage),
+          decide: (w, c, onUsage) => aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage, () => reservation!.dispatch()),
         });
+        } finally { await reservation?.release(); }
       } catch (e) {
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
         const usage = world.aiUsage;
@@ -185,8 +189,9 @@ export async function POST(request: Request) {
     }
     const usage = currentUsage(world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
+      ? { status: (failure instanceof BudgetExceeded || failure instanceof DailyLimitExceeded) ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded || failure instanceof DailyLimitExceeded, dailyLimitReached: failure instanceof DailyLimitExceeded } }
       : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) } };
+    result.body.dailyUsage = await dailyUsage(id).catch(() => null);
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);

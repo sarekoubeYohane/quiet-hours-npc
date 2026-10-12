@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-auth-'));
 try {
-  const sources = ['lib/world.ts', 'lib/attention.ts', 'lib/perception.ts', 'lib/false-perception.ts', 'lib/d20.ts', 'lib/habits.ts', 'lib/activities.ts', 'lib/models.ts', 'lib/model-keys.ts', 'lib/playbook.ts', 'lib/store.ts', 'lib/auth.ts', 'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts'];
+  const sources = ['lib/daily-usage.ts', 'lib/world.ts', 'lib/attention.ts', 'lib/perception.ts', 'lib/false-perception.ts', 'lib/d20.ts', 'lib/habits.ts', 'lib/activities.ts', 'lib/models.ts', 'lib/model-keys.ts', 'lib/playbook.ts', 'lib/store.ts', 'lib/auth.ts', 'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts'];
   for (const source of sources) {
     const output = join(directory, source.replace(/\.ts$/, '.cjs'));
     await mkdir(dirname(output), { recursive: true });
@@ -32,7 +32,10 @@ try {
       async first() { return db.prepare(sql).get(...values) ?? null; },
       async run() { return { meta: { changes: Number(db.prepare(sql).run(...values).changes) } }; }
     }; return statement; } };
-    exports.reset = () => { for (const row of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) db.exec('DROP TABLE ' + row.name); };
+    const ledger = new DatabaseSync(':memory:');
+    ledger.exec(${JSON.stringify(await readFile('drizzle-ledger/0000_daily_usage.sql', 'utf8'))});
+    env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledger.prepare(sql).get(...values) ?? null; }, async run() { return { meta: { changes: Number(ledger.prepare(sql).run(...values).changes) } }; } }; } }; } };
+    exports.reset = () => { ledger.exec('DELETE FROM daily_usage_reservations'); for (const row of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) db.exec('DROP TABLE ' + row.name); };
     exports.migrate = sql => db.exec(sql);
     exports.env = env;
   `);

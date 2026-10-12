@@ -45,17 +45,19 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood } as Action;
   return { attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void):Promise<ActivityDecision>{
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void,beforeRequest?:()=>Promise<void>):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
 const schema={...actionSchema,properties:{...actionSchema.properties,type:{...actionSchema.properties.type,enum:allowedTypes}}};
 const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。${resumable?'原活動可延續；仍由你判斷續做或切換。':'沒有可延續的原活動（可能已完成或決策模式／模型已改變），必須選擇新行動，不能回傳 continue。'}`;
 let r:Response;
-try { r=await fetcher(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
+const init:RequestInit={
 method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({model,messages:[{role:'system',content:activityPrompt+"\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify({...perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined}),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)})}],...(direct?{
 store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
-}:{temperature:.8,max_tokens:2048})})}); }
+}:{temperature:.8,max_tokens:2048})})};
+await beforeRequest?.();
+try { r=await fetcher(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',init); }
 catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
 if(!r.ok)throw Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`);
 let d:{usage?:{prompt_tokens?:number;completion_tokens?:number};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};

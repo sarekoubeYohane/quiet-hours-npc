@@ -6,9 +6,9 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
+  for (const [source, output] of [['lib/daily-usage.ts', 'daily-usage'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world|attention|false-perception|perception|habits|activities|models|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(daily-usage|world|attention|false-perception|perception|habits|activities|models|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
       .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
       .replace('require("@/lib/auth")', 'require("./auth.cjs")').replace(/require\("(?:@\/lib\/|\.\/)store"\)/g, 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
@@ -19,15 +19,30 @@ try {
   await writeFile(join(directory, 'auth.cjs'), 'let userId = "test-owner"; exports.setUserId = id => { userId = id; }; exports.getGitHubUser = async () => ({ userId });');
   await writeFile(join(directory, 'store.cjs'), `
     const { DatabaseSync } = require('node:sqlite');
-    const db = new DatabaseSync(':memory:');
+    const { AsyncLocalStorage } = require('node:async_hooks');
+    const context = new AsyncLocalStorage();
+    const primaryDb = new DatabaseSync(':memory:');
+    const db = new Proxy({}, { get(_, key) { const connection = context.getStore() || primaryDb; return connection[key].bind(connection); } });
     db.exec('CREATE TABLE worlds (owner TEXT PRIMARY KEY, state TEXT NOT NULL, version INTEGER NOT NULL, locked_until INTEGER NOT NULL)');
     db.exec(${JSON.stringify(await readFile('drizzle/0002_account_model_keys.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
+    const ledgerDb = new DatabaseSync(':memory:');
+    ledgerDb.exec(${JSON.stringify(await readFile('drizzle-ledger/0000_daily_usage.sql', 'utf8'))});
+    require('./cloudflare-workers.cjs').env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledgerDb.prepare(sql).get(...values) ?? null; }, async run() { return { meta: { changes: Number(ledgerDb.prepare(sql).run(...values).changes) } }; } }; } }; } };
     let conflict, uncertain, failBefore, failRead;
     exports.install = value => {
+      ledgerDb.exec('DELETE FROM daily_usage_reservations');
       db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
+    exports.inOtherEnvironment = async (world, callback) => {
+      const other = new DatabaseSync(':memory:');
+      for (const row of primaryDb.prepare("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'").all()) other.exec(row.sql);
+      other.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(world));
+      for (const row of primaryDb.prepare('SELECT * FROM account_model_keys').all()) { const columns = Object.keys(row); other.prepare('INSERT INTO account_model_keys (' + columns.join(',') + ') VALUES (' + columns.map(() => '?').join(',') + ')').run(...Object.values(row)); }
+      try { return await context.run(other, callback); } finally { other.close(); }
+    };
+    exports.replaceWorld = value => db.prepare('UPDATE worlds SET state = ?, locked_until = 0, operations = ? WHERE owner = ?').run(JSON.stringify(value), JSON.stringify({floor:0,results:{}}), 'test-owner');
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
     exports.failNextOperationRead = () => { failRead = true; };
     exports.throwBeforeNextSave = () => { failBefore = true; };
@@ -53,7 +68,7 @@ try {
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
   `);
-  const allTests = ['tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
+  const allTests = ['tests/daily-usage-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
