@@ -138,3 +138,70 @@ test('independent environment worlds share atomic reservations and never exceed 
     assert.equal(sent, 144);
   } finally { release(); global.fetch = original; Date.now = clock; }
 });
+
+test('a missing ledger blocks model dispatch while rule mode remains usable', async () => {
+  store.install(seedWorld());
+  await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
+  const env = build('cloudflare-workers').env, ledger = env.USAGE_DB, original = global.fetch;
+  let sent = 0;
+  global.fetch = async () => { sent++; throw Error('must not dispatch'); };
+  delete env.USAGE_DB;
+  try {
+    assert.equal((await advance()).status, 502);
+    const result = await (await GET()).json();
+    assert.equal(result.dailyUsage, null);
+    assert.equal(result.world.turn, 0);
+    assert.equal(sent, 0);
+    const demo = await POST(request({ operation: 'advance', operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', minutes: 15 }));
+    assert.equal(demo.status, 200);
+  } finally { env.USAGE_DB = ledger; global.fetch = original; }
+});
+
+test('hourly refusal releases the daily reservation without counting an unsent request', async () => {
+  store.install(seedWorld());
+  await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
+  const response = await POST(request({ operation: 'advance', operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', model: 'gpt-6-luna', minutes: 15, limits: { calls: 3, tokens: 1000 } }));
+  assert.equal(response.status, 429);
+  const result = await (await GET()).json();
+  assert.equal(result.dailyUsage.used, 0);
+  assert.equal(result.dailyUsage.reserved, 0);
+  assert.equal(result.dailyUsage.remaining, 144);
+});
+
+test('SQL queued beyond lease expiry never consumes a released reservation or sends a model request', async () => {
+  const original = global.fetch, clock = Date.now;
+  let now = Date.parse('2026-10-12T01:00:00Z'); Date.now = () => now;
+  store.install(seedWorld());
+  await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
+  store.delayNextUsageDispatch({ before: () => { now += 130000; } });
+  let sent = 0; global.fetch = async () => { sent++; throw Error('must not send'); };
+  try {
+    assert.equal((await advance()).status, 502);
+    const result = await (await GET()).json();
+    assert.equal(result.dailyUsage.used, 0);
+    assert.equal(result.dailyUsage.reserved, 0);
+    assert.equal(result.dailyUsage.remaining, 144);
+    assert.equal(sent, 0);
+  } finally { global.fetch = original; Date.now = clock; }
+});
+
+test('a quota write acknowledged after midnight is refunded and reserved on the actual dispatch day', async () => {
+  const original = global.fetch, clock = Date.now;
+  let now = Date.parse('2026-10-12T15:59:59Z'); Date.now = () => now;
+  store.install(seedWorld());
+  await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
+  store.delayNextUsageDispatch({ after: () => { now += 2000; } });
+  global.fetch = async () => { throw Error('provider failure'); };
+  try {
+    assert.equal((await advance()).status, 502);
+    let result = await (await GET()).json();
+    assert.equal(result.dailyUsage.day, '2026-10-13');
+    assert.equal(result.dailyUsage.used, 1);
+    assert.equal(result.dailyUsage.reserved, 0);
+    now -= 2000;
+    result = await (await GET()).json();
+    assert.equal(result.dailyUsage.day, '2026-10-12');
+    assert.equal(result.dailyUsage.used, 0);
+    assert.equal(result.dailyUsage.reserved, 0);
+  } finally { global.fetch = original; Date.now = clock; }
+});

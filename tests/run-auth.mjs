@@ -33,6 +33,7 @@ try {
       async run() { return { meta: { changes: Number(db.prepare(sql).run(...values).changes) } }; }
     }; return statement; } };
     const ledger = new DatabaseSync(':memory:');
+    ledger.function('unixepoch', () => Math.floor(Date.now() / 1000));
     ledger.exec(${JSON.stringify(await readFile('drizzle-ledger/0000_daily_usage.sql', 'utf8'))});
     env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledger.prepare(sql).get(...values) ?? null; }, async run() { return { meta: { changes: Number(ledger.prepare(sql).run(...values).changes) } }; } }; } }; } };
     exports.reset = () => { ledger.exec('DELETE FROM daily_usage_reservations'); for (const row of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) db.exec('DROP TABLE ' + row.name); };

@@ -27,11 +27,14 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0002_account_model_keys.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
     const ledgerDb = new DatabaseSync(':memory:');
+    ledgerDb.function('unixepoch', () => Math.floor(Date.now() / 1000));
     ledgerDb.exec(${JSON.stringify(await readFile('drizzle-ledger/0000_daily_usage.sql', 'utf8'))});
-    require('./cloudflare-workers.cjs').env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledgerDb.prepare(sql).get(...values) ?? null; }, async run() { return { meta: { changes: Number(ledgerDb.prepare(sql).run(...values).changes) } }; } }; } }; } };
+    let dispatchDelay;
+    exports.delayNextUsageDispatch = options => { dispatchDelay = options; };
+    require('./cloudflare-workers.cjs').env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledgerDb.prepare(sql).get(...values) ?? null; }, async run() { const delay = sql.startsWith('UPDATE daily_usage_reservations SET used = used + 1') ? dispatchDelay : undefined; if(delay) dispatchDelay = undefined; await delay?.before?.(); const result = { meta: { changes: Number(ledgerDb.prepare(sql).run(...values).changes) } }; await delay?.after?.(); return result; } }; } }; } };
     let conflict, uncertain, failBefore, failRead;
     exports.install = value => {
-      ledgerDb.exec('DELETE FROM daily_usage_reservations');
+      ledgerDb.exec('DELETE FROM daily_usage_reservations'); dispatchDelay = undefined;
       db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
