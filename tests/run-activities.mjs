@@ -23,12 +23,13 @@ try {
     db.exec('CREATE TABLE worlds (owner TEXT PRIMARY KEY, state TEXT NOT NULL, version INTEGER NOT NULL, locked_until INTEGER NOT NULL)');
     db.exec(${JSON.stringify(await readFile('drizzle/0002_account_model_keys.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
-    let conflict, uncertain, failBefore;
+    let conflict, uncertain, failBefore, failRead;
     exports.install = value => {
-      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false;
+      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
+    exports.failNextOperationRead = () => { failRead = true; };
     exports.throwBeforeNextSave = () => { failBefore = true; };
     exports.throwAfterNextSave = () => { uncertain = true; };
     exports.snapshot = () => JSON.parse(db.prepare('SELECT state FROM worlds WHERE owner = ?').get('test-owner').state);
@@ -36,7 +37,7 @@ try {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async first() { return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
       if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }
       if (finalSave && conflict) {

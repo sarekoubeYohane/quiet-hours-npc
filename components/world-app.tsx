@@ -52,7 +52,7 @@ const payload=saved||JSON.stringify({operationScope:storageKey.slice('quiet-hour
 sessionStorage.setItem(storageKey,payload);setPendingOperation(true);
 operation=JSON.parse(payload).operation;
 const deadline=Date.now()+15000;
-let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;retryable?:boolean;limitReached?:boolean}|undefined;
+let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean}|undefined;
 while(Date.now()<deadline){
 try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:payload,signal:AbortSignal.timeout(125000)});d=await r.json();}
 catch{r=undefined;d=undefined;}
@@ -64,6 +64,7 @@ if(!r||!d||d.retryable)throw Error('等待逾時：另一個回合可能仍在�
 if(d.scopeMismatch){await readLatest();throw Error(d.error);}
 acceptWorld(d);
 if(r.status===401){setSignInRequired(true);throw Error(d.error);}
+if(!d.operationSettled&&![400,403,410,422].includes(r.status))throw Error(`${d.error||'暫時無法確認操作結果。'} 未完成操作已保留，請按「重試未完成操作」。`);
 sessionStorage.removeItem(storageKey);setPendingOperation(false);
 await readLatest();
 if(!r.ok)throw Error(d.error);

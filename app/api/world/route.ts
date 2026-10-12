@@ -53,9 +53,19 @@ export async function GET() {
 }
 
 type OperationResult = { status: number; body: Record<string, unknown> };
+const settledReply = (result: OperationResult) => reply({ ...result.body, operationSettled: true }, result.status);
 const uncertainResult: OperationResult = { status: 502, body: { error: '上次操作的結果無法確認，請重新讀取世界；此操作不會再次呼叫模型。', operationUncertain: true } };
 const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
 type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }> };
+function trimJournal(journal: Journal, maxResults: number, protectedId?: string) {
+  const oldest = Object.keys(journal.results).filter(id => id !== protectedId).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
+  while (oldest.length && (Object.keys(journal.results).length > maxResults || new TextEncoder().encode(JSON.stringify(journal)).byteLength > 500000)) {
+    const id = oldest.shift()!;
+    journal.floor = Math.max(journal.floor, Number(id.split(':')[0]));
+    delete journal.results[id];
+  }
+}
+
 
 export async function POST(request: Request) {
   const id = await owner();
@@ -97,23 +107,18 @@ export async function POST(request: Request) {
     const serializedJournal = stored!.operations;
     journal = JSON.parse(serializedJournal);
     const previous = journal.results[operationId];
-    if (previous && 'status' in previous) return reply(previous.body, previous.status);
+    if (previous && 'status' in previous) return settledReply(previous);
     if (previous && 'pending' in previous) {
       if (previous.pending > Date.now()) return waiting();
       await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
         .bind(`$.results."${operationId}"`, JSON.stringify(uncertainResult), id, `$.results."${operationId}".pending`, previous.pending).run();
       const latest = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
       const settled = latest && (JSON.parse(latest.operations) as Journal).results[operationId];
-      if (settled && 'status' in settled) return reply(settled.body, settled.status);
+      if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if (issuedAt <= journal.floor || issuedAt < Date.now() - 86400000) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
-    const entries = Object.keys(journal.results).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
-    while (entries.length >= 8 || (entries.length && new TextEncoder().encode(JSON.stringify(journal)).byteLength > 500000)) {
-      const old = entries.shift()!;
-      journal.floor = Math.max(journal.floor, Number(old.split(':')[0]));
-      delete journal.results[old];
-    }
+    trimJournal(journal, 7);
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
 
     normalizeWorld(world);
@@ -183,27 +188,23 @@ export async function POST(request: Request) {
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
       : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) } };
     journal.results[operationId] = result;
-    // Keep the current exact response; evict older snapshots to bound historical bytes.
-    while (entries.length && new TextEncoder().encode(JSON.stringify(journal)).byteLength > 500000) {
-      const old = entries.shift()!;
-      journal.floor = Math.max(journal.floor, Number(old.split(':')[0]));
-      delete journal.results[old];
-    }
+    // The current exact response may exceed the historical byte budget by itself.
+    trimJournal(journal, 8, operationId);
     const saved = await db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > ? AND operations = ?').bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), pendingJournal).run();
     if (!saved.meta.changes) {
       await retainPaidUsage(db, id, initialUsage, world.aiUsage);
       throw Error('儲存衝突，請重新載入再試。');
     }
-    return reply(result.body, result.status);
+    return settledReply(result);
   } catch (e) {
     if (locked && operationId) {
       const result: OperationResult = { status: 502, body: { error: e instanceof Error ? e.message : '操作失敗，請重新讀取世界。' } };
       try {
-        await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND (json_extract(operations, ?) = ? OR json_extract(operations, ?) IS NULL)')
-          .bind(`$.results."${operationId}"`, JSON.stringify(result), id, `$.results."${operationId}".pending`, lease, `$.results."${operationId}"`).run();
+        await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
+          .bind(`$.results."${operationId}"`, JSON.stringify(result), id, `$.results."${operationId}".pending`, lease).run();
         const row = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
         const settled = row && (JSON.parse(row.operations) as Journal).results[operationId];
-        if (settled && 'status' in settled) return reply(settled.body, settled.status);
+        if (settled && 'status' in settled) return settledReply(settled);
       } catch { /* Durable pending blocks re-execution even when storage is unavailable. */ }
       return reply(uncertainResult.body, uncertainResult.status);
     }

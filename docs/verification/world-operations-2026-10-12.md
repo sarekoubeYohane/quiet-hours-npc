@@ -23,3 +23,12 @@
 - 390px 手機寬度沒有水平溢出，無頁面 JavaScript 錯誤。
 
 fixture 不部署到正式站，不代表 Cloudflare 正式環境或真實 GPT 已試玩。測試工具、截圖是可重建的暫存驗證資料，不納入應用程式。
+
+## Review 修正
+
+- API red → green：已提交但回應遺失後，D1 日誌讀取暫時回 502；新測試先因缺少 settlement 訊號失敗，現在只對確定保存的結果提供 `operationSettled:true`，恢復服務後同 ID 回傳原结果且 turn 仍為 1。
+- 瀏覽器 red：真實 POST 已提交但回應遺失、第二個 POST 回 503，原 UI 刪掉 pending（assert actual null）。瀏覽器 green 已通過：503 後 pending 留存，按明確重試沿用同 ID，世界仍為 turn 1。只有明確定案或受理前拒絕才清除。
+- API red → green：卡住的模型請求過期後，9 個新操作完成並淘汰舊 ID；舊 Worker 回復時不復活舊結果，重送仍回 410。
+- 實際 Workers/D1 的 model-key 測試 helper 更新為附唯一 operationId；重新執行通過。
+
+最終自動檢查：`pnpm test` 138/138 通過（112 世界 API/行為、24 登入/Key、2 實際 Workers/D1）；`pnpm typecheck`、本次 runtime/tests ESLint 及 `git diff --check` 通過。

@@ -87,3 +87,25 @@ test('paid success, confirmed CAS failure and ambiguous saves never dispatch a d
   }
  } finally {global.fetch=original;Date.now=clock;}
 });
+test('durably settled results are distinguishable from a transient read failure after a lost response', async () => {
+ store.install(seedWorld());
+ const body={operation:'advance',operationId:operationId(),minutes:15};
+ const first=await POST(request(body));const accepted=await first.json();assert.equal(accepted.operationSettled,true);
+ store.failNextOperationRead();
+ const unavailable=await POST(request(body));assert.equal(unavailable.status,502);assert.notEqual((await unavailable.json()).operationSettled,true);
+ const replay=await POST(request(body));assert.deepEqual(await replay.json(),accepted);
+ assert.equal((await (await GET()).json()).world.turn,1);
+});
+test('an expired worker cannot revive its evicted result after newer operations finish', async () => {
+ store.install(seedWorld());await POST(request({operation:'set-model-key',mode:'openai',key:'test-key'}));
+ const original=global.fetch,clock=Date.now;let instant=clock(),release,entered;Date.now=()=>instant;
+ const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
+ global.fetch=async()=>{entered();await gate;throw Error('provider failed');};
+ try {
+  const body={operation:'advance',operationId:operationId(),mode:'openai',model:'gpt-6-luna',minutes:15};
+  const running=POST(request(body));await ready;instant+=130000;
+  for(let i=0;i<9;i++){instant++;assert.equal((await POST(request({operation:'takeover',operationId:operationId()}))).status,200);}
+  release();await running;
+  const replay=await POST(request(body));assert.equal(replay.status,410);assert.equal((await replay.json()).operationExpired,true);
+ }finally{release();Date.now=clock;global.fetch=original;}
+});
