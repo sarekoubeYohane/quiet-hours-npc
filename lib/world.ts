@@ -29,9 +29,9 @@ export function seedWorld():World{return normalizeWorld({minute:1260,turn:0,last
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]});}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string){
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
-w.events=[...w.events,event].slice(-300);perceiveEvent(w,event);
+w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
 }
 export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,shortTerm:memoryProjection(c),longTerm:c.longTerm,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
@@ -76,7 +76,8 @@ const relationship=target.relationships[c.id]||'';
 attemptKey=JSON.stringify(['persuade',c.id,target.id,c.location,target.mood,relationship]);
 if(w.events.some(e=>e.attemptKey===attemptKey)){
   c.activity='再次試著向 '+target.name+' 解釋自己的請求。';
-  record(w,c.id,c.name+' 又對 '+target.name+' 說：「'+content+'」；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,content});
+  const actorExperience=c.name+' 又對 '+target.name+' 說：「'+content+'」';
+  record(w,c.id,actorExperience+'；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,content},undefined,actorExperience);
   return;
 }
 const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;

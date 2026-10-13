@@ -75,3 +75,17 @@ test('selected memory cannot partially commit across model failure, CAS conflict
 test('aggregate memory pressure trims only short-term FIFO while all long-term memories survive takeover',async()=>{
  const w=seedWorld(),c=w.characters.find(c=>c.id==='owner');c.longTerm=Array.from({length:55},(_,i)=>({id:`long-${i}`,characterId:c.id,version:1,time:i,text:'乙'.repeat(300),source:{kind:'experience'},origin:{id:`past-${i}`,version:1},reason:'重要'}));store.install(w);await POST(req({operation:'takeover'}));for(let i=0;i<45;i++)assert.equal((await POST(req({operation:'intervene',target:'owner',text:`${i} `+'界'.repeat(490)}))).status,200);const saved=(await read()).characters.find(c=>c.id==='owner');assert.deepEqual(saved.longTerm,c.longTerm);assert.equal(saved.shortTerm.at(-1).text,`觀察者對 店主 說：「44 ${'界'.repeat(490)}」`);
 });
+test('invalid legacy text is rejected before FIFO can hide it, even when older than the retained window',async()=>{
+ for (const count of [1,90]) {
+  const w=seedWorld(),c=w.characters[0];delete c.shortTerm;c.memories=Array.from({length:count},(_,i)=>({time:i,text:i===0?'界'.repeat(23000):`近期${i}`}));store.install(w);
+  const response=await GET();assert.equal(response.status,503);assert.match((await response.json()).error,/4096 bytes/);
+ }
+});
+test('repeated persuasion keeps observer dice diagnostics out of subjective memory without editing spoken words',async()=>{
+ const w=seedWorld();for(const c of w.characters){c.location='cafe';c.region='cafe-front';}store.install(w);const random=Math.random;let draws=0,select=false;Math.random=()=>{draws++;return .5;};
+ try{await withModel(async(inputs,advance)=>{
+  assert.equal((await advance()).status,200);assert.equal((await advance()).status,200);assert.equal(draws,1);const saved=await read(),vera=saved.characters.find(c=>c.id==='vera');assert.ok(saved.events.some(e=>e.actor==='vera'&&e.text.includes('不會重新擲骰')));
+  const repeated=vera.shortTerm.find(m=>m.text.includes('又對 Cass'));assert.ok(repeated);assert.ok(repeated.text.includes('我喜歡擲骰遊戲'));assert.equal(repeated.text.includes('客觀條件未變'),false);assert.equal(repeated.text.includes('不會重新擲骰'),false);
+  select=true;assert.equal((await advance()).status,200);const input=inputs.findLast(i=>i.self.id==='vera');assert.equal(JSON.stringify(input).includes('不會重新擲骰'),false);const memory=(await read()).characters.find(c=>c.id==='vera').longTerm[0];assert.equal(memory.text,repeated.text);assert.equal(draws,1);
+ },input=>input.self.id==='vera'&&!select?{type:'persuade',target:'cass',content:'我喜歡擲骰遊戲',mood:input.self.mood,durationMinutes:15}:input.self.id==='vera'?{mood:input.self.mood,memorySelections:[{id:input.self.shortTerm.find(m=>m.text.includes('又對 Cass')).id,version:1,reason:'想記住這段交流'}]}:{mood:input.self.mood});}finally{Math.random=random;}
+});

@@ -137,7 +137,7 @@ function observationTrace(world: World, character: Character, event: import('./w
   return { characterId: character.id, status, observations, reason, ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) };
 }
 // Called only for newly confirmed events. Reload/normalization never replays history.
-export function perceiveEvent(world: World, event: import('./world').WorldEvent) {
+export function perceiveEvent(world: World, event: import('./world').WorldEvent, actorExperience?: string) {
   if (event.perception) return;
   normalizePerception(world);
   if (event.actor && event.scene && ['move', 'work', 'rest', 'reflect', 'observe', 'say', 'shout', 'attempt', 'door', 'message'].includes(event.kind)) {
@@ -153,7 +153,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent)
   event.perception = [];
   const audience: string[] = [];
   for (const character of world.characters) {
-    if (character.id === event.actor) { remember(world, character, event.text, event); audience.push(character.id); continue; }
+    if (character.id === event.actor) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
     const candidates = eventCandidates(world, character, event);
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;

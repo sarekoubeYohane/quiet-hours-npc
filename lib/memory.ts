@@ -7,6 +7,9 @@ export type LongMemory = { id: string; characterId: string; version: number; tim
 export class MemoryValidationError extends Error {}
 export const memoryBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
 const textBytes = (value: string) => new TextEncoder().encode(value).length;
+function observationSource(observation: Observation): MemorySource {
+  return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
+}
 function validateShort(item: ShortMemory) {
   if (textBytes(item.text) > 4096) throw new MemoryValidationError('短期經歷超過 4096 bytes；保留原資料，未截斷文字。');
 }
@@ -20,8 +23,9 @@ export function projectMemories(c: Character) {
 }
 function boundShort(c: Character) {
   const items = c.shortTerm!;
-  while (items.length > 80 || memoryBytes(items) > 64 * 1024) items.shift();
+  // Invalid legacy text must be reported, not silently hidden by FIFO eviction.
   for (const item of items) validateShort(item);
+  while (items.length > 80 || memoryBytes(items) > 64 * 1024) items.shift();
   projectMemories(c);
   while (items.length && memoryStateBytes(c) > 208 * 1024) { items.shift(); projectMemories(c); }
   validateMemoryState(c);
@@ -34,7 +38,7 @@ export function normalizeMemory(c: Character) {
       if (seen.has(o.id)) return; seen.add(o.id);
       const linked = items.findIndex(item => item.id === o.id);
       if (linked >= 0) items.splice(linked, 1);
-      items.push({ id: o.id, characterId: c.id, version: 1, time: o.time, text: o.text, source: { kind: 'observation', ...(o.source ? { person: o.source } : {}), ...(o.region ? { region: o.region } : {}), sense: o.sense, clarity: o.clarity }, observation: o, consumed: index < (c.observationCursor || 0) });
+      items.push({ id: o.id, characterId: c.id, version: 1, time: o.time, text: o.text, source: observationSource(o), observation: o, consumed: index < (c.observationCursor || 0) });
     });
     for (const [index, m] of (c.control?.experiences || []).entries()) {
       const match = m.id && items.find(item => item.id === m.id);
@@ -50,7 +54,7 @@ export function addExperience(c: Character, time: number, text: string, observat
   normalizeMemory(c);
   const id = observation?.id || crypto.randomUUID();
   if (c.shortTerm!.some(item => item.id === id)) return;
-  const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity } : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
+  const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? observationSource(observation) : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
   validateShort(item);
   c.shortTerm!.push(item); boundShort(c);
 }
