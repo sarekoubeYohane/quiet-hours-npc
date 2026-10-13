@@ -1,3 +1,4 @@
+import { budgetMemoryInput, memorySelectionSchema, selectMemories } from './memory';
 import { parseAttention, clueKinds } from './attention';
 import { npcPlaybook } from './playbook';
 import { perception,type World,type Character,type Action,type Intent } from './world';
@@ -22,7 +23,8 @@ const actionSchema = { type: 'object', properties: {
   durationMinutes: { type: 'integer', enum: activityDurations },
   attentionConditions: { type: 'array', maxItems: 12, items: { type: 'object', properties: { kind: { type: 'string', enum: clueKinds }, source: { type: 'string' }, region: { type: 'string' } }, required: ['kind','source','region'], additionalProperties: false } },
   intents: { type: 'array', maxItems: 12, items: intentSchema },
-}, required: ['type', 'target', 'content', 'mood', 'durationMinutes', 'intents', 'attentionConditions'], additionalProperties: false };
+  memorySelections: memorySelectionSchema,
+}, required: ['type', 'target', 'content', 'mood', 'durationMinutes', 'intents', 'attentionConditions', 'memorySelections'], additionalProperties: false };
 
 function parseDecision(value: unknown, allowedTypes: string[], world: World, character: Character): ActivityDecision {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
@@ -43,7 +45,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   });
   const attention = parseAttention(world, character, data.attentionConditions);
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood } as Action;
-  return { attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
+  return { longTerm: selectMemories(character, data.memorySelections), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void):Promise<ActivityDecision>{
 const direct=provider==='openai';
@@ -51,9 +53,10 @@ const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
 const schema={...actionSchema,properties:{...actionSchema.properties,type:{...actionSchema.properties.type,enum:allowedTypes}}};
 const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。${resumable?'原活動可延續；仍由你判斷續做或切換。':'沒有可延續的原活動（可能已完成或決策模式／模型已改變），必須選擇新行動，不能回傳 continue。'}`;
+const input = budgetMemoryInput({...perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined}),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)});
 let r:Response;
 try { r=await fetcher(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
-method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({model,messages:[{role:'system',content:activityPrompt+"\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify({...perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined}),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)})}],...(direct?{
+method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({model,messages:[{role:'system',content:activityPrompt+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}],...(direct?{
 store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
 }:{temperature:.8,max_tokens:2048})})}); }
 catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
