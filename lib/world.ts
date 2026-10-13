@@ -1,3 +1,4 @@
+import { memoryProjection, normalizeMemory, type ShortMemory, type LongMemory } from './memory';
 import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
 import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
@@ -7,8 +8,8 @@ export type ActivityPlan={action:Action;startedAt:number;until:number;attention:
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
-export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{time:number;text:string}[]};
-export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;memories:{time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
+export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
+export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memories:{id?:string;time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
 export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage};
 export type Action={type:'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
@@ -18,21 +19,21 @@ export function pendingInterventions(w:World,c:Character){
 // A character's next action consumes the requests they received before it.
 // Event order, rather than time, distinguishes requests made in the same turn.
 let lastAction=-1;for(let i=0;i<w.events.length;i++)if(w.events[i].actor===c.id)lastAction=i;
-return w.events.slice(lastAction+1).filter(e=>e.actor==='observer'&&e.kind==='intervention'&&e.audience.includes(c.id)).map(({id,time,text})=>({id,time,text}));
+return w.events.slice(lastAction+1).filter(e=>e.actor==='observer'&&e.kind==='intervention'&&e.audience.includes(c.id)&&(!c.shortTerm||c.shortTerm.some(m=>m.eventId===e.id))).map(({id,time,text})=>({id,time,text}));
 }
 export const timeLabel=(m:number)=>`${String(Math.floor((m%1440)/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
 export function cafeOwner(minute:number):Character{return {id:'owner',name:'店主',color:'#a5c9b3',location:'cafe',mood:'平靜',personality:'務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。',goal:'整理咖啡館，照顧自己的生活與來訪的客人。',activity:'在吧台整理杯子。',relationships:{},memories:[{time:minute,text:'我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。'}],intents:[],control:{mode:'autonomous'}};}
-export function normalizeWorld(w:World){for(const c of w.characters){c.intents??=[];c.attentionConditions??=[];c.observationCursor??=0;}if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};normalizePerception(w);return w;}
+export function normalizeWorld(w:World){for(const c of w.characters){c.intents??=[];c.attentionConditions??=[];c.observationCursor??=0;}if(!w.characters.some(c=>c.id==='owner'))w.characters.push(cafeOwner(w.minute));const owner=w.characters.find(c=>c.id==='owner')!;owner.control??={mode:'autonomous'};normalizePerception(w);for(const c of w.characters)normalizeMemory(c);return w;}
 export function seedWorld():World{return normalizeWorld({minute:1260,turn:0,lastMode:'demo',characters:[
 {id:'cass',intents:[],name:'Cass',color:'#eb9e79',location:'kris-home',mood:'疲憊',personality:'努力保持冷靜；害怕被留下，但也想保有自己的選擇。',abilityTags:['不擅長髮飾設計'],goal:'先安頓自己，慢慢想清楚接下來的生活。',activity:'坐在客廳，捧著一杯溫水。',relationships:{vera:'在乎她，也需要幾天空間。',kris:'暫時借住；信任她務實的支持。'},memories:[{time:1260,text:'與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。'}]},
 {id:'vera',intents:[],name:'Vera',color:'#a2bdf0',location:'vera-home',mood:'不安',personality:'不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。',abilityTags:['擅長髮飾設計'],goal:'尊重 Cass 的空間，也試著做一件自己喜歡的事。',activity:'整理桌上的髮夾，偶爾看一眼手機。',relationships:{cass:'想關心她，但不想再越界。',kris:'知道她是 Cass 信任的人。'},memories:[{time:1260,text:'Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。'}]},
 {id:'kris',intents:[],name:'Kris',color:'#d4c485',location:'kris-home',mood:'平靜',personality:'成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。',goal:'提供安全的暫住空間，讓 Cass 自己思考。',activity:'在廚房收拾杯子。',relationships:{cass:'願意幫忙，但不替她做決定。',vera:'不代替兩人傳遞私密談話。'},memories:[{time:1260,text:'Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。'}]}
 ,cafeOwner(1260)],events:[{id:'opening',time:1260,actor:'world',text:'雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。',kind:'opening',audience:['cass','kris']} ]});}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution){
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string){
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
-w.events=[...w.events,event].slice(-300);perceiveEvent(w,event);
+w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
 }
-export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
+export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,shortTerm:memoryProjection(c),longTerm:c.longTerm,memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
 if(tags.includes('完全不懂髮飾設計'))return -4;
@@ -75,7 +76,8 @@ const relationship=target.relationships[c.id]||'';
 attemptKey=JSON.stringify(['persuade',c.id,target.id,c.location,target.mood,relationship]);
 if(w.events.some(e=>e.attemptKey===attemptKey)){
   c.activity='再次試著向 '+target.name+' 解釋自己的請求。';
-  record(w,c.id,c.name+' 又對 '+target.name+' 說：「'+content+'」；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,content});
+  const actorExperience=c.name+' 又對 '+target.name+' 說：「'+content+'」';
+  record(w,c.id,actorExperience+'；客觀條件未變，因此不會重新擲骰。','say',witnesses,{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,content},undefined,actorExperience);
   return;
 }
 const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;
