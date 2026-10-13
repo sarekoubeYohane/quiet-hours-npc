@@ -81,9 +81,9 @@
 
 已請求回想而仍未就緒、失敗或預算不足時，回復整回合、保留已知已付用量、停止自動推進並回報技術原因。不保存半套信念／意圖、不讓其他 NPC 部分提交、不把故障寫成角色經歷。相同 operationId 重放原結果；已保存失敗後的使用者新嘗試須讀新版本、使用新 ID。提交不明不得盲目重做外部請求。
 
-**待使用者確認的具體服務提案：** Cloudflare Vectorize ＋ OpenAI `text-embedding-3-small`，1536 維、cosine；Vectorize 由站主 Cloudflare 帳號負擔，Embedding 由各使用者既有有效 OpenAI Key 付費，兩者不得混為免費。這是提案，供應商、模型、費用／Key 歸屬、各類費用上限及測試環境設定尚未批准；只使用 OpenRouter 的帳號是否需另提供 OpenAI Key 也必須明示。工程可先設計可替換 adapter 與模擬服務，但不能默認使用現有聊天 Key 做 Embedding、開服務、建立付費資源或宣稱已有服務。用量需分辨聊天、Embedding、索引及搜尋，沿既有帳本擴充；bytes 預算不是 token 或金額預算。本輪不開通、不付費試跑。
+**2026-10-13 已確認服務方案與費用歸屬（#51）：** Cloudflare Vectorize ＋ OpenAI `text-embedding-3-small`，1536 維、cosine。Vectorize 由站主 Cloudflare 帳號負擔；Embedding 由站主的 OpenAI API 帳號／Key 負擔；NPC 聊天與自主決策仍由各使用者自己的有效聊天模型 Key 負擔。只使用 OpenRouter Key 的使用者**不需要**另提供 OpenAI Embedding Key。由站主提供 Embedding 服務並不授權開通任何付費資源或設定 Key；實作必須加入站主每月總預算及每帳號用量上限、付費 dispatch 前檢查，超限不得暗中轉嫁給使用者或跳過已要求的回想。各類用量須區分聊天、Embedding、向量索引與搜尋；bytes 預算不是 token／金額預算。可先設計替換 adapter 與模擬服務；測試／正式環境 Key、索引與付費啟用仍須另行授權。本輪不開通、不付費試跑。
 
-設定交接須列出各環境獨立 Vectorize binding／索引、Embedding 模型與維度、有效 OpenAI Key、各類預算；Key 不寫入文件或世界。Vectorize mutation 為非同步，#55 須驗證可查狀態／版本水位；mutation UUID 不可按字典順序推斷先後。參考：[Vectorize API](https://developers.cloudflare.com/vectorize/reference/client-api/)、[Vectorize 費用](https://developers.cloudflare.com/vectorize/platform/pricing/)、[OpenAI Embedding](https://developers.openai.com/api/docs/guides/embeddings)。
+設定交接須列出各環境獨立 Vectorize binding／索引、Embedding 模型與維度、站主 OpenAI Embedding Key 與使用者聊天模型 Key 的分離、站主及每帳號各類預算；Key 不寫入文件或世界。Vectorize mutation 為非同步，#55 須驗證可查狀態／版本水位；mutation UUID 不可按字典順序推斷先後。參考：[Vectorize API](https://developers.cloudflare.com/vectorize/reference/client-api/)、[Vectorize 費用](https://developers.cloudflare.com/vectorize/platform/pricing/)、[OpenAI Embedding](https://developers.openai.com/api/docs/guides/embeddings)。
 
 ## 世界 API 驗收計畫（未執行）
 
