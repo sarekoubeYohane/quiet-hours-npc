@@ -1,9 +1,9 @@
-import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory } from './memory';
+import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { longTerm?: LongMemory[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { longTerm?: LongMemory[]; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -132,6 +132,8 @@ export async function advanceActivities(world: World, options: {
     }
     character.observationCursor = observedCount;
     if (decision.longTerm) character.longTerm = decision.longTerm;
+    if (decision.shortTerm) character.shortTerm = decision.shortTerm;
+    if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
     consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
     for (const reason of decision.attentionDiagnostics || []) noteAttention(world, character, reason);
