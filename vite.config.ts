@@ -23,10 +23,16 @@ export default defineConfig(async () => {
 
   return {
     define: { __GIT_COMMIT__: JSON.stringify(gitCommit()), __BUILT_AT__: JSON.stringify(new Date().toISOString()) },
+    // Only server environments emit maps; keep them out of public client assets.
+    environments: {
+      rsc: { build: { sourcemap: true } },
+      ssr: { build: { sourcemap: true } },
+    },
     plugins: [
       vinext(),
       // Bindings, vars and environments come from wrangler.jsonc.
       cloudflare({
+        configPath: "wrangler.jsonc",
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
       }),

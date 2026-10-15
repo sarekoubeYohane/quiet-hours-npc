@@ -80,3 +80,17 @@ WorldApp 單檔 ESLint 仍有 3 errors／1 warning（render 使用 ref、effect 
 - **一小時線上實測未執行、未通過**。部署後再記錄起訖、版本、回合、用量差額及故障／恢復狀態。
 - 要定位當晚首次逾時與 HTML 來源：需要該時間段 Worker request／exception 日誌（2026-10-15 23:11–23:14，Asia/Taipei）、失敗的 GET 或 POST 路徑、HTTP 狀態／Content-Type、Cloudflare request ID，及 pending operationId 和唯讀日誌狀態。請勿附 cookie、Authorization 或 API Key。現有票內沒有這些證據。
 - 仍不保證跨模型供應商與 D1 的交易原子性。Worker 在 dispatch 後終止而未保存的用量無法由此查詢還原，不能宣稱已防止所有供應商用量遺失；本次驗證的是已保存用量不因恢復而消失或重複計入。
+
+
+## 後續：開啟觀測（使用者確認）
+
+使用者確認改為啟用 Workers Logs：`enabled:true`、`invocation_logs:true`、`head_sampling_rate:1`、`persist:true`。以 Wrangler 解析 local／test／production，均繼承此設定。先前使用者提供的 false 已由本次確認取代。
+
+伺服器 `rsc`／`ssr` 建置產生 external source maps，Wrangler 開啟 `upload_source_maps`。首次建置產物缺少觀測設定；只增加 Cloudflare Vite plugin 的 `configPath:"wrangler.jsonc"` 後，重建確認產物帶入日誌及上傳開關，避免沿用舊的產物設定。`dist/server/index.js.map`、ssr 與伺服器 chunks 的 maps 存在，`dist/client` 沒有 map。部署前檢查增加日誌／map 上傳設定守門。
+
+世界 API 新增結構化 `world_api` 記錄，白名單只有 requestId、已驗證 operationId、stage、lease、version、outcome、status、durationMs。回應附 `X-World-Request-Id` 供 Network 面板與日誌對照。階段包括讀取、日誌重放、租約等待／取得／到期、模型派送、提交開始／成功／衝突及失敗；不記錄 URL、headers、帳號、請求本文、模型內容或錯誤原文。診斷輸出失敗不改變操作結果。
+
+新增 API 測試先 red（缺 `X-World-Request-Id`），再 green；檢查 requestId 與 operationId 可關聯提交、回應狀態，事件私密文字與 Key sentinel 不出現在日誌。外部模型繼續全數模擬。這次修改不會自行部署，Cloudflare 端實際保存、source map 上傳成功與一小時實測仍待部署後驗證。
+
+
+觀測追加最終檢查：`pnpm test` 240/240（198 世界／UI、32 登入／Key、10 Workers／migration），typecheck、相關 ESLint、build:test、建置守門與 diff check 通過。Standards 新增審查 0 發現；Spec 找到模糊保存後缺確認日誌，已以 throw-after-save 先 red 後 green，補 `journal-confirmed` 並區分 settled／uncertain；複審通過。另驗證 console.info 拋錯不影響世界操作成功。本段仍不代表 Cloudflare 實際日誌保存與 source map 上傳已驗證。

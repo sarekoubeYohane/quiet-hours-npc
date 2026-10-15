@@ -161,3 +161,32 @@ test('paid lost-response lookup preserves latest world, events and usage without
   assert.equal(before.world.aiUsage.totalInputTokens,120);assert.equal(before.world.aiUsage.totalOutputTokens,80);
  }finally{global.fetch=original;}
 });
+test('world diagnostics correlate requests and operations without logging payloads or credentials', async () => {
+ store.install(seedWorld());
+ const captured=[],original=console.info;
+ console.info=value=>captured.push(value);
+ const body={operation:'intervene',operationId:operationId(),target:'all',text:'PRIVATE-STORY-MARKER'};
+ try{
+  const response=await POST(request(body));assert.equal(response.status,200);
+  const requestId=response.headers.get('X-World-Request-Id');assert.ok(requestId);
+  const entries=captured.filter(entry=>entry.event==='world_api'&&entry.requestId===requestId);
+  assert.ok(entries.some(entry=>entry.operationId===body.operationId&&entry.stage==='commit-start'));
+  assert.ok(entries.some(entry=>entry.stage==='response'&&entry.status===200));
+  await POST(request({operation:'set-model-key',mode:'openai',key:'PRIVATE-KEY-MARKER'}));
+  const serialized=JSON.stringify(captured);
+  assert.doesNotMatch(serialized,/PRIVATE-STORY-MARKER|PRIVATE-KEY-MARKER|Authorization|cookie/i);
+ }finally{console.info=original;}
+});
+test('diagnostics distinguish a thrown save from its subsequently confirmed journal result', async () => {
+ store.install(seedWorld());store.throwAfterNextSave();
+ const captured=[],original=console.info;console.info=value=>captured.push(value);
+ try{
+  const id=operationId();
+  const response=await POST(request({operation:'advance',minutes:15,operationId:id}));
+  assert.equal(response.status,200);
+  assert.ok(captured.some(entry=>entry.operationId===id&&entry.stage==='journal-confirmed'&&entry.outcome==='settled'));
+  assert.equal((await (await GET()).json()).world.turn,1);
+  console.info=()=>{throw Error('diagnostic sink unavailable');};
+  assert.equal((await POST(request({operation:'takeover',operationId:operationId()}))).status,200);
+ }finally{console.info=original;}
+});

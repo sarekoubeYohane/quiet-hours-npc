@@ -6,10 +6,13 @@
   "main": "vinext/server/fetch-handler",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
   "observability": {
     "logs": {
-      "enabled": false,
-      "invocation_logs": true
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1,
+      "persist": true
     }
   },
   "assets": { "directory": "dist/client", "not_found_handling": "none", "binding": "ASSETS" },
