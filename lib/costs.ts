@@ -22,6 +22,7 @@ export function beginCost(usage: AIUsage, provider: string, model: string, price
   const now = Date.now();
   for (const group of [usage.costs.total,usage.costs.hour]) {
     const c = group[key] ??= {provider,model,price:price ? {...price} : null,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0,lastDispatchAt:now};
+    if(typeof c.knownUsd!=='number'||!Number.isFinite(c.knownUsd)||c.knownUsd<0){c.knownUsd=0;c.unknownCalls=c.calls;}
     c.calls++; c.unknownCalls++; c.lastDispatchAt=now;
   }
   return (tokens: TokenUsage) => {
@@ -40,7 +41,7 @@ export function beginCost(usage: AIUsage, provider: string, model: string, price
 }
 export function costSummary(usage: AIUsage) {
   const estimate=(group:Record<string,CostCohort>|undefined,calls:number):CostEstimate=>{
-    const cohorts=Object.values(group||{}), recorded=cohorts.reduce((n,c)=>n+c.calls,0);
+    const cohorts=Object.values(group||{}).map(c=>typeof c.knownUsd==='number'&&Number.isFinite(c.knownUsd)&&c.knownUsd>=0?c:{...c,knownUsd:0,unknownCalls:c.calls}), recorded=cohorts.reduce((n,c)=>n+c.calls,0);
     let unknownCalls=Math.max(0,calls-recorded)+cohorts.reduce((n,c)=>n+c.unknownCalls,0);
     let knownUsd=cohorts.reduce((n,c)=>n+c.knownUsd,0);
     if(!Number.isFinite(knownUsd)){knownUsd=0;unknownCalls=Math.max(1,unknownCalls);}

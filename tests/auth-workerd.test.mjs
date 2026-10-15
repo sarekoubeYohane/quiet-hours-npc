@@ -27,6 +27,7 @@ const authModule = ts.transpileModule(source, {
 
 test('OAuth requests work in Workers and reject token/identity redirects without following them', async () => {
   const mf = new Miniflare({
+    outboundService: async () => { throw Error('External network blocked by local test fixture'); },
     cf: false,
     compatibilityDate: '2026-05-15',
     compatibilityFlags: ['nodejs_compat'],

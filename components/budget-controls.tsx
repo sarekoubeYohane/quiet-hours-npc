@@ -5,15 +5,21 @@ import { validBudgetLimits, type BudgetLimits } from '@/lib/activities';
 
 const choices = { calls: [3,6,12,24,48,120,240,600,1200], tokens: [1000,10000,30000,60000,120000,500000,1000000,5000000,10000000] };
 const label = (value: number | null) => value === null ? '無上限' : value.toLocaleString();
+function budgetDraft(limits: BudgetLimits) {
+  return {
+    draft: { calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' },
+    custom: { calls: String(limits.calls ?? ''), tokens: String(limits.tokens ?? '') },
+  };
+}
 export default function BudgetControls({ limits, automatic, disabled, onApply }: {
   limits: BudgetLimits; automatic: boolean; disabled: boolean; onApply: (limits: BudgetLimits) => Promise<boolean>;
 }) {
-  const [draft, setDraft] = useState({ calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' });
-  const [custom, setCustom] = useState({ calls: String(limits.calls ?? ''), tokens: String(limits.tokens ?? '') });
+  const [draft, setDraft] = useState(() => budgetDraft(limits).draft);
+  const [custom, setCustom] = useState(() => budgetDraft(limits).custom);
   const [error, setError] = useState('');
   const cancel = () => {
-    setDraft({ calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' });
-    setCustom({ calls: String(limits.calls ?? ''), tokens: String(limits.tokens ?? '') });setError('');
+    const current = budgetDraft(limits);
+    setDraft(current.draft);setCustom(current.custom);setError('');
   };
   async function apply() {
     const value = (kind: 'calls' | 'tokens') => {

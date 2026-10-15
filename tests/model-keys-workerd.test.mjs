@@ -16,6 +16,7 @@ for (const name of ['costs', 'cognition', 'recall', 'recall-services', 'memory',
 
 test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext without exposing secrets', async () => {
   const mf = new Miniflare({
+    outboundService: async () => { throw Error('External network blocked by local test fixture'); },
     cf: false, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
     bindings: { APP_ENV: 'local', AUTH_ORIGIN: 'http://localhost:5173', GITHUB_CLIENT_ID: 'fixture-client', GITHUB_CLIENT_SECRET: 'fixture-secret', SESSION_SECRET: 'fixture-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) },
     d1Databases: ['DB'],

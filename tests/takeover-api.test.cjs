@@ -17,7 +17,7 @@ const withModel = async run => {
     const data = JSON.parse(JSON.parse(init.body).messages[1].content); perceived.push(data);
     return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:data.self.intents})}}]});
   };
-  try { await run(perceived); } finally { global.fetch=original; }
+  try { await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}})); await run(perceived); } finally { global.fetch=original; }
 };
 test('takeover persists and waiting owner makes no autonomous calls while other characters advance within their budget', async () => {
   const world=seedWorld(); owner(world).intents=queue;
@@ -27,7 +27,8 @@ test('takeover persists and waiting owner makes no autonomous calls while other 
   assert.equal(owner(await read()).control.mode,'taken-over');
   assert.equal(owner(await read()).plan,undefined);
   await withModel(async perceived => {
-    assert.equal((await advance({calls:3,tokens:500000})).status,200);
+    await POST(request({operation:'set-budget',limits:{calls:3,tokens:500000}}));
+    assert.equal((await advance()).status,200);
     const saved=await read(); assert.equal(saved.turn,1); assert.deepEqual(owner(saved).intents,queue);
     assert.deepEqual(perceived.map(p=>p.self.id),['cass','vera','kris']);
     assert.match(owner(saved).activity,/待命/);

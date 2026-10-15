@@ -33,7 +33,7 @@ try{
  globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200,prompt_tokens_details:{cached_tokens:500}});await interrupt();await round();assert.match(await panel.innerText(),/部分估算/);assert.match(await panel.innerText(),/1 次價格、快取單價或用量不完整/);
  console.log('PASS #82 reload preserves source/date/history and identifiable cache without price is partial');
  globalThis.fetch=async()=>makeResponse(undefined);await interrupt();await round();assert.match(await panel.innerText(),/2 次價格、快取單價或用量不完整/);
- globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200},{type:'invalid'});await interrupt();const failed=await round();assert.equal(failed.status(),502);assert.equal(store.snapshot().aiUsage.totalCalls,5);assert.match(await panel.innerText(),/0.005/);
+ globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200},{type:'invalid'});await interrupt();const failed=await round();assert.equal(failed.status(),502);assert.equal((await read()).world.aiUsage.totalCalls,5);assert.match(await panel.innerText(),/0.005/);
  console.log('PASS #82 missing usage unknown, failure retains incurred known cost');
  globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200});await page.getByRole('combobox',{name:'OpenAI 模型',exact:true}).click();await page.getByRole('option',{name:'GPT-6.1 Sol',exact:true}).click();await interrupt();await round();assert.match(await panel.innerText(),/3 次價格、快取單價或用量不完整/);console.log('PASS #82 mixed model actual dispatch with unknown price never free');
  const mixed=store.snapshot();mixed.aiUsage.totalCalls++;mixed.aiUsage.calls++;store.replaceCommittedWorld(mixed);await refresh();assert.match(await panel.innerText(),/4 次價格、快取單價或用量不完整/);

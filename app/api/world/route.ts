@@ -198,7 +198,8 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
-    const limits = b.limits ?? (validBudgetLimits(world.playerBudget) ? world.playerBudget : defaultLimits);
+    // Legacy request limits remain valid replay payloads, but only set-budget changes policy.
+    const limits = b.operation === 'set-budget' ? b.limits! : validBudgetLimits(world.playerBudget) ? world.playerBudget : defaultLimits;
     if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
     trace.operationId = operationId; trace.version = version;
@@ -254,7 +255,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     if (b.operation === 'set-price') {
       savePrice(world,b.price!);
     } else if (b.operation === 'set-budget') {
-      world.playerBudget = { ...limits };
+      world.playerBudget = { ...b.limits! };
     } else if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';

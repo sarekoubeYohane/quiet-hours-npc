@@ -71,3 +71,7 @@ test('provider failure with trusted reported usage retains incurred cost and pro
  const fetcher=global.fetch;
  try{await setup();await POST(req({operation:'set-price',price:price()}));global.fetch=async()=>Response.json({usage:{prompt_tokens:1000000,completion_tokens:500000}},{status:429});const result=await advance();assert.equal(result.status,502);assert.equal((await result.json()).stopReason.scope,'provider');const saved=await read();assert.equal(saved.world.turn,0);assert.equal(saved.costSummary.total.knownUsd,2);assert.equal(saved.costSummary.total.complete,true);}finally{global.fetch=fetcher;}
 });
+test('overflow in competing paid cohorts remains unknown after another settings save',async()=>{
+ const fetcher=global.fetch;global.fetch=async()=>response();
+ try{await setup();await POST(req({operation:'set-price',price:price(4e307,0)}));await advance();const newer=(await read()).world;const baseline=seedWorld();baseline.modelPrices=newer.modelPrices;store.install(baseline);await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:null,tokens:null}}));store.conflictOnNextSave(newer);await advance();await POST(req({operation:'set-price',price:price(0,0)}));const saved=await read();assert.equal(Number.isFinite(saved.costSummary.total.knownUsd),true);assert.equal(saved.costSummary.total.complete,false);}finally{global.fetch=fetcher;}
+});

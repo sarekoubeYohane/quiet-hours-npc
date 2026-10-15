@@ -44,3 +44,19 @@ test('unlimited persisted policy passes old hourly and daily thresholds, then fi
   now+=3600001;assert.equal((await advance()).status,429);assert.equal(dispatched,5);const saved=await read();assert.equal(saved.aiUsage.calls,1);assert.equal(saved.aiUsage.totalCalls,156);assert.equal(saved.turn,1);
  }finally{global.fetch=original;Date.now=clock;}
 });
+test('advance uses only applied budget despite unlimited or stale larger request limits and replays paid failure',async()=>{
+ const original=global.fetch;let dispatched=0;
+ global.fetch=async()=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+ try{
+  for(const limits of [{calls:null,tokens:null},{calls:1200,tokens:10000000}]){
+   store.install(seedWorld());dispatched=0;
+   await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));
+   await POST(req({operation:'set-budget',limits:{calls:1,tokens:1}}));
+   const request=req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,limits});
+   const replay=request.clone();const response=await POST(request);assert.equal(response.status,429);
+   const saved=await read();assert.deepEqual(saved.playerBudget,{calls:1,tokens:1});assert.equal(saved.turn,0);assert.equal(saved.aiUsage.totalCalls,1);assert.equal(saved.aiUsage.totalInputTokens,30);assert.equal(dispatched,1);
+   await POST(req({operation:'set-budget',limits:{calls:null,tokens:null}}));
+   assert.equal((await POST(replay)).status,429);assert.equal(dispatched,1);assert.deepEqual((await read()).playerBudget,{calls:null,tokens:null});
+  }
+ }finally{global.fetch=original;}
+});

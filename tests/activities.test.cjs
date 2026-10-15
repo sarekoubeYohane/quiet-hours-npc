@@ -88,6 +88,7 @@ test('API persists a completed round and rejects origin mismatch before requesti
   const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 4, tokens: 30000 } }) });
   try {
     await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
+    await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'set-budget', mode: 'openai', limits: { calls: 4, tokens: 30000 } }) }));
     assert.equal((await POST(request('https://other.invalid'))).status, 403); assert.equal(calls, 0);
     const first = await POST(request('https://test.invalid')); assert.equal(first.status, 200);
     assert.equal((await first.json()).limitReached, true); assert.equal(store.snapshot().turn, 1);

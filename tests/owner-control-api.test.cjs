@@ -27,7 +27,7 @@ const withModel = async run => {
     const data = JSON.parse(JSON.parse(init.body).messages[1].content); called.push(data.self.id);
     return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: data.self.intents }) } }] });
   };
-  try { await run(called); } finally { global.fetch = original; }
+  try { await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}})); await run(called); } finally { global.fetch = original; }
 };
 
 test('single designated action survives reload, replaces autonomous activity, preserves intents and resumes autonomous control', async () => {

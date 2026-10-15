@@ -14,6 +14,7 @@ async function withModel(choose, run) {
   };
   try {
     await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
+    await POST(request({ operation: 'set-budget', limits: { calls: 120, tokens: 500000 } }));
     await run(inputs, body => POST(request({ operation: 'advance', mode: 'openai', model: 'gpt-6-luna', minutes: 15, limits: { calls: 120, tokens: 500000 }, ...body })));
   } finally { global.fetch = previous; }
 }

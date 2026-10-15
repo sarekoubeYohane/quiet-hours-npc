@@ -14,7 +14,7 @@ const act=async action=>{assert.equal((await POST(req({operation:'direct',action
 const withModel=async(actions,run)=>{
  const old=global.fetch,inputs=[];
  global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]})}}]});};
- try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs);}finally{global.fetch=old;}
+ try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs);}finally{global.fetch=old;}
 };
 const scene=()=>{
  const w=seedWorld();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';

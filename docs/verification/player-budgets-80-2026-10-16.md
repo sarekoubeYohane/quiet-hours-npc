@@ -12,7 +12,7 @@
 
 ## 操作介面
 
-設定沿用世界租約、版本與持久操作日誌。`POST /api/world` 的 `operation: set-budget` 需完整 `limits: {calls, tokens}`；值是安全正整數或明確 null。未傳 limits 的推進採已保存設定；舊呼叫者仍可明確傳入有效 limits。未完成操作存在時，UI 不接受新設定操作，不改寫原 payload／operationId。
+設定沿用世界租約、版本與持久操作日誌。`POST /api/world` 的 `operation: set-budget` 需完整 `limits: {calls, tokens}`；值是安全正整數或明確 null。所有推進與聊天續接僅採已保存設定（舊世界用有限預設）；舊呼叫者傳入的有效 limits 只保留 payload 相容性，不改變有效預算。僅 set-budget 可套用新預算。未完成操作存在時，UI 不接受新設定操作，不改寫原 payload／operationId。
 
 瀏覽器驗收由整合驗證紀錄補充；上述 API／DOM 測試不能替代 Chromium 輸入、確認對話框、暫停與恢復驗收。雲端 D1、正式登入及供應商帳單尚未驗證。
 

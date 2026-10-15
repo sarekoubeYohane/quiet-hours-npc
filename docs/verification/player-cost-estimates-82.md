@@ -22,3 +22,7 @@
 - `npm run typecheck`、`npm run build`、新增成本檔案的 ESLint 與 `git diff --check` 通過。
 - `npm test` 首次在 Workers 固定模組清單漏載新 costs.js 而啟動失敗；已補齊測試 fixture 模組，單獨 `node --test tests/model-keys-workerd.test.mjs` 1/1通過，再執行完整 `npm test` **255/255通過（213＋32＋10）**。全repo lint仍有既存pixel-world/world-app規則錯誤，新增成本模組／介面／測試針對檢查通過。
 - 真正 Chromium **PASS**：`tooling/verification/browser82.mjs` 操作真實 WorldApp→世界API→SQLite；驗證空白／負值／Infinity／NaN／來源／日期拒絕且無mutation、明示零價、小數保存、取消、reload、當時來源與日期不變、部分快取價、missing usage未知、失敗有用量仍累計、實際切換另一模型且無價格、站主未知費用分列。固定UI案例已知小計 USD0.003→USD0.00375→失敗後USD0.005，與API讀回一致。腳本可依tooling README重現，未使用真實付費API。
+
+補充硬化：兩個競爭寫入各自合法但總和超出浮點範圍時，SQLite加總溢位經後續JSON保存可能變null；新增世界API重現案例先Red（錯誤標完整），再將非有限／null費用依據轉明確未知，8/8成本測試Green。避免極大合法單價在CAS衝突後被誤顯示免費。padding修正後再跑完整Chromium82全部PASS，並目視確認內距。
+
+最終硬化後再執行 `npm test` **256/256通過（214＋32＋10）**、`npm run typecheck` 通過。

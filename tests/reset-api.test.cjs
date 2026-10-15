@@ -87,6 +87,7 @@ test('reset keeps hourly AI usage statistics while discarding characters, events
   assert.deepEqual(after.world.aiUsage, { ...before.world.aiUsage, savedDecisions: 0 });
   assert.equal(after.world.turn, 0);
   // Hourly limits still count the earlier calls: a 3-call ceiling is already spent.
+  assert.equal((await post(cookie, { operation: 'set-budget', limits: { calls: 3, tokens: 30000 } })).status, 200);
   const blocked = await post(cookie, { operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 3, tokens: 30000 } });
   assert.equal(blocked.status, 429);
   assert.equal((await blocked.json()).limitReached, true);
