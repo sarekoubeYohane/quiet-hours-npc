@@ -6,7 +6,7 @@ import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resetWorld, resolve, type Action, type AIUsage } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
-import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, type BudgetLimits } from '@/lib/activities';
+import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, validBudgetLimits, budgetReached, type BudgetLimits } from '@/lib/activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable, ModelKeyError } from '@/lib/model-keys';
 
 export const dynamic = 'force-dynamic';
@@ -149,10 +149,10 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
-    const limits = b.limits || defaultLimits;
-    if (!Number.isInteger(limits.calls) || limits.calls < 3 || limits.calls > 120 || !Number.isInteger(limits.tokens) || limits.tokens < 1000 || limits.tokens > 500000) return reply({ error: '請設定每小時 3–120 次呼叫、1,000–500,000 token 的上限。' }, 400);
+    if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
+    if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
     if (b.operation === 'advance') {
       if (![15, 30].includes(b.minutes || 0)) return reply({ error: '請選擇 15 或 30 分鐘。' }, 400);
       if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
@@ -162,6 +162,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
+    const limits = b.limits ?? (validBudgetLimits(world.playerBudget) ? world.playerBudget : defaultLimits);
     if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
     trace.operationId = operationId; trace.version = version;
@@ -214,7 +215,9 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
-    if (b.operation === 'takeover') {
+    if (b.operation === 'set-budget') {
+      world.playerBudget = { ...limits };
+    } else if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';
       c.control!.experiences ??= [];
@@ -264,7 +267,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
               // Keep the same logical-round ledger captured by advanceActivities.
               // A rolling-hour boundary may reset only the next round, not this guard.
               const usage = w.aiUsage!;
-              if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) throw new BudgetExceeded();
+              if (budgetReached(usage, limits)) throw new BudgetExceeded();
               const reservationId = `${operationId}:${c.id}:${dispatch++}`;
               if ((await reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, recallBudgetLimits(kind))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
@@ -303,7 +306,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     const usage = currentUsage(world);
     const result: OperationResult = failure
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
-      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) } };
+      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (budgetReached(usage, limits)) } };
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);

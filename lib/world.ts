@@ -12,7 +12,7 @@ export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'fin
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
 export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage};
+export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;playerBudget?:{calls:number|null;tokens:number|null}};
 export type Action={type:'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
@@ -34,7 +34,7 @@ export function seedWorld():World{return normalizeWorld({minute:1260,turn:0,last
 // belongs to the account rather than to the story, so it is carried over; saved decisions are
 // a statistic of the old story and start from zero. The daily ledger planned in #27 must live
 // outside the world row so that a reset cannot clear it.
-export function resetWorld(previous:World):World{const fresh=seedWorld();if(previous.aiUsage)fresh.aiUsage={...previous.aiUsage,savedDecisions:0};return fresh;}
+export function resetWorld(previous:World):World{const fresh=seedWorld();if(previous.playerBudget)fresh.playerBudget={...previous.playerBudget};if(previous.aiUsage)fresh.aiUsage={...previous.aiUsage,savedDecisions:0};return fresh;}
 export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string){
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
 w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
