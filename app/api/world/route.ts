@@ -45,21 +45,78 @@ async function retainPaidUsage(db: ReturnType<typeof database>, id: string, befo
       after.totalUnknownCalls - (before?.totalUnknownCalls || 0), id).run();
 }
 
-export async function GET() {
+type WorldTrace = {
+  requestId: string; operationId?: string; lease?: number; version?: number;
+  stage: string; outcome?: string;
+};
+function traceWorld(trace: WorldTrace, stage: string, extra: { outcome?: string; status?: number; durationMs?: number } = {}) {
+  trace.stage = stage;
+  if (extra.outcome) trace.outcome = extra.outcome;
+  // Deliberate allowlist: no URL, headers, owner, error message, key or world payload.
+  try {
+    console.info({ event: 'world_api', requestId: trace.requestId, operationId: trace.operationId,
+      stage, lease: trace.lease, version: trace.version, outcome: trace.outcome, status: extra.status, durationMs: extra.durationMs });
+  } catch { /* Diagnostics must not change the operation's outcome. */ }
+}
+async function observeWorldRequest(run: (trace: WorldTrace) => Promise<Response>) {
+  const started = performance.now();
+  const trace: WorldTrace = { requestId: crypto.randomUUID(), stage: 'start' };
+  traceWorld(trace, 'start');
+  try {
+    const response = await run(trace);
+    response.headers.set('X-World-Request-Id', trace.requestId);
+    traceWorld(trace, 'response', { status: response.status, durationMs: Math.round(performance.now() - started) });
+    return response;
+  } catch (error) {
+    traceWorld(trace, 'unhandled', { outcome: 'unhandled-error', durationMs: Math.round(performance.now() - started) });
+    throw error;
+  }
+}
+export async function GET(request?: Request) {
+  return observeWorldRequest(trace => readWorld(request, trace));
+}
+export async function POST(request: Request) {
+  return observeWorldRequest(trace => mutateWorld(request, trace));
+}
+
+async function readWorld(request: Request | undefined, trace: WorldTrace) {
   const id = await owner();
   if (id instanceof Response) return id;
   try {
+    const operationId = request && new URL(request.url).searchParams.get('operationId');
+    if (operationId && !operationIdPattern.test(operationId)) return reply({ error: '操作識別碼無效。' }, 400);
+    if (operationId) trace.operationId = operationId;
+    traceWorld(trace, 'world-read');
     const loaded = await loadWorld(id);
+    let operation;
+    if (operationId) {
+      // Read only: reload must never dispatch a request that may not have reached us.
+      const row = await database().prepare('SELECT operations, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;state:string;version:number}>();
+      // Keep the world and its operation result from the same committed row.
+      loaded.world = JSON.parse(row!.state);
+      loaded.version = row!.version;
+      const journal = JSON.parse(row!.operations) as Journal;
+      const result = journal.results[operationId];
+      operation = result && 'status' in result
+        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error }
+        : result && 'pending' in result
+          ? { state: result.pending > Date.now() ? 'pending' : 'uncertain' }
+          : { state: isOperationExpired(Number(operationId.split(':')[0]), journal.floor) ? 'expired' : 'unknown' };
+    }
+    trace.version = loaded.version;
+    traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
-  } catch (error) { return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
+    return reply({ ...loaded, operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+  } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
 type OperationResult = { status: number; body: Record<string, unknown> };
 const settledReply = (result: OperationResult) => reply({ ...result.body, operationSettled: true }, result.status);
 const uncertainResult: OperationResult = { status: 502, body: { error: '上次操作的結果無法確認，請重新讀取世界；此操作不會再次呼叫模型。', operationUncertain: true } };
 const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
+const operationIdPattern = /^\d{13}:[0-9a-f-]{36}$/;
+const isOperationExpired = (issuedAt: number, floor: number) => issuedAt <= floor || issuedAt < Date.now() - 86400000;
 type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }> };
 function trimJournal(journal: Journal, maxResults: number, protectedId?: string) {
   const oldest = Object.keys(journal.results).filter(id => id !== protectedId).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
@@ -71,7 +128,7 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
 }
 
 
-export async function POST(request: Request) {
+async function mutateWorld(request: Request, trace: WorldTrace) {
   const id = await owner();
   if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
@@ -105,17 +162,20 @@ export async function POST(request: Request) {
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
-    if (typeof b.operationId !== 'string' || !/^\d{13}:[0-9a-f-]{36}$/.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
+    if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
+    trace.operationId = operationId; trace.version = version;
+    traceWorld(trace, 'journal-read');
     const issuedAt = Number(operationId.split(':')[0]);
     if (issuedAt > Date.now() + 60000) return reply({ error: '裝置時間不正確，請校正時間後重試。' }, 400);
     const stored = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
     const serializedJournal = stored!.operations;
     journal = JSON.parse(serializedJournal);
     const previous = journal.results[operationId];
-    if (previous && 'status' in previous) return settledReply(previous);
+    if (previous && 'status' in previous) { traceWorld(trace, 'journal-replay', { outcome: previous.body.operationUncertain ? 'uncertain' : 'settled' }); return settledReply(previous); }
     if (previous && 'pending' in previous) {
-      if (previous.pending > Date.now()) return waiting();
+      if (previous.pending > Date.now()) { trace.lease = previous.pending; traceWorld(trace, 'lease-wait', { outcome: 'pending' }); return waiting(); }
+      traceWorld(trace, 'lease-expired', { outcome: 'uncertain' });
       await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
         .bind(`$.results."${operationId}"`, JSON.stringify(uncertainResult), id, `$.results."${operationId}".pending`, previous.pending).run();
       const latest = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
@@ -123,7 +183,7 @@ export async function POST(request: Request) {
       if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
-    if (issuedAt <= journal.floor || issuedAt < Date.now() - 86400000) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
+    if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
     trimJournal(journal, 7);
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
 
@@ -145,11 +205,13 @@ export async function POST(request: Request) {
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
     const db = database();
     lease = Date.now() + 120000;
+    trace.lease = lease;
     journal.results[operationId] = { pending: lease };
     const pendingJournal = JSON.stringify(journal);
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
-    if (!acquired.meta.changes) return waiting();
+    if (!acquired.meta.changes) { traceWorld(trace, 'lease-wait', { outcome: 'contended' }); return waiting(); }
     locked = true;
+    traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
     if (b.operation === 'takeover') {
@@ -193,7 +255,8 @@ export async function POST(request: Request) {
             await verifyLease();
             if (env.RECALL_ENABLED === 'true' && (await reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, recallBudgetLimits('chat'))).replayed) throw Error('付費請求結果不明，禁止重送。');
             dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
-            await verifyLease(); },
+            await verifyLease();
+            traceWorld(trace, 'model-dispatch'); },
           decide: (w, c, onUsage) => {
             let dispatch = 0;
             const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
@@ -212,6 +275,7 @@ export async function POST(request: Request) {
               signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
               beforeContinuation: async () => {
                 await guard('chat', 1);
+                traceWorld(trace, 'model-continuation-dispatch');
                 const usage = w.aiUsage!;
                 usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
               },
@@ -243,13 +307,18 @@ export async function POST(request: Request) {
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);
+    traceWorld(trace, 'commit-start');
     const saved = await db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > ? AND operations = ?').bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), pendingJournal).run();
     if (!saved.meta.changes) {
+      traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
       await retainPaidUsage(db, id, initialUsage, world.aiUsage);
       throw Error('儲存衝突，請重新載入再試。');
     }
+    trace.version = version + 1;
+    traceWorld(trace, 'commit-complete', { outcome: failure ? 'failed-round' : 'success' });
     return settledReply(result);
   } catch (e) {
+    traceWorld(trace, 'operation-error', { outcome: locked ? 'commit-or-operation-error' : 'before-acceptance-error' });
     if (locked && operationId) {
       const result: OperationResult = { status: 502, body: { error: e instanceof Error ? e.message : '操作失敗，請重新讀取世界。' } };
       try {
@@ -257,14 +326,17 @@ export async function POST(request: Request) {
           .bind(`$.results."${operationId}"`, JSON.stringify(result), id, `$.results."${operationId}".pending`, lease).run();
         const row = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
         const settled = row && (JSON.parse(row.operations) as Journal).results[operationId];
-        if (settled && 'status' in settled) return settledReply(settled);
+        if (settled && 'status' in settled) {
+          traceWorld(trace, 'journal-confirmed', { outcome: settled.body.operationUncertain ? 'uncertain' : 'settled' });
+          return settledReply(settled);
+        }
       } catch { /* Durable pending blocks re-execution even when storage is unavailable. */ }
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。' }, 502);
   } finally {
-    if (locked) try { await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run(); } catch { /* Lease expires; the operation remains durable. */ }
+    if (locked) try { await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run(); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }
   }
 }
 

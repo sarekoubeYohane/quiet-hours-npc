@@ -12,6 +12,7 @@ import { regions, doors, regionOf, canSee, observationTargets } from '@/lib/perc
 import { habitViews } from '@/lib/habits';
 import PixelWorld,{PixelSprite} from '@/components/pixel-world';
 import type { EnvironmentView } from '@/lib/environment';
+import { readWorldResponse, WorldResponseError } from '@/lib/world-response';
 import type { ModelKeyStatus } from '@/lib/model-keys';
 function Picker({value,onChange,items,label,disabled=false}:{value:string;onChange:(v:string)=>void;items:{value:string;label:string}[];label:string;disabled?:boolean}){return <Select value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger className="picker" aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{items.map(i=><SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent></Select>;}
 function Initial({c,small=false}:{c:Character;small?:boolean}){return <span className={`initial ${small?'small':''}`} style={{color:c.color,borderColor:c.color+'55',background:c.color+'14'}}><PixelSprite id={c.id}/></span>;}
@@ -26,19 +27,32 @@ const versionRef=useRef(-1),scopeRef=useRef('');
 const [pendingOperation,setPendingOperation]=useState(false),[resetOpen,setResetOpen]=useState(false);
 const acceptWorld=useCallback((d:{world?:World;version?:number})=>{if(d.world&&typeof d.version==='number'&&d.version>=versionRef.current){versionRef.current=d.version;setWorld(d.world);}},[]);
 const readLatest=useCallback(async()=>{
-const r=await fetch('/api/world',{credentials:'same-origin'});const d=await r.json() as {world:World;version:number;operationScope:string;modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string};
-if(!r.ok){if(r.status===401)setSignInRequired(true);throw Error(d.error);}
+type Latest={world:World;version:number;operationScope:string;modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string;operation?:{state:string;status?:number;error?:string}};
+const read=async(path:string)=>{const r=await fetch(path,{credentials:'same-origin',signal:AbortSignal.timeout(15000)});if(r.status===401)setSignInRequired(true);const d=await readWorldResponse<Latest>(r);if(!r.ok)throw Error(d.error||`讀取世界失敗（HTTP ${r.status}）。`);if(!d.world||typeof d.version!=='number'||typeof d.operationScope!=='string'||!d.modelKeys?.openai||!d.modelKeys?.openrouter)throw new WorldResponseError(r.status,'application/json');return d;};
+let d=await read('/api/world');
 const scope=`quiet-hours:pending:${d.operationScope}`;
 if(scopeRef.current!==scope){scopeRef.current=scope;versionRef.current=-1;}
 acceptWorld(d);setSignInRequired(false);setModelKeys(d.modelKeys);setKeyStorageAvailable(d.modelKeyStorageAvailable);
-setPendingOperation(!!sessionStorage.getItem(scope));
+const saved=sessionStorage.getItem(scope);
+setPendingOperation(!!saved);
+if(saved){
+const payload=JSON.parse(saved) as {operationId:string};
+d=await read(`/api/world?operationId=${encodeURIComponent(payload.operationId)}`);
+if(`quiet-hours:pending:${d.operationScope}`!==scope)throw Error('登入帳號已變更，請重新讀取世界。');
+acceptWorld(d);
+// A successful GET alone does not settle an operation. Only the durable journal can.
+if(d.operation?.state==='settled'){
+sessionStorage.removeItem(scope);setPendingOperation(false);
+if(d.operation.status!==200)throw Error(d.operation.error||'上次操作已確認失敗，世界未重做；可以決定是否建立新操作。');
+}else if(d.operation?.state==='uncertain'||d.operation?.state==='expired')throw Error('上次操作的結果仍無法確認；未完成操作已保留，不會自動重做模型決策。請保留操作識別碼供診斷。');
+}
 },[acceptWorld]);
 playingRef.current=playing;
 const stopAuto=useCallback((message?:string)=>{autoRef.current=false;setAutomatic(false);if(message)setNotice(message);},[]);
 const refresh=useCallback(async()=>{if(busyRef.current)return;stopAuto();busyRef.current=true;setBusy(true);setError('');try{await readLatest();}catch(e){setError((e as Error).message);}finally{busyRef.current=false;setBusy(false);}},[stopAuto,readLatest]);
 async function manageKey(operation:'set-model-key'|'clear-model-key'){
 if(busyRef.current||mode==='demo')return;stopAuto();busyRef.current=true;setBusy(true);setError('');setNotice('');
-try{const r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation,mode,...(operation==='set-model-key'?{key}: {})})});const d=await r.json() as {modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string};if(r.status===401)setSignInRequired(true);if(!r.ok)throw Error(d.error);setModelKeys(d.modelKeys);setKeyStorageAvailable(d.modelKeyStorageAvailable);setKey('');setNotice(operation==='set-model-key'?'Key 已加密保存。同帳號在本站的其他瀏覽器也可使用，最長 24 小時。':'Key 已清除。同帳號在本站的所有瀏覽器都會停止新的模型呼叫。');}catch(e){setError((e as Error).message);}finally{busyRef.current=false;setBusy(false);}}
+try{const r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation,mode,...(operation==='set-model-key'?{key}: {})})});if(r.status===401)setSignInRequired(true);const d=await readWorldResponse<{modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string}>(r);if(!r.ok)throw Error(d.error);setModelKeys(d.modelKeys);setKeyStorageAvailable(d.modelKeyStorageAvailable);setKey('');setNotice(operation==='set-model-key'?'Key 已加密保存。同帳號在本站的其他瀏覽器也可使用，最長 24 小時。':'Key 已清除。同帳號在本站的所有瀏覽器都會停止新的模型呼叫。');}catch(e){setError((e as Error).message);}finally{busyRef.current=false;setBusy(false);}}
 useEffect(()=>{void refresh();},[refresh]);
 async function act(operation:string){
 if(busyRef.current||(operation==='advance'&&playingRef.current))return;
@@ -53,19 +67,20 @@ const payload=saved||JSON.stringify({operationScope:storageKey.slice('quiet-hour
 sessionStorage.setItem(storageKey,payload);setPendingOperation(true);
 operation=JSON.parse(payload).operation;
 const deadline=Date.now()+15000;
-let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean}|undefined;
+let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean;operationUncertain?:boolean}|undefined;
+let transportError:Error|undefined;
 while(Date.now()<deadline){
-try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:payload,signal:AbortSignal.timeout(125000)});d=await r.json();}
-catch{r=undefined;d=undefined;}
+try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:payload,signal:AbortSignal.timeout(125000)});if(r.status===401)setSignInRequired(true);d=await readWorldResponse<NonNullable<typeof d>>(r);if(!r.ok&&typeof d.error!=='string')throw new WorldResponseError(r.status,'application/json');}
+catch(e){transportError=e instanceof WorldResponseError?e:undefined;if(e instanceof WorldResponseError&&e.status===401)throw e;r=undefined;d=undefined;}
 if(r&&d&&!d.retryable)break;
 setNotice('世界正處理另一個回合或連線中斷，正在等待後重試…');
 await new Promise(resolve=>setTimeout(resolve,1000));
 }
-if(!r||!d||d.retryable)throw Error('等待逾時：另一個回合可能仍在處理。未完成操作已保留，請按「重試未完成操作」。');
+if(!r||!d||d.retryable)throw Error(transportError?.message||'等待逾時：另一個回合可能仍在處理。未完成操作已保留，請按「重試未完成操作」。');
 if(d.scopeMismatch){await readLatest();throw Error(d.error);}
 acceptWorld(d);
 if(r.status===401){setSignInRequired(true);throw Error(d.error);}
-if(!d.operationSettled&&![400,403,410,422].includes(r.status))throw Error(`${d.error||'暫時無法確認操作結果。'} 未完成操作已保留，請按「重試未完成操作」。`);
+if(d.operationUncertain||(!d.operationSettled&&![400,403,422].includes(r.status)))throw Error(`${d.error||'暫時無法確認操作結果。'} 未完成操作已保留，請按「重試未完成操作」。`);
 sessionStorage.removeItem(storageKey);setPendingOperation(false);
 await readLatest();
 if(!r.ok)throw Error(d.error);
