@@ -1,7 +1,7 @@
 import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
-import { record, normalizeWorld, resolve, type Action, type AIUsage } from '@/lib/world';
+import { record, normalizeWorld, resetWorld, resolve, type Action, type AIUsage } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
 import { advanceActivities, BudgetExceeded, currentUsage, defaultLimits, type BudgetLimits } from '@/lib/activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable, ModelKeyError } from '@/lib/model-keys';
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     const limits = b.limits || defaultLimits;
     if (!Number.isInteger(limits.calls) || limits.calls < 3 || limits.calls > 120 || !Number.isInteger(limits.tokens) || limits.tokens < 1000 || limits.tokens > 500000) return reply({ error: '請設定每小時 3–120 次呼叫、1,000–500,000 token 的上限。' }, 400);
@@ -99,7 +99,9 @@ export async function POST(request: Request) {
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
 
     }
-    const { world, version } = await loadWorld(id);
+    const loaded = await loadWorld(id);
+    let world = loaded.world;
+    const version = loaded.version;
     if (typeof b.operationId !== 'string' || !/^\d{13}:[0-9a-f-]{36}$/.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
     const issuedAt = Number(operationId.split(':')[0]);
@@ -159,6 +161,15 @@ export async function POST(request: Request) {
       c.activity = '已交還控制權，等待下一次自主選擇。';
     } else if (b.operation === 'direct') {
       world.characters.find(c => c.id === 'owner')!.control!.pending = b.action!;
+    } else if (b.operation === 'reset') {
+      // Same lease, version check and journal as every other mutation: a round another page is
+      // committing either finishes first or makes this save fail, never a half-reset world.
+      world = resetWorld(world);
+      // Operations issued before the reset belong to the old story. Raising the floor makes a
+      // later retry of such an ID answer 410, so the page re-reads the fresh world instead of
+      // applying an old intention to it. Settled results stay replayable; IDs from the same
+      // millisecond as the reset are not treated as older.
+      journal.floor = Math.max(journal.floor, issuedAt - 1);
     } else if (b.operation === 'intervene') {
       const targets = b.target === 'all' ? world.characters.map(c => c.id) : [b.target!];
       const name = world.characters.find(c => c.id === b.target)?.name;
