@@ -8,3 +8,7 @@
 - `npm run typecheck`、受影響 TS／測試檔 ESLint、`npm run build`、`git diff --check` 通過。
 - 未合併 PR、未部署、未執行雲端 migration 或付費請求。
 - 驗證範圍為本 PR 與目前 main；其他開放 PR 合併後仍需檢查共有檔案。
+
+## 第二輪：PR #58 合併後
+
+同步 main `e31d763`，保留重置世界功能與本 PR 變更。`npm test` 188 項通過；typecheck、受影響 server／測試 ESLint、建置與 diff check 通過。每日額度專項 9 項另跑通過；144 次耗盡後透過真實 reset API 及 operationId 重放，帳本仍為 144／144，下一次模型請求仍拒絕。未合併或部署。

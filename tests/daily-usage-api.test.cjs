@@ -23,7 +23,7 @@ test('failed provider requests consume daily quota without advancing the world',
   } finally { global.fetch = original; }
 });
 
-test('the 144 hard limit survives world replacement, key changes and a fresh login', async () => {
+test('the 144 hard limit survives reset API replay, key changes and a fresh login', async () => {
   store.install(seedWorld());
   await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
   const original = global.fetch, clock = Date.now;
@@ -39,7 +39,14 @@ test('the 144 hard limit survives world replacement, key changes and a fresh log
       if (i === 100) { now += 3600001; store.replaceWorld(one); }
       assert.equal((await advance()).status, 502);
     }
-    store.replaceWorld(one);
+    const reset = { operation: 'reset', operationId: `${++now}:${crypto.randomUUID()}`, mode: 'demo' };
+    const resetResponse = await POST(request(reset));
+    assert.equal(resetResponse.status, 200);
+    const resetResult = await resetResponse.json();
+    assert.equal(resetResult.world.turn, 0);
+    assert.equal(resetResult.dailyUsage.used, 144);
+    assert.equal(resetResult.dailyUsage.remaining, 0);
+    assert.deepEqual(await (await POST(request(reset))).json(), resetResult);
     await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'replacement-key' }));
     build('auth').setUserId(null);
     assert.equal((await GET()).status, 401);

@@ -43,7 +43,7 @@ try {
   const sql = (await Promise.all((await readdir('drizzle')).filter(f => f.endsWith('.sql')).sort().map(f => readFile(join('drizzle', f), 'utf8')))).join('\n');
   await writeFile(join(directory, 'migrations.sql'), sql);
   const selected = process.argv.slice(2);
-  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : ['tests/auth-api.test.cjs', 'tests/model-keys-api.test.cjs'])], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
+  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : ['tests/auth-api.test.cjs', 'tests/model-keys-api.test.cjs', 'tests/reset-api.test.cjs'])], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }
 

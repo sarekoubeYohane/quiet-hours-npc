@@ -20,7 +20,7 @@
 | 感知咖啡館 PoC | [PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 已合併，#41–#46 已關閉 | 目前是受限地圖與感官 PoC；不含長期信念修正 |
 | GitHub 登入 | [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 與修補 #36／#38 已合併 | [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 保留作本機／測試站及正式登出真人驗收；正式站已回報成功登入 |
 | 帳號模型 Key | [PR #39](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/39) 已合併 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) 依 10/09 修訂為同帳號跨瀏覽器共用，待部署配置與雙瀏覽器真人驗收 |
-| Infra 其餘工作 | #22 已完成 | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、[#24–#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24)、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
+| Infra 其餘工作 | #22、#24 已完成；[#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25) 的重置操作已實作（見[驗證紀錄](docs/verification/world-reset-2026-10-12.md)） | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、#25 的瀏覽器與部署環境驗收、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
 | 長期記憶／信念修正 | #52 短期與選留已由 #61 合併；#53 已由 PR #63 合併；#54／#55 依各自 PR 交付 | [#16](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/16)、[#18](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/18) 保持 Open；[#7](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/7)、[#19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 為未全部完成的母規格 |
 
 上述「已合併」不等於已部署到所有環境；以 GitHub PR、部署版本與各 Issue 的驗收紀錄為準。
@@ -181,3 +181,7 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 伺服器固定每人每日 144 次模型請求，台北午夜重置；畫面分開顯示每日與每小時用量。失敗與重試計數，額度不足時暫停，使用者可重試或自行切換規則模式。本機使用獨立 `USAGE_DB`，`pnpm db:migrate:local` 會套用世界與帳本 migration。
 
 **部署前置尚未完成**：共用雲端帳本 D1 尚未建立，測試／正式 binding 與 #28 CI migration 整合待補；不得直接部署本分支。詳細語意、故障限制與配置見 [每日帳本](docs/design/daily-usage.md)。
+
+### 重置世界（#25）
+
+世界面板底部的「重置世界」會先跳出確認對話框；確認後，你在目前環境的世界回到初始種子狀態，角色、事件、記憶、習慣、意圖與店主控制都從頭開始。重置是帶操作 ID 的世界操作，沿用租約、版本條件與結果日誌：另一頁正在處理回合時先等待，重送同一操作只回傳原結果，不會重置第二次。它只改變目前登入帳號在這個環境的世界，不影響其他使用者，也不影響同帳號在其他環境的世界。每小時 AI 用量統計跟著帳號保留，「延續活動省下的決策」隨舊故事歸零；每日共用帳本（#27）規劃存放在世界資料列以外，接入時重置不得清除它。重置前建立、尚未送達伺服器的操作重試時回 410，頁面會改讀新世界。沒有資料庫結構變更；舊資料形狀的載入與重置目前以記憶體 SQLite 驗證，雲端 D1 待部署後確認。自動測試見 [驗證紀錄](docs/verification/world-reset-2026-10-12.md)；瀏覽器與部署環境的真人驗收仍記於 [#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25)。
