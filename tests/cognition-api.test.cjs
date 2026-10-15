@@ -227,3 +227,24 @@ test('current review and metadata history handles share at most eight maintenanc
     const saved = (await read()).characters[0]; assert.equal(saved.cognition.beliefs.length, 24); assert.equal(saved.cognition.trace.length, 24);
   });
 });
+test('invalid final cognition restores the whole world and replays failure after candidate composition', async () => {
+  for (const invalid of ['unresolved-contradiction', 'belief-capacity']) {
+    const w = seedWorld(), subject = w.characters[1];
+    const current = { id: 'personal-space', characterId: subject.id, version: 1, time: 0, topic: '相處距離', text: '我仍需要自己的空間', conviction: 'leaning', references: [], contradictions: [], reason: '仍會影響未來選擇' };
+    subject.cognition = { beliefs: invalid === 'belief-capacity'
+      ? Array.from({ length: 24 }, (_, i) => ({ ...current, id: `current-${i}`, topic: `既有主題${i}` }))
+      : [current, { ...current, id: 'other-view', topic: '另一個看法', contradictions: ['personal-space'] }], relationshipTags: [], trace: [] };
+    store.install(w); const before = await read();
+    await withModel(input => input.self.id === 'cass' ? { cognitiveUpdates: [belief(input)], type: 'move', target: 'cafe' } : input.self.id !== subject.id ? {} : {
+      cognitiveUpdates: invalid === 'belief-capacity' ? [belief(input)] : [{ kind: 'belief', operation: 'withdraw', id: 'personal-space', version: 1, references: evidence(input), reason: '未同時處理仍指向此信念的未解矛盾' }],
+      intents: [{ id: 'not-saved', content: '本回合候選意圖', intensity: 'medium', importance: 'medium', urgency: 'low', context: '' }], type: 'move', target: 'cafe',
+    }, async (inputs, advance) => {
+      const operationId = `${Date.now()}:${crypto.randomUUID()}`, response = await advance({ operationId });
+      assert.equal(response.status, 502, invalid); const failure = await response.json(), after = await read();
+      assert.deepEqual(after.characters, before.characters); assert.deepEqual(after.events, before.events);
+      assert.equal(after.minute, before.minute); assert.equal(after.turn, before.turn);
+      assert.equal(after.aiUsage.totalCalls, 2); assert.equal(after.aiUsage.totalInputTokens, 20);
+      assert.deepEqual(await (await advance({ operationId })).json(), failure); assert.equal(inputs.length, 2);
+    });
+  }
+});

@@ -121,7 +121,8 @@ export function updateCognition(c: Character, value: unknown, time: number, cont
   const remainingTrace = state.trace.filter(trace => !historyRemovals.has(trace.traceId));
   for (const trace of state.trace) if (historyRemovals.has(trace.traceId) && traceRequired(trace, { ...state, trace: remainingTrace })) throw new MemoryValidationError('不能釋放最終現行認知仍需要的版本來源鏈');
   state.trace = remainingTrace;
-  validateCognition({ ...c, cognition: state });
+  // Compose cognition with all same-decision memory changes before validating
+  // the complete character at consumeMemories → validateMemoryState.
   return state;
 }
 export function validateCognition(c: Character) {
