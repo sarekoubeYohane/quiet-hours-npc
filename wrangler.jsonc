@@ -6,6 +6,12 @@
   "main": "vinext/server/fetch-handler",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "logs": {
+      "enabled": false,
+      "invocation_logs": true
+    }
+  },
   "assets": { "directory": "dist/client", "not_found_handling": "none", "binding": "ASSETS" },
   "vars": { "APP_ENV": "local", "AUTH_ORIGIN": "http://localhost:5173", "GITHUB_ALLOWED_IDS": "89203678" },
   "d1_databases": [
