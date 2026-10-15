@@ -9,7 +9,8 @@
   "assets": { "directory": "dist/client", "not_found_handling": "none", "binding": "ASSETS" },
   "vars": { "APP_ENV": "local", "AUTH_ORIGIN": "http://localhost:5173", "GITHUB_ALLOWED_IDS": "89203678" },
   "d1_databases": [
-    { "binding": "DB", "database_name": "quiet-hours-npc-local", "database_id": "quiet-hours-npc-local", "migrations_dir": "drizzle" }
+    { "binding": "DB", "database_name": "quiet-hours-npc-local", "database_id": "quiet-hours-npc-local", "migrations_dir": "drizzle" },
+    { "binding": "USAGE_DB", "database_name": "quiet-hours-npc-local-usage", "database_id": "quiet-hours-npc-local-usage", "migrations_dir": "drizzle-ledger" }
   ],
   "env": {
     "test": {

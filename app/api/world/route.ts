@@ -1,3 +1,4 @@
+import { dailyUsage, reserveDailyUsage, DailyLimitExceeded } from '@/lib/daily-usage';
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase } from '@/lib/recall-services';
@@ -52,7 +53,7 @@ export async function GET() {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, dailyUsage: await dailyUsage(id).catch(() => null), operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
@@ -186,6 +187,8 @@ export async function POST(request: Request) {
           const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
           if (held?.locked_until !== lease || Date.now() >= lease - 10000) throw Error('世界租約或工作期限已到期，本回合停止付費請求。');
         };
+        const reservation = b.mode === 'demo' ? undefined : await reserveDailyUsage(id, world.characters.filter(c => c.control?.mode !== 'taken-over' && !c.control?.pending && !c.control?.active).length * (env.RECALL_ENABLED === 'true' ? 2 : 1), lease - 10000);
+        try {
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,
@@ -216,9 +219,10 @@ export async function POST(request: Request) {
                 usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
               },
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
-            });
+            }, () => reservation!.dispatch());
           },
         });
+        } finally { await reservation?.release(); }
       } catch (e) {
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
         const usage = world.aiUsage;
@@ -238,8 +242,9 @@ export async function POST(request: Request) {
     }
     const usage = currentUsage(world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
+      ? { status: (failure instanceof BudgetExceeded || failure instanceof DailyLimitExceeded) ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded || failure instanceof DailyLimitExceeded, dailyLimitReached: failure instanceof DailyLimitExceeded } }
       : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) } };
+    result.body.dailyUsage = await dailyUsage(id).catch(() => null);
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);

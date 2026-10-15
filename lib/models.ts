@@ -64,7 +64,7 @@ function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
     work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
   });
 }
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown> }):Promise<ActivityDecision>{
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown> }, beforeRequest?:()=>Promise<void>):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
@@ -82,10 +82,12 @@ for (;;) {
 let r:Response;
 const requestSignal = recall?.signal() || AbortSignal.timeout(25000);
 const dispatch: typeof fetch = (...args) => { requestSignal.throwIfAborted(); return withDeadline(fetcher(...args), requestSignal); };
-try { r=await dispatch(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
+const init:RequestInit={
 method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:requestSignal,body:JSON.stringify({model,messages,...(direct?{
 store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:recall?.enabled&&!recalled?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
-}:{temperature:.8,max_tokens:2048})})}); }
+}:{temperature:.8,max_tokens:2048})})};
+await beforeRequest?.();
+try { r=await dispatch(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',init); }
 catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
 if(!r.ok)throw Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`);
 let d:{usage?:{prompt_tokens?:number;completion_tokens?:number};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};

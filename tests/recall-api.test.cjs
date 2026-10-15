@@ -85,3 +85,28 @@ test('recalled memory omitted from the initial projection can ground a belief', 
   const decision = await aiDecision(w,c,'key','gpt-6-luna','openai',fetcher,undefined,{enabled:true,signal:()=>AbortSignal.timeout(5000),beforeContinuation:async()=>{},search:async()=>[{id:'omitted',version:1,text:'y'.repeat(700),source:{kind:'experience',person:'remembered-person'}}]});
   assert.equal(calls,2);assert.equal(decision.cognition.beliefs[0].references[0].id,'omitted');
 });
+
+test('daily ledger counts both recall chats once and releases unused round reservations', async () => {
+  fixture();
+  await run(n => n === 1 ? {type:'recall',questions:['過去？']} : action, async ({advance,inputs}) => {
+    const operationId=`${Date.now()}:${crypto.randomUUID()}`;
+    const response=await advance({operationId});assert.equal(response.status,200);
+    const result=await response.json();assert.equal(result.dailyUsage.used,2);assert.equal(result.dailyUsage.reserved,0);
+    assert.deepEqual(await(await advance({operationId})).json(),result);assert.equal(inputs.length,2);
+    assert.equal((await(await GET()).json()).dailyUsage.used,2);
+  });
+  fixture();
+  await run(()=>action,async({advance})=>{const response=await advance();assert.equal(response.status,200);const result=await response.json();assert.equal(result.dailyUsage.used,1);assert.equal(result.dailyUsage.reserved,0);});
+});
+test('daily quota admits the entire potential recall round before any provider dispatch', async () => {
+  fixture();
+  const {reserveDailyUsage}=build('daily-usage');
+  const prior=await reserveDailyUsage('test-owner',143,Date.now()+120000);
+  for(let i=0;i<143;i++)await prior.dispatch();
+  await prior.release();
+  await run(()=>({type:'recall',questions:['過去？']}),async({advance,inputs,embeddingInputs})=>{
+    const response=await advance();assert.equal(response.status,429);
+    const result=await response.json();assert.equal(result.dailyLimitReached,true);assert.equal(result.dailyUsage.used,143);assert.equal(result.dailyUsage.remaining,1);
+    assert.equal(inputs.length,0);assert.equal(embeddingInputs.length,0);assert.equal((await read()).turn,0);
+  });
+});
