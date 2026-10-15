@@ -1,5 +1,5 @@
 import type { Character, World } from './world';
-import { MemoryValidationError, memoryBytes, memoryStateBytes, boundMemoryWithMetadata, type LongMemory } from './memory';
+import { MemoryValidationError, memoryBytes, memoryStateBytes, recallableMemoryProjection, boundMemoryWithMetadata, type LongMemory } from './memory';
 import { database } from './store';
 import { recallServices, recallBudgetDatabase, recordEmbeddingUsage } from './recall-services';
 
@@ -96,7 +96,7 @@ export async function recallMemories(options: {
       found.set(memory.id, memory);
     }
   }
-  return [...found.values()].slice(0, 8).map(({ id, version, time, text, source }) => ({ id, version, time, text, source }));
+  return recallableMemoryProjection({ ...character, longTerm: [...found.values()].slice(0, 8) });
 }
 
 export async function boundRecallStorage(world: World, owner: string) {

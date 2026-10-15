@@ -7,7 +7,7 @@
 - Key 在 D1 加密保存，供同帳號、同環境的瀏覽器共用，最長 24 小時；登出只撤銷目前登入，手動清除則停止所有瀏覽器後續的模型呼叫。Key 不存入世界或紀錄。啟用前須套用 migration 與加密秘密，見 [模型 Key 管理](docs/design/account-model-keys.md)。
 - 每個角色只收到自己的性格、目標、關係、記憶與主觀觀察；現場人物依區域、門與遮擋決定是否看見。私密想法僅自己知情；訊息僅收發雙方；隔門聲音不揭露說話者身分或逐字內容。
 - 位置與門由世界規則更新。移動、開關門耗掉一個回合；當面說話需能看見對象。工作限泡茶、整理與畫髮飾。
-- 角色最近 80 則記憶、最近 300 則事件持久保存。尚無長期摘要、關係數值成長或離線持續運行。
+- 已合併 #52 的短期主觀經歷與長期選留；短期最多 80 筆／64 KiB，長期最多 64 筆／64 KiB 且不按年代淘汰。事件另保留最近 300 則。#54 的摘要／遺忘在本分支完成、尚未合併或部署；沒有離線持續運行。
 - 世界更新用資料庫租約與版本條件避免平行回合覆蓋。最終保存確認零列衝突時，只把本次已付費嘗試與回報 token 差額原子加入最新世界，不覆蓋角色進度或較新租約；累計用量保留，過期請求不改寫較新的小時計量窗口。資料庫拋錯且提交結果不明時不重播差額，避免重計；資料庫全面中斷或工作程序終止的用量持久性仍需要另行加入冪等帳本。
 - 角色設定來自對話中的概念測試，非小說正史。
 
@@ -37,7 +37,7 @@
 
 ## D20 行動判定
 
-本段描述已由 [PR #20](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/20) 合併、並已關閉的 [行動判定工作票 #8–#13](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/8) 的受限實作。感知使用同一套 D20 結果門檻，功能與資訊邊界見下節；長期記憶與信念修正仍待另外設計。
+本段描述已由 [PR #20](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/20) 合併、並已關閉的 [行動判定工作票 #8–#13](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/8) 的受限實作。感知使用同一套 D20 結果門檻，功能與資訊邊界見下節；記憶與信念設計沿用已確認的 #50／#51 契約，完成狀態見下節。
 
 - 已支援的髮飾設計挑戰與說服使用 D20；容易 DC8、普通 DC12、困難 DC16，能力修正 −4／−2／0／+2／+4。結果按差值分為大成功 ≥8、成功 0～7、部分成功 −6～−1、失敗 −10～−7、大失敗 ≤−11；天然 1、20 無特權。
 - 角色可從設定的自然語言能力標籤取得相應修正；不同挑戰難度與能力分開。普通工作仍直接完成，不擲骰。
@@ -78,6 +78,13 @@ NPC 的主觀經歷共用短期容量（最多 80 筆／64 KiB，包含未處理
 
 [#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 與 [記憶實作契約](docs/design/npc-memory-contract.md) 記錄完整設計。#52／#53 已合併；本分支同步最新 main。#56 UI 尚未批准。
 
+## 記憶摘要與遺忘（#54，已合併）
+
+已於 PR #64 合併，完成既有自主決策中的明示合併、濃縮、保留、遺忘及來源遺忘。達到75%容量壓力時附最多8筆整理候選；候選與正文共用88 KiB輸入，選留與整理共用4操作／8 KiB輸出。先計算整份淨結果，再檢查硬容量，允許長期已滿時「合併兩筆再選留一筆」，沒有有效取捨則整回合回復。
+
+摘要保留來源類型、仍未一致的來源引用；改寫／來源遺忘使用同一ID且版本遞增，合併沿第一筆ID遞增並移除其他片段，遺忘實體移除。角色可回憶投影只包含active正文與仍記得的來源；系統追溯不含原文、不進模型。整理同時移除原經歷的短期／觀察／接管與待回應別名，不能從事件或診斷重灌已忘細節。追溯與可選認知追溯共用24筆／12 KiB，釋放需模型明示且不能破壞最終仍引用的版本；重複保留紀錄可整理。
+
+接管、待命、純活動延續及規則試玩沿原流程，不為整理新增模型呼叫。#54 已合併，部署另驗，摘要忠實性、正文去除來源是否完整、真實模型與線上行為未驗收；向量索引拒絕舊版本由#55驗證。實際測試、限制與可重現指令見 [#54驗證紀錄](docs/verification/npc-memory-54-2026-10-14.md)。
 
 
 ## 信念與關係標籤（#53，已合併）
@@ -92,7 +99,7 @@ NPC 在原本的自主決策中，可以新增、更新、堅持或撤回自己�
 
 ## 本地與部署
 
-專案以 vinext 與 Cloudflare 的 Vite plugin 建置，執行在 Workers，世界資料存在 D1，不再依賴 OpenAI Sites 的 hosting 設定、受控安裝腳本或 connector 預覽。`wrangler.jsonc` 宣告三組環境，各自綁定獨立的 D1；頁面右上、頁尾與登入卡顯示目前環境與建置時的提交短碼，`/api/environment` 不需登入即可讀到同樣資訊，供部署後從外部核對版本。
+專案以 vinext 與 Cloudflare 的 Vite plugin 建置，執行在 Workers，世界資料存在 D1，不再依賴 OpenAI Sites 的 hosting 設定、受控安裝腳本或 connector 預覽。`wrangler.jsonc` 宣告三組環境，各自綁定獨立的 D1；頁面右上、頁尾與登入卡顯示目前環境與建置時的提交短碼，頁尾與登入卡另有建置時間（台北時間），右上標籤的提示文字也有；`/api/environment` 不需登入即可讀到同樣資訊（含 `builtAt`、`builtAtLabel`），供部署後從外部核對版本。
 
 | 環境 | Wrangler 設定 | Worker 名稱 | 網址 |
 | --- | --- | --- | --- |
@@ -124,13 +131,13 @@ GitHub OAuth App 的回呼網址以上表網址為 origin，路徑固定為 `/ap
 | Deploy command | `pnpm exec wrangler deploy --config dist/server/wrangler.json` |
 | Builds for non-production branches | 關閉 |
 
-這是現有 Workers Builds 的錯誤排查設定，不代表 #31 的正式發布流程已完成。PR 分支由 GitHub CI 驗證，不使用 Cloudflare 自動分支 preview。測試站的固定網址與自動部署仍依 #28 建立；測試站建置用 `pnpm build:test`，同樣部署該次產生的 `dist/server/wrangler.json`。
+這是現有 Workers Builds 的錯誤排查設定，不代表 #31 的正式發布流程已完成。PR 分支由 GitHub CI 驗證，不使用 Cloudflare 自動分支 preview。測試站由 GitHub Actions 的 `Deploy test site` 在 main 合併後自動部署：檢查通過後以 `pnpm build:test` 建置、先做 migration 相容守門與套用，再部署該次產生的 `dist/server/wrangler.json`，最後核對 `/api/environment`。流程、需要的 secrets 與判讀見 [測試站自動部署](docs/design/test-site-deploy.md)；第一次實際部署要等 token 與 variable 設定完成。
 
 2026-10-09 的 PR #36 失敗紀錄是 `npx wrangler preview` 查詢 `quiet-hours-npc-local`，得到 `10007: This Worker does not exist on your account`。這是預設 preview 部署讀到本機 Worker 名稱，不是依賴安裝或程式編譯失敗。不要為了排除此錯誤在雲端建立本機 Worker，或僅以 `--worker-name` 改名：preview 還需要獨立的 bindings、secrets 與 OAuth origin，目前專案沒有配置這套流程。
 
 官方參考：[Workers Builds 分支設定](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/)、[Vite plugin 環境選擇](https://developers.cloudflare.com/workers/vite-plugin/reference/cloudflare-environments/)。
 
-測試站與正式站的部署流程分別由 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由 [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 及 [PR #38](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/38) 合併實作；正式站於 2026-10-09 已回報可成功登入，但本機／測試站與登出驗收仍記於 #23。各環境須各自核對 OAuth Secrets 與 migration；#28 的測試站自動部署流程尚未完成。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
+測試站的自動部署流程見 [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) 與 [測試站自動部署](docs/design/test-site-deploy.md)；正式站的手動發布由 [#31](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/31) 建立。GitHub 登入已由 [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 及 [PR #38](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/38) 合併實作；正式站於 2026-10-09 已回報可成功登入，但本機／測試站與登出驗收仍記於 #23。各環境須各自核對 OAuth Secrets 與 migration；測試站自動部署的工作流程已加入，首次實際部署待 secrets 設定。整體規格見 [Infra 工作票 #19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 與 [Infra 工作拆分](docs/design/infra-environments-ticket-plan.md)。舊 Sites 站保留作參考。
 
 OpenRouter API 文件：https://openrouter.ai/docs/quickstart
 
@@ -156,7 +163,7 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 - 預設每小時最多 12 次 AI 呼叫，30,000 已回報 token 為停止門檻；可在介面調整。後端保存每個帳號的計數，即使重新整理也不重置。計量窗口自使用起持續一小時，之後歸零；累計統計保留。
 - 呼叫次數包含失敗嘗試。供應商未回報用量時只計呼叫、不猜測 token；token 不是金額，也不包含其他應用程式使用的 API 額度。每次請求前檢查門檻，單次回覆可能超過 token 門檻。
 - 為避免同回合新對話增加額外請求，需要決策時會預留可自主決策角色的呼叫空間。門檻不足或模型失敗會保留用量並回復世界回合，避免保存部分角色的行動。
-- 世界仍保存最近 80 則角色記憶；一般模型請求收到最近 12 則、性格、目標與待回應介入；交還控制權後首次自主決策另有上述已知經歷。不提供長期摘要。
+- 主觀短期經歷共用80筆／64 KiB；模型輸入優先保留短期，另附有界相關長期與至多12則相容文字，全部記憶輸入受88 KiB限制。交還控制權後同一短期集合中的已知接管經歷可供決策。#54摘要／遺忘仍以本分支驗證狀態為準。
 - 核心驗證：`node tests/run-activities.mjs`。使用模擬模型及記憶體 SQLite 資料庫執行實際保存 SQL，不發出付費 API 請求。
 
 ## 登入流程

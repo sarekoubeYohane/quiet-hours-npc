@@ -4,10 +4,22 @@ import type { Observation } from './perception';
 
 export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
 export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; consumed?: boolean; controlled?: boolean };
-export type LongMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; origin: { id: string; version: number }; reason: string };
+export type MemoryRef = { id: string; version: number };
+export type RememberedSource = MemoryRef & { source: MemorySource };
+export type MemoryTraceOperation = 'merge' | 'rewrite' | 'forget' | 'forget-source' | 'keep';
+export type MemoryTrace = { id: string; version: number; type: MemoryTraceOperation; from: MemoryRef[]; to?: MemoryRef; reason: string };
+export type LongMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; origin: MemoryRef; reason: string; kind?: 'episode' | 'summary'; state?: 'active' | 'superseded' | 'forgotten'; rememberedSources?: RememberedSource[]; origins?: MemoryRef[]; unresolved?: MemoryRef[] };
 export class MemoryValidationError extends Error {}
 export const memoryBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
 const textBytes = (value: string) => new TextEncoder().encode(value).length;
+function validRef(value: unknown): value is MemoryRef {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const ref = value as MemoryRef;
+  return Object.keys(value).every(key => ['id', 'version'].includes(key)) && typeof ref.id === 'string' && ref.id.length > 0 && textBytes(ref.id) <= 128 && Number.isSafeInteger(ref.version) && ref.version > 0;
+}
+function validRefs(value: unknown): value is MemoryRef[] {
+  return Array.isArray(value) && value.length <= 8 && value.every(validRef) && new Set(value.map(item => `${item.id}:${item.version}`)).size === value.length;
+}
 function observationSource(observation: Observation): MemorySource {
   return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
 }
@@ -67,7 +79,17 @@ export function addExperience(c: Character, time: number, text: string, observat
   c.shortTerm!.push(item); boundShort(c);
 }
 export const memorySelectionSchema = { type: 'array', maxItems: 4, items: { type: 'object', properties: { id: { type: 'string', maxLength: 128 }, version: { type: 'integer', minimum: 1 }, reason: { type: 'string', maxLength: 256 } }, required: ['id', 'version', 'reason'], additionalProperties: false } };
-export function selectMemories(c: Character, value: unknown): LongMemory[] {
+const memoryRefSchema = { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 128 }, version: { type: 'integer', minimum: 1 } }, required: ['id', 'version'], additionalProperties: false };
+export const memoryOperationSchema = { type: 'array', maxItems: 4, items: {
+  type: 'object', properties: {
+    type: { type: 'string', enum: ['merge', 'rewrite', 'forget', 'forget-source', 'keep', 'compact-trace'] },
+    targets: { type: 'array', minItems: 1, maxItems: 8, items: memoryRefSchema },
+    text: { type: 'string', maxLength: 4096 },
+    unresolved: { type: 'array', maxItems: 8, items: memoryRefSchema },
+    reason: { type: 'string', minLength: 1, maxLength: 256 },
+  }, required: ['type', 'targets', 'text', 'unresolved', 'reason'], additionalProperties: false,
+} };
+function selectedMemories(c: Character, value: unknown): LongMemory[] {
   if (value === undefined) return c.longTerm || [];
   if (!Array.isArray(value) || value.length > 4 || memoryBytes(value) > 8192) throw new MemoryValidationError('記憶選留超限');
   const result = [...(c.longTerm || [])], seen = new Set<string>();
@@ -78,6 +100,10 @@ export function selectMemories(c: Character, value: unknown): LongMemory[] {
     if (!source) throw new MemoryValidationError('只能選留本次自己的短期經歷版本');
     if (!result.some(m => m.origin.id === source.id && m.origin.version === source.version)) result.push({ id: crypto.randomUUID(), characterId: c.id, version: 1, time: source.time, text: source.text, source: { ...source.source }, origin: { id: source.id, version: source.version }, reason: item.reason });
   }
+  return result;
+}
+export function selectMemories(c: Character, value: unknown): LongMemory[] {
+  const result = selectedMemories(c, value);
   if (result.length > 64 || memoryBytes(result) > 64 * 1024) throw new MemoryValidationError('長期記憶已滿，需要明示重新評估，不能自動刪除');
   return result;
 }
@@ -89,13 +115,114 @@ export function consumeMemories(c: Character) {
 export function memoryProjection(c: Character) {
   return (c.shortTerm || []).map(({ id, version, time, text, source, controlled }) => ({ id, version, time, text, source, ...(controlled ? { controlled: true } : {}) }));
 }
-export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: LongMemory[] | undefined; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memories: unknown[]; observations: unknown[]; relationships: Record<string, string> }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, recalledMemories?: unknown): T {
+function sourceProjection(source: MemorySource): MemorySource {
+  return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
+}
+function rememberedSources(item: LongMemory): RememberedSource[] {
+  return item.rememberedSources ?? [{ id: item.id, version: item.version, source: item.source }];
+}
+export function recallableMemoryProjection(c: Character) {
+  return (c.longTerm || []).filter(item => !item.state || item.state === 'active').map(item => ({ id: item.id, version: item.version, time: item.time, text: item.text, kind: item.kind || 'episode', state: 'active' as const, source: sourceProjection(item.source), rememberedSources: rememberedSources(item).map(ref => ({ id: ref.id, version: ref.version, source: sourceProjection(ref.source) })), ...(item.unresolved?.length ? { unresolved: item.unresolved.map(({ id, version }) => ({ id, version })) } : {}) }));
+}
+export type MemoryProjection = ReturnType<typeof recallableMemoryProjection>;
+export type MemoryReview = MemoryRef & { kind: 'short' | 'long' | 'trace'; required?: boolean };
+export type MemoryCandidate = Pick<Character, 'longTerm' | 'shortTerm' | 'memoryTrace'>;
+type CognitiveMemoryReferences = { cognition?: { beliefs?: { references?: (MemoryRef & { kind: string })[] }[]; relationshipTags?: { references?: (MemoryRef & { kind: string })[] }[]; trace?: unknown[] } };
+function traceRequired(trace: MemoryTrace, c: Character): boolean {
+  const cognition = (c as Character & CognitiveMemoryReferences).cognition;
+  const refs = [...(c.longTerm || []).filter(item => !item.state || item.state === 'active').flatMap(item => [{ id: item.id, version: item.version }, ...(item.unresolved || [])]), ...[...(cognition?.beliefs || []), ...(cognition?.relationshipTags || [])].flatMap(item => (item.references || []).filter(ref => ref.kind === 'long'))];
+  return refs.some(ref => {
+    if (trace.type === 'keep' && (c.longTerm || []).some(item => (!item.state || item.state === 'active') && item.id === ref.id && item.version === ref.version)) return false;
+    if (trace.type === 'keep' && (c.memoryTrace || []).some(other => other.id !== trace.id && [...other.from, ...(other.to ? [other.to] : [])].some(anchor => anchor.id === ref.id && anchor.version === ref.version))) return false;
+    return [...trace.from, ...(trace.to ? [trace.to] : [])].some(anchor => anchor.id === ref.id && anchor.version === ref.version);
+  });
+}
+export function evaluateMemories(c: Character, selections: unknown, operations: unknown, visible: MemoryProjection, review: MemoryReview[] = []): MemoryCandidate {
+  if (operations === undefined) operations = [];
+  if (!Array.isArray(operations) || operations.length + (Array.isArray(selections) ? selections.length : 0) > 4 || memoryBytes({ selections: selections ?? [], operations }) > 8192) throw new MemoryValidationError('記憶整理超過單次工作量');
+  const candidate: Character = structuredClone(c);
+  candidate.longTerm = selectedMemories(c, selections);
+  candidate.memoryTrace ??= [];
+  const removedTraces: MemoryTrace[] = [];
+  const removedOrigins: MemoryRef[] = [], changed = new Set<string>();
+  for (const operation of operations) {
+    if (!operation || typeof operation !== 'object' || !['merge', 'rewrite', 'forget', 'forget-source', 'keep', 'compact-trace'].includes(operation.type) || Object.keys(operation).some(key => !['type', 'targets', 'text', 'unresolved', 'reason'].includes(key)) || !Array.isArray(operation.targets) || operation.targets.length < (operation.type === 'merge' ? 2 : 1) || operation.targets.length > 8 || !Array.isArray(operation.unresolved) || operation.unresolved.length > 8 || typeof operation.text !== 'string' || (['merge', 'rewrite'].includes(operation.type) ? !operation.text.trim() : operation.type !== 'forget-source' && operation.text !== '') || (operation.type === 'forget-source' && operation.text !== '' && !operation.text.trim()) || textBytes(operation.text) > 4096 || typeof operation.reason !== 'string' || !operation.reason.trim() || textBytes(operation.reason) > 256) throw new MemoryValidationError('記憶整理格式無效');
+    if (!['merge', 'rewrite'].includes(operation.type) && operation.unresolved.length) throw new MemoryValidationError('只有摘要可新增或帶回未解矛盾引用');
+    if (!validRefs(operation.targets) || !validRefs(operation.unresolved)) throw new MemoryValidationError('記憶整理引用格式無效');
+    const refs = operation.targets as MemoryRef[], seen = new Set<string>();
+    if (operation.type === 'compact-trace') {
+      for (const ref of refs) {
+        const trace = candidate.memoryTrace.find(item => item.id === ref.id && item.version === ref.version);
+        if (!trace || !review.some(item => item.kind === 'trace' && item.id === ref.id && item.version === ref.version) || operation.unresolved.length || seen.has(ref.id)) throw new MemoryValidationError('只能精簡本次明示的來源追溯');
+        seen.add(ref.id); removedTraces.push(trace);
+      }
+      candidate.memoryTrace = candidate.memoryTrace.filter(item => !seen.has(item.id));
+      continue;
+    }
+    const items = refs.map(ref => {
+      if (!ref || Object.keys(ref).some(key => !['id', 'version'].includes(key)) || typeof ref.id !== 'string' || textBytes(ref.id) > 128 || !Number.isSafeInteger(ref.version) || ref.version < 1 || seen.has(ref.id)) throw new MemoryValidationError('記憶整理引用無效');
+      seen.add(ref.id);
+      const item = candidate.longTerm!.find(m => m.id === ref.id && m.version === ref.version && m.characterId === c.id);
+      if (!item || !visible.some(m => m.id === ref.id && m.version === ref.version)) throw new MemoryValidationError('只能整理本次可見的自己記憶版本');
+      return item;
+    });
+    const sources = items.flatMap(rememberedSources);
+    if (sources.length > 8) throw new MemoryValidationError('摘要來源超過 8 筆');
+    const inherited = items.flatMap(item => item.unresolved || []);
+    const available = [...refs, ...sources, ...inherited];
+    if (operation.unresolved.some((ref: MemoryRef) => !available.some(target => target.id === ref?.id && target.version === ref.version))) throw new MemoryValidationError('矛盾只能引用本次整理來源');
+    if (['merge', 'rewrite'].includes(operation.type) && inherited.some(ref => !operation.unresolved.some((item: MemoryRef) => item.id === ref.id && item.version === ref.version))) throw new MemoryValidationError('摘要不能默默解決仍未一致的主觀來源');
+    const first = items[0], origins = items.flatMap(item => item.origins ?? [item.origin]);
+    if (operation.type === 'keep') {
+      if (items.length !== 1 || operation.unresolved.length) throw new MemoryValidationError('保留每項只處理一筆記憶');
+      candidate.memoryTrace.push({ id: crypto.randomUUID(), version: 1, type: 'keep', from: refs, to: refs[0], reason: operation.reason });
+      continue;
+    }
+    const updated: LongMemory = ['merge', 'rewrite'].includes(operation.type)
+      ? { ...first, version: first.version + 1, kind: 'summary', state: 'active', text: operation.text, rememberedSources: sources, origins, unresolved: operation.unresolved, reason: operation.reason }
+      : { ...first, version: first.version + 1, state: 'active', ...(operation.text ? { text: operation.text } : {}), source: { kind: first.source.kind, ...(first.source.sense ? { sense: first.source.sense } : {}), ...(first.source.clarity ? { clarity: first.source.clarity } : {}) }, rememberedSources: [], reason: operation.reason };
+    if (operation.type !== 'merge' && items.length !== 1) throw new MemoryValidationError('來源遺忘每項只處理一筆記憶');
+    for (const item of items) changed.add(item.id);
+    removedOrigins.push(...origins);
+    candidate.longTerm = candidate.longTerm!.filter(item => !seen.has(item.id)); if (operation.type !== 'forget') candidate.longTerm.push(updated);
+    candidate.shortTerm = candidate.shortTerm!.filter(item => !origins.some(ref => ref.id === item.id && ref.version === item.version));
+    candidate.memoryTrace.push({ id: crypto.randomUUID(), version: 1, type: operation.type, from: refs, ...(operation.type !== 'forget' ? { to: { id: updated.id, version: updated.version } } : {}), reason: operation.reason });
+  }
+  if (candidate.longTerm.some(item => !changed.has(item.id) && (item.origins || [item.origin]).some(ref => removedOrigins.some(origin => origin.id === ref.id && origin.version === ref.version)))) throw new MemoryValidationError('同源內容仍在另一筆未整理記憶中，需明示一起處理');
+  if (removedTraces.some(trace => traceRequired(trace, candidate))) throw new MemoryValidationError('仍被現行版本或未解矛盾引用的追溯不能釋放');
+  projectMemories(candidate);
+  validateMemoryState(candidate);
+  return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
+}
+export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
   const candidates = input.self.longTerm || [];
   const cognition = input.self.cognition;
   const beliefs = cognition?.beliefs || [], tags = cognition?.relationshipTags || [];
   if (cognition) { cognition.beliefs = []; cognition.relationshipTags = []; input.self.relationships = {}; }
   input.self.longTerm = [];
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, cognition: input.self.cognition, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const underPressure = (items: unknown[], count: number, bytes: number) => items.length >= count * .75 || memoryBytes(items) >= bytes * .75;
+  const short = character?.shortTerm || [];
+  const traces = [...(character?.memoryTrace || []), ...((character as Character & CognitiveMemoryReferences | undefined)?.cognition?.trace || [])];
+  const pressureQueues: MemoryReview[][] = character ? [
+    underPressure(short, 80, 64 * 1024) ? short.filter(item => !item.consumed).map(({ id, version }) => ({ kind: 'short' as const, id, version })) : [],
+    underPressure(character.longTerm || [], 64, 64 * 1024) ? candidates.map(({ id, version }) => ({ kind: 'long' as const, id, version })) : [],
+    underPressure(traces, 24, 12 * 1024) ? (character.memoryTrace || []).map(trace => ({ kind: 'trace' as const, id: trace.id, version: trace.version, required: traceRequired(trace, character) })) : [],
+  ].filter(queue => queue.length > 0) : [];
+    const reviewWithin = (limit: number) => {
+    const result: MemoryReview[] = [];
+    for (let offset = 0; result.length < limit && pressureQueues.some(queue => offset < queue.length); offset++) {
+      for (const queue of pressureQueues) if (queue[offset] && result.length < limit) result.push(queue[offset]);
+    }
+    return result;
+  };
+  input.self.memoryReview = reviewWithin(8);
+  if (cognition && input.self.memoryReview.length && ((cognition.historyCandidates?.length || 0) + (cognition.reviewCandidates?.length || 0))) {
+    input.self.memoryReview = reviewWithin(4);
+    const historyQuota = cognition.historyCandidates?.length && cognition.reviewCandidates?.length ? 2 : 4;
+    if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
+    if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
+  }
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -108,22 +235,20 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
   if (memoryBytes(payload()) > 88 * 1024) throw new MemoryValidationError('記憶輸入超過 88 KiB');
   if (cognition) {
     for (const belief of beliefs) { cognition.beliefs.push(belief); if (memoryBytes(payload()) > 88 * 1024) cognition.beliefs.pop(); }
-    for (const tag of tags) {
-      cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags);
-      if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); }
-    }
+    for (const tag of tags) { cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags); if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); } }
   }
   for (const candidate of candidates) {
     input.self.longTerm.push(candidate);
     if (memoryBytes(payload()) > 88 * 1024) input.self.longTerm.pop();
   }
+  input.self.memoryReview = input.self.memoryReview.filter(ref => ref.kind === 'trace' || (ref.kind === 'short' ? input.self.shortTerm as MemoryRef[] : input.self.longTerm!).some(item => item.id === ref.id && item.version === ref.version));
   if (cognition?.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.filter(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version));
   return input;
 }
 export function validateMemoryState(c: Character) {
   validateCognition(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
-  const validSource = (source: MemorySource) => source && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (!source.person || boundedId(source.person)) && (!source.region || boundedId(source.region));
+  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   const shortIds = new Set<string>();
   for (const item of c.shortTerm || []) {
     if (shortIds.has(item.id)) throw new MemoryValidationError('短期記憶身份重複');
@@ -136,13 +261,21 @@ export function validateMemoryState(c: Character) {
   for (const item of long) {
     if (!boundedId(item.id) || ids.has(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || typeof item.text !== 'string' || textBytes(item.text) > 4096 || typeof item.reason !== 'string' || textBytes(item.reason) > 256 || !boundedId(item.origin?.id) || !Number.isSafeInteger(item.origin.version) || item.origin.version < 1) throw new MemoryValidationError('長期記憶格式或文字超限');
     ids.add(item.id);
+    if ((item.kind !== undefined && !['episode', 'summary'].includes(item.kind)) || (item.state !== undefined && !['active', 'superseded', 'forgotten'].includes(item.state)) || (item.origins !== undefined && !validRefs(item.origins)) || (item.unresolved !== undefined && !validRefs(item.unresolved)) || (item.rememberedSources !== undefined && (!Array.isArray(item.rememberedSources) || item.rememberedSources.length > 8 || item.rememberedSources.some(ref => !validRef({ id: ref?.id, version: ref?.version }) || Object.keys(ref).some(key => !['id', 'version', 'source'].includes(key)) || !validSource(ref.source))))) throw new MemoryValidationError('摘要來源、矛盾或狀態格式無效');
   }
   if (long.length > 64 || memoryBytes(long) > 64 * 1024) throw new MemoryValidationError('長期記憶容量超限，未刪除任何資料');
+  const combinedTrace = [...(c.memoryTrace || []), ...((c as Character & CognitiveMemoryReferences).cognition?.trace || [])];
+  if (combinedTrace.length > 24 || memoryBytes(combinedTrace) > 12 * 1024) throw new MemoryValidationError('記憶及認知追溯容量已滿，需要明示精簡');
+  const traceIds = new Set<string>();
+  for (const trace of c.memoryTrace || []) {
+    if (!boundedId(trace.id) || traceIds.has(trace.id) || !Number.isSafeInteger(trace.version) || trace.version < 1 || !['merge', 'rewrite', 'forget', 'forget-source', 'keep'].includes(trace.type) || !validRefs(trace.from) || trace.from.length === 0 || (trace.to !== undefined && !validRef(trace.to)) || typeof trace.reason !== 'string' || !trace.reason.trim() || textBytes(trace.reason) > 256 || Object.keys(trace).some(key => !['id', 'version', 'type', 'from', 'to', 'reason'].includes(key))) throw new MemoryValidationError('記憶追溯格式或引用無效');
+    traceIds.add(trace.id);
+  }
   // Existing relationship text remains unchanged; no belief/tag conversion.
   if (Object.keys(c.relationships).length > 32 || memoryBytes(c.relationships) > 12 * 1024 || Object.entries(c.relationships).some(([id, text]) => !boundedId(id) || typeof text !== 'string' || (!c.cognition && textBytes(text) > 256))) throw new MemoryValidationError('既有關係文字超過記憶契約，未截斷資料');
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
 export function memoryStateBytes(c: Character) {
-  const state = { shortTerm: c.shortTerm, longTerm: c.longTerm, cognition: c.cognition, memoryTrace: 'memoryTrace' in c ? c.memoryTrace : undefined, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
+  const state = { shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
   return memoryBytes(state);
 }
