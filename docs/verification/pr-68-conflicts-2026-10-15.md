@@ -6,3 +6,7 @@
 - 回想專項 25 項通過。
 - typecheck、受影響 TS／測試檔 ESLint、build、diff check 通過。
 - 未合併 PR、部署、執行雲端 migration 或付費請求。其他 PR 合併後仍須檢查共有檔案。
+
+## 第二輪：PR #58 合併後
+
+同步 main `e31d763`，保留重置世界功能與本 PR 變更。`npm test` 204 項通過；typecheck、受影響 server／測試 ESLint、建置與 diff check 通過。未合併或部署。
