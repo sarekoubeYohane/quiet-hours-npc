@@ -1,6 +1,16 @@
-# #67 工作拆分草稿
+# #67 工作拆分與已發布工作票
 
-狀態：待使用者確認粒度與阻擋關係，尚未發布子工作票。暫用 T1–T7，不是真實 Issue 編號。
+狀態：2026-10-15 使用者確認後已發布七張工作票，均標 ready-for-agent。原生子票／阻擋寫入工具不可用，已於各票 Parent 與 Blocked by 列出實際 Issue 連結；未修改或關閉母票。
+
+| 切片 | 工作票 | 標題 |
+| --- | --- | --- |
+| T1 | [#69](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/69) | 以共用契約完成既有 NPC 決策 |
+| T2 | [#70](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/70) | 不同容量模型完成同一決策契約 |
+| T3 | [#71](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/71) | 人物四維度與匿名互動目標 |
+| T4 | [#72](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/72) | 跨回合追蹤與門外腳步完整流程 |
+| T5 | [#73](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/73) | 決策請求歸屬與失效回覆 |
+| T6 | [#74](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/74) | 分離世界裁定任務與 NPC 模型路由 |
+| T7 | [#75](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/75) | 接上完整記憶／信念／回想並驗收一致提交 |
 依據：[正式規格 #67](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/67)。
 2026-10-15 核對：#53／#54／#55 仍 Open，分別已有未合併 PR #63／#64／#68；不是尚未開始，也不是已在 main。
 
@@ -23,7 +33,7 @@
 
 ## T2：不同容量模型完成同一決策契約
 
-**Blocked by：** T1。
+**Blocked by：** #69。
 
 **交付：** 雲端與模擬本機服務在不同封裝／容量下完成同一世界操作，容量不足有明確失敗，不偷偷刪記憶。
 
@@ -38,7 +48,7 @@
 
 ## T3：人物四維度與匿名互動目標
 
-**Blocked by：** T1。
+**Blocked by：** #69。
 
 **交付：** NPC 可向眼前未知人物說話，也可向已知聯絡人傳訊息，兩條目標路徑互不混淆。
 
@@ -54,7 +64,7 @@
 
 ## T4：跨回合追蹤與門外腳步完整流程
 
-**Blocked by：** T3。
+**Blocked by：** #71。
 
 **交付：** 「聽腳步 → 開門 → 得到實際新觀察 → 下一次決策」可由世界 API 重現，並正確處理目標離開與重新出現。
 
@@ -69,7 +79,7 @@
 
 ## T5：決策請求歸屬與失效回覆
 
-**Blocked by：** T1。
+**Blocked by：** #69。
 
 **交付：** 同回合多 NPC 的模型請求可關聯原輸入，錯配／遲到回覆無法污染世界，重送維持冪等。
 
@@ -84,7 +94,7 @@
 
 ## T6：分離世界裁定任務與 NPC 模型路由
 
-**Blocked by：** T1。
+**Blocked by：** #69。
 
 **交付：** 從世界 API 執行既有合法行動，裁定輸入與 NPC 上下文各自受限；任務路由可用替身驗證，正式既有行動仍使用程式裁定。
 
@@ -99,7 +109,7 @@
 
 ## T7：接上完整記憶／信念／回想並驗收一致提交
 
-**Blocked by：** T2、T4、T5、T6，以及 #53、#54、#55 對應實作合併並通過整合驗證。
+**Blocked by：** #70、#72、#73、#74，以及 #53、#54、#55 對應實作合併並通過整合驗證。
 
 **交付：** 完整認知決策在新的共用介面上走通；這一票實際接線與修復相容性，不是只有最後重跑測試。
 
