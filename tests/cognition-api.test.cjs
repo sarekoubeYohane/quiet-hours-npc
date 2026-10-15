@@ -227,6 +227,26 @@ test('current review and metadata history handles share at most eight maintenanc
     const saved = (await read()).characters[0]; assert.equal(saved.cognition.beliefs.length, 24); assert.equal(saved.cognition.trace.length, 24);
   });
 });
+test('combined cognition and memory maintenance validates the net shared trace capacity', async () => {
+  const w = seedWorld(), c = w.characters[0];
+  c.longTerm = [{ id: 'key', characterId: c.id, version: 1, time: 0, text: '重要片段', source: { kind: 'experience' }, origin: { id: 'origin', version: 1 }, reason: '保留' }];
+  c.cognition = { beliefs: [{ id: 'personal-space', characterId: c.id, version: 1, time: 0, topic: '相處距離', text: '目前看法', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' }], relationshipTags: [], trace: [] };
+  c.memoryTrace = Array.from({ length: 24 }, (_, i) => ({ id: `keep-${i}`, version: 1, type: 'keep', from: [{ id: 'key', version: 1 }], to: { id: 'key', version: 1 }, reason: '仍在乎' })); store.install(w);
+  await withModel(input => input.self.id !== c.id ? {} : { cognitiveUpdates: [belief(input, { version: 1 })], memoryOperations: [{ type: 'compact-trace', targets: [{ id: 'keep-0', version: 1 }], text: '', unresolved: [], reason: '釋放重複保留記錄' }] }, async (_inputs, advance) => {
+    assert.equal((await advance()).status, 200); const saved = (await read()).characters[0]; assert.equal(saved.cognition.beliefs[0].version, 2); assert.equal(saved.cognition.trace.length + saved.memoryTrace.length, 24);
+  });
+});
+test('combined memory and cognition pressure exposes at most eight maintenance handles', async () => {
+  const w = seedWorld(), c = w.characters[0];
+  c.longTerm = Array.from({ length: 48 }, (_, i) => ({ id: `long-${i}`, characterId: c.id, version: 1, time: 0, text: '片段', source: { kind: 'experience' }, origin: { id: `o-${i}`, version: 1 }, reason: '保留' }));
+  c.cognition = { beliefs: Array.from({ length: 18 }, (_, i) => ({ id: `belief-${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '想法', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' })), relationshipTags: [], trace: Array.from({ length: 9 }, (_, i) => ({ traceId: `cog-${i}`, kind: 'belief', id: `past-${i}`, version: 1, operation: 'withdraw', time: 0, reason: '放下', references: [] })) };
+  c.memoryTrace = Array.from({ length: 9 }, (_, i) => ({ id: `mem-${i}`, version: 1, type: 'forget', from: [{ id: `forgot-${i}`, version: 1 }], reason: '放下' })); store.install(w);
+  await withModel(() => ({}), async (inputs, advance) => {
+    assert.equal((await advance()).status, 200); const self = inputs.find(input => input.self.id === c.id).self;
+    assert.ok(self.memoryReview.length + (self.cognition.historyCandidates?.length || 0) + (self.cognition.reviewCandidates?.length || 0) <= 8);
+    assert.ok(self.memoryReview.length && self.cognition.historyCandidates.length && self.cognition.reviewCandidates.length);
+  });
+});
 test('invalid final cognition restores the whole world and replays failure after candidate composition', async () => {
   for (const invalid of ['unresolved-contradiction', 'belief-capacity']) {
     const w = seedWorld(), subject = w.characters[1];
@@ -247,4 +267,17 @@ test('invalid final cognition restores the whole world and replays failure after
       assert.deepEqual(await (await advance({ operationId })).json(), failure); assert.equal(inputs.length, 2);
     });
   }
+});
+test('all simultaneous memory pressures retain a trace handle for a legal shared-capacity tradeoff', async () => {
+  const w = seedWorld(), c = w.characters[0];
+  c.shortTerm = Array.from({ length: 80 }, (_, i) => ({ id: `short-${i}`, characterId: c.id, version: 1, time: i, text: '近期片段', source: { kind: 'experience' } }));
+  c.longTerm = Array.from({ length: 48 }, (_, i) => ({ id: `long-${i}`, characterId: c.id, version: 1, time: 0, text: '長期片段', source: { kind: 'experience' }, origin: { id: `origin-${i}`, version: 1 }, reason: '保留' }));
+  c.cognition = { beliefs: Array.from({ length: 18 }, (_, i) => ({ id: `belief-${i}`, characterId: c.id, version: 1, time: 0, topic: `topic-${i}`, text: '目前理解', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' })), relationshipTags: [], trace: [] };
+  c.memoryTrace = Array.from({ length: 24 }, (_, i) => ({ id: `keep-${i}`, version: 1, type: 'keep', from: [{ id: 'long-0', version: 1 }], to: { id: 'long-0', version: 1 }, reason: '仍然在乎' })); store.install(w);
+  await withModel(input => input.self.id !== c.id ? {} : { cognitiveUpdates: [belief(input, { id: 'belief-0', version: 1, topic: 'topic-0' })], memoryOperations: [{ type: 'compact-trace', targets: [{ id: 'keep-0', version: 1 }], text: '', unresolved: [], reason: '釋放重複保留追溯' }] }, async (inputs, advance) => {
+    assert.equal((await advance()).status, 200); const self = inputs.find(input => input.self.id === c.id).self;
+    for (const kind of ['short', 'long', 'trace']) assert.ok(self.memoryReview.some(item => item.kind === kind), kind);
+    assert.ok(self.memoryReview.length + (self.cognition.historyCandidates?.length || 0) + (self.cognition.reviewCandidates?.length || 0) <= 8);
+    const saved = (await read()).characters[0]; assert.equal(saved.cognition.beliefs[0].version, 2); assert.equal(saved.memoryTrace.length + saved.cognition.trace.length, 24);
+  });
 });

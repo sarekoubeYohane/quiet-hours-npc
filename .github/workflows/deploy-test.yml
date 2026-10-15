@@ -1,0 +1,130 @@
+name: Deploy test site
+
+# main 合併後自動部署測試站（#28）。檢查全部通過才部署；任何一步失敗都不會動到測試站。
+# 正式站不在此流程：沒有 production 的建置、migration 或部署步驟（正式發布見 #31）。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 部署序列化：同一時間只有一個工作在跑，排隊中只保留最新一筆；舊的 pending 由 GitHub 取消。
+concurrency:
+  group: deploy-test-site
+  cancel-in-progress: false
+
+env:
+  TEST_SITE_URL: https://quiet-hours-npc-test.houmengkou.workers.dev
+
+jobs:
+  # 沒有綁 GitHub Environment：被較新提交超越、或從非 main 分支手動觸發時，這裡結束，不留下部署紀錄。
+  check-head:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.head.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 確認本提交是 main 的最新提交
+        id: head
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::只部署 main；本次從 $GITHUB_REF 觸發，不部署。"
+            echo "### 未部署：只部署 main（本次為 \`$GITHUB_REF\`）" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          latest=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ -z "$latest" ]; then echo "::error::無法讀取 origin 的 main 目前提交。"; exit 1; fi
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main 已有更新的提交 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，交由較新的工作處理。"
+            echo "### 未部署：main 已前進到 \`${latest:0:7}\`，本次 \`${GITHUB_SHA:0:7}\` 不部署" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: check-head
+    if: needs.check-head.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+      url: ${{ env.TEST_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 檢查部署設定（secret 與 variable）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=0
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::缺少 repository secret CLOUDFLARE_API_TOKEN，設定方式見 docs/design/test-site-deploy.md"; missing=1; fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "::error::缺少 repository variable CLOUDFLARE_ACCOUNT_ID，設定方式見 docs/design/test-site-deploy.md"; missing=1; fi
+          [ "$missing" = 0 ]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: 安裝 pnpm
+        run: corepack enable && corepack prepare pnpm@11.25.0 --activate
+      - name: 安裝相依套件
+        run: pnpm install --frozen-lockfile
+
+      # 與 PR 檢查相同的三道關卡；任一失敗即停止，不部署。
+      - name: 型別檢查
+        run: pnpm typecheck
+      - name: 測試
+        run: pnpm test
+      - name: 以測試站設定建置
+        run: pnpm build:test
+      - name: 確認建置成品只指向測試站
+        run: node tooling/check-test-build.mjs dist/server/wrangler.json
+
+      # 相容守門：只有已套用清單是版本庫清單的前綴時才增量套用；不認識的變更、順序不符、
+      # 或有資料表卻沒有 migration 紀錄時停止，不重置資料。判斷邏輯都在 tooling/migration-gate.mjs。
+      - name: 讀取測試站 D1 的資料表與已套用 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 execute DB --remote --env test --json --command "SELECT name FROM sqlite_master WHERE type='table'" > d1-tables.json
+          if grep -q '"d1_migrations"' d1-tables.json; then
+            pnpm exec wrangler d1 execute DB --remote --env test --json --command "SELECT name FROM d1_migrations ORDER BY id" > d1-applied.json
+          else
+            rm -f d1-applied.json
+          fi
+      - name: Migration 相容守門
+        id: gate
+        run: node tooling/migration-gate.mjs --tables d1-tables.json --applied d1-applied.json --migrations drizzle
+      - name: 套用 migrations 到測試站 D1
+        if: steps.gate.outputs.pending != '0'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler d1 migrations apply DB --remote --env test
+
+      # 檢查期間若 main 又前進，這裡以失敗結束：較新的工作會接手，本次不覆蓋它。
+      - name: 部署前再次確認 main 沒有更新
+        run: |
+          latest=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$latest" != "$GITHUB_SHA" ]; then echo "::error::main 在檢查期間前進到 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，請等較新的工作完成。"; exit 1; fi
+      - name: 部署測試站 Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --config dist/server/wrangler.json
+
+      # 線上必須回報本次提交，且未登入拿不到世界（401）。最多嘗試 6 次，間隔 10 秒。
+      - name: 核對測試站回報的環境、提交與登入保護
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            world_status=$(curl -s -o /dev/null -w '%{http_code}' "$TEST_SITE_URL/api/world" || echo 000)
+            if curl -fsS "$TEST_SITE_URL/api/environment" > environment.json && node tooling/check-deployed-environment.mjs environment.json test "$GITHUB_SHA" "$world_status" "$TEST_SITE_URL"; then
+              exit 0
+            fi
+            echo "第 $attempt 次核對尚未符合（/api/world 回 $world_status），10 秒後重試。"; sleep 10
+          done
+          echo "::error::部署後 /api/environment 或 /api/world 的回應與本次不符，請檢查 Worker 部署紀錄。"; exit 1

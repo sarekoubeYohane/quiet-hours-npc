@@ -2,8 +2,8 @@ import { execSync } from "node:child_process";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 
-// Commit short code shown in the UI and by /api/environment; null when git is unavailable
-// and lib/environment.ts then reports unknown.
+// Commit short code and build time shown in the UI and by /api/environment; the commit is null
+// when git is unavailable and lib/environment.ts then reports unknown.
 function gitCommit(): string | null {
   try {
     return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim() || null;
@@ -22,7 +22,7 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    define: { __GIT_COMMIT__: JSON.stringify(gitCommit()) },
+    define: { __GIT_COMMIT__: JSON.stringify(gitCommit()), __BUILT_AT__: JSON.stringify(new Date().toISOString()) },
     plugins: [
       vinext(),
       // Bindings, vars and environments come from wrangler.jsonc.
