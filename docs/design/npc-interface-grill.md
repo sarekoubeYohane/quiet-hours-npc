@@ -199,7 +199,7 @@
 
 ### Q19：以門外腳步案例走查介面
 
-使用者回答：好。選用 Vera 聽到門外腳步、想確認是否 Cass 的示例。走查見 [npc-interface-walkthrough.md](npc-interface-walkthrough.md)；為設計示例，不是真實模型測試或角色正史，也不代表全部範例已由使用者審定。
+使用者回答：好。選用 Vera 聽到門外腳步、想確認是否 Cass 的示例。走查見 [npc-interface-walkthrough.md](npc-interface-walkthrough.md)；為設計示例，不是真實模型測試或角色正史。使用者在閱讀完整走查後回答「先試試看這樣」，確認以此流程作為第一版試驗基準；不代表已完成 runtime 驗證。
 
 ## 範圍校正與既有契約對照（2026-10-15）
 
