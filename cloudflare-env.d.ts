@@ -18,3 +18,17 @@ declare namespace Cloudflare {
   }
 }
 
+
+declare namespace Cloudflare {
+  interface Env {
+    /** Explicit opt-in only; absent/false leaves all recall transports disabled. */
+    RECALL_ENABLED?: string;
+    /** Shared billing D1 across local/test/production; distinct from each world DB. */
+    RECALL_USAGE_DB?: D1Database;
+    MEMORY_VECTOR_INDEX?: Vectorize;
+    /** Site owner's separate OpenAI key; never a user's chat key. */
+    OWNER_EMBEDDING_KEY?: string;
+    /** JSON object keyed embedding/index/search/chat; monthly conservative units. */
+    RECALL_BUDGET_LIMITS?: string;
+  }
+}

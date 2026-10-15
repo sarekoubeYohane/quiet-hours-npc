@@ -34,14 +34,20 @@ export function projectMemories(c: Character) {
   c.observationCursor = items.filter(item => item.observation && item.consumed).length;
   if (c.control && (c.control.experiences !== undefined || items.some(item => item.controlled))) c.control.experiences = items.filter(item => item.controlled).map(({ id, time, text }) => ({ id, time, text }));
 }
-function boundShort(c: Character) {
+function boundShort(c: Character, extraBytes = 0) {
   const items = c.shortTerm!;
   // Invalid legacy text must be reported, not silently hidden by FIFO eviction.
   for (const item of items) validateShort(item);
   while (items.length > 80 || memoryBytes(items) > 64 * 1024) items.shift();
   projectMemories(c);
-  while (items.length && memoryStateBytes(c) > 208 * 1024) { items.shift(); projectMemories(c); }
+  while (items.length && memoryStateBytes(c) + extraBytes > 208 * 1024) { items.shift(); projectMemories(c); }
   validateMemoryState(c);
+  if (memoryStateBytes(c) + extraBytes > 208*1024) throw new MemoryValidationError('索引中介資料使角色記憶總量超過208 KiB，未刪除長期資料。');
+}
+export function boundMemoryWithMetadata(c: Character, extraBytes: number) {
+  if (!Number.isSafeInteger(extraBytes) || extraBytes < 0) throw new MemoryValidationError('索引中介資料容量無效');
+  normalizeMemory(c);
+  boundShort(c, extraBytes);
 }
 export function normalizeMemory(c: Character) {
   if (!c.shortTerm) {
@@ -188,7 +194,7 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
   validateMemoryState(candidate);
   return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
 }
-export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; memoryReview?: MemoryReview[]; cognition?: { historyCandidates?: unknown[]; beliefs: Belief[]; relationshipTags: RelationshipTag[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] } }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character): T {
+export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
   const candidates = input.self.longTerm || [];
   const cognition = input.self.cognition;
   const beliefs = cognition?.beliefs || [], tags = cognition?.relationshipTags || [];
@@ -216,7 +222,7 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => ({ shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, cognition: input.self.cognition, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -229,10 +235,7 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
   if (memoryBytes(payload()) > 88 * 1024) throw new MemoryValidationError('記憶輸入超過 88 KiB');
   if (cognition) {
     for (const belief of beliefs) { cognition.beliefs.push(belief); if (memoryBytes(payload()) > 88 * 1024) cognition.beliefs.pop(); }
-    for (const tag of tags) {
-      cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags);
-      if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); }
-    }
+    for (const tag of tags) { cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags); if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); } }
   }
   for (const candidate of candidates) {
     input.self.longTerm.push(candidate);
@@ -272,7 +275,7 @@ export function validateMemoryState(c: Character) {
   if (Object.keys(c.relationships).length > 32 || memoryBytes(c.relationships) > 12 * 1024 || Object.entries(c.relationships).some(([id, text]) => !boundedId(id) || typeof text !== 'string' || (!c.cognition && textBytes(text) > 256))) throw new MemoryValidationError('既有關係文字超過記憶契約，未截斷資料');
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
-function memoryStateBytes(c: Character) {
+export function memoryStateBytes(c: Character) {
   const state = { shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
   return memoryBytes(state);
 }

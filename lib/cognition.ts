@@ -1,5 +1,5 @@
 import type { Character } from './world';
-import { MemoryValidationError, memoryBytes } from './memory';
+import { MemoryValidationError, memoryBytes, type MemoryReview } from './memory';
 
 export type CognitiveReference = { kind: 'short' | 'long' | 'belief' | 'relationship'; id: string; version: number };
 export type Conviction = 'doubtful' | 'leaning' | 'certain';
@@ -8,7 +8,7 @@ export type RelationshipTag = { id: string; characterId: string; version: number
 export type CognitiveTrace = { traceId: string; kind: 'belief' | 'relationship'; id: string; version: number; operation: 'upsert' | 'keep' | 'withdraw'; time: number; reason: string; references: CognitiveReference[]; conviction?: Conviction; nextVersion?: number };
 export type CognitiveState = { beliefs: Belief[]; relationshipTags: RelationshipTag[]; trace: CognitiveTrace[] };
 export type HistoryCandidate = Pick<CognitiveTrace, 'traceId' | 'kind' | 'id' | 'version' | 'operation'> & { required: boolean };
-export type CognitiveDecisionContext = { visible: Character; knownPeople: string[]; historyCandidates: HistoryCandidate[] };
+export type CognitiveDecisionContext = { visible: Character; knownPeople: string[]; historyCandidates: HistoryCandidate[]; memoryReview?: MemoryReview[] };
 type CognitiveView = { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: HistoryCandidate[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] };
 const byteLength = (text: string) => new TextEncoder().encode(text).length;
 const boundedText = (value: unknown, limit: number, required = true): value is string => typeof value === 'string' && byteLength(value) <= limit && (!required || !!value.trim());
