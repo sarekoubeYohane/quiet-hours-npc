@@ -1,3 +1,6 @@
+import { env } from 'cloudflare:workers';
+import { recallMemories, boundRecallStorage } from '@/lib/recall';
+import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase } from '@/lib/recall-services';
 import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
@@ -49,7 +52,7 @@ export async function GET() {
     const loaded = await loadWorld(id);
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
@@ -145,6 +148,7 @@ export async function POST(request: Request) {
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
     if (!acquired.meta.changes) return waiting();
     locked = true;
+    const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
     if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
@@ -167,14 +171,42 @@ export async function POST(request: Request) {
       const before = structuredClone(world);
       try {
         let dispatchKey = '';
+        const verifyLease = async () => {
+          const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
+          if (held?.locked_until !== lease || Date.now() >= lease - 10000) throw Error('世界租約或工作期限已到期，本回合停止付費請求。');
+        };
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,
           beforeDecision: async () => {
-            const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
-            if (held?.locked_until !== lease || lease <= Date.now()) throw Error('世界租約已到期，本回合停止新的模型呼叫。');
-            dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'); },
-          decide: (w, c, onUsage) => aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage),
+            await verifyLease();
+            if (env.RECALL_ENABLED === 'true' && (await reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, recallBudgetLimits('chat'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+            dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
+            await verifyLease(); },
+          decide: (w, c, onUsage) => {
+            let dispatch = 0;
+            const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
+              await verifyLease();
+              // Keep the same logical-round ledger captured by advanceActivities.
+              // A rolling-hour boundary may reset only the next round, not this guard.
+              const usage = w.aiUsage!;
+              if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) throw new BudgetExceeded();
+              const reservationId = `${operationId}:${c.id}:${dispatch++}`;
+              if ((await reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, recallBudgetLimits(kind))).replayed) throw Error('付費請求結果不明，禁止重送。');
+              await verifyLease();
+              return reservationId;
+            };
+            return aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage, {
+              enabled: env.RECALL_ENABLED === 'true',
+              signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
+              beforeContinuation: async () => {
+                await guard('chat', 1);
+                const usage = w.aiUsage!;
+                usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
+              },
+              search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
+            });
+          },
         });
       } catch (e) {
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
@@ -182,6 +214,15 @@ export async function POST(request: Request) {
         if (usage) usage.savedDecisions = before.aiUsage?.savedDecisions || 0;
         Object.assign(world, before, { aiUsage: usage });
         failure = e instanceof Error ? e : new Error('模型決策失敗，本回合沒有推進。');
+      }
+    }
+    if (env.RECALL_ENABLED === 'true') {
+      try { await boundRecallStorage(world, id); }
+      catch (error) {
+        const usage = world.aiUsage;
+        if (usage) usage.savedDecisions = beforeOperation.aiUsage?.savedDecisions || 0;
+        Object.assign(world, beforeOperation, { aiUsage: usage });
+        failure = error instanceof Error ? error : new Error('記憶容量驗證失敗，本回合沒有推進。');
       }
     }
     const usage = currentUsage(world);
