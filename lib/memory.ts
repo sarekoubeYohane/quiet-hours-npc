@@ -122,7 +122,7 @@ export function validateMemoryState(c: Character) {
   if (Object.keys(c.relationships).length > 32 || memoryBytes(c.relationships) > 12 * 1024 || Object.entries(c.relationships).some(([id, text]) => !boundedId(id) || typeof text !== 'string' || textBytes(text) > 256)) throw new MemoryValidationError('既有關係文字超過記憶契約，未截斷資料');
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
-function memoryStateBytes(c: Character) {
+export function memoryStateBytes(c: Character) {
   const state = { shortTerm: c.shortTerm, longTerm: c.longTerm, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
   return memoryBytes(state);
 }
