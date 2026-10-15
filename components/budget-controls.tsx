@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { validBudgetLimits, type BudgetLimits } from '@/lib/activities';
 
@@ -8,13 +8,9 @@ const label = (value: number | null) => value === null ? '無上限' : value.toL
 export default function BudgetControls({ limits, automatic, disabled, onApply }: {
   limits: BudgetLimits; automatic: boolean; disabled: boolean; onApply: (limits: BudgetLimits) => Promise<boolean>;
 }) {
-  const [draft, setDraft] = useState({ calls: String(limits.calls ?? 'unlimited'), tokens: String(limits.tokens ?? 'unlimited') });
-  const [custom, setCustom] = useState({ calls: '', tokens: '' });
+  const [draft, setDraft] = useState({ calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' });
+  const [custom, setCustom] = useState({ calls: String(limits.calls ?? ''), tokens: String(limits.tokens ?? '') });
   const [error, setError] = useState('');
-  useEffect(() => {
-    setDraft({ calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' });
-    setCustom({ calls: limits.calls === null ? '' : String(limits.calls), tokens: limits.tokens === null ? '' : String(limits.tokens) });
-  }, [limits.calls, limits.tokens]);
   const cancel = () => {
     setDraft({ calls: limits.calls === null ? 'unlimited' : choices.calls.includes(limits.calls) ? String(limits.calls) : 'custom', tokens: limits.tokens === null ? 'unlimited' : choices.tokens.includes(limits.tokens) ? String(limits.tokens) : 'custom' });
     setCustom({ calls: String(limits.calls ?? ''), tokens: String(limits.tokens ?? '') });setError('');

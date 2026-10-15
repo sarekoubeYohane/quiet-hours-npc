@@ -68,7 +68,7 @@
 
 啟用後 NPC 可直接完成決策，或提出一輪最多兩題回想，再更新意圖並完成唯一最終行動。只索引回合開始時已提交且仍有效的自己長期記憶；Vectorize 必須在搜尋面證明精確版本可查，搜尋後再由 D1 回讀驗證。跨帳號／NPC、已忘或過期結果會拒絕整回合，不以文字搜尋或略過回想回退。
 
-回想預設關閉；未啟用時一般聊天保留原有 strict schema，不要求新服務。啟用須另行配置各環境 Vectorize、站主 Embedding Key、共用 `RECALL_USAGE_DB` 及預算。每次聊天、Embedding、索引與搜尋先驗租約及預算；已知 Embedding tokens 和保守 dispatch units 分開由 `GET /api/world` 的 `recallUsage` 讀取，失敗／重放仍保留。沒有新增 UI。詳見 [服務設定交接](docs/design/recall-service-configuration.md) 與 [驗證紀錄](docs/verification/npc-recall-2026-10-15.md)。
+回想預設關閉；未啟用時一般聊天保留原有 strict schema，不要求新服務。啟用須另行配置各環境 Vectorize、站主 Embedding Key、共用 `RECALL_USAGE_DB` 及預算。玩家自付聊天（包含回想後續接）只檢查玩家預算；站主付費 Embedding、索引與搜尋檢查獨立站主預算，全部派送仍先驗租約；已知 Embedding tokens 和保守 dispatch units 分開由 `GET /api/world` 的 `recallUsage` 讀取，失敗／重放仍保留。介面區分玩家與站主用量，以及玩家預算、站主服務、供應商額度／速率與技術故障。詳見 [服務設定交接](docs/design/recall-service-configuration.md) 與 [驗證紀錄](docs/verification/npc-recall-2026-10-15.md)。
 
 ## 記憶選留（#52）
 

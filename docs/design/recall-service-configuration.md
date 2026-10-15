@@ -27,7 +27,7 @@ Embedding 固定為 OpenAI `text-embedding-3-small`，傳送 `dimensions:1536`�
 
 Embedding 成功回覆的 `usage.total_tokens` 以獨立 nullable `known_input_tokens` 欄位保存，callback 在後續向量格式驗證前等待完成；世界回復也保留這筆已知用量。缺失回報保留 unknown，不能假報零付費。
 
-用量分為 `embedding`、`index`、`search`、`chat`；保守 dispatch units 不是供應商回報 token，也不是美元。Embedding 以輸入 UTF-8 bytes 做 token 上界保留；索引、搜尋與聊天使用各自明示的 dispatch 上界。正式啟用前站主須依當時服務單價把可接受金額換成保守 units 限額，並另外設定供應商帳戶支出控制；本文件不宣稱能限制 Vectorize 已存向量的持續儲存帳單。
+用量分為站主付費 `embedding`、`index`、`search`，以及玩家自付 `chat`；保守 dispatch units 不是供應商回報 token，也不是美元。Embedding 以輸入 UTF-8 bytes 做 token 上界保留；索引與搜尋使用各自明示的 dispatch 上界；聊天保留冪等派送紀錄，但不佔站主月預算。正式啟用前站主須依當時服務單價把可接受金額換成保守 units 限額，並另外設定供應商帳戶支出控制；本文件不宣稱能限制 Vectorize 已存向量的持續儲存帳單。
 
 設定示例（不是正式啟用授權）：
 
@@ -35,12 +35,11 @@ Embedding 成功回覆的 `usage.total_tokens` 以獨立 nullable `known_input_t
 {
   "embedding": { "ownerMonthly": 1000000, "accountMonthly": 100000 },
   "index": { "ownerMonthly": 10000, "accountMonthly": 1000 },
-  "search": { "ownerMonthly": 10000, "accountMonthly": 1000 },
-  "chat": { "ownerMonthly": 10000, "accountMonthly": 1000 }
+  "search": { "ownerMonthly": 10000, "accountMonthly": 1000 }
 }
 ```
 
-省略類別採上列保守預設；零代表禁止該類 dispatch；負數、小數、非安全整數拒絕設定。使用者聊天仍用自己的有效聊天模型 Key；站主 Embedding／Vectorize 額度不轉嫁給使用者。
+省略類別採上列保守預設；零代表禁止該類 dispatch；負數、小數、非安全整數拒絕設定。`chat` 的舊站主月上限不再套用至玩家 Key。付費方由實際持有憑證的派送路徑明確指定，不依模型供應商名稱推測。玩家付費 chat 仍保留獨立於世界回復的冪等 reservation，但不經站主上限；Embedding／索引／搜尋仍以站主路徑原子保留，不能套用玩家無上限。使用者聊天仍用自己的有效聊天模型 Key；站主 Embedding／Vectorize 額度不轉嫁給使用者。
 
 Vectorize binding 沒有 AbortSignal 參數，adapter 會在取消時停止等待；伺服器端的 mutation 可能繼續且計費，因此保留用量。OpenAI fetch 傳入 AbortSignal，取消同樣不能當作未計費證明。所有 transport 仍須由呼叫端在 dispatch 前重驗世界租約、工作期限及預算。
 
@@ -52,3 +51,11 @@ Vectorize binding 沒有 AbortSignal 參數，adapter 會在取消時停止等�
 4. 確認金額換算、供應商支出控制及持續向量儲存費用；未確認前保留關閉。
 
 官方介面參考（2026-10-15 查閱）：[Vectorize API](https://developers.cloudflare.com/vectorize/reference/client-api/)、[metadata filtering](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/)、[OpenAI Embedding API](https://developers.openai.com/api/reference/resources/embeddings/methods/create)。
+
+## 介面與政策（#78／#81）
+
+`GET /api/world` 的 `recallUsage.ownerUnits` 只含站主 embedding／index／search；`playerPaidChatCalls` 為共享派送紀錄中的玩家聊天次數，舊 `units` 欄位保留相容用途，不能全加總成站主成本。已知 Embedding tokens 另列，保守 units 不是 tokens 或美元。回想關閉顯示未啟用；不要求共用 binding 才能一般聊天。
+
+失敗回應的 `stopReason.scope` 分為 `player`（玩家預算）、`owner`（站主預算或設定）、`provider`（供應商額度／速率）、`technical`（期限、連線或資料故障），並提供 `code`。瀏覽器顯示作用範圍且停下自動運行。站主回想失敗仍回復整個未完成回合、保留已發生用量，不降級成空記憶。
+
+#19／#27 已依 #78 修訂：沒有固定每日 144 次攔截。每日真實用量及完整跨環境帳本仍由 #27 承接，不能把本站小時／累計資料宣稱為完整每日帳單。

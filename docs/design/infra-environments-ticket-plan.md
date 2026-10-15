@@ -14,7 +14,7 @@
 | T3 多頁面操作不互蓋：操作冪等與依序處理 | [#24](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24) | 無 |
 | T4 每人每環境獨立世界與手動重置 | [#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25) | #23 |
 | T5 模型 Key 綁定帳號與環境，最長 24 小時 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) | #23 |
-| T6 每人每日 GPT 上限的跨環境用量帳本 | [#27](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) | #23 |
+| T6 每日真實用量的跨環境帳本 | [#27](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) | #23 |
 | T7 CI 通過後自動部署測試站：固定網址、序列化、失敗不部署 | [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) | #21、#23 |
 | T8 伺服器端共用自動推進排程與前景頁面偵測 | [#29](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/29) | #24、#26 |
 | T9 測試站真實試玩、免費方案用量實測與正式站啟用判定 | [#30](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/30) | #25、#27、#28、#29 |
@@ -48,7 +48,7 @@
 - **T3 #24**：操作帶識別碼，重送不重複提交也不重複呼叫模型；租約競爭時等待重試；回到前景重新讀取。
 - **T4 #25**：每人每環境獨立世界跨部署保留；手動重置只影響自己的世界，不清除用量。
 - **T5 #26**：模型 Key 加密綁定帳號與環境，同帳號跨瀏覽器共用，最長 24 小時；登出只結束該登入，Key 到期或手動清除後失效。Key 不進世界資料、日誌、錯誤回應。
-- **T6 #27**：每人每日 144 次硬上限，Asia/Taipei 午夜重置，測試站與正式站共用帳本 D1，本機獨立；原子預留不超賣；與小時限制分開顯示；用完暫停不自動切換。
+- **T6 #27**：每日真實用量及跨環境帳本（Asia/Taipei 日界），測試站與正式站共用帳本 D1，本機獨立；依 #78 取消固定每日 144 次硬上限，玩家預算可調或無上限，站主付費服務獨立保護。本次 #81 未實作完整每日帳本。
 - **T7 #28**：main 合併後檢查通過才部署測試站，序列化，migration 相容守門，固定 workers.dev 網址，頁面顯示環境與提交。
 - **T8 #29**：每個世界一個伺服器端自動推進排程，多頁不加速，用經驗證啟動者帳號的 Key，心跳偵測前景，離線即停且不補跑；決策模式改為世界層級設定。啟動者登入與排程權限仍按 T8 驗證，不能以 Key 尚未到期取代登入。
 - **T9 #30**：手機與電腦在測試站真實試玩並記錄；量測 Workers 請求數、CPU、D1 讀寫對照免費限制；真實 GPT 與模擬分開記錄；給出正式站 go 或 no-go。需使用者配合試玩與負擔模型費用。

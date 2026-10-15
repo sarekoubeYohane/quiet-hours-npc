@@ -87,7 +87,7 @@ method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-
 store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:recall?.enabled&&!recalled?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
 }:{temperature:.8,max_tokens:2048})})}); }
 catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
-if(!r.ok)throw Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`);
+if(!r.ok)throw Object.assign(Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`), { code: r.status === 429 || r.status === 402 ? 'provider_limit' : 'technical_failure' });
 let d:{usage?:{prompt_tokens?:number;completion_tokens?:number};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};
 try { d=await withDeadline(r.json(), requestSignal); } catch { throw Error('模型服務未回傳有效資料，本回合沒有推進。'); }
 if(!d||typeof d!=='object')throw Error('模型服務未回傳有效資料，本回合沒有推進。');

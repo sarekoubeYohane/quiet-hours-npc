@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
-import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase } from '@/lib/recall-services';
+import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase, RecallServiceError } from '@/lib/recall-services';
 import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
@@ -72,6 +72,13 @@ async function observeWorldRequest(run: (trace: WorldTrace) => Promise<Response>
     throw error;
   }
 }
+function stopReason(error: unknown) {
+  if (error instanceof BudgetExceeded) return {scope:'player',code:'player_budget'};
+  if (error instanceof RecallServiceError) return {scope:error.code === 'provider_limit' ? 'provider' : 'owner',code:error.code};
+  if (error instanceof Error && (error as Error & {code?:string}).code === 'provider_limit') return {scope:'provider',code:'provider_limit'};
+  return {scope:'technical',code:'technical_failure'};
+}
+
 export async function GET(request?: Request) {
   return observeWorldRequest(trace => readWorld(request, trace));
 }
@@ -98,7 +105,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
       const journal = JSON.parse(row!.operations) as Journal;
       const result = journal.results[operationId];
       operation = result && 'status' in result
-        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error }
+        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error, stopReason: result.body.stopReason }
         : result && 'pending' in result
           ? { state: result.pending > Date.now() ? 'pending' : 'uncertain' }
           : { state: isOperationExpired(Number(operationId.split(':')[0]), journal.floor) ? 'expired' : 'unknown' };
@@ -108,7 +115,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
     return reply({ ...loaded, operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
-  } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
+  } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
 type OperationResult = { status: number; body: Record<string, unknown> };
@@ -256,7 +263,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
           limits,
           beforeDecision: async () => {
             await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, recallBudgetLimits('chat'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+            if (env.RECALL_ENABLED === 'true' && (await reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player')).replayed) throw Error('付費請求結果不明，禁止重送。');
             dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
@@ -267,9 +274,9 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
               // Keep the same logical-round ledger captured by advanceActivities.
               // A rolling-hour boundary may reset only the next round, not this guard.
               const usage = w.aiUsage!;
-              if (budgetReached(usage, limits)) throw new BudgetExceeded();
+              if (kind === 'chat' && budgetReached(usage, limits)) throw new BudgetExceeded();
               const reservationId = `${operationId}:${c.id}:${dispatch++}`;
-              if ((await reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, recallBudgetLimits(kind))).replayed) throw Error('付費請求結果不明，禁止重送。');
+              if ((await reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner')).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
@@ -305,8 +312,8 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     }
     const usage = currentUsage(world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded } }
-      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && (budgetReached(usage, limits)) } };
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure) } }
+      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && budgetReached(usage, limits) } };
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);
@@ -323,7 +330,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
   } catch (e) {
     traceWorld(trace, 'operation-error', { outcome: locked ? 'commit-or-operation-error' : 'before-acceptance-error' });
     if (locked && operationId) {
-      const result: OperationResult = { status: 502, body: { error: e instanceof Error ? e.message : '操作失敗，請重新讀取世界。' } };
+      const result: OperationResult = { status: 502, body: { error: e instanceof Error ? e.message : '操作失敗，請重新讀取世界。', stopReason:stopReason(e) } };
       try {
         await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
           .bind(`$.results."${operationId}"`, JSON.stringify(result), id, `$.results."${operationId}".pending`, lease).run();
@@ -337,7 +344,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
-    return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。' }, 502);
+    return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。', stopReason:stopReason(e) }, 502);
   } finally {
     if (locked) try { await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run(); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }
   }
