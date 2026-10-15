@@ -1,3 +1,4 @@
+import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resetWorld, resolve, type Action, type AIUsage } from '@/lib/world';
@@ -49,7 +50,7 @@ export async function GET() {
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
     return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
-  } catch { return reply({ error: '暫時無法讀取世界，請稍後重試。' }, 503); }
+  } catch (error) { return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
 type OperationResult = { status: number; body: Record<string, unknown> };
