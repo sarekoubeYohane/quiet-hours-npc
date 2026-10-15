@@ -6,9 +6,9 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/cognition.ts', 'cognition'], ['lib/memory.ts', 'memory'], ['lib/daily-usage.ts', 'daily-usage'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
+  for (const [source, output] of [['lib/daily-usage.ts', 'daily-usage'], ['lib/cognition.ts', 'cognition'], ['lib/recall.ts', 'recall'], ['lib/recall-services.ts', 'recall-services'], ['lib/memory.ts', 'memory'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(cognition|memory|daily-usage|world|attention|false-perception|perception|habits|activities|models|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(daily-usage|cognition|recall|recall-services|memory|world|attention|false-perception|perception|habits|activities|models|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
       .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
       .replace('require("@/lib/auth")', 'require("./auth.cjs")').replace(/require\("(?:@\/lib\/|\.\/)store"\)/g, 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
@@ -32,10 +32,12 @@ try {
     let dispatchDelay;
     exports.delayNextUsageDispatch = options => { dispatchDelay = options; };
     require('./cloudflare-workers.cjs').env.USAGE_DB = { prepare(sql) { return { bind(...values) { return { async first() { return ledgerDb.prepare(sql).get(...values) ?? null; }, async run() { const delay = sql.startsWith('UPDATE daily_usage_reservations SET used = used + 1') ? dispatchDelay : undefined; if(delay) dispatchDelay = undefined; await delay?.before?.(); const result = { meta: { changes: Number(ledgerDb.prepare(sql).run(...values).changes) } }; await delay?.after?.(); return result; } }; } }; } };
-    let conflict, uncertain, failBefore, failRead;
+    db.exec(${JSON.stringify(await readFile('drizzle/0004_recall_usage.sql', 'utf8'))});
+    let conflict, uncertain, failBefore, failRead, budgetHook;
+    exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
       ledgerDb.exec('DELETE FROM daily_usage_reservations'); dispatchDelay = undefined;
-      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
+      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.inOtherEnvironment = async (world, callback) => {
@@ -50,12 +52,15 @@ try {
     exports.failNextOperationRead = () => { failRead = true; };
     exports.throwBeforeNextSave = () => { failBefore = true; };
     exports.throwAfterNextSave = () => { uncertain = true; };
+    exports.installForOwner = (owner,value) => db.prepare('INSERT OR REPLACE INTO worlds (owner,state,version,locked_until,operations) VALUES (?, ?, 0, 0, ?)').run(owner, JSON.stringify(value), '{"floor":0,"results":{}}');
+    exports.replaceCommittedWorld = value => db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0 WHERE owner = ?').run(JSON.stringify(value), 'test-owner');
     exports.snapshot = () => JSON.parse(db.prepare('SELECT state FROM worlds WHERE owner = ?').get('test-owner').state);
     exports.loadWorld = async owner => {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { return { results: db.prepare(sql).all(...values) }; }, async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+      if(sql.startsWith('INSERT OR IGNORE INTO recall_dispatch_usage') && budgetHook){const hook=budgetHook;budgetHook=undefined;await hook();}
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
       if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }
       if (finalSave && conflict) {
@@ -71,7 +76,7 @@ try {
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
   `);
-  const allTests = ['tests/daily-usage-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
+  const allTests = ['tests/daily-usage-api.test.cjs', 'tests/recall-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
