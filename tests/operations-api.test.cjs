@@ -109,3 +109,55 @@ test('an expired worker cannot revive its evicted result after newer operations 
   const replay=await POST(request(body));assert.equal(replay.status,410);assert.equal((await replay.json()).operationExpired,true);
  }finally{release();Date.now=clock;global.fetch=original;}
 });
+test('read-only operation lookup confirms a lost response without executing the operation again', async () => {
+ store.install(seedWorld());
+ const body={operation:'advance',operationId:operationId(),minutes:15};
+ const accepted=await POST(request(body));assert.equal(accepted.status,200);
+ const lookup=()=>GET(new Request(`https://test.invalid/api/world?operationId=${encodeURIComponent(body.operationId)}`));
+ const latest=await (await lookup()).json();
+ assert.equal(latest.operation.state,'settled');assert.equal(latest.operation.status,200);
+ assert.equal(latest.world.turn,1);assert.equal(latest.version,1);
+ assert.deepEqual((await (await lookup()).json()).operation,latest.operation);
+ assert.equal((await (await GET()).json()).world.turn,1);
+});
+test('operation lookup does not dispatch unknown requests or settle an active or expired lease', async () => {
+ store.install(seedWorld());await POST(request({operation:'set-model-key',mode:'openai',key:'test-key'}));
+ const original=global.fetch,clock=Date.now;let instant=clock(),release,entered,calls=0;Date.now=()=>instant;
+ const ready=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ global.fetch=async()=>{calls++;entered();await gate;throw Error('provider unavailable');};
+ const body={operation:'advance',operationId:operationId(),minutes:15,mode:'openai',model:'gpt-6-luna'};
+ const lookup=id=>GET(new Request(`https://test.invalid/api/world?operationId=${encodeURIComponent(id)}`));
+ let running;
+ try{
+  assert.equal((await (await lookup(body.operationId)).json()).operation.state,'unknown');assert.equal(calls,0);
+  running=POST(request(body));await ready;
+  assert.equal((await (await lookup(body.operationId)).json()).operation.state,'pending');
+  instant+=130000;
+  assert.equal((await (await lookup(body.operationId)).json()).operation.state,'uncertain');
+  assert.equal(calls,1);
+  // A read must not replace pending with a tombstone: the existing writer still owns its journal.
+  release();await running;
+  assert.equal((await (await lookup(body.operationId)).json()).operation.state,'settled');
+  assert.equal((await (await GET()).json()).world.aiUsage.totalCalls,1);
+ }finally{release();await running;global.fetch=original;Date.now=clock;}
+});
+test('paid lost-response lookup preserves latest world, events and usage without another paid call', async () => {
+ store.install(seedWorld());await POST(request({operation:'set-model-key',mode:'openai',key:'test-key'}));
+ const original=global.fetch;let calls=0;
+ global.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+ const body={operation:'advance',operationId:operationId(),minutes:15,mode:'openai',model:'gpt-6-luna'};
+ try{
+  assert.equal((await POST(request(body))).status,200);
+  assert.equal(calls,4);
+  assert.equal((await POST(request({operation:'intervene',operationId:operationId(),target:'all',text:'下一個共同事件'}))).status,200);
+  const before=await (await GET()).json();
+  const url=`https://test.invalid/api/world?operationId=${encodeURIComponent(body.operationId)}`;
+  for(let i=0;i<3;i++){
+   const data=await (await GET(new Request(url))).json();
+   assert.deepEqual(data.world,before.world);assert.equal(data.version,2);
+   assert.equal(data.operation.state,'settled');assert.equal(data.operation.status,200);
+  }
+  assert.equal(calls,4);assert.equal(before.world.aiUsage.totalCalls,4);
+  assert.equal(before.world.aiUsage.totalInputTokens,120);assert.equal(before.world.aiUsage.totalOutputTokens,80);
+ }finally{global.fetch=original;}
+});

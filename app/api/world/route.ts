@@ -45,14 +45,31 @@ async function retainPaidUsage(db: ReturnType<typeof database>, id: string, befo
       after.totalUnknownCalls - (before?.totalUnknownCalls || 0), id).run();
 }
 
-export async function GET() {
+export async function GET(request?: Request) {
   const id = await owner();
   if (id instanceof Response) return id;
   try {
+    const operationId = request && new URL(request.url).searchParams.get('operationId');
+    if (operationId && !operationIdPattern.test(operationId)) return reply({ error: '操作識別碼無效。' }, 400);
     const loaded = await loadWorld(id);
+    let operation;
+    if (operationId) {
+      // Read only: reload must never dispatch a request that may not have reached us.
+      const row = await database().prepare('SELECT operations, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;state:string;version:number}>();
+      // Keep the world and its operation result from the same committed row.
+      loaded.world = JSON.parse(row!.state);
+      loaded.version = row!.version;
+      const journal = JSON.parse(row!.operations) as Journal;
+      const result = journal.results[operationId];
+      operation = result && 'status' in result
+        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error }
+        : result && 'pending' in result
+          ? { state: result.pending > Date.now() ? 'pending' : 'uncertain' }
+          : { state: isOperationExpired(Number(operationId.split(':')[0]), journal.floor) ? 'expired' : 'unknown' };
+    }
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。' }, 503); }
 }
 
@@ -60,6 +77,8 @@ type OperationResult = { status: number; body: Record<string, unknown> };
 const settledReply = (result: OperationResult) => reply({ ...result.body, operationSettled: true }, result.status);
 const uncertainResult: OperationResult = { status: 502, body: { error: '上次操作的結果無法確認，請重新讀取世界；此操作不會再次呼叫模型。', operationUncertain: true } };
 const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
+const operationIdPattern = /^\d{13}:[0-9a-f-]{36}$/;
+const isOperationExpired = (issuedAt: number, floor: number) => issuedAt <= floor || issuedAt < Date.now() - 86400000;
 type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }> };
 function trimJournal(journal: Journal, maxResults: number, protectedId?: string) {
   const oldest = Object.keys(journal.results).filter(id => id !== protectedId).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
@@ -105,7 +124,7 @@ export async function POST(request: Request) {
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
-    if (typeof b.operationId !== 'string' || !/^\d{13}:[0-9a-f-]{36}$/.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
+    if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
     const issuedAt = Number(operationId.split(':')[0]);
     if (issuedAt > Date.now() + 60000) return reply({ error: '裝置時間不正確，請校正時間後重試。' }, 400);
@@ -123,7 +142,7 @@ export async function POST(request: Request) {
       if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
-    if (issuedAt <= journal.floor || issuedAt < Date.now() - 86400000) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
+    if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
     trimJournal(journal, 7);
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
 
