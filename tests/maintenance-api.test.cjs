@@ -125,14 +125,14 @@ test('a hard-full history can release an explicit keep record while preserving t
   });
 });
 test('a referenced old version keeps its rewrite source anchor even when the newer memory is explicitly forgotten', async () => {
-  const w = seedWorld(), c = w.characters[0]; c.longTerm = [{ ...retained(c, 'key', '我已經把往事濃縮了。'), version: 2 }]; c.cognition = { beliefs: [{ references: [{ kind: 'long', id: 'key', version: 1 }] }], relationshipTags: [], trace: [] };
+  const w = seedWorld(), c = w.characters[0]; c.longTerm = [{ ...retained(c, 'key', '我已經把往事濃縮了。'), version: 2 }]; c.cognition = { beliefs: [{ id: 'b', characterId: c.id, version: 1, time: 0, topic: '自己的想法', text: '仍在乎這件事', conviction: 'leaning', references: [{ kind: 'long', id: 'key', version: 1 }], contradictions: [], reason: '影響生活' }], relationshipTags: [], trace: [] };
   c.memoryTrace = [{ id: 'protected-rewrite', version: 1, type: 'rewrite', from: [{ id: 'key', version: 1 }], to: { id: 'key', version: 2 }, reason: '留下舊版本身分' }, ...Array.from({ length: 17 }, (_, i) => ({ id: `old-${i}`, version: 1, type: 'forget', from: [{ id: `gone-${i}`, version: 1 }], reason: '放下細節' }))]; store.install(w); const before = await read();
   await withModel(input => input.self.id === c.id ? { memoryOperations: [operation('forget', [{ id: 'key', version: 2 }]), operation('compact-trace', [{ id: 'protected-rewrite', version: 1 }])] } : {}, async (_inputs, advance) => {
     assert.equal((await advance()).status, 502); assert.deepEqual((await read()).characters, before.characters);
   });
 });
 test('duplicate keep anchors can be explicitly compacted while a referenced old version keeps another anchor', async () => {
-  const w = seedWorld(), c = w.characters[0]; c.longTerm = [{ ...retained(c, 'key', '濃縮後的印象。'), version: 2 }]; c.cognition = { beliefs: [{ references: [{ kind: 'long', id: 'key', version: 1 }] }], relationshipTags: [], trace: [] }; c.memoryTrace = Array.from({ length: 24 }, (_, i) => ({ id: `old-keep-${i}`, version: 1, type: 'keep', from: [{ id: 'key', version: 1 }], to: { id: 'key', version: 1 }, reason: '之前仍想保留' })); store.install(w);
+  const w = seedWorld(), c = w.characters[0]; c.longTerm = [{ ...retained(c, 'key', '濃縮後的印象。'), version: 2 }]; c.cognition = { beliefs: [{ id: 'b', characterId: c.id, version: 1, time: 0, topic: '自己的想法', text: '仍在乎這件事', conviction: 'leaning', references: [{ kind: 'long', id: 'key', version: 1 }], contradictions: [], reason: '影響生活' }], relationshipTags: [], trace: [] }; c.memoryTrace = Array.from({ length: 24 }, (_, i) => ({ id: `old-keep-${i}`, version: 1, type: 'keep', from: [{ id: 'key', version: 1 }], to: { id: 'key', version: 1 }, reason: '之前仍想保留' })); store.install(w);
   await withModel(input => input.self.id === c.id ? { memoryOperations: [operation('compact-trace', [{ id: 'old-keep-0', version: 1 }]), operation('keep', [{ id: 'key', version: 2 }])] } : {}, async (_inputs, advance) => {
     assert.equal((await advance()).status, 200); const saved = (await read()).characters[0]; assert.equal(saved.memoryTrace.length, 24); assert.equal(saved.memoryTrace.some(item => item.id === 'old-keep-0'), false); assert.ok(saved.memoryTrace.some(item => item.to?.id === 'key' && item.to.version === 1));
   });
