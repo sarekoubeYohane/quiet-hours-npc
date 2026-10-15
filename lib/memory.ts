@@ -1,3 +1,4 @@
+import { validateCognition, projectRelationships, relationshipsProjection, type Belief, type RelationshipTag } from './cognition';
 import type { Character } from './world';
 import type { Observation } from './perception';
 
@@ -60,6 +61,7 @@ export function normalizeMemory(c: Character) {
     c.shortTerm = items.sort((a, b) => a.time - b.time);
   }
   c.longTerm ??= [];
+  projectRelationships(c);
   boundShort(c);
 }
 export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string }) {
@@ -186,8 +188,11 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
   validateMemoryState(candidate);
   return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
 }
-export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character): T {
+export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; memoryReview?: MemoryReview[]; cognition?: { historyCandidates?: unknown[]; beliefs: Belief[]; relationshipTags: RelationshipTag[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] } }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character): T {
   const candidates = input.self.longTerm || [];
+  const cognition = input.self.cognition;
+  const beliefs = cognition?.beliefs || [], tags = cognition?.relationshipTags || [];
+  if (cognition) { cognition.beliefs = []; cognition.relationshipTags = []; input.self.relationships = {}; }
   input.self.longTerm = [];
   const underPressure = (items: unknown[], count: number, bytes: number) => items.length >= count * .75 || memoryBytes(items) >= bytes * .75;
   const short = character?.shortTerm || [];
@@ -197,8 +202,21 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
     underPressure(character.longTerm || [], 64, 64 * 1024) ? candidates.map(({ id, version }) => ({ kind: 'long' as const, id, version })) : [],
     underPressure(traces, 24, 12 * 1024) ? (character.memoryTrace || []).map(trace => ({ kind: 'trace' as const, id: trace.id, version: trace.version, required: traceRequired(trace, character) })) : [],
   ].filter(queue => queue.length > 0) : [];
-  input.self.memoryReview = pressureQueues.flatMap(queue => queue.slice(0, Math.ceil(8 / pressureQueues.length))).slice(0, 8);
-  const payload = () => ({ shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+    const reviewWithin = (limit: number) => {
+    const result: MemoryReview[] = [];
+    for (let offset = 0; result.length < limit && pressureQueues.some(queue => offset < queue.length); offset++) {
+      for (const queue of pressureQueues) if (queue[offset] && result.length < limit) result.push(queue[offset]);
+    }
+    return result;
+  };
+  input.self.memoryReview = reviewWithin(8);
+  if (cognition && input.self.memoryReview.length && ((cognition.historyCandidates?.length || 0) + (cognition.reviewCandidates?.length || 0))) {
+    input.self.memoryReview = reviewWithin(4);
+    const historyQuota = cognition.historyCandidates?.length && cognition.reviewCandidates?.length ? 2 : 4;
+    if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
+    if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
+  }
+  const payload = () => ({ shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, cognition: input.self.cognition, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -209,14 +227,23 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
     return request.memoryId ? { id: request.id, time: request.time, memoryId: request.memoryId } : item;
   });
   if (memoryBytes(payload()) > 88 * 1024) throw new MemoryValidationError('記憶輸入超過 88 KiB');
+  if (cognition) {
+    for (const belief of beliefs) { cognition.beliefs.push(belief); if (memoryBytes(payload()) > 88 * 1024) cognition.beliefs.pop(); }
+    for (const tag of tags) {
+      cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags);
+      if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); }
+    }
+  }
   for (const candidate of candidates) {
     input.self.longTerm.push(candidate);
     if (memoryBytes(payload()) > 88 * 1024) input.self.longTerm.pop();
   }
   input.self.memoryReview = input.self.memoryReview.filter(ref => ref.kind === 'trace' || (ref.kind === 'short' ? input.self.shortTerm as MemoryRef[] : input.self.longTerm!).some(item => item.id === ref.id && item.version === ref.version));
+  if (cognition?.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.filter(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version));
   return input;
 }
 export function validateMemoryState(c: Character) {
+  validateCognition(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
   const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   const shortIds = new Set<string>();
@@ -242,7 +269,7 @@ export function validateMemoryState(c: Character) {
     traceIds.add(trace.id);
   }
   // Existing relationship text remains unchanged; no belief/tag conversion.
-  if (Object.keys(c.relationships).length > 32 || memoryBytes(c.relationships) > 12 * 1024 || Object.entries(c.relationships).some(([id, text]) => !boundedId(id) || typeof text !== 'string' || textBytes(text) > 256)) throw new MemoryValidationError('既有關係文字超過記憶契約，未截斷資料');
+  if (Object.keys(c.relationships).length > 32 || memoryBytes(c.relationships) > 12 * 1024 || Object.entries(c.relationships).some(([id, text]) => !boundedId(id) || typeof text !== 'string' || (!c.cognition && textBytes(text) > 256))) throw new MemoryValidationError('既有關係文字超過記憶契約，未截斷資料');
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
 function memoryStateBytes(c: Character) {

@@ -1,9 +1,10 @@
+import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { longTerm?: LongMemory[]; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -134,6 +135,7 @@ export async function advanceActivities(world: World, options: {
     if (decision.longTerm) character.longTerm = decision.longTerm;
     if (decision.shortTerm) character.shortTerm = decision.shortTerm;
     if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
+    if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
     consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
     for (const reason of decision.attentionDiagnostics || []) noteAttention(world, character, reason);
@@ -142,6 +144,7 @@ export async function advanceActivities(world: World, options: {
         throw Error('沒有可延續的原活動，請選擇新行動。');
       }
       if (decision.intents) character.intents = decision.intents;
+      if (typeof decision.action.mood === 'string') character.mood = decision.action.mood;
       character.plan!.attention = attentionMarker(world, character);
       record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan!.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
       continue;

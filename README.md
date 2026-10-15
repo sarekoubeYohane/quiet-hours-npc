@@ -21,7 +21,7 @@
 | GitHub 登入 | [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 與修補 #36／#38 已合併 | [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 保留作本機／測試站及正式登出真人驗收；正式站已回報成功登入 |
 | 帳號模型 Key | [PR #39](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/39) 已合併 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) 依 10/09 修訂為同帳號跨瀏覽器共用，待部署配置與雙瀏覽器真人驗收 |
 | Infra 其餘工作 | #22 已完成 | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、[#24–#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24)、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
-| 長期記憶／信念修正 | 尚未完成 | [#16](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/16)、[#18](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/18) 保持 Open；[#7](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/7)、[#19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 為未全部完成的母規格 |
+| 長期記憶／信念修正 | #52 短期與選留已由 #61 合併；#53 已由 PR #63 合併；#54／#55 依各自 PR 交付 | [#16](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/16)、[#18](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/18) 保持 Open；[#7](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/7)、[#19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 為未全部完成的母規格 |
 
 上述「已合併」不等於已部署到所有環境；以 GitHub PR、部署版本與各 Issue 的驗收紀錄為準。
 
@@ -70,15 +70,25 @@ NPC 的主觀經歷共用短期容量（最多 80 筆／64 KiB，包含未處理
 
 舊文字標為來源未分類，既有主觀觀察與關係保守保留；GET 不寫回或呼叫模型。選留結果由世界 API 讀回，隨世界版本與操作日誌一致保存。無效選留或中途失敗回復整回合，保留已知模型用量；接管、待命及純活動續做不為記憶新增呼叫。異常超限舊資料會明確報錯，原存檔不會被截斷或清空。
 
-[#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 與 [記憶實作契約](docs/design/npc-memory-contract.md) 記錄完整設計。#51 設計前置已完成；#52 由 [PR #61](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/61) 合併至 main。信念／關係標籤已在獨立 [PR #63](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/63) 完成、尚未合併；#55 獨立推進，本分支沒有#53／#55 runtime；#56 UI 尚未批准，沒有新增記憶頁面。服務選型不代表已開通或授權付費試跑。
+[#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 與 [記憶實作契約](docs/design/npc-memory-contract.md) 記錄完整設計。#52／#53 已合併；本分支同步最新 main。#56 UI 尚未批准。
 
 ## 記憶摘要與遺忘（#54 分支）
 
-本分支基於 main `26cfc8a`，完成既有自主決策中的明示合併、濃縮、保留、遺忘及來源遺忘。達到75%容量壓力時附最多8筆整理候選；候選與正文共用88 KiB輸入，選留與整理共用4操作／8 KiB輸出。先計算整份淨結果，再檢查硬容量，允許長期已滿時「合併兩筆再選留一筆」，沒有有效取捨則整回合回復。
+本分支已同步 main `a2501be`，完成既有自主決策中的明示合併、濃縮、保留、遺忘及來源遺忘。達到75%容量壓力時附最多8筆整理候選；候選與正文共用88 KiB輸入，選留與整理共用4操作／8 KiB輸出。先計算整份淨結果，再檢查硬容量，允許長期已滿時「合併兩筆再選留一筆」，沒有有效取捨則整回合回復。
 
 摘要保留來源類型、仍未一致的來源引用；改寫／來源遺忘使用同一ID且版本遞增，合併沿第一筆ID遞增並移除其他片段，遺忘實體移除。角色可回憶投影只包含active正文與仍記得的來源；系統追溯不含原文、不進模型。整理同時移除原經歷的短期／觀察／接管與待回應別名，不能從事件或診斷重灌已忘細節。追溯與可選認知追溯共用24筆／12 KiB，釋放需模型明示且不能破壞最終仍引用的版本；重複保留紀錄可整理。
 
 接管、待命、純活動延續及規則試玩沿原流程，不為整理新增模型呼叫。#54 尚未合併或部署，摘要忠實性、正文去除來源是否完整、真實模型與線上行為未驗收；向量索引拒絕舊版本由#55驗證。實際測試、限制與可重現指令見 [#54驗證紀錄](docs/verification/npc-memory-54-2026-10-14.md)。
+
+## 信念與關係標籤（#53，已合併）
+
+NPC 在原本的自主決策中，可以新增、更新、堅持或撤回自己的短信念，使用存疑（`doubtful`）、傾向相信（`leaning`）、深信（`certain`）表示主觀確信。經歷被記住不代表被相信；不同確信程度不強制角色採取某個意圖或行動。模型先重新理解情境、調整意圖，再選擇既有合法行動；同次心理解讀產生現在的情緒，包含重新評估後選擇繼續原活動的情況。
+
+人物關係改用多項自由短標籤，能按料理、私密談話等情境表達不同信任。舊關係整句保守保留為來源未分類的單筆標籤，不自行拆成信念；首次認知候選成功時才保存正式欄位。相同主題優先更新既有 ID，變更或堅持均附短理由；相反信念可明示為未解矛盾共存，不能由程式默默刪掉其中一邊。
+
+每 NPC 現行信念最多 24 筆／16 KiB，關係標籤最多 32 筆／12 KiB；輸入按在場人物、已知來源與當前意圖選最多 8 個相關標籤，沒有完整關係網向量搜尋。更正痕跡只保存有限 ID、版本、狀態與短理由，舊信念全文不送回模型。容量壓力下提供最多 8 個有限整理候選；模型可明示釋放未被現行認知引用的歷史中介資料，不能自動淘汰現行信念、標籤或解決矛盾。記憶選留及認知更新共用每次 4 項／8 KiB 輸出與 88 KiB 輸入預算。
+
+正式結果在 `GET /api/world` 的 `world.characters[].cognition` 讀回；`relationships` 是現行關係標籤的舊介面投影。撤回標籤後不會重新灌入舊關係文字。引用只能來自本次模型實際看見的自己資料及有效版本；無效候選回復整回合，保留已付用量，同 operationId 重放原結果。接管、待命與純活動延續不為認知整理增開呼叫。自動驗證與尚待真人模型／部署驗收的限制見 [#53 驗證紀錄](docs/verification/npc-memory-53-2026-10-14.md)。
 
 ## 本地與部署
 
