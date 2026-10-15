@@ -27,7 +27,9 @@ export async function recallMemories(options: {
     // the deadline even when that provider cannot cancel its billed request.
     return Promise.race([action(abort, reservationId), new Promise<never>((_, reject) => abort.addEventListener('abort', () => reject(Error('回想索引或搜尋逾時，本回合已回復。')), { once: true }))]);
   }
-  const memories = snapshot.characters.find(c => c.id === character.id)?.longTerm || [];
+  const committedCharacter = snapshot.characters.find(c => c.id === character.id);
+  if (!committedCharacter) throw new MemoryValidationError('已提交世界中不存在此角色。');
+  const memories = committedCharacter.longTerm || [];
   const recallable = (m: LongMemory) => m.characterId === character.id && (!('state' in m) || m.state === 'active');
   const ids = new Map<string, LongMemory>();
   for (const memory of memories.filter(recallable)) {
@@ -35,7 +37,9 @@ export async function recallMemories(options: {
     ids.set(Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join(''), memory);
   }
   const plannedManifest = [...ids.entries()].map(([vector_id, m]) => ({vector_id, account_owner:owner, npc:character.id, memory_id:m.id, version:m.version}));
-  if (memoryStateBytes(character)+memoryBytes(plannedManifest)>208*1024) throw new MemoryValidationError('索引中介資料使角色記憶總量超過208 KiB，未截斷資料。');
+  // Derived writes survive rollback: both the current decision and the larger
+  // committed baseline must remain valid before any index side effect.
+  if (Math.max(memoryStateBytes(character), memoryStateBytes(committedCharacter))+memoryBytes(plannedManifest)>208*1024) throw new MemoryValidationError('索引中介資料使角色記憶總量超過208 KiB，未截斷資料。');
   const db = database();
   const manifest = await db.prepare('SELECT vector_id FROM recall_index_entries WHERE account_owner = ? AND npc = ?').bind(owner, character.id).all<{vector_id:string}>();
   const stale = manifest.results.map(row => row.vector_id).filter(id => !ids.has(id));

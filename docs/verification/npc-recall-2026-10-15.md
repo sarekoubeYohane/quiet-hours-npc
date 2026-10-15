@@ -8,7 +8,7 @@
 
 第二切片改寫／遺忘清理先失敗：第二次POST502而預期200。加入upsert前派生manifest與過期向量清理後7／7通過。已知Embedding用量切片先出現 `undefined !== 7`，補provider回報持久保存後10／10通過。其餘已存在行為以回歸案例擴充；不把事後新增的通過案例當成原先Red證據。
 
-目前 focused API 23／23通過。涵蓋成功重放、空結果、第二輪拒絕、跨帳號／NPC／過期版本／已忘ID、三次未就緒、一次延遲後精確版本可查、刪除與改寫、unknown upsert追蹤、已知tokens及保守units失敗保留、跨帳號併發共享預算、租約失效、D1搜尋中改寫、10秒回想期限、110秒共享工作期限、CAS回復、預設關閉、superseded排除及64筆watermark／8筆傳輸上限。
+目前 focused API 24／24通過。涵蓋成功重放、空結果、第二輪拒絕、跨帳號／NPC／過期版本／已忘ID、三次未就緒、一次延遲後精確版本可查、刪除與改寫、unknown upsert追蹤、已知tokens及保守units失敗保留、跨帳號併發共享預算、租約失效、D1搜尋中改寫、10秒回想期限、110秒共享工作期限、CAS回復、預設關閉、superseded排除及64筆watermark／8筆傳輸上限。
 
 ## 滾動一小時邊界修正的實際 Red → Green
 
@@ -18,10 +18,14 @@
 
 接管期間合法500字介入原本200，但角色記憶加64筆已持久化索引manifest超過208 KiB；實際API Red為23項中22通過、1失敗（`55-metadata-red.log`）。所有世界狀態提交前共用metadata-aware短期FIFO，正常容量壓力保留最新經歷、移除最舊短期並同步相容投影；長期64筆完整保留、0模型或Embedding請求，23／23轉綠（`55-metadata-green.log`）。關閉回想不額外查新表；無短期可釋放且仍超限時回復整次操作，保留已知付費用量。
 
+## 保護較大的整回合回復基準
+
+較早NPC的合法訊息可讓另一NPC的80筆短期FIFO移除一筆大內容；當下角色容量縮小，卻不能代表失敗時較大的已提交基準也能容納新manifest。實際Red為索引後決策失敗、整回合回復後短期內容仍被容量整理改動（24項中23通過、1失敗；`55-rollback-cap-red.log`）。任何manifest或索引副作用前，同時計算目前角色及已提交snapshot角色加plannedmanifest的容量；基準容納不下就先拒絕，0Embedding且characters完全一致，24／24轉綠（`55-rollback-cap-green.log`）。
+
 ## 執行結果
 
-- `node tests/run-activities.mjs tests/recall-api.test.cjs`：23 tests passed，0 failed。
-- `pnpm test`：178通過（世界／活動API152、登入／Key API24、Workers／D1整合2），0失敗。最初曾因測試harness未列入recall模組而失敗，補齊run-auth及workerd模組清單後完整重跑成功。
+- `node tests/run-activities.mjs tests/recall-api.test.cjs`：24 tests passed，0 failed。
+- `pnpm test`：179通過（世界／活動API153、登入／Key API24、Workers／D1整合2），0失敗。最初曾因測試harness未列入recall模組而失敗，補齊run-auth及workerd模組清單後完整重跑成功。
 - `pnpm typecheck`：通過。
 - scoped ESLint：本票lib／route／tests／env型別通過；未把完整repo既有lint問題當成本票通過證據。
 - `pnpm build:production`：成功，沒有部署。
@@ -32,7 +36,7 @@
 
 ## 可重現操作
 
-1. 本機執行 focused API 指令，應23項全部通過；測試名稱指出每項驗收證據。
+1. 本機執行 focused API 指令，應24項全部通過；測試名稱指出每項驗收證據。
 2. 一般站點未啟用回想時，照常推進15分鐘；Network中的GET回應 `recallUsage.enabled=false`，無新binding需求。
 3. 在經授權、啟用模擬服務的本機fixture執行成功重放案例：同operationId回覆完全相同、聊天請求維持兩次。
 4. 執行 `second recall round` 案例：502、turn不變、已付兩次聊天保留；不能由畫面直接要求模型一定觸發此情況。
