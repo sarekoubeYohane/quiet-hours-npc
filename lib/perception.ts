@@ -1,3 +1,4 @@
+import { addExperience } from './memory';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 import type { Character, World } from './world';
 import { falsePerception, type FalsePerceptionDiagnostic } from './false-perception';
@@ -118,16 +119,11 @@ export function resolvePerception(world: World, character: Character, eventId: s
   (world.perceptionTrials ??= {})[opportunity] = trial;
   return trial;
 }
-export function remember(world: World, character: Character, text: string) {
-  const memory = { time: world.minute, text };
-  character.memories = [...character.memories, memory].slice(-80);
-  if (character.control && (character.control.mode === 'taken-over' || character.control.experiences !== undefined)) character.control.experiences = [...(character.control.experiences || []), memory].slice(-80);
+export function remember(world: World, character: Character, text: string, event?: { id: string; actor: string }) {
+  addExperience(character, world.minute, text, undefined, event);
 }
 export function saveObservation(world: World, character: Character, observation: Observation) {
-  character.observations ??= [];
-  if (character.observations.some(item => item.id === observation.id)) return;
-  character.observations.push(observation);
-  remember(world, character, observation.text);
+  addExperience(character, world.minute, observation.text, observation);
 }
 // Passive events and active probes share the same subjective projection and
 // persistence; only their observer-facing explanations differ.
@@ -141,7 +137,7 @@ function observationTrace(world: World, character: Character, event: import('./w
   return { characterId: character.id, status, observations, reason, ...(trial ? { opportunity: trial.opportunity, resolution: trial.resolution, factors: trial.factors, ...(trial.falsePerception ? { falsePerception: trial.falsePerception } : {}) } : {}) };
 }
 // Called only for newly confirmed events. Reload/normalization never replays history.
-export function perceiveEvent(world: World, event: import('./world').WorldEvent) {
+export function perceiveEvent(world: World, event: import('./world').WorldEvent, actorExperience?: string) {
   if (event.perception) return;
   normalizePerception(world);
   if (event.actor && event.scene && ['move', 'work', 'rest', 'reflect', 'observe', 'say', 'shout', 'attempt', 'door', 'message'].includes(event.kind)) {
@@ -151,13 +147,13 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent)
   const privateEvent = ['reflect', 'message', 'intervention', 'blocked', 'observe'].includes(event.kind) || event.scene?.target === 'observer';
   if (event.kind === 'continue') return;
   if (privateEvent || !event.scene) {
-    for (const character of world.characters) if (event.audience.includes(character.id)) remember(world, character, event.text);
+    for (const character of world.characters) if (event.audience.includes(character.id)) remember(world, character, event.text, event);
     return;
   }
   event.perception = [];
   const audience: string[] = [];
   for (const character of world.characters) {
-    if (character.id === event.actor) { remember(world, character, event.text); audience.push(character.id); continue; }
+    if (character.id === event.actor) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
     const candidates = eventCandidates(world, character, event);
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;

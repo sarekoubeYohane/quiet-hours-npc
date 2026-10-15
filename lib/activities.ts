@@ -1,8 +1,10 @@
+import { projectRelationships, type CognitiveState } from './cognition';
+import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type BudgetLimits = { calls: number; tokens: number };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -85,7 +87,8 @@ export async function advanceActivities(world: World, options: {
           control.active = true;
           character.plan = { action, startedAt: world.minute - minutes, until: world.minute - minutes + 60, attention: attentionMarker(world, character), modelKey };
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof MemoryValidationError) throw error;
         record(world, character.id, `${character.name} 的指定行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
       }
       continue;
@@ -129,6 +132,9 @@ export async function advanceActivities(world: World, options: {
       decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
     }
     character.observationCursor = observedCount;
+    if (decision.longTerm) character.longTerm = decision.longTerm;
+    if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
+    consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
     for (const reason of decision.attentionDiagnostics || []) noteAttention(world, character, reason);
     if (decision.continueExisting) {
@@ -136,6 +142,7 @@ export async function advanceActivities(world: World, options: {
         throw Error('沒有可延續的原活動，請選擇新行動。');
       }
       if (decision.intents) character.intents = decision.intents;
+      if (typeof decision.action.mood === 'string') character.mood = decision.action.mood;
       character.plan!.attention = attentionMarker(world, character);
       record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan!.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
       continue;
@@ -150,7 +157,8 @@ export async function advanceActivities(world: World, options: {
         character.plan = { action: decision.action, startedAt: world.minute - minutes,
           until: world.minute - minutes + duration, attention: attentionMarker(world, character), modelKey };
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof MemoryValidationError) throw error;
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
   }
@@ -158,6 +166,7 @@ export async function advanceActivities(world: World, options: {
     const reason = observationAttention(character, observation);
     noteAttention(world, character, character.control?.mode === 'taken-over' || character.control?.active ? '使用者控制，等待指定行動' : reason ? `${reason}；留待下次決策` : '一般線索，等待正常決策', observation.id);
   }
+  for (const character of world.characters) validateMemoryState(character);
   world.turn++;
 }
 
