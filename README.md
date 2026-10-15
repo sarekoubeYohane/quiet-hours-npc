@@ -20,7 +20,7 @@
 | 感知咖啡館 PoC | [PR #47](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/47) 已合併，#41–#46 已關閉 | 目前是受限地圖與感官 PoC；不含長期信念修正 |
 | GitHub 登入 | [PR #35](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/35) 與修補 #36／#38 已合併 | [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) 保留作本機／測試站及正式登出真人驗收；正式站已回報成功登入 |
 | 帳號模型 Key | [PR #39](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/39) 已合併 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) 依 10/09 修訂為同帳號跨瀏覽器共用，待部署配置與雙瀏覽器真人驗收 |
-| Infra 其餘工作 | #22 已完成 | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、[#24–#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24)、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
+| Infra 其餘工作 | #22、#24 已完成；[#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25) 的重置操作已實作（見[驗證紀錄](docs/verification/world-reset-2026-10-12.md)） | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21)、#25 的瀏覽器與部署環境驗收、[#27–#32](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) 尚有工作，尤其共用用量帳本、正式測試站 CI、伺服器排程與正式發布 |
 | 長期記憶／信念修正 | #52 短期與選留已由 #61 合併；#53 已由 PR #63 合併；#54／#55 依各自 PR 交付 | [#16](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/16)、[#18](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/18) 保持 Open；[#7](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/7)、[#19](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/19) 為未全部完成的母規格 |
 
 上述「已合併」不等於已部署到所有環境；以 GitHub PR、部署版本與各 Issue 的驗收紀錄為準。
@@ -79,6 +79,7 @@ NPC 的主觀經歷共用短期容量（最多 80 筆／64 KiB，包含未處理
 摘要保留來源類型、仍未一致的來源引用；改寫／來源遺忘使用同一ID且版本遞增，合併沿第一筆ID遞增並移除其他片段，遺忘實體移除。角色可回憶投影只包含active正文與仍記得的來源；系統追溯不含原文、不進模型。整理同時移除原經歷的短期／觀察／接管與待回應別名，不能從事件或診斷重灌已忘細節。追溯與可選認知追溯共用24筆／12 KiB，釋放需模型明示且不能破壞最終仍引用的版本；重複保留紀錄可整理。
 
 接管、待命、純活動延續及規則試玩沿原流程，不為整理新增模型呼叫。#54 尚未合併或部署，摘要忠實性、正文去除來源是否完整、真實模型與線上行為未驗收；向量索引拒絕舊版本由#55驗證。實際測試、限制與可重現指令見 [#54驗證紀錄](docs/verification/npc-memory-54-2026-10-14.md)。
+
 
 ## 信念與關係標籤（#53，已合併）
 
@@ -183,3 +184,7 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 ### 多頁面操作與網路重試
 
 世界變更現在帶持久操作 ID；同一操作重送會回傳原結果，不重複推進或呼叫模型。租約競爭會短暫等待，逾時及重整後可按「重試未完成操作」。回前景與成功後讀取最新世界，舊快照不使畫面版本倒退。部署前須套用 `0003_world_operations.sql` 並重新載入瀏覽器。保留範圍、失敗邊界及升級/回退注意見 [操作重送設計](docs/design/world-operations.md)；[驗證紀錄](docs/verification/world-operations-2026-10-12.md)。
+
+### 重置世界（#25）
+
+世界面板底部的「重置世界」會先跳出確認對話框；確認後，你在目前環境的世界回到初始種子狀態，角色、事件、記憶、習慣、意圖與店主控制都從頭開始。重置是帶操作 ID 的世界操作，沿用租約、版本條件與結果日誌：另一頁正在處理回合時先等待，重送同一操作只回傳原結果，不會重置第二次。它只改變目前登入帳號在這個環境的世界，不影響其他使用者，也不影響同帳號在其他環境的世界。每小時 AI 用量統計跟著帳號保留，「延續活動省下的決策」隨舊故事歸零；每日共用帳本（#27）規劃存放在世界資料列以外，接入時重置不得清除它。重置前建立、尚未送達伺服器的操作重試時回 410，頁面會改讀新世界。沒有資料庫結構變更；舊資料形狀的載入與重置目前以記憶體 SQLite 驗證，雲端 D1 待部署後確認。自動測試見 [驗證紀錄](docs/verification/world-reset-2026-10-12.md)；瀏覽器與部署環境的真人驗收仍記於 [#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25)。
