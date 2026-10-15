@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { recallMemories, validateRecallStorage } from '@/lib/recall';
+import { recallMemories, boundRecallStorage } from '@/lib/recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase } from '@/lib/recall-services';
 import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
@@ -148,6 +148,7 @@ export async function POST(request: Request) {
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
     if (!acquired.meta.changes) return waiting();
     locked = true;
+    const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
     if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
@@ -207,13 +208,21 @@ export async function POST(request: Request) {
             });
           },
         });
-        if (env.RECALL_ENABLED === 'true') await validateRecallStorage(world, id);
       } catch (e) {
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
         const usage = world.aiUsage;
         if (usage) usage.savedDecisions = before.aiUsage?.savedDecisions || 0;
         Object.assign(world, before, { aiUsage: usage });
         failure = e instanceof Error ? e : new Error('模型決策失敗，本回合沒有推進。');
+      }
+    }
+    if (env.RECALL_ENABLED === 'true') {
+      try { await boundRecallStorage(world, id); }
+      catch (error) {
+        const usage = world.aiUsage;
+        if (usage) usage.savedDecisions = beforeOperation.aiUsage?.savedDecisions || 0;
+        Object.assign(world, beforeOperation, { aiUsage: usage });
+        failure = error instanceof Error ? error : new Error('記憶容量驗證失敗，本回合沒有推進。');
       }
     }
     const usage = currentUsage(world);

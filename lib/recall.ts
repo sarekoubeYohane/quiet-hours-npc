@@ -1,5 +1,5 @@
 import type { Character, World } from './world';
-import { MemoryValidationError, memoryBytes, memoryStateBytes, type LongMemory } from './memory';
+import { MemoryValidationError, memoryBytes, memoryStateBytes, boundMemoryWithMetadata, type LongMemory } from './memory';
 import { database } from './store';
 import { recallServices, recallBudgetDatabase, recordEmbeddingUsage } from './recall-services';
 
@@ -95,9 +95,10 @@ export async function recallMemories(options: {
   return [...found.values()].slice(0, 8).map(({ id, version, time, text, source }) => ({ id, version, time, text, source }));
 }
 
-export async function validateRecallStorage(world: World, owner: string) {
+export async function boundRecallStorage(world: World, owner: string) {
   for (const c of world.characters) {
     const manifest = await database().prepare('SELECT vector_id, account_owner, npc, memory_id, version FROM recall_index_entries WHERE account_owner = ? AND npc = ?').bind(owner, c.id).all();
-    if (manifest.results.length > 64 || memoryStateBytes(c) + memoryBytes(manifest.results) > 208*1024) throw new MemoryValidationError('索引中介資料超過角色記憶總量或64筆上限。');
+    if (manifest.results.length > 64) throw new MemoryValidationError('索引中介資料超過64筆上限。');
+    boundMemoryWithMetadata(c, memoryBytes(manifest.results));
   }
 }

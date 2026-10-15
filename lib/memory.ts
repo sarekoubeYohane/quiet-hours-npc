@@ -21,14 +21,20 @@ export function projectMemories(c: Character) {
   c.observationCursor = items.filter(item => item.observation && item.consumed).length;
   if (c.control && (c.control.experiences !== undefined || items.some(item => item.controlled))) c.control.experiences = items.filter(item => item.controlled).map(({ id, time, text }) => ({ id, time, text }));
 }
-function boundShort(c: Character) {
+function boundShort(c: Character, extraBytes = 0) {
   const items = c.shortTerm!;
   // Invalid legacy text must be reported, not silently hidden by FIFO eviction.
   for (const item of items) validateShort(item);
   while (items.length > 80 || memoryBytes(items) > 64 * 1024) items.shift();
   projectMemories(c);
-  while (items.length && memoryStateBytes(c) > 208 * 1024) { items.shift(); projectMemories(c); }
+  while (items.length && memoryStateBytes(c) + extraBytes > 208 * 1024) { items.shift(); projectMemories(c); }
   validateMemoryState(c);
+  if (memoryStateBytes(c) + extraBytes > 208*1024) throw new MemoryValidationError('索引中介資料使角色記憶總量超過208 KiB，未刪除長期資料。');
+}
+export function boundMemoryWithMetadata(c: Character, extraBytes: number) {
+  if (!Number.isSafeInteger(extraBytes) || extraBytes < 0) throw new MemoryValidationError('索引中介資料容量無效');
+  normalizeMemory(c);
+  boundShort(c, extraBytes);
 }
 export function normalizeMemory(c: Character) {
   if (!c.shortTerm) {
