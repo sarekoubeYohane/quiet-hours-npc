@@ -5,7 +5,7 @@ import { demoDecision, pendingInterventions, record, resolve, type Action, type 
 import { learnHabit } from './habits';
 
 export type ActivityDecision = { longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
-export type TokenUsage = { inputTokens: number; outputTokens: number };
+export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
 export function validBudgetLimits(value: unknown): value is BudgetLimits {
@@ -33,6 +33,7 @@ export function currentUsage(world: World, now = Date.now()): AIUsage {
     totalCalls: existing?.totalCalls || 0, totalInputTokens: existing?.totalInputTokens || 0,
     totalOutputTokens: existing?.totalOutputTokens || 0, totalUnknownCalls: existing?.totalUnknownCalls || 0,
     savedDecisions: existing?.savedDecisions || 0,
+    ...(existing?.costs ? {costs:{total:existing.costs.total,hour:{}}} : {}),
   };
 }
 

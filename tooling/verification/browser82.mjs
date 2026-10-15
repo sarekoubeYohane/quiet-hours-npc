@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import {url,server,store,load} from './browser-fixture.mjs';
+import {launchBrowser,outputPath} from './browser-runtime.mjs';
+const action={type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]};
+const initial=load('world').seedWorld();for(const c of initial.characters)c.control={mode:'taken-over'};initial.characters[0].control={mode:'autonomous'};store.install(initial);
+let browser;
+try{
+ browser=await launchBrowser();const page=await browser.newPage();await page.addInitScript(()=>{Date.now=()=>Date.parse('2026-10-15T16:00:00Z');});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.goto(url);await page.getByRole('button',{name:'模型設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await page.locator('input[type=password]').fill('fixture-key');await page.getByRole('button',{name:'保存 Key（24 小時）',exact:true}).click();await page.getByRole('button',{name:'替換 Key（24 小時）',exact:true}).waitFor();
+ const panel=page.getByRole('region',{name:'已發生費用估算'});
+ const open=async()=>{const summary=panel.locator('summary').filter({hasText:'自訂模型單價'});if(!(await summary.evaluate(el=>el.parentElement.open)))await summary.click();};await open();
+ const read=async()=>page.request.get(url+'/api/world').then(r=>r.json());
+ const settle=async()=>page.waitForFunction(()=>!document.querySelector('button.advance-button')?.disabled);
+ const save=async()=>{await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'),page.getByRole('button',{name:'保存自訂單價',exact:true}).click()]);await settle();await open();};
+ const fill=async(input,output,source='fixture fixed price',date='2026-10-15')=>{for(const [name,value]of [['價格模型','gpt-6-luna'],['輸入 USD 單價',input],['輸出 USD 單價',output],['價格來源',source],['價格更新日期',date]])await page.getByLabel(name,{exact:true}).fill(value);};
+ const refresh=async()=>{await Promise.all([page.waitForResponse(r=>r.url().includes('/api/world')&&r.request().method()==='GET'),page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')))]);await settle();};
+ const round=async()=>{const response=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'),page.getByRole('button',{name:'下一回合',exact:true}).click()]);await settle();return response[0];};
+ const interrupt=async()=>{const w=store.snapshot();for(const c of w.characters)delete c.plan;store.replaceCommittedWorld(w);await refresh();};
+ const version=(await read()).version;
+ for(const value of ['', '-1','Infinity','NaN']){await fill(value,'1');await page.getByRole('button',{name:'保存自訂單價',exact:true}).click();await panel.getByRole('alert').waitFor();assert.equal((await read()).version,version);}
+ await fill('1','1','', '2026-10-15');await page.getByRole('button',{name:'保存自訂單價',exact:true}).click();await panel.getByRole('alert').waitFor();assert.equal((await read()).version,version);
+ await fill('1','1','fixture','');await page.getByRole('button',{name:'保存自訂單價',exact:true}).click();await panel.getByRole('alert').waitFor();assert.equal((await read()).version,version);
+ console.log('PASS #82 invalid blank/negative/nonfinite/source/date UI rejects without API mutation');
+ await fill('0','0');await save();assert.equal((await read()).world.modelPrices[0].input,0);
+ await fill('2','5');await page.getByRole('button',{name:'取消單價變更',exact:true}).click();assert.equal(await page.getByLabel('輸入 USD 單價',{exact:true}).inputValue(),'0');
+ await fill('2','5');await save();assert.equal((await round()).status(),200);await panel.getByText('玩家累計已發生：估算 USD 0.003',{exact:true}).waitFor();
+ await fill('0.5','1.25','second fixture price','2026-10-14');await save();await interrupt();assert.equal((await round()).status(),200);await panel.getByText('玩家累計已發生：估算 USD 0.00375',{exact:true}).waitFor();
+ await panel.locator('summary').filter({hasText:'已發生用量與當時價格依據'}).click();assert.match(await panel.innerText(),/fixture fixed price/);assert.match(await panel.innerText(),/second fixture price/);assert.match(await panel.innerText(),/2026-10-14/);
+ console.log('PASS #82 zero/fractional prices, cancel, real usage cost, changed-price immutable history');
+ await page.reload();await page.getByRole('region',{name:'已發生費用估算'}).waitFor();await open();assert.match(await panel.innerText(),/second fixture price/);assert.match(await panel.innerText(),/0.00375/);
+ await page.getByRole('button',{name:'模型設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await settle();
+ const makeResponse=(usage,content=action)=>Response.json({usage,choices:[{message:{content:JSON.stringify(content)},finish_reason:'stop'}]});
+ globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200,prompt_tokens_details:{cached_tokens:500}});await interrupt();await round();assert.match(await panel.innerText(),/部分估算/);assert.match(await panel.innerText(),/1 次價格、快取單價或用量不完整/);
+ console.log('PASS #82 reload preserves source/date/history and identifiable cache without price is partial');
+ globalThis.fetch=async()=>makeResponse(undefined);await interrupt();await round();assert.match(await panel.innerText(),/2 次價格、快取單價或用量不完整/);
+ globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200},{type:'invalid'});await interrupt();const failed=await round();assert.equal(failed.status(),502);assert.equal(store.snapshot().aiUsage.totalCalls,5);assert.match(await panel.innerText(),/0.005/);
+ console.log('PASS #82 missing usage unknown, failure retains incurred known cost');
+ globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200});await page.getByRole('combobox',{name:'OpenAI 模型',exact:true}).click();await page.getByRole('option',{name:'GPT-6.1 Sol',exact:true}).click();await interrupt();await round();assert.match(await panel.innerText(),/3 次價格、快取單價或用量不完整/);console.log('PASS #82 mixed model actual dispatch with unknown price never free');
+ const mixed=store.snapshot();mixed.aiUsage.totalCalls++;mixed.aiUsage.calls++;store.replaceCommittedWorld(mixed);await refresh();assert.match(await panel.innerText(),/4 次價格、快取單價或用量不完整/);
+ assert.match(await panel.innerText(),/站主共用服務另外計量：費用未知/);assert.deepEqual(errors,[]);await page.screenshot({path:outputPath('browser82.png'),fullPage:true});
+ console.log('PASS #82 legacy/mixed unknown remains partial, owner cost separated unknown, no browser page errors');
+}finally{await browser?.close();server.close();}

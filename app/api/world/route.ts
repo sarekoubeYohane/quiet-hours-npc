@@ -1,3 +1,4 @@
+import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase, RecallServiceError } from '@/lib/recall-services';
@@ -26,6 +27,32 @@ async function retainPaidUsage(db: ReturnType<typeof database>, id: string, befo
   const counter = (name: string) => `coalesce(json_extract(state, '$.aiUsage.${name}'), 0)`;
   const window = counter('windowStartedAt');
   const hourly = (name: string, delta: string) => `CASE WHEN ${window} = paid.window THEN ${counter(name)} + paid.${delta} WHEN ${window} > paid.window THEN ${counter(name)} ELSE paid.${delta} END`;
+  const costBinds: (string | number)[] = [];
+  const costFields: string[] = [];
+  // Each price cohort is an additive paid receipt. Merge into the latest row in
+  // the same SQL update as token deltas, including reset/other-page races.
+  for (const group of ['total', 'hour'] as const) {
+    const pairs: string[] = [];
+    for (const [key, cohort] of Object.entries(after.costs?.[group] || {})) {
+      const old = group === 'hour' && before?.windowStartedAt !== after.windowStartedAt ? undefined : before?.costs?.[group]?.[key];
+      if (cohort.calls <= (old?.calls || 0)) continue;
+      const basePath = `$.aiUsage.costs.${group}.${JSON.stringify(key)}`;
+      const empty = {...cohort,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0};
+      const entries: string[] = [];
+      costBinds.push(`$.${JSON.stringify(key)}`,basePath,JSON.stringify(empty));
+      for (const field of ['calls','input','output','cachedInput','knownUsd','unknownCalls'] as const) {
+        const stored = `coalesce(json_extract(state, ?), 0)`;
+        entries.push(`'$.${field}', ${group === 'hour' ? `CASE WHEN ${window} = paid.window THEN ${stored} + ? ELSE ? END` : `${stored} + ?`}`);
+        const delta = cohort[field] - (old?.[field] || 0);
+        costBinds.push(`${basePath}.${field}`,delta);
+        if (group === 'hour') costBinds.push(delta);
+      }
+      entries.push("'$.lastDispatchAt', max(coalesce(json_extract(state, ?), 0), ?)");
+      costBinds.push(`${basePath}.lastDispatchAt`,cohort.lastDispatchAt);
+      pairs.push(`?, json_set(coalesce(json_extract(state, ?), json(?)), ${entries.join(',')})`);
+    }
+    if (pairs.length) costFields.push(`'$.aiUsage.costs.${group}', ${group === 'hour' ? `CASE WHEN ${window} > paid.window THEN coalesce(json_extract(state, '$.aiUsage.costs.hour'), json('{}')) ELSE ` : ''}json_set(${group === 'hour' ? `CASE WHEN ${window} = paid.window THEN coalesce(json_extract(state, '$.aiUsage.costs.hour'), json('{}')) ELSE json('{}') END` : `coalesce(json_extract(state, '$.aiUsage.costs.total'), json('{}'))`}, ${pairs.join(',')})${group === 'hour' ? ' END' : ''}`);
+  }
   await db.prepare(`WITH paid(window, calls, input, output, unknown) AS (VALUES (?, ?, ?, ?, ?))
     UPDATE worlds SET state = json_set(state,
       '$.aiUsage.windowStartedAt', max(${window}, paid.window),
@@ -38,11 +65,12 @@ async function retainPaidUsage(db: ReturnType<typeof database>, id: string, befo
       '$.aiUsage.totalOutputTokens', ${counter('totalOutputTokens')} + paid.output,
       '$.aiUsage.totalUnknownCalls', ${counter('totalUnknownCalls')} + paid.unknown,
       '$.aiUsage.savedDecisions', ${counter('savedDecisions')}
+      ${costFields.length ? ',' + costFields.join(',') : ''}
     ), version = version + 1 FROM paid WHERE owner = ?`)
     .bind(after.windowStartedAt, calls,
       after.totalInputTokens - (before?.totalInputTokens || 0),
       after.totalOutputTokens - (before?.totalOutputTokens || 0),
-      after.totalUnknownCalls - (before?.totalUnknownCalls || 0), id).run();
+      after.totalUnknownCalls - (before?.totalUnknownCalls || 0), ...costBinds, id).run();
 }
 
 type WorldTrace = {
@@ -114,7 +142,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, costSummary:costSummary(loaded.world.aiUsage!), operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -144,7 +172,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    let b: { operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; action?: Action };
+    let b: { operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
@@ -156,10 +184,11 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
+    if (b.operation === 'set-price' && !validPrice(b.price)) return reply({error:'請填寫有效的供應商、模型、非負有限 USD 單價、來源與日期。'},400);
     if (b.operation === 'advance') {
       if (![15, 30].includes(b.minutes || 0)) return reply({ error: '請選擇 15 或 30 分鐘。' }, 400);
       if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
@@ -196,7 +225,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
 
     normalizeWorld(world);
-    const initialUsage = world.aiUsage && { ...world.aiUsage };
+    const initialUsage = world.aiUsage && structuredClone(world.aiUsage);
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
     if (b.operation === 'direct') {
       try {
@@ -222,7 +251,9 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
-    if (b.operation === 'set-budget') {
+    if (b.operation === 'set-price') {
+      savePrice(world,b.price!);
+    } else if (b.operation === 'set-budget') {
       world.playerBudget = { ...limits };
     } else if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
@@ -268,6 +299,9 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           decide: (w, c, onUsage) => {
+            const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
+            const price=w.modelPrices?.find(p=>p.provider===provider && p.model===b.model!.trim());
+            let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
             let dispatch = 0;
             const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
               await verifyLease();
@@ -280,7 +314,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
               await verifyLease();
               return reservationId;
             };
-            return aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, onUsage, {
+            return aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
               enabled: env.RECALL_ENABLED === 'true',
               signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
               beforeContinuation: async () => {
@@ -288,6 +322,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
                 traceWorld(trace, 'model-continuation-dispatch');
                 const usage = w.aiUsage!;
                 usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
+                reportCost=beginCost(usage,provider,b.model!.trim(),price);
               },
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });

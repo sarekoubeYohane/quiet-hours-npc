@@ -23,3 +23,5 @@
 - 原有租約期限、讀回、CAS 衝突、未知提交、失敗用量及重播回歸均通過。
 
 瀏覽器實測使用真正 Chromium（Playwright）載入 `WorldApp`、SQLite 世界 API、固定時鐘與模擬外部供應商邊界；已實際操作模型設定選單及「下一回合」。未啟用站主服務提示、供應商 429 範圍、站主 Embedding=0 停止與回合回復、站主服務缺設定、技術連線故障，以及正常玩家聊天提交皆通過，沒有 pageerror。合併 #80 後 `node tests/run-activities.mjs` 為 206 通過，0 失敗，並已涵蓋兩項玩家無上限仍不能解除站主 Embedding=0；可重現 harness 由整合瀏覽器驗證紀錄交付。實際雲端 OAuth／正式 D1／真實服務未驗證、未遷移；完整每日跨環境帳本仍屬 #27。
+
+可攜 Chromium 重現腳本已保存為 `tooling/verification/browser81.mjs`，環境參數與執行方式見同目錄 README。此腳本包含真實 `WorldApp`、GET／POST 與 SQLite，不以靜態畫面代替操作驗證。
