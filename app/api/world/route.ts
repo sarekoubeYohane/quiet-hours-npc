@@ -1,3 +1,4 @@
+import { buildAdjudicationInput, validateExistingAdjudication, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
@@ -110,8 +111,8 @@ function stopReason(error: unknown) {
 export async function GET(request?: Request) {
   return observeWorldRequest(trace => readWorld(request, trace));
 }
-export async function POST(request: Request) {
-  return observeWorldRequest(trace => mutateWorld(request, trace));
+export async function POST(request: Request, services?: WorldTaskServices) {
+  return observeWorldRequest(trace => mutateWorld(request, trace, services));
 }
 
 async function readWorld(request: Request | undefined, trace: WorldTrace) {
@@ -163,7 +164,7 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
 }
 
 
-async function mutateWorld(request: Request, trace: WorldTrace) {
+async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices) {
   const id = await owner();
   if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
@@ -287,8 +288,8 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
       try {
         let dispatchKey = '';
         const verifyLease = async () => {
-          const held = await db.prepare('SELECT locked_until FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number}>();
-          if (held?.locked_until !== lease || Date.now() >= lease - 10000) throw Error('世界租約或工作期限已到期，本回合停止付費請求。');
+          const held = await db.prepare('SELECT locked_until, version FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number;version:number}>();
+          if (held?.locked_until !== lease || held.version !== version || Date.now() >= lease - 10000) throw Error('世界租約或工作期限已到期，本回合停止付費請求。');
         };
         await advanceActivities(world, {
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
@@ -299,7 +300,7 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
             dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
-          decide: (w, c, onUsage) => {
+          decide: async (w, c, onUsage) => {
             const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
             const price=w.modelPrices?.find(p=>p.provider===provider && p.model===b.model!.trim());
             let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
@@ -315,8 +316,10 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
               await verifyLease();
               return reservationId;
             };
-            return aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
+            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
               enabled: env.RECALL_ENABLED === 'true',
+              binding: {operationId,worldVersion:version},
+              verifyCurrent: verifyLease,
               signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
               beforeContinuation: async () => {
                 await guard('chat', 1);
@@ -327,6 +330,12 @@ async function mutateWorld(request: Request, trace: WorldTrace) {
               },
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });
+            if (typeof services?.adjudicateExistingAction === 'function' && !decision.continueExisting) {
+              const candidate = await services.adjudicateExistingAction(buildAdjudicationInput(w,c,decision.action));
+              await verifyLease();
+              validateExistingAdjudication(candidate);
+            }
+            return decision;
           },
         });
       } catch (e) {

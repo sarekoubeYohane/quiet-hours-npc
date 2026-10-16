@@ -1,3 +1,5 @@
+import { requestModel } from './model-adapter';
+export const npcContractVersion = 'npc-decision.v1';
 import { cognitionForDecision, cognitiveUpdatesSchema, knownPeopleForDecision, relationshipsProjection, updateCognition, type CognitiveDecisionContext } from './cognition';
 import { budgetMemoryInput, memoryBytes, memorySelectionSchema, evaluateMemories, memoryOperationSchema } from './memory';
 import { parseAttention, clueKinds } from './attention';
@@ -21,6 +23,7 @@ const intentSchema = {
 };
 const actionTypes = ['continue', 'door', 'move', 'say', 'shout', 'persuade', 'message', 'rest', 'reflect', 'work', 'observe'];
 const actionSchema = { type: 'object', properties: {
+  contractVersion: { type: 'string', enum: [npcContractVersion] },
   type: { type: 'string', enum: actionTypes }, target: { type: 'string', maxLength: 100 },
   content: { type: 'string', maxLength: 500 }, mood: { type: 'string', maxLength: 20 },
   durationMinutes: { type: 'integer', enum: activityDurations },
@@ -29,17 +32,18 @@ const actionSchema = { type: 'object', properties: {
   memorySelections: memorySelectionSchema,
   memoryOperations: memoryOperationSchema,
   cognitiveUpdates: cognitiveUpdatesSchema, interpretation: { type: 'string', maxLength: 256 },
-}, required: ['type', 'target', 'content', 'mood', 'durationMinutes', 'intents', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations'], additionalProperties: false };
+}, required: ['contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'intents', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations'], additionalProperties: false };
 
 function parseDecision(value: unknown, allowedTypes: string[], world: World, character: Character, context: CognitiveDecisionContext): ActivityDecision {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
   const data = value as Record<string, unknown>;
+  if (data.contractVersion !== undefined && data.contractVersion !== npcContractVersion) throw Error('NPC 契約版本不相容。');
   const work = { memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
   if (memoryBytes(work) > 8192 || (Array.isArray(data.memorySelections) ? data.memorySelections.length : 0) + (Array.isArray(data.cognitiveUpdates) ? data.cognitiveUpdates.length : 0) + (Array.isArray(data.memoryOperations) ? data.memoryOperations.length : 0) > 4) throw Error();
   const text = (value: unknown, max: number, nonempty = false) => typeof value === 'string' && value.length <= max && (!nonempty || value.trim().length > 0);
   if (!allowedTypes.includes(data.type as string) || !text(data.target, 100) || !text(data.content, 500) || !text(data.mood, 20) ||
     !activityDurations.includes(data.durationMinutes as number) || !Array.isArray(data.intents) || data.intents.length > 12 ||
-    Object.keys(data).some(key => !actionSchema.required.includes(key))) throw Error();
+    Object.keys(data).some(key => ![...actionSchema.required, 'contractVersion'].includes(key))) throw Error();
   const ids = new Set<string>();
   const intents: Intent[] = data.intents.map((value: unknown) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
@@ -56,15 +60,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood } as Action;
   return { cognition, interpretation: data.interpretation as string | undefined, ...evaluateMemories({ ...character, ...(cognition ? { cognition } : {}) }, data.memorySelections, data.memoryOperations, context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => reject(new DOMException('模型回應逾時。', 'TimeoutError'));
-    signal.addEventListener('abort', abort, { once: true });
-    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
-  });
-}
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown> }):Promise<ActivityDecision>{
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void>; binding?: {operationId:string;worldVersion:number} }):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
@@ -73,31 +69,18 @@ const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。$
 const perceived = perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined});
 perceived.self.cognition = cognitionForDecision(c, perceived.contacts, perceived.visiblePeople);
 perceived.self.relationships = relationshipsProjection(perceived.self.cognition.relationshipTags);
-const input = budgetMemoryInput({...perceived,knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)},c);
+const input = budgetMemoryInput({contractVersion:npcContractVersion,...perceived,knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)},c);
 const visible: Character = { ...c, longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), cognition: { ...input.self.cognition, trace: [] } };
 const decisionContext: CognitiveDecisionContext = { visible, knownPeople: knownPeopleForDecision(visible, input.contacts.map(person => person.id)), memoryReview: input.self.memoryReview, historyCandidates: input.self.cognition.historyCandidates || [] };
 const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
 let recalled = false;
 for (;;) {
-let r:Response;
-const requestSignal = recall?.signal() || AbortSignal.timeout(25000);
-const dispatch: typeof fetch = (...args) => { requestSignal.throwIfAborted(); return withDeadline(fetcher(...args), requestSignal); };
-try { r=await dispatch(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
-method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:requestSignal,body:JSON.stringify({model,messages,...(direct?{
-store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:recall?.enabled&&!recalled?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
-}:{temperature:.8,max_tokens:2048})})}); }
-catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
-const providerError=!r.ok?Object.assign(Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`), { code: r.status === 429 || r.status === 402 ? 'provider_limit' : 'technical_failure' }):undefined;
-let d:{usage?:{prompt_tokens?:number;completion_tokens?:number;prompt_tokens_details?:{cached_tokens?:number}};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};
-try { d=await withDeadline(r.json(), requestSignal); } catch { if(providerError)throw providerError;throw Error('模型服務未回傳有效資料，本回合沒有推進。'); }
-if(!d||typeof d!=='object'){if(providerError)throw providerError;throw Error('模型服務未回傳有效資料，本回合沒有推進。');}
-const choice=d?.choices?.[0];
-if(typeof d.usage?.prompt_tokens==='number'&&typeof d.usage?.completion_tokens==='number'&&Number.isFinite(d.usage.prompt_tokens)&&Number.isFinite(d.usage.completion_tokens)&&d.usage.prompt_tokens>=0&&d.usage.completion_tokens>=0)onUsage?.({inputTokens:d.usage.prompt_tokens,outputTokens:d.usage.completion_tokens,...(d.usage.prompt_tokens_details?.cached_tokens === undefined ? {} : {cachedInputTokens:d.usage.prompt_tokens_details.cached_tokens})});
-if(providerError)throw providerError;
-if(choice?.message?.refusal)throw Error('模型未接受這次場景請求，本回合沒有儲存。');
-if(choice?.finish_reason==='length')throw Error('模型回覆超過長度限制，本回合沒有儲存。');
-const raw=choice?.message?.content||'';
-if(typeof raw==='string'&&raw.includes(key))throw Error('模型回覆包含敏感資料，本回合沒有推進。');
+const requestId = crypto.randomUUID();
+const inputDigest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(messages.map(message=>message.content).join('\n'))))).map(byte=>byte.toString(16).padStart(2,'0')).join('');
+// Association belongs to the caller, not candidate-provided NPC identifiers.
+const binding = {requestId,characterId:c.id,contractVersion:npcContractVersion,inputDigest,...recall?.binding};
+const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId:binding.requestId});
+await recall?.verifyCurrent?.();
 try {
   const value = JSON.parse(raw.replace(/^\s*`{3}(?:json)?\s*/, '').replace(/\s*`{3}\s*$/, ''));
   if(value?.type === 'recall') {

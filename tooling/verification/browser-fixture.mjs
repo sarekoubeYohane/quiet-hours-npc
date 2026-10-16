@@ -63,11 +63,17 @@ const load=name=>require(join(directory,`${name}.cjs`));
 const store=load('store'); store.install(load('world').seedWorld());
 const {GET,POST}=load('route');
 let now=Date.parse('2026-10-15T16:00:00Z'); Date.now=()=>now;
-let modelCalls=0, modelFault=null; const requests=[];
+let modelCalls=0, modelFault=null, modelResponder; const requests=[], modelRequests=[];
+// Local-only transport boundary: acceptance runners select replies and inspect
+// task inputs while the real application, API handlers and SQLite still execute.
+const setModelResponder = responder => { modelResponder = responder; };
 globalThis.fetch=async(url,init)=>{
  if(!/^https:\/\/(api.openai.com|openrouter.ai)\//.test(String(url)))throw Error(`fixture blocked external network: ${url}`);
- modelCalls++; if(modelFault)return new Response('{}',{status:modelFault});
+ modelCalls++;
  const request=JSON.parse(init.body);
+ modelRequests.push(request);
+ if(modelFault)return new Response('{}',{status:modelFault});
+ if(modelResponder)return modelResponder(request, modelCalls, init.signal);
  return Response.json({model:request.model,usage:{prompt_tokens:1000,completion_tokens:200},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]})},finish_reason:'stop'}]});
 };
 const entry=join(directory,'entry.jsx');
@@ -106,5 +112,5 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(Number(process.env.FIXTURE_PORT||0),'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}`; console.log(`BROWSER_FIXTURE_URL=${url}`);
-export {url,server,store,load,requests};
+export {url,server,store,load,requests,modelRequests,setModelResponder};
 process.on('SIGTERM',()=>server.close());
