@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
-for (const name of ['cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
+for (const name of ['costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
@@ -16,6 +16,7 @@ for (const name of ['cognition', 'recall', 'recall-services', 'memory', 'world',
 
 test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext without exposing secrets', async () => {
   const mf = new Miniflare({
+    outboundService: async () => { throw Error('External network blocked by local test fixture'); },
     cf: false, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
     bindings: { APP_ENV: 'local', AUTH_ORIGIN: 'http://localhost:5173', GITHUB_CLIENT_ID: 'fixture-client', GITHUB_CLIENT_SECRET: 'fixture-secret', SESSION_SECRET: 'fixture-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) },
     d1Databases: ['DB'],

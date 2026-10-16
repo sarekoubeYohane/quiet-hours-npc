@@ -5,15 +5,24 @@ import { demoDecision, pendingInterventions, record, resolve, type Action, type 
 import { learnHabit } from './habits';
 
 export type ActivityDecision = { longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
-export type TokenUsage = { inputTokens: number; outputTokens: number };
-export type BudgetLimits = { calls: number; tokens: number };
+export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
+export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
+export function validBudgetLimits(value: unknown): value is BudgetLimits {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const limits = value as BudgetLimits;
+  return [limits.calls, limits.tokens].every(limit => limit === null || (typeof limit === 'number' && Number.isSafeInteger(limit) && limit > 0));
+}
+export function budgetReached(usage: AIUsage, limits: BudgetLimits): boolean {
+  return (limits.calls !== null && usage.calls >= limits.calls) ||
+    (limits.tokens !== null && usage.inputTokens + usage.outputTokens >= limits.tokens);
+}
 export const activityDurations = [15, 30, 60, 90];
 const sustained = new Set<Action['type']>(['rest', 'work', 'reflect', 'observe']);
 const attentionKinds = new Set(['message', 'intervention']);
 
 export class BudgetExceeded extends Error {
-  constructor() { super('已達 AI 用量上限，或剩餘呼叫次數不足以完成一個回合。自動運行已暫停；可調整上限或切換規則試玩。'); }
+  constructor() { super('已達玩家 AI 用量上限。自動運行已暫停；可調整上限或切換規則試玩。'); }
 }
 
 export function currentUsage(world: World, now = Date.now()): AIUsage {
@@ -24,6 +33,7 @@ export function currentUsage(world: World, now = Date.now()): AIUsage {
     totalCalls: existing?.totalCalls || 0, totalInputTokens: existing?.totalInputTokens || 0,
     totalOutputTokens: existing?.totalOutputTokens || 0, totalUnknownCalls: existing?.totalUnknownCalls || 0,
     savedDecisions: existing?.savedDecisions || 0,
+    ...(existing?.costs ? {costs:{total:existing.costs.total,hour:{}}} : {}),
   };
 }
 
@@ -68,10 +78,7 @@ export async function advanceActivities(world: World, options: {
   const usage = currentUsage(world, options.now);
   world.aiUsage = usage;
   if (ai) {
-    const needed = plannedCalls(world, minutes, modelKey);
-    // Any new dialogue can interrupt later characters in this same round. Reserve a full round.
-    if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens ||
-      (needed > 0 && usage.calls + world.characters.filter(mayChooseAutonomously).length > limits.calls)) throw new BudgetExceeded();
+    if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
   world.minute += minutes; world.lastMode = mode;
   const offset = world.turn % world.characters.length;
@@ -120,7 +127,7 @@ export async function advanceActivities(world: World, options: {
     const from = character.location;
     let decision: ActivityDecision;
     if (ai) {
-      if (usage.calls >= limits.calls || usage.inputTokens + usage.outputTokens >= limits.tokens) throw new BudgetExceeded();
+      if (budgetReached(usage, limits)) throw new BudgetExceeded();
       await options.beforeDecision?.();
       // Count attempts before requesting, including errors whose usage is not returned.
       usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;

@@ -9,6 +9,7 @@ const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
 const advance = async mode => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', mode: mode || 'openai', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const read = async () => (await (await GET()).json());
+const counters = value => { const copy = {...value}; delete copy.costs; return copy; };
 const usage = windowStartedAt => ({ windowStartedAt, calls: 5, inputTokens: 150, outputTokens: 100, unknownCalls: 1, totalCalls: 20, totalInputTokens: 600, totalOutputTokens: 400, totalUnknownCalls: 2, savedDecisions: 7 });
 const withModel = async (run, failAt = 0) => {
   const original = global.fetch; let calls = 0;
@@ -30,7 +31,7 @@ test('conflict adds only this request paid deltas to the newer world and preserv
     const saved = await read();
     assert.deepEqual(saved.world.characters, newer.characters); assert.deepEqual(saved.world.events, newer.events);
     assert.equal(saved.world.minute, 1440); assert.equal(saved.world.turn, 12); assert.equal(saved.world.lastMode, 'concurrent');
-    assert.deepEqual(saved.world.aiUsage, { ...newer.aiUsage, calls: 12, inputTokens: 360, outputTokens: 240, totalCalls: 64, totalInputTokens: 1920, totalOutputTokens: 1280 });
+    assert.deepEqual(counters(saved.world.aiUsage), { ...newer.aiUsage, calls: 12, inputTokens: 360, outputTokens: 240, totalCalls: 64, totalInputTokens: 1920, totalOutputTokens: 1280 });
     assert.equal(saved.version, 11);
     // A newer writer's lease is still held, as observed through the public API.
     assert.equal((await POST(request({ operation: 'takeover' }))).status, 409);
@@ -80,7 +81,7 @@ test('older request adds lifetime usage without replacing or charging a newer ho
   await withModel(async () => {
     assert.equal((await advance()).status, 502);
     const saved = (await read()).world;
-    assert.deepEqual(saved.aiUsage, { ...newer.aiUsage, totalCalls: 84, totalInputTokens: 720, totalOutputTokens: 480 });
+    assert.deepEqual(counters(saved.aiUsage), { ...newer.aiUsage, totalCalls: 84, totalInputTokens: 720, totalOutputTokens: 480 });
   });
 });
 
@@ -92,7 +93,7 @@ test('newer request establishes its hourly window while adding lifetime usage to
     assert.equal((await advance()).status, 502);
     const saved = (await read()).world;
     assert.ok(saved.aiUsage.windowStartedAt > world.aiUsage.windowStartedAt);
-    assert.deepEqual({ ...saved.aiUsage, windowStartedAt: 0 }, { ...newer.aiUsage, windowStartedAt: 0, calls: 4, inputTokens: 120, outputTokens: 80, unknownCalls: 0, totalCalls: 84, totalInputTokens: 720, totalOutputTokens: 480 });
+    assert.deepEqual({ ...counters(saved.aiUsage), windowStartedAt: 0 }, { ...newer.aiUsage, windowStartedAt: 0, calls: 4, inputTokens: 120, outputTokens: 80, unknownCalls: 0, totalCalls: 84, totalInputTokens: 720, totalOutputTokens: 480 });
   });
 });
 

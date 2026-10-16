@@ -7,10 +7,13 @@ export type RecallRecord = { id: string; metadata: RecallMetadata };
 export type RecallVector = RecallRecord & { values: number[] };
 export type RecallBudgetLimits = { ownerMonthly: number; accountMonthly: number; month?: string };
 type RecallDB = ReturnType<typeof database>;
+export class RecallServiceError extends Error {
+  constructor(message: string, readonly code: 'owner_budget' | 'owner_unavailable' | 'provider_limit') { super(message); }
+}
 
 /** One shared billing ledger across every environment using the site owner's services. */
 export function recallBudgetDatabase(): RecallDB {
-  if (env.RECALL_ENABLED !== 'true' || !env.RECALL_USAGE_DB) throw Error('回想共用預算儲存尚未啟用或設定未完成');
+  if (env.RECALL_ENABLED !== 'true' || !env.RECALL_USAGE_DB) throw new RecallServiceError('站主回想服務尚未啟用或設定未完成', 'owner_unavailable');
   return env.RECALL_USAGE_DB;
 }
 
@@ -40,7 +43,8 @@ export function recallBudgetLimits(kind: RecallUsageKind): RecallBudgetLimits {
 }
 
 /** Independent from world CAS: paid or uncertain attempts remain reserved after rollback. */
-export async function reserveRecallDispatch(db: RecallDB, owner: string, kind: RecallUsageKind, reservationId: string, units: number, limits: RecallBudgetLimits = recallBudgetLimits(kind)) {
+export async function reserveRecallDispatch(db: RecallDB, owner: string, kind: RecallUsageKind, reservationId: string, units: number, limits: RecallBudgetLimits = recallBudgetLimits(kind), payer: 'owner' | 'player' = 'owner') {
+  if (payer === 'player' && kind !== 'chat') throw Error('此服務沒有玩家付費憑證');
   const month = limits.month ?? new Date().toISOString().slice(0, 7);
   if (!owner || !reservationId || !Number.isSafeInteger(units) || units < 1 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !['embedding', 'index', 'search', 'chat'].includes(kind) || ![limits.ownerMonthly, limits.accountMonthly].every(limit => Number.isSafeInteger(limit) && limit >= 0)) throw Error('回想預算保留無效');
   const existing = await db.prepare('SELECT account_owner, month, kind, units FROM recall_dispatch_usage WHERE reservation_id = ?').bind(reservationId).first<{account_owner:string;month:string;kind:string;units:number}>();
@@ -50,14 +54,14 @@ export async function reserveRecallDispatch(db: RecallDB, owner: string, kind: R
   }
   // A single SQLite write statement serializes concurrent accounts against the shared site budget.
   const result = await db.prepare(`INSERT OR IGNORE INTO recall_dispatch_usage (reservation_id, account_owner, month, kind, units, reserved_at)
-    SELECT ?, ?, ?, ?, ?, ? WHERE
+    SELECT ?, ?, ?, ?, ?, ? WHERE ? = 1 OR (
     COALESCE((SELECT SUM(units) FROM recall_dispatch_usage WHERE month = ? AND kind = ?), 0) + ? <= ? AND
-    COALESCE((SELECT SUM(units) FROM recall_dispatch_usage WHERE month = ? AND kind = ? AND account_owner = ?), 0) + ? <= ?`)
-    .bind(reservationId, owner, month, kind, units, Date.now(), month, kind, units, limits.ownerMonthly, month, kind, owner, units, limits.accountMonthly).run();
+    COALESCE((SELECT SUM(units) FROM recall_dispatch_usage WHERE month = ? AND kind = ? AND account_owner = ?), 0) + ? <= ?)`)
+    .bind(reservationId, owner, month, kind, units, Date.now(), payer === 'player' ? 1 : 0, month, kind, units, limits.ownerMonthly, month, kind, owner, units, limits.accountMonthly).run();
   if (result.meta.changes === 0) {
     const raced = await db.prepare('SELECT account_owner, month, kind, units FROM recall_dispatch_usage WHERE reservation_id = ?').bind(reservationId).first<{account_owner:string;month:string;kind:string;units:number}>();
     if (raced && raced.account_owner === owner && raced.kind === kind && raced.units === units) return { kind, units, month: raced.month, reservationId, replayed: true };
-    throw Error('回想服務預算不足或識別碼衝突');
+    throw new RecallServiceError('站主回想服務預算不足，本回合未推進；提高玩家預算不能解除站主限制。', 'owner_budget');
   }
   return { kind, units, month, reservationId, replayed: false };
 }
@@ -65,7 +69,7 @@ export async function reserveRecallDispatch(db: RecallDB, owner: string, kind: R
 export async function recallUsage(db: RecallDB, owner: string) {
   const month = new Date().toISOString().slice(0, 7);
   const rows = await db.prepare('SELECT kind, SUM(units) AS units, SUM(known_input_tokens) AS known_input_tokens FROM recall_dispatch_usage WHERE account_owner = ? AND month = ? GROUP BY kind').bind(owner, month).all<{kind:RecallUsageKind;units:number;known_input_tokens:number|null}>();
-  return { month, knownEmbeddingInputTokens: rows.results.find(row => row.kind === 'embedding')?.known_input_tokens ?? 0, units: Object.fromEntries(['embedding', 'index', 'search', 'chat'].map(kind => [kind, rows.results.find(row => row.kind === kind)?.units ?? 0])) as Record<RecallUsageKind, number> };
+  return { month, payer: 'owner' as const, playerPaidChatCalls: rows.results.find(row => row.kind === 'chat')?.units ?? 0, ownerUnits: Object.fromEntries(['embedding', 'index', 'search'].map(kind => [kind, rows.results.find(row => row.kind === kind)?.units ?? 0])) as Record<'embedding' | 'index' | 'search', number>, knownEmbeddingInputTokens: rows.results.find(row => row.kind === 'embedding')?.known_input_tokens ?? 0, units: Object.fromEntries(['embedding', 'index', 'search', 'chat'].map(kind => [kind, rows.results.find(row => row.kind === kind)?.units ?? 0])) as Record<RecallUsageKind, number> };
 }
 
 function metadata(value: unknown): RecallMetadata {
@@ -91,7 +95,7 @@ function abortable<T>(run: () => Promise<T>, signal: AbortSignal): Promise<T> {
 /** Transport only. Callers must reserve usage and revalidate the lease before each dispatch. */
 export function recallServices() {
   const configured = () => {
-    if (env.RECALL_ENABLED !== 'true' || !env.RECALL_USAGE_DB || !env.MEMORY_VECTOR_INDEX || !env.OWNER_EMBEDDING_KEY) throw Error('回想服務尚未啟用或設定未完成');
+    if (env.RECALL_ENABLED !== 'true' || !env.RECALL_USAGE_DB || !env.MEMORY_VECTOR_INDEX || !env.OWNER_EMBEDDING_KEY) throw new RecallServiceError('站主回想服務尚未啟用或設定未完成', 'owner_unavailable');
     return env.MEMORY_VECTOR_INDEX;
   };
   return {
@@ -104,7 +108,7 @@ export function recallServices() {
         headers: { Authorization: `Bearer ${env.OWNER_EMBEDDING_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'text-embedding-3-small', dimensions: 1536, encoding_format: 'float', input: texts }),
       });
-      if (!response.ok) throw Error('Embedding 服務失敗');
+      if (!response.ok) throw new RecallServiceError(response.status === 429 || response.status === 402 ? '站主 Embedding 供應商額度不足或暫時限流。' : '站主 Embedding 服務失敗。', response.status === 429 || response.status === 402 ? 'provider_limit' : 'owner_unavailable');
       const body = await response.json() as {data?: {index:number;embedding:number[]}[];usage?:{total_tokens?:number}};
       if (body.usage?.total_tokens !== undefined) {
         if (!Number.isSafeInteger(body.usage.total_tokens) || body.usage.total_tokens < 0) throw Error('Embedding 用量回覆無效');
