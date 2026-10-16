@@ -8,7 +8,10 @@ process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/acceptanc
 await mkdir(process.env.BROWSER_ARTIFACT_DIR, { recursive: true });
 const original = load('world').seedWorld();
 original.turn = 123; original.minute = 3105;
+original.events[0].text = '原世界的完整對話與記憶，不應為驗收而裁切。\n☕🌙'.repeat(18000);
+assert.ok(Buffer.byteLength(JSON.stringify(original)) > 1024 * 1024);
 load('world').record(original, 'observer', 'ORIGINAL-STORY-ONLY', 'intervention', ['cass']);
+for (let n = 0; n < 6; n++) load('world').record(original, 'observer', `原世界保留事件 ${n}`, 'intervention', ['cass']);
 original.adjudication = { provider: 'openai', model: 'fixture-adjudicator' };
 original.playerBudget = { calls: 120, tokens: 1000000 };
 store.install(original);

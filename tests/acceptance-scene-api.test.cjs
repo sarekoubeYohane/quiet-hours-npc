@@ -65,10 +65,35 @@ test('failed switching never loses either story, and late response replay cannot
   assert.deepEqual(returned.characters, before.characters);
 });
 
+test('a large UTF-8 world can enter, reload, and return without losing story or account settings', async () => {
+  const original = seedWorld(); original.turn = 123; original.minute = 3105;
+  original.events[0].text = '原世界的完整對話與記憶，不應為驗收而裁切。\n☕🌙'.repeat(18000);
+  original.playerBudget = { calls: 120, tokens: 1000000 };
+  original.adjudication = { provider: 'openai', model: 'gpt-6.1-sol' };
+  store.install(original);
+  const before = await read();
+  assert.ok(Buffer.byteLength(JSON.stringify(before)) > 1024 * 1024);
+  const response = await act({ operation: 'enter-acceptance' });
+  assert.equal(response.status, 200, (await response.clone().json()).error);
+  const entered = await read();
+  assert.deepEqual(entered.acceptance, { id: 'daily-life-v1' });
+  assert.doesNotMatch(JSON.stringify(entered), /原世界的完整對話/);
+  assert.equal((await act({ operation: 'intervene', target: 'cass', text: 'TEST-SCENE-ONLY' })).status, 200);
+  const exited = await act({ operation: 'exit-acceptance' });
+  assert.equal(exited.status, 200, (await exited.clone().json()).error);
+  const restored = await read();
+  assert.deepEqual(restored.events, before.events);
+  assert.deepEqual(restored.characters, before.characters);
+  assert.equal(restored.turn, 123); assert.equal(restored.minute, 3105);
+  assert.deepEqual(restored.playerBudget, before.playerBudget);
+  assert.deepEqual(restored.adjudication, before.adjudication);
+  assert.equal(restored.aiUsage.totalCalls, 0);
+});
+
 test('original backup is bounded, hidden from journal results, and private to the authenticated owner', async () => {
-  const large = seedWorld(); large.events[0].text = 'x'.repeat(513 * 1024); store.install(large);
+  const large = seedWorld(); large.events[0].text = 'x'.repeat(2_000_001); store.install(large);
   assert.equal((await act({ operation: 'enter-acceptance' })).status, 502);
-  assert.equal((await read()).events[0].text.length, 513 * 1024);
+  assert.equal((await read()).events[0].text.length, 2_000_001);
   const original = seedWorld(); record(original, 'observer', 'PAUSED-PRIVATE-STORY', 'intervention', ['cass']); store.install(original);
   const enterBody = { operation: 'enter-acceptance', operationId: Date.now() + ':' + crypto.randomUUID() };
   assert.equal((await POST(request(enterBody))).status, 200);
@@ -78,6 +103,54 @@ test('original backup is bounded, hidden from journal results, and private to th
   finally { auth.setUserId('test-owner'); }
   assert.equal((await read()).acceptance.id, 'daily-life-v1');
 });
+test('an incompressible backup stays bounded and a damaged snapshot cannot replace either story', async () => {
+  const { createHash } = require('node:crypto');
+  const original = seedWorld();
+  original.events[0].text = Array.from({ length: 12000 }, (_, n) => createHash('sha256').update(String(n)).digest('hex')).join('');
+  store.install(original);
+  const before = await read();
+  const rejected = await act({ operation: 'enter-acceptance' });
+  assert.equal(rejected.status, 502); assert.match((await rejected.json()).error, /容量/);
+  assert.deepEqual((await read()).events, before.events);
+  assert.equal((await read()).acceptance, undefined);
+
+  for (const snapshot of [
+    { format: 'gzip-base64-v1', data: 'not-base64!' },
+    { format: 'gzip-base64-v1', data: Buffer.from('not gzip').toString('base64') },
+    { format: 'gzip-base64-v1', data: require('node:zlib').gzipSync('x'.repeat(2_000_001)).toString('base64') },
+    ...[{}, null, [], { ...seedWorld(), characters: [null] }, { ...seedWorld(), events: [null] }, { ...seedWorld(), minute: -1 }].map(value => ({
+      format: 'gzip-base64-v1', data: require('node:zlib').gzipSync(JSON.stringify(value)).toString('base64'),
+    })),
+    { format: 'future-format', data: '' },
+  ]) {
+    const scene = seedWorld(); scene.acceptance = { id: 'daily-life-v1', snapshot };
+    store.install(scene);
+    const before = await read();
+    const response = await act({ operation: 'exit-acceptance' });
+    assert.equal(response.status, 502); assert.match((await response.json()).error, /備份/);
+    assert.deepEqual((await read()).characters, before.characters);
+    assert.deepEqual((await read()).acceptance, { id: 'daily-life-v1' });
+    assert.equal((await act({ operation: 'reset' })).status, 400);
+  }
+});
+
+test('a scene saved by the previous release can still return to its uncompressed original', async () => {
+  const original = seedWorld(); original.turn = 123; original.minute = 3105;
+  const scene = seedWorld();
+  scene.acceptance = { id: 'daily-life-v1', original, originalSavedDecisions: 160 };
+  scene.aiUsage = { windowStartedAt: Date.now(), calls: 7, inputTokens: 210, outputTokens: 70, unknownCalls: 0, totalCalls: 7, totalInputTokens: 210, totalOutputTokens: 70, totalUnknownCalls: 0, savedDecisions: 2 };
+  store.install(scene);
+  const response = await act({ operation: 'exit-acceptance' });
+  assert.equal(response.status, 200);
+  const restored = await read();
+  assert.equal(restored.acceptance, undefined);
+  assert.equal(restored.turn, 123); assert.equal(restored.minute, 3105);
+  assert.deepEqual(restored.events, original.events);
+  assert.deepEqual(restored.characters, original.characters);
+  assert.equal(restored.aiUsage.savedDecisions, 160);
+  assert.equal(restored.aiUsage.totalCalls, 7);
+});
+
 const act = async body => POST(request({ worldContext: (await read()).contextId, ...body }));
 const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
 const rest = { type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] };
@@ -115,7 +188,7 @@ test('enter, acquire, eat, reload and return preserves the original story and sh
   const previous = global.fetch;
   global.fetch = async (_url, init) => {
     const input = JSON.parse(JSON.parse(init.body).messages[1].content);
-    assert.doesNotMatch(JSON.stringify(input), /ORIGINAL-PRIVATE-MEMORY/);
+    assert.doesNotMatch(JSON.stringify(input), /ORIGINAL-PRIVATE-MEMORY|gzip-base64-v1/);
     if (input.contractVersion === 'world-adjudication.v1') {
       judges++;
       return completion({ status: 'accepted', effects: judges === 1

@@ -1,5 +1,7 @@
 # 最小日常驗收場景驗證
 
+此為 PR #102 的歷史驗證；後續正式站遭遇容量阻擋，見 [正式站複測](minimal-acceptance-production-2026-10-16.md)，修正與新限制見 [容量修正驗證](acceptance-large-world-fix-2026-10-16.md)。
+
 日期：2026-10-16，台北。基準 main：`a1c3900746d3adbb42be9360d58386bc33d5f168`（PR #101 已合併）。來源需求：本輪「補最小驗收場景」，契約見 [場景設計](../design/minimal-acceptance-scene.md)。
 
 ## 已實作
