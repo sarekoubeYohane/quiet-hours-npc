@@ -1,5 +1,7 @@
 # Local browser verification
 
+`browser-acceptance-scene.mjs` 使用真正的場景進入／返回 API，驗證取消、原世界保存、餐點取得／食用、店主自主授權與借杯／攜帶／洗淨／歸還、泡茶中斷、跨分頁舊操作、重載及共用用量。桌機與 390px 截圖寫入 `docs/verification/assets/acceptance-scene/`（可由 `BROWSER_ARTIFACT_DIR` 改變）。沿下方相同 Playwright／Chromium 環境執行，不使用真實 Key 或玩家世界。
+
 Character assets (#88): `browser88.mjs` verifies the four approved master/profile/avatar/pixel files, dimensions, alpha, baseline, real map/profile rendering and unchanged world state. Set `BROWSER_FONT_DIR` for readable CJK evidence. `prepare-character-assets.py <generated_images-directory>` exports the approved source IDs with ImageMagick; see `docs/design/character-visual-assets.md`.
 
 Observation integration (#89/#95/#90/#56): run `browser89.mjs`, `browser95.mjs`, `browser90.mjs`, `browser56.mjs`, and `browser-action-analysis.mjs` for shared navigation, authoritative map state, profiles/interactions, read-only cognition, and saved action/perception judgements. Existing `browser80–83.mjs` now navigate through Settings/Analysis explicitly. See `docs/verification/observation-interface-integration-2026-10-16.md` for results and screenshots.
