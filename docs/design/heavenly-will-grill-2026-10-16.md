@@ -1,6 +1,6 @@
 # 天上意志模型輔助裁定：Grill 紀錄
 
-狀態：本輪 Grill 已收斂，使用者已確認最後情境走查（2026-10-16 18:52，Asia/Taipei）。本文件為已確認設計紀錄，尚未轉為新規格或工作票，runtime 未因此完成。
+狀態：本輪 Grill 已收斂，使用者已確認最後情境走查（2026-10-16 18:52，Asia/Taipei）。本文件為已確認設計紀錄；使用者隨後要求 to-spec，已整合進正式主規格 #87 並同步既有 #93／#94。runtime 未因此完成。
 日期：2026-10-16（Asia/Taipei）
 流程：grill-with-docs（grilling + domain-modeling），依 AGENTS.md 一次一題。
 查證 main：19eafb69091357a364d50c3b6c235c13f97c8ad9。
@@ -156,6 +156,12 @@
 | 活動進度 | 少數有意義的階段逐步生效，中斷保留已完成的世界變化。 |
 | 條件改變 | 不依過時前提完成；角色只取得可知結果，自主選擇後續方法。 |
 
+## 正式規格發布
+
+- 使用者於 2026-10-16 要求 to-spec；已將本輪補充直接整合進 [主規格 #87](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/87)，涵蓋付費、AI 啟動條件、既有判定分工、日常活動粒度、階段效果、中斷與前提變更。
+- 同步更新 [#93 自由餐點與共用裁定能力](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/93)、[#94 同一物件生命週期](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/94) 的相關驗收；未另開同義規格或工作票，保留既有阻擋關係，三票均保留 ready-for-agent。
+- 驗收沿既有已確認的世界 API 讀取／推進／介入與瀏覽器操作，補上配置門檻、共用預算、階段／中斷／前提變更及技術回復案例；此次只檢查文件內容與發布後讀回，未執行 runtime 測試。
+
 ## 後續工程與規格整合
 
 - 與 [#67](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/67)／[#74](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/74) 的任務隔離及接線整合；與 [#87](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/87)／[#93](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/93)／[#94](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/94) 的自由提案及物件效果去重。既有付費與預算規則沿 [#78](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/78)。
@@ -163,5 +169,5 @@
 - 定義受限階段效果、前提與生效時點、活動中斷／續做、條件變動與物件生命週期。具體型別、欄位及傳輸格式由工程細化，不要求重新訪談既有產品決策。
 - 保留既有操作識別、版本、租約及每回合一致提交；不得因階段化而重複派送、擲骰、生成物件或套用效果。先前回合已保存的效果不受之後技術回復撤銷。
 - 工程驗收沿世界 API 與瀏覽器，以明示場景、模型替身與可控骰值驗證；本輪尚未執行 runtime 測試。
-- 本次只更新討論文件與詞彙表；尚未建立新規格／工作票、修改 runtime、合併或部署。後續按使用者指示進入 to-spec、to-tickets 或實作。
+- 本次已更新討論文件、詞彙表、正式主規格及既有相關工作票，尚未修改 runtime、合併或部署。剩餘工程參數須在對應功能啟用前定稿；後續按使用者指示進入工作規劃或實作。
 
