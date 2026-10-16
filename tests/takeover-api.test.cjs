@@ -19,8 +19,10 @@ const withModel = async run => {
   };
   try { await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}})); await run(perceived); } finally { global.fetch=original; }
 };
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('takeover persists and waiting owner makes no autonomous calls while other characters advance within their budget', async () => {
-  const world=seedWorld(); owner(world).intents=queue;
+  const world=worldWithAdjudication(); owner(world).intents=queue;
   owner(world).plan={action:{type:'work',target:'tea'},startedAt:1245,until:1335,attention:'',modelKey:'openai:gpt-6-luna'};
   store.install(world);
   assert.equal((await POST(request({operation:'takeover'}))).status,200);
@@ -36,7 +38,7 @@ test('takeover persists and waiting owner makes no autonomous calls while other 
 });
 
 test('return re-evaluates preserved intentions and only known takeover experiences in one decision, without learning controlled habits', async () => {
-  const world=seedWorld(); owner(world).intents=queue; store.install(world);
+  const world=worldWithAdjudication(); owner(world).intents=queue; store.install(world);
   assert.equal((await POST(request({operation:'takeover'}))).status,200);
   await withModel(async perceived => {
     for (const content of ['只有店主知道的想法一','只有店主知道的想法二']) {
@@ -60,7 +62,7 @@ test('return re-evaluates preserved intentions and only known takeover experienc
 });
 
 test('failed takeover round and conflicting control save leave no partial world or control changes', async () => {
-  store.install(seedWorld());
+  store.install(worldWithAdjudication());
   store.conflictOnNextSave();
   assert.equal((await POST(request({operation:'takeover'}))).status,502);
   assert.equal(owner(await read()).control.mode,'autonomous');
@@ -78,7 +80,7 @@ test('failed takeover round and conflicting control save leave no partial world 
 });
 
 test('return ends an unfinished designated activity and cancels a pending command without erasing its actual history', async () => {
-  const world=seedWorld(); owner(world).intents=queue; store.install(world);
+  const world=worldWithAdjudication(); owner(world).intents=queue; store.install(world);
   assert.equal((await POST(request({operation:'takeover'}))).status,200);
   assert.equal((await POST(request({operation:'direct',action:{type:'work',target:'tea'}}))).status,200);
   await withModel(async perceived => {
@@ -100,7 +102,7 @@ test('return ends an unfinished designated activity and cancels a pending comman
 });
 
 test('first autonomous decision receives earlier known takeover results beyond twelve recent memories and retries after failure', async () => {
-  const world = seedWorld(); owner(world).intents = queue; store.install(world);
+  const world = worldWithAdjudication(); owner(world).intents = queue; store.install(world);
   assert.equal((await POST(request({operation:'takeover'}))).status, 200);
   assert.equal((await POST(request({operation:'intervene',target:'owner',text:'等候的客人已回覆：今晚不來'}))).status, 200);
   for (let i = 0; i < 16; i++) {
@@ -138,7 +140,7 @@ test('first autonomous decision receives earlier known takeover results beyond t
 });
 
 test('return context stays bounded at eighty known experiences and survives a failed final transaction', async () => {
-  store.install(seedWorld()); assert.equal((await POST(request({operation:'takeover'}))).status, 200);
+  store.install(worldWithAdjudication()); assert.equal((await POST(request({operation:'takeover'}))).status, 200);
   for (let i = 0; i < 81; i++) {
     assert.equal((await POST(request({operation:'intervene',target:'owner',text:`控制經歷-${i}-結束`}))).status, 200);
   }

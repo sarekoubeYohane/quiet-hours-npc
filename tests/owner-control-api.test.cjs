@@ -9,8 +9,10 @@ const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }) });
 const read = async () => (await (await GET()).json()).world;
 
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('old worlds gain an independent cafe owner without replacing existing progress', async () => {
-  const old = seedWorld(); old.characters = old.characters.filter(c => c.id !== 'owner'); old.minute = 1380; old.turn = 8;
+  const old = worldWithAdjudication(); old.characters = old.characters.filter(c => c.id !== 'owner'); old.minute = 1380; old.turn = 8;
   old.characters[0].activity = '保留中的活動'; old.characters[0].plan = { action: { type: 'rest' }, startedAt: 1365, until: 1455, attention: '', modelKey: 'demo' };
   store.install(old);
   const saved = await read();
@@ -31,7 +33,7 @@ const withModel = async run => {
 };
 
 test('single designated action survives reload, replaces autonomous activity, preserves intents and resumes autonomous control', async () => {
-  const world = seedWorld(); const owner = world.characters.find(c => c.id === 'owner');
+  const world = worldWithAdjudication(); const owner = world.characters.find(c => c.id === 'owner');
   const queue = [{ id: 'care', content: '照顧咖啡館', intensity: 'high', importance: 'medium', urgency: 'low', context: '晚點再整理' }];
   owner.intents = queue; owner.plan = { action: { type: 'rest' }, startedAt: 1245, until: 1335, attention: '', modelKey: 'openai:gpt-6-luna' };
   store.install(world);
@@ -55,7 +57,7 @@ test('single designated action survives reload, replaces autonomous activity, pr
 });
 
 test('invalid direct actions have no effect and only the cafe owner can be controlled', async () => {
-  const world = seedWorld(); store.install(world);
+  const world = worldWithAdjudication(); store.install(world);
   assert.equal((await POST(request({ operation: 'direct', target: 'cass', action: { type: 'rest' } }))).status, 400);
   for (const action of [{ type: 'say', target: 'cass', content: '遠處的話' }, { type: 'move', target: 'missing-place' }, { type: 'message', target: 'cass', content: '' }, { type: 'reflect', content: 'x'.repeat(501) }, { type: 'work', target: 'tea', unexpected: true }]) {
     assert.equal((await POST(request({ operation: 'direct', action }))).status, 400);
@@ -64,7 +66,7 @@ test('invalid direct actions have no effect and only the cafe owner can be contr
 });
 
 test('failed model round restores pending direct action and no action leaks to uninformed characters', async () => {
-  const world = seedWorld(); world.turn = 3; store.install(world);
+  const world = worldWithAdjudication(); world.turn = 3; store.install(world);
   assert.equal((await POST(request({ operation: 'direct', action: { type: 'reflect', content: '店主自己的秘密' } }))).status, 200);
   const original = global.fetch;
   global.fetch = async () => { throw Error('test provider failure'); };

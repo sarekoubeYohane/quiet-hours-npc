@@ -3,7 +3,7 @@ import type { TokenUsage } from './activities';
 
 export type ModelPrice = { id: string; provider: 'openai' | 'openrouter'; model: string; input: number; output: number; cachedInput?: number; source: string; date: string; custom: true; savedAt: number };
 export type PriceInput = Omit<ModelPrice, 'id' | 'custom' | 'savedAt'>;
-export type CostCohort = { provider: string; model: string; price: ModelPrice | null; calls: number; input: number; output: number; cachedInput: number; knownUsd: number; unknownCalls: number; lastDispatchAt: number };
+export type CostCohort = { task?:'npc'|'adjudication'; provider: string; model: string; price: ModelPrice | null; calls: number; input: number; output: number; cachedInput: number; knownUsd: number; unknownCalls: number; lastDispatchAt: number };
 export type CostLedger = { total: Record<string, CostCohort>; hour: Record<string, CostCohort> };
 export type CostEstimate = { knownUsd: number; unknownCalls: number; calls: number; complete: boolean; cohorts: CostCohort[] };
 export function validPrice(value: unknown): value is PriceInput {
@@ -16,12 +16,12 @@ export function savePrice(world: World, input: PriceInput) {
   const price: ModelPrice = { provider: input.provider, model: input.model.trim(), input: input.input, output: input.output, ...(input.cachedInput === undefined ? {} : {cachedInput:input.cachedInput}), source: input.source.trim(), date:input.date, id:crypto.randomUUID(),custom:true,savedAt:Date.now() };
   world.modelPrices = [...(world.modelPrices || []).filter(p => p.provider !== price.provider || p.model !== price.model), price];
 }
-export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined) {
+export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined, task:'npc'|'adjudication'='npc') {
   usage.costs ??= {total:{},hour:{}};
-  const key = price?.id || `unknown:${encodeURIComponent(provider)}:${encodeURIComponent(model)}`;
+  const key = `${task}:${price?.id || `unknown:${encodeURIComponent(provider)}:${encodeURIComponent(model)}`}`;
   const now = Date.now();
   for (const group of [usage.costs.total,usage.costs.hour]) {
-    const c = group[key] ??= {provider,model,price:price ? {...price} : null,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0,lastDispatchAt:now};
+    const c = group[key] ??= {task,provider,model,price:price ? {...price} : null,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0,lastDispatchAt:now};
     if(typeof c.knownUsd!=='number'||!Number.isFinite(c.knownUsd)||c.knownUsd<0){c.knownUsd=0;c.unknownCalls=c.calls;}
     c.calls++; c.unknownCalls++; c.lastDispatchAt=now;
   }

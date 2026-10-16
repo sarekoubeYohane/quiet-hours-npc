@@ -20,8 +20,10 @@ const withModel = async (respond, run) => {
   try { await run(); } finally { global.fetch = original; }
 };
 
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('world API persists NPC-selected queue order, including a waiting intent, in one decision per NPC', async () => {
-  store.install(seedWorld()); let calls = 0;
+  store.install(worldWithAdjudication()); let calls = 0;
   const queue = [intent('waiting', '確認 Vera 平安', '已傳訊息，還在等回覆'), intent('rest', '讓自己恢復精神')];
   await withModel(id => { calls++; return decision(id === 'cass' ? queue : []); }, async () => {
     assert.equal((await advance()).status, 200);
@@ -31,7 +33,7 @@ test('world API persists NPC-selected queue order, including a waiting intent, i
 });
 
 test('every NPC receives the shared Playbook and only its own private queue and character setting', async () => {
-  const world = seedWorld();
+  const world = worldWithAdjudication();
   for (const c of world.characters) c.intents = [intent(c.id, `${c.id}-private-intent`)];
   store.install(world); const prompts = [];
   await withModel((id, data, payload) => {
@@ -53,7 +55,7 @@ test('every NPC receives the shared Playbook and only its own private queue and 
 });
 
 test('invalid queue rolls back the entire round and preserves paid usage', async () => {
-  const world = seedWorld(); world.characters[0].intents = [intent('prior', '先安頓自己')];
+  const world = worldWithAdjudication(); world.characters[0].intents = [intent('prior', '先安頓自己')];
   store.install(world); let calls = 0;
   await withModel(() => decision(++calls === 1 ? [intent('new', '新的方向')] : [{ ...intent('invalid', '格式錯誤'), urgency: 'tomorrow' }]), async () => {
     assert.equal((await advance()).status, 502);
@@ -67,7 +69,7 @@ test('invalid queue rolls back the entire round and preserves paid usage', async
 });
 
 test('old worlds load empty queues while preserving their memories, habits and activity progress', async () => {
-  const old = seedWorld(); delete old.characters[0].intents;
+  const old = worldWithAdjudication(); delete old.characters[0].intents;
   old.characters[0].habits = [{ key: 'rest', type: 'rest', target: '', location: 'kris-home', period: 3, observedDays: [0, 1, 2], lastSeen: 1200 }];
   old.characters[0].plan = { action: { type: 'rest' }, startedAt: 1245, until: 1335, attention: '', modelKey: 'openai:gpt-6-luna' };
   store.install(old);
@@ -83,7 +85,7 @@ test('old worlds load empty queues while preserving their memories, habits and a
 });
 
 test('NPC can keep intentions after an action, reorder them, and remove one after receiving the actual blocked result', async () => {
-  store.install(seedWorld()); const waiting = intent('waiting', '確認 Vera 平安', '等回覆');
+  store.install(worldWithAdjudication()); const waiting = intent('waiting', '確認 Vera 平安', '等回覆');
   const recovering = intent('recovering', '好好休息'); let round = 0;
   await withModel((id, data) => {
     if (id !== 'cass') return decision([]);
@@ -105,7 +107,7 @@ test('NPC can keep intentions after an action, reorder them, and remove one afte
 });
 
 test('continuing an activity retains its queue without additional model decisions', async () => {
-  store.install(seedWorld()); const queue = [intent('recover', '恢復精神')]; let calls = 0;
+  store.install(worldWithAdjudication()); const queue = [intent('recover', '恢復精神')]; let calls = 0;
   await withModel(() => { calls++; return decision(queue, { durationMinutes: 90 }); }, async () => {
     assert.equal((await advance()).status, 200);
     for (let i = 0; i < 5; i++) assert.equal((await advance()).status, 200);
@@ -121,7 +123,7 @@ for (const [name, malformed] of [
   ['blank intent', [intent('blank', ' ')]], ['oversized context', [intent('long', '方向', 'x'.repeat(401))]],
   ['unknown intent fields', [{ ...intent('extra', '方向'), deadline: 10 }]],
 ]) test(`model contract rejects ${name} without advancing the world`, async () => {
-  const world = seedWorld(); store.install(world);
+  const world = worldWithAdjudication(); store.install(world);
   await withModel(() => decision(malformed), async () => {
     assert.equal((await advance()).status, 502);
     const saved = (await (await GET()).json()).world;
@@ -133,7 +135,7 @@ for (const [name, malformed] of [
 });
 
 test('a storage conflict leaves no partially saved queue or activity', async () => {
-  const world = seedWorld(); world.characters[0].intents = [intent('prior', '保留的方向')];
+  const world = worldWithAdjudication(); world.characters[0].intents = [intent('prior', '保留的方向')];
   store.install(world); store.conflictOnNextSave();
   await withModel(() => decision([intent('unsaved', '尚未儲存的方向')], { durationMinutes: 90 }), async () => {
     const response = await advance();

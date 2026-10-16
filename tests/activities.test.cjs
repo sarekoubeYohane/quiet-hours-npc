@@ -12,8 +12,10 @@ const store = fromBuild('store');
 const options = (decide, extras = {}) => ({ minutes: 15, mode: 'openai', modelKey: 'openai:test', limits: { calls: 120, tokens: 500000 }, decide, ...extras });
 const restful = async (w, c, usage) => { usage({ inputTokens: 100, outputTokens: 20 }); return { action: { type: 'rest' }, durationMinutes: 90 }; };
 
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('90-minute activities reuse five later rounds without calls or duplicate memories', async () => {
-  const world = seedWorld(); let calls = 0;
+  const world = worldWithAdjudication(); let calls = 0;
   const opts = options(async (...args) => { calls++; return restful(...args); });
   await advanceActivities(world, opts);
   const memories = world.characters.map(c => c.memories.length);
@@ -25,7 +27,7 @@ test('90-minute activities reuse five later rounds without calls or duplicate me
 });
 
 test('an intervention interrupts only its recipient and is consumed by the next action', async () => {
-  const world = seedWorld(); const called = [];
+  const world = worldWithAdjudication(); const called = [];
   const opts = options(async (w, c, u) => { called.push(c.id); return restful(w, c, u); });
   await advanceActivities(world, opts); called.length = 0;
   record(world, 'observer', '先休息吧', 'intervention', ['vera']);
@@ -35,7 +37,7 @@ test('an intervention interrupts only its recipient and is consumed by the next 
 });
 
 test('private thoughts do not interrupt another NPC; messages affect only the recipient', async () => {
-  const world = seedWorld(); await advanceActivities(world, options(restful));
+  const world = worldWithAdjudication(); await advanceActivities(world, options(restful));
   const vera = world.characters.find(c => c.id === 'vera');
   const cass = world.characters.find(c => c.id === 'cass');
   record(world, 'kris', '私密想法', 'reflect', ['kris']);
@@ -47,7 +49,7 @@ test('private thoughts do not interrupt another NPC; messages affect only the re
 });
 
 test('a watched departure interrupts an activity and changing models invalidates plans', async () => {
-  const world = seedWorld(); await advanceActivities(world, options(restful));
+  const world = worldWithAdjudication(); await advanceActivities(world, options(restful));
   const kris = world.characters.find(c => c.id === 'kris');
   kris.attentionConditions = [{ kind: 'person', source: 'cass', region: '' }];
   resolve(world, world.characters.find(c => c.id === 'cass'), { type: 'move', target: 'cafe' });
@@ -56,7 +58,7 @@ test('a watched departure interrupts an activity and changing models invalidates
 });
 
 test('budget prevents new requests, survives a reload, and resets its hourly window', async () => {
-  const world = seedWorld(); const now = Date.now(); let calls = 0;
+  const world = worldWithAdjudication(); const now = Date.now(); let calls = 0;
   const opts = options(async (...args) => { calls++; return restful(...args); }, { now, limits: { calls: 4, tokens: 30000 } });
   await advanceActivities(world, opts);
   const reloaded = JSON.parse(JSON.stringify(world));
@@ -67,7 +69,7 @@ test('budget prevents new requests, survives a reload, and resets its hourly win
 });
 
 test('API failure rolls back a partial round but persists attempts and reported tokens', async () => {
-  const world = seedWorld(); store.install(world); const originalFetch = global.fetch; let calls = 0;
+  const world = worldWithAdjudication(); store.install(world); const originalFetch = global.fetch; let calls = 0;
   global.fetch = async () => ++calls === 1 ? Response.json({ usage: { prompt_tokens: 100, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] }) } }] }) : new Response('', { status: 429 });
   try {
     await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
@@ -83,7 +85,7 @@ test('API failure rolls back a partial round but persists attempts and reported 
 });
 
 test('API persists a completed round and rejects origin mismatch before requesting AI', async () => {
-  store.install(seedWorld()); const originalFetch = global.fetch; let calls = 0;
+  store.install(worldWithAdjudication()); const originalFetch = global.fetch; let calls = 0;
   global.fetch = async () => { calls++; return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] }) } }] }); };
   const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 4, tokens: 30000 } }) });
   try {
@@ -98,7 +100,7 @@ test('API persists a completed round and rejects origin mismatch before requesti
 });
 
 test('model payload includes only recent memories and reports usage even with invalid JSON', async () => {
-  const world = seedWorld(); const character = world.characters[0];
+  const world = worldWithAdjudication(); const character = world.characters[0];
   character.memories = Array.from({ length: 80 }, (_, i) => ({ time: i, text: `memory-${i}` }));
   let payload, tokens;
   const fakeFetch = async (url, init) => { payload = JSON.parse(init.body); return Response.json({ usage: { prompt_tokens: 42, completion_tokens: 8 }, choices: [{ message: { content: 'invalid JSON' } }] }); };
@@ -109,7 +111,7 @@ test('model payload includes only recent memories and reports usage even with in
 });
 
 test('a habit needs three different world days, not repeated actions in one day', () => {
-  const world = seedWorld(), character = world.characters[0];
+  const world = worldWithAdjudication(), character = world.characters[0];
   for (let i = 0; i < 10; i++) learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
   assert.equal(habitViews(world, character)[0].days, 1);
   assert.equal(habitsForDecision(world, character).length, 0);
@@ -122,7 +124,7 @@ test('a habit needs three different world days, not repeated actions in one day'
 });
 
 test('habit relevance respects time and place, and unused habits weaken', () => {
-  const world = seedWorld(), character = world.characters[0];
+  const world = worldWithAdjudication(), character = world.characters[0];
   for (let i = 0; i < 3; i++) { world.minute = 1260 + i * 1440; learnHabit(world, character, { type: 'rest' }, character.location); }
   const strength = habitStrength(character.habits[0], world.minute);
   assert.equal(habitsForDecision(world, character).length, 1);
@@ -136,11 +138,11 @@ test('habit relevance respects time and place, and unused habits weaken', () => 
 });
 
 test('continuation, demo mode, invalid actions and observer requests do not create habit evidence', async () => {
-  const demo = seedWorld(); await advanceActivities(demo, options(restful, { mode: 'demo', modelKey: 'demo' }));
+  const demo = worldWithAdjudication(); await advanceActivities(demo, options(restful, { mode: 'demo', modelKey: 'demo' }));
   assert.ok(demo.characters.every(c => !c.habits));
-  const invalid = seedWorld(); await advanceActivities(invalid, options(async () => ({ action: { type: 'work', target: 'invalid-task' }, durationMinutes: 60 })));
+  const invalid = worldWithAdjudication(); await advanceActivities(invalid, options(async () => ({ action: { type: 'work', target: 'invalid-task' }, durationMinutes: 60 })));
   assert.ok(invalid.characters.every(c => !c.habits));
-  const world = seedWorld(); record(world, 'observer', '請休息', 'intervention', ['cass']);
+  const world = worldWithAdjudication(); record(world, 'observer', '請休息', 'intervention', ['cass']);
   await advanceActivities(world, options(restful));
   assert.equal(world.characters[0].habits, undefined);
   const prior = JSON.stringify(world.characters[1].habits);
@@ -149,7 +151,7 @@ test('continuation, demo mode, invalid actions and observer requests do not crea
 });
 
 test('model receives only its own established habits, without raw statistics or other private patterns', async () => {
-  const world = seedWorld(), cass = world.characters[0], vera = world.characters[1];
+  const world = worldWithAdjudication(), cass = world.characters[0], vera = world.characters[1];
   for (let i = 0; i < 3; i++) {
     world.minute = 1260 + i * 1440;
     learnHabit(world, cass, { type: 'work', target: 'tidy' }, cass.location);

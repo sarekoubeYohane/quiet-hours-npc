@@ -21,7 +21,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
  await writeFile(output,code);
  const WorldApp=require(output).default;
  const {POST,GET}=build('route'),store=build('store');
- store.install(build('world').seedWorld());
+ store.install(require('./fixtures/ai-world.cjs')(build('world').seedWorld)());
  const historyTurns=Number(process.env.RECOVERY_HISTORY_TURNS || 0);
  const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})}));
  for(let turn=0;turn<historyTurns;turn++){
