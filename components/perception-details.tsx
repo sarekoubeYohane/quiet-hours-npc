@@ -17,7 +17,7 @@ export default function PerceptionDetails({ event, world }: { event: WorldEvent;
         <small>模板 {trace.falsePerception.templateId} · 候選權重 {trace.falsePerception.selectedWeight}／{trace.falsePerception.totalWeight} · 抽選 {trace.falsePerception.draw.toFixed(3)}</small>
       </p>}
       {trace.observations.map(observation => <p key={observation.id}>
-        {observation.sense === 'sight' ? '看見' : '聽見'} · {observation.text}
+        {observation.sense === 'sight' ? '視覺線索' : '聽覺線索'} · {observation.text}
         <small>觀察時間：D{Math.floor(observation.time/1440)+1} {timeLabel(observation.time)} · 來源：{observation.source ? world.characters.find(c => c.id === observation.source)?.name : '未知'} · {observation.clarity === 'clear' ? '清楚' : '模糊'}</small>
       </p>)}
     </div>)}

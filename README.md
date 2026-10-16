@@ -76,7 +76,7 @@ NPC 的主觀經歷共用短期容量（最多 80 筆／64 KiB，包含未處理
 
 舊文字標為來源未分類，既有主觀觀察與關係保守保留；GET 不寫回或呼叫模型。選留結果由世界 API 讀回，隨世界版本與操作日誌一致保存。無效選留或中途失敗回復整回合，保留已知模型用量；接管、待命及純活動續做不為記憶新增呼叫。異常超限舊資料會明確報錯，原存檔不會被截斷或清空。
 
-[#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 與 [記憶實作契約](docs/design/npc-memory-contract.md) 記錄完整設計。#52／#53 已合併；本分支同步最新 main。#56 UI 尚未批准。
+[#50 規格](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/50) 與 [記憶實作契約](docs/design/npc-memory-contract.md) 記錄完整設計。#52／#53 已合併；本分支同步最新 main。#56 唯讀分析已由 #87 批准；分析頁顯示現有記憶／摘要、信念、關係與有限更正來源，不新增模型呼叫。
 
 ## 記憶摘要與遺忘（#54，已合併）
 
