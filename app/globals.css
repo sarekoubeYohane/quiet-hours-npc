@@ -93,4 +93,52 @@
 .cognition-analysis .analysis-references { padding-inline-start:18px; font-size:12px; }
 .cognition-analysis .analysis-references li { margin-block:10px; }
 .cognition-analysis .system-trace { border-top:1px solid var(--border); padding-top:12px; }
+/* Analysis is a reading surface: give character evidence the same room as events. */
+.analysis-workspace { --analysis-padding:24px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.analysis-notice { padding:20px 24px; font-size:.875rem; line-height:1.8; color:var(--muted-foreground); }
+.analysis-notice p + p { margin-top:12px; }
+.analysis-events { padding:var(--analysis-padding); overflow-wrap:anywhere; }
+.analysis-events > h2 { margin-bottom:8px; font-size:1.125rem; }
+.analysis-events > article { padding:20px 0; border-top:1px solid var(--border); font-size:1rem; line-height:1.85; }
+.analysis-workspace .character { padding-bottom:24px; overflow-wrap:anywhere; }
+.analysis-workspace .character-picker { flex-wrap:wrap; padding-inline:var(--analysis-padding); }
+.analysis-workspace .character-picker button { min-height:44px; font-size:1rem; }
+.analysis-workspace .identity { flex-wrap:wrap; }
+.analysis-workspace .identity div > span { font-size:.875rem; }
+.analysis-workspace .character > .hint,
+.analysis-workspace .character > details { margin:16px var(--analysis-padding); }
+.analysis-workspace .character > .detail { padding:24px var(--analysis-padding) 0; }
+.analysis-workspace .detail > p,
+.analysis-workspace .intent-list p,
+.analysis-workspace .habit-list p,
+.analysis-workspace .memories p,
+.analysis-workspace .activity { font-size:1rem; line-height:1.85; }
+.analysis-workspace .detail h3 { flex-wrap:wrap; gap:4px 12px; font-size:1rem; font-weight:600; color:var(--foreground); margin-bottom:10px; }
+.analysis-workspace .detail h3 span { font-size:.875rem; font-weight:400; color:var(--muted-foreground); }
+.analysis-workspace small,
+.analysis-workspace .memories time { font-size:.875rem; line-height:1.7; color:var(--muted-foreground); }
+.analysis-workspace summary,
+.analysis-workspace .cognition-analysis summary { padding-block:10px; font-size:1rem; color:#b8cce8; cursor:pointer; }
+.analysis-workspace .perception-details { font-size:.9375rem; line-height:1.8; }
+.analysis-workspace .cognition-analysis > details { margin-block:20px; border-top:1px solid var(--border); padding-top:8px; }
+.analysis-workspace .cognition-analysis .memories { max-height:32rem; margin-top:8px; padding:0 12px 0 0; scrollbar-gutter:stable; }
+.analysis-workspace .cognition-analysis article { padding:16px; border:1px solid var(--border); border-radius:6px; background:#151d29; }
+.analysis-workspace .cognition-analysis article + article { margin-top:12px; }
+.analysis-workspace .cognition-analysis article p { margin-block:8px; }
+.analysis-workspace .cognition-analysis article small { display:block; }
+.analysis-workspace .cognition-analysis h4 { font-size:1rem; }
+.analysis-workspace .analysis-references { font-size:.9375rem; line-height:1.8; }
+.analysis-workspace .memories:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+@media(max-width:1000px) {
+  .analysis-workspace { grid-template-columns:minmax(0,1fr); }
+  .analysis-workspace .side-column { display:flex; order:-1; }
+}
+@media(max-width:600px) {
+  .analysis-workspace { --analysis-padding:18px; }
+  .analysis-notice { padding:18px; }
+  .analysis-workspace .identity,
+  .analysis-workspace .section-head { padding-inline:var(--analysis-padding); }
+  .analysis-workspace .cognition-analysis article { padding:12px; }
+  .analysis-workspace .cognition-analysis .memories { max-height:28rem; }
+}
 .profile-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.character-profile{margin:20px 0;padding:24px}.profile-toolbar{display:flex;align-items:center;gap:16px;margin-bottom:24px;color:#a7b7cd}.profile-layout{display:grid;grid-template-columns:minmax(220px,40%) minmax(0,1fr);gap:32px}.profile-visual{border:1px solid;border-radius:10px;background:radial-gradient(ellipse at center,#2a394c,#111c29);padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px}.profile-visual img{height:400px;max-width:100%;object-fit:contain;image-rendering:auto}.profile-visual p{font-size:12px;color:#a7b7cd;margin-top:20px;text-align:center}.profile-fallback{font-size:100px;min-height:350px;display:grid;place-items:center}.profile-content h1{font-size:2rem}.profile-content h2{margin:24px 0 12px}.profile-content p{line-height:1.9;overflow-wrap:anywhere}.character[aria-label="角色近況"]{padding:20px}.character[aria-label="角色近況"] .identity{margin:16px 0}.character[aria-label="角色近況"] .profile-actions{margin-bottom:0}@media(max-width:640px){.character-profile{padding:16px}.profile-layout{grid-template-columns:minmax(0,1fr);gap:16px}.profile-visual{min-height:320px;padding:16px}.profile-visual img{height:300px}}
