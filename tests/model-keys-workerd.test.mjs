@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import { createHash } from 'node:crypto';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
@@ -14,7 +15,7 @@ for (const name of ['acceptance-scene', 'world-effects', 'adjudication', 'model-
   modules.push({ type: 'ESModule', path: name + '.js', contents: code });
 }
 
-test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext without exposing secrets', async () => {
+test('world API encrypts keys, rejects damaged ciphertext and round-trips large acceptance backups in real Workers/D1', async () => {
   const mf = new Miniflare({
     outboundService: async () => { throw Error('External network blocked by local test fixture'); },
     cf: false, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
@@ -73,5 +74,26 @@ test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext 
     const damaged = await advance();
     assert.equal(damaged.status, 503);
     assert.ok(!(await damaged.text()).includes(fakeKey));
+    // Setup through the D1 fixture; all round-trip assertions use the actual world API.
+    const before = (await (await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: first } })).json()).world;
+    before.turn = 123; before.minute = 3105;
+    before.events[0].text = Array.from({ length: 6000 }, (_, n) => `${createHash('sha256').update(String(n)).digest('hex')}：完整保存原世界記憶與對話。☕🌙`).join('\n');
+    assert.ok(Buffer.byteLength(JSON.stringify(before)) > 512 * 1024);
+    await db.prepare('UPDATE worlds SET state = ?, operations = ?').bind(JSON.stringify(before), '{"floor":0,"results":{}}').run();
+    const entered = await post({ operation: 'enter-acceptance', mode: 'demo' });
+    assert.equal(entered.status, 200, (await entered.clone().json()).error);
+    const scene = (await entered.json()).world;
+    assert.deepEqual(scene.acceptance, { id: 'daily-life-v1' });
+    assert.ok(!JSON.stringify(scene).includes('完整保存原世界記憶與對話'));
+    const reloaded = (await (await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: second } })).json()).world;
+    assert.equal(reloaded.contextId, scene.contextId);
+    const exited = await post({ operation: 'exit-acceptance', mode: 'demo', worldContext: reloaded.contextId });
+    assert.equal(exited.status, 200, (await exited.clone().json()).error);
+    const restored = (await exited.json()).world;
+    assert.equal(restored.turn, 123); assert.equal(restored.minute, 3105);
+    assert.deepEqual(restored.events, before.events); assert.deepEqual(restored.characters, before.characters);
+    assert.equal(restored.aiUsage.totalCalls, before.aiUsage.totalCalls);
+    const finalRead = (await (await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: second } })).json()).world;
+    assert.deepEqual(finalRead.events, before.events);
   } finally { await mf.dispose(); }
 });

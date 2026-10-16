@@ -34,3 +34,5 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-
 ```
 
 `browser95.mjs` verifies authoritative day/night, region and door state through world API operations, generic activity text, interrupted movement/reload/background recovery, old worlds, reduced motion and 375px image-failure fallbacks. It uses existing assets; no image generation or paid model calls.
+
+`browser-acceptance-scene.mjs` 的原世界 fixture 包含超過 1 MiB 的 UTF-8 故事，驗證完整進入／重載／返回；此為可拋棄 SQLite 與模型替身，正式站容量複測另見驗證紀錄。

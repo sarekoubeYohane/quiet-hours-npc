@@ -237,7 +237,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
-    if (b.operation === 'exit-acceptance' && !world.acceptance?.original) return reply({error:'沒有可返回的原世界。'},400);
+    if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
@@ -277,7 +277,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let failure: Error | undefined;
     if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {
-        world = b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world);
+        world = await (b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world));
         journal.floor = Math.max(journal.floor, issuedAt - 1);
       } catch (error) { failure = error instanceof Error ? error : new Error('無法切換驗收場景。'); }
     } else if (b.operation === 'set-price') {
