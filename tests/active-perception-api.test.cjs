@@ -17,10 +17,12 @@ const withModel=async(actions,run)=>{
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs);}finally{global.fetch=old;}
 };
 const scene=()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';
  for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
  return w;
 };
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('focused looking obtains current people, replaces work and consumes world time; targets share world validation',async()=>{
  const w=scene();owner(w).plan={action:{type:'work',target:'tidy'},startedAt:w.minute,until:w.minute+90,attention:'',modelKey:'openai:gpt-6-luna'};
  w.scene.doors['cafe-door']='open';store.install(w);await POST(req({operation:'takeover'}));

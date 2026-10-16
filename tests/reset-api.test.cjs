@@ -24,9 +24,13 @@ async function signIn(id = 123) {
   try { return cookies(await load('app/api/auth/github/callback/route').GET(request('/api/auth/github/callback?code=fake&state=' + state, cookies(start)))); }
   finally { global.fetch = original; }
 }
-function post(cookie, body) {
+async function post(cookie, body) {
   headers.set(new Headers({ cookie }));
-  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin }, body: JSON.stringify({ mode: 'demo', operationId: operationId(), ...body }) }));
+  const response = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin }, body: JSON.stringify({ mode: 'demo', operationId: operationId(), ...body }) }));
+  if (body.operation === 'set-model-key' && response.ok) {
+    await post(cookie, { operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6-luna' } });
+  }
+  return response;
 }
 async function read(cookie) {
   headers.set(new Headers({ cookie }));

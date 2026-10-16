@@ -18,8 +18,10 @@ async function withModel(choose, run) {
     await run(inputs, body => POST(request({ operation: 'advance', mode: 'openai', model: 'gpt-6-luna', minutes: 15, limits: { calls: 120, tokens: 500000 }, ...body })));
   } finally { global.fetch = previous; }
 }
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('one existing decision saves a belief before its intention and legal action, while merely heard claims need not become beliefs', async () => {
-  const w = seedWorld(); store.install(w);
+  const w = worldWithAdjudication(); store.install(w);
   await withModel(input => input.self.id === 'cass' ? {
     cognitiveUpdates: [belief(input)], interpretation: '這次我想先安排自己的生活。',
     intents: [{ id: 'visit-cafe', content: '找個地方安頓自己的節奏', intensity: 'medium', importance: 'high', urgency: 'low', context: '依目前對相處距離的看法' }], type: 'move', target: 'cafe', mood: '安心',
@@ -35,7 +37,7 @@ test('one existing decision saves a belief before its intention and legal action
   });
 });
 test('similar beliefs update in place, keep or withdraw with reasons, and old views stay out of later decision input', async () => {
-  store.install(seedWorld()); let stage = 0;
+  store.install(worldWithAdjudication()); let stage = 0;
   await withModel(input => input.self.id !== 'cass' ? {} : {
     cognitiveUpdates: stage === 0 ? [belief(input, { text: 'OLD_VIEW_ONLY', conviction: 'certain' })] : stage === 1 ? [belief(input, { version: 1, text: '新的看法仍有疑問', conviction: 'doubtful', reason: '新經歷使我重新理解。' })] : stage === 2 || stage === 3 ? [{ kind: 'belief', operation: stage === 2 ? 'keep' : 'withdraw', id: 'personal-space', version: 2, references: evidence(input), reason: stage === 2 ? '我聽見新說法，但目前還不願改觀。' : '我想先放下這個看法。' }] : [],
   }, async (inputs, advance) => {
@@ -54,7 +56,7 @@ test('similar beliefs update in place, keep or withdraw with reasons, and old vi
   });
 });
 test('relationship tags express topic-dependent trust and explicitly replace legacy views without restoring withdrawn tags', async () => {
-  const w = seedWorld(); w.characters[0].relationships.kris = 'LEGACY_RELATION_ONLY'; store.install(w); let stage = 0;
+  const w = worldWithAdjudication(); w.characters[0].relationships.kris = 'LEGACY_RELATION_ONLY'; store.install(w); let stage = 0;
   const tag = (input, id, topic, text, version = 0) => ({ kind: 'relationship', operation: 'upsert', id, version, person: 'kris', topic, text, references: evidence(input), reason: '不同事情可以有不同程度的信任。' });
   await withModel(input => {
     if (input.self.id !== 'cass') return {};
@@ -71,7 +73,7 @@ test('relationship tags express topic-dependent trust and explicitly replace leg
   });
 });
 test('mistaken certainty and unresolved contradictory beliefs coexist until the NPC explicitly changes them', async () => {
-  store.install(seedWorld()); let stage = 0;
+  store.install(worldWithAdjudication()); let stage = 0;
   await withModel(input => input.self.id !== 'cass' ? {} : { cognitiveUpdates: stage === 0 ? [belief(input, { text: '我深信對方今晚會聯絡我。', conviction: 'certain' })] : stage === 1 ? [belief(input, { id: 'contrary-view', text: '也許對方不會想聯絡我。', conviction: 'doubtful', contradictions: ['personal-space'], reason: '兩個看法仍衝突，我還不想決定。' })] : stage === 2 ? [{ kind: 'belief', operation: 'keep', id: 'personal-space', version: 1, references: evidence(input), reason: '我仍相信自己的判斷，雖然有另一個念頭。' }] : [] }, async (inputs, advance) => {
     for (stage = 0; stage < 4; stage++) assert.equal((await advance()).status, 200);
     const cass = (await read()).characters[0]; assert.equal(cass.cognition.beliefs.length, 2);
@@ -81,7 +83,7 @@ test('mistaken certainty and unresolved contradictory beliefs coexist until the 
   });
 });
 test('only a bounded set of related relationship tags is visible and omitted tags cannot be changed', async () => {
-  const w = seedWorld(), cass = w.characters[0];
+  const w = worldWithAdjudication(), cass = w.characters[0];
   cass.intents = [{ id: 'contact-vera', content: '想和 Vera 商量聯絡方式', intensity: 'low', importance: 'medium', urgency: 'low', context: '' }];
   cass.cognition = { beliefs: [], relationshipTags: Array.from({ length: 20 }, (_, index) => ({ id: `topic-${index}`, characterId: 'cass', version: 1, time: 0, person: 'vera', topic: `話題${index}`, text: `話題${index}仍有自己的想法`, references: [], origin: 'legacy-unclassified' })), trace: [] }; store.install(w);
   const before = await read();
@@ -94,7 +96,7 @@ test('only a bounded set of related relationship tags is visible and omitted tag
   });
 });
 test('the shared 88 KiB decision budget includes beliefs and tags without deleting omitted saved content', async () => {
-  const w = seedWorld(), c = w.characters[0]; c.memories = [];
+  const w = worldWithAdjudication(), c = w.characters[0]; c.memories = [];
   c.shortTerm = Array.from({ length: 80 }, (_, i) => ({ id: `recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(160), source: { kind: 'experience' } }));
   c.longTerm = Array.from({ length: 58 }, (_, i) => ({ id: `long-${i}`, characterId: c.id, version: 1, time: i, text: '乙'.repeat(280), source: { kind: 'experience' }, origin: { id: `past-${i}`, version: 1 }, reason: '重要' }));
   c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `belief-${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '丙'.repeat(125), conviction: 'leaning', references: [], contradictions: [], reason: '仍在乎' })), relationshipTags: [], trace: [] }; store.install(w);
@@ -107,7 +109,7 @@ test('the shared 88 KiB decision budget includes beliefs and tags without deleti
 });
 test('invalid cognitive references, versions and shared operation capacity restore the whole round and replay paid failure', async () => {
   for (const invalid of ['foreign-reference', 'stale-reference', 'unknown-person', 'combined-count', 'conviction', 'reason-bytes', 'extra-field']) {
-    const w = seedWorld(); for (const c of w.characters) c.shortTerm = Array.from({ length: 4 }, (_, i) => ({ id: `${c.id}-recent-${i}`, characterId: c.id, version: 1, time: i, text: '自己的經歷', source: { kind: 'experience' } }));
+    const w = worldWithAdjudication(); for (const c of w.characters) c.shortTerm = Array.from({ length: 4 }, (_, i) => ({ id: `${c.id}-recent-${i}`, characterId: c.id, version: 1, time: i, text: '自己的經歷', source: { kind: 'experience' } }));
     store.install(w); const before = await read(); let calls = 0;
     await withModel(input => {
       const candidate = belief(input); if (calls++ === 0) return { cognitiveUpdates: [candidate] };
@@ -127,7 +129,7 @@ test('invalid cognitive references, versions and shared operation capacity resto
   }
 });
 test('explicit metadata-only history release allows further changes at capacity without reviving old views', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   c.cognition = { beliefs: [], relationshipTags: [], trace: Array.from({ length: 24 }, (_, i) => ({ traceId: `history-${i}`, kind: 'belief', id: `past-${i}`, version: 1, operation: 'withdraw', time: i, reason: '曾經相信，後來撤回', references: [], conviction: 'certain' })) }; store.install(w); let stage = 0;
   await withModel(input => input.self.id !== 'cass' ? {} : { cognitiveUpdates: [{ kind: 'history', operation: 'forget', id: input.self.cognition.historyCandidates[0].traceId, version: 1, reason: '這段更正中介資料已無需保留。' }, belief(input, { version: stage, text: `目前第${stage + 1}次理解`, reason: '我又重新看待這件事。' })] }, async (inputs, advance) => {
     for (stage = 0; stage < 8; stage++) {
@@ -140,7 +142,7 @@ test('explicit metadata-only history release allows further changes at capacity 
 });
 test('saved cognitive state rejects duplicate identities and unbounded old-text history rather than leaking it into the model', async () => {
   for (const invalid of ['duplicate-belief', 'history-text', 'history-reason-bytes']) {
-    const w = seedWorld(), c = w.characters[0], current = { id: 'b', characterId: c.id, version: 1, time: 0, topic: '自己的理解', text: '仍是目前的看法', conviction: 'leaning', references: [], contradictions: [], reason: '影響之後的意圖' };
+    const w = worldWithAdjudication(), c = w.characters[0], current = { id: 'b', characterId: c.id, version: 1, time: 0, topic: '自己的理解', text: '仍是目前的看法', conviction: 'leaning', references: [], contradictions: [], reason: '影響之後的意圖' };
     c.cognition = { beliefs: [current], relationshipTags: [], trace: [] };
     if (invalid === 'duplicate-belief') c.cognition.beliefs.push({ ...current });
     else c.cognition.trace.push({ traceId: 'history', kind: 'belief', id: 'past', version: 1, operation: 'withdraw', time: 0, reason: invalid === 'history-reason-bytes' ? '界'.repeat(86) : '已撤回', references: [], ...(invalid === 'history-text' ? { text: 'OLD_SECRET_FULL_TEXT' } : {}) });
@@ -148,7 +150,7 @@ test('saved cognitive state rejects duplicate identities and unbounded old-text 
   }
 });
 test('a reconsidered continuation can change present emotion without adding a separate cognitive call', async () => {
-  store.install(seedWorld()); let reconsider = false;
+  store.install(worldWithAdjudication()); let reconsider = false;
   await withModel(input => input.self.id === 'cass' ? { type: reconsider ? 'continue' : 'rest', durationMinutes: 90, mood: reconsider ? '安心' : '難過', interpretation: reconsider ? '剛才的消息讓我理解自己仍有選擇。' : '我想先緩一緩。', cognitiveUpdates: reconsider ? [belief(input)] : [] } : { durationMinutes: 90 }, async (inputs, advance) => {
     assert.equal((await advance()).status, 200); const before = await read(), plan = before.characters[0].plan;
     reconsider = true; assert.equal((await POST(request({ operation: 'intervene', target: 'cass', text: '你仍然可以自己決定休息多久。' }))).status, 200);
@@ -158,7 +160,7 @@ test('a reconsidered continuation can change present emotion without adding a se
   });
 });
 test('redundant keep metadata can be released at hard capacity while a referenced changed version remains protected', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   const current = { id: 'personal-space', characterId: c.id, version: 1, time: 0, topic: '相處距離', text: '我仍相信能保留自己的空間', conviction: 'leaning', references: [{ kind: 'short', id: c.shortTerm[0].id, version: 1 }], contradictions: [], reason: '持續影響相處' };
   c.cognition = { beliefs: [current, { ...current, id: 'related-belief', topic: '接下來的生活', text: '另一個看法以目前的相處理解為依據', references: [{ kind: 'belief', id: 'personal-space', version: 1 }] }], relationshipTags: [], trace: Array.from({ length: 24 }, (_, i) => ({ traceId: `keep-${i}`, kind: 'belief', id: 'personal-space', version: 1, operation: 'keep', time: i, reason: '暫時仍然相信', references: [], conviction: 'leaning' })) }; store.install(w);
   let changedTrace;
@@ -174,7 +176,7 @@ test('redundant keep metadata can be released at hard capacity while a reference
 });
 test('at hard capacity a whole candidate can release a formerly required version after explicitly changing its last current reference', async () => {
   for (const historyFirst of [true, false]) {
-    const w = seedWorld(), c = w.characters[0];
+    const w = worldWithAdjudication(), c = w.characters[0];
     c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `current-${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '依以前的理解形成目前看法', conviction: 'leaning', references: [{ kind: 'belief', id: `past-${i}`, version: 1 }], contradictions: [], reason: '目前仍有影響' })), relationshipTags: [], trace: Array.from({ length: 24 }, (_, i) => ({ traceId: `anchor-${i}`, kind: 'belief', id: `past-${i}`, version: 1, operation: 'upsert', nextVersion: 2, time: i, reason: '曾相信，後來改觀', references: [], conviction: 'certain' })) }; store.install(w);
     let invalid = false;
     await withModel(input => {
@@ -192,7 +194,7 @@ test('at hard capacity a whole candidate can release a formerly required version
   }
 });
 test('an actually known message sender can receive contextual relationship tags without granting anonymous or diagnostic identities', async () => {
-  store.install(seedWorld());
+  store.install(worldWithAdjudication());
   assert.equal((await POST(request({ operation: 'intervene', target: 'cass', text: '我可以提供餐點建議，但你的私事不需要告訴我。' }))).status, 200);
   await withModel(input => {
     if (input.self.id !== 'cass' || input.self.cognition.relationshipTags.some(item => item.person === 'observer')) return {};
@@ -203,12 +205,12 @@ test('an actually known message sender can receive contextual relationship tags 
     assert.equal((await advance()).status, 200); assert.ok(inputs.findLast(input => input.self.id === 'cass').self.cognition.relationshipTags.some(item => item.person === 'observer'));
   });
   for (const person of ['world', 'system', 'hidden-person']) {
-    const w = seedWorld(), c = w.characters[0]; c.shortTerm = [{ id: 'anonymous-sound', characterId: c.id, version: 1, time: 0, text: '似乎聽見有人說話', source: { kind: 'observation', ...(person === 'hidden-person' ? {} : { person }) } }]; store.install(w); const before = await read();
+    const w = worldWithAdjudication(), c = w.characters[0]; c.shortTerm = [{ id: 'anonymous-sound', characterId: c.id, version: 1, time: 0, text: '似乎聽見有人說話', source: { kind: 'observation', ...(person === 'hidden-person' ? {} : { person }) } }]; store.install(w); const before = await read();
     await withModel(input => input.self.id === 'cass' ? { cognitiveUpdates: [{ kind: 'relationship', operation: 'upsert', id: 'unavailable-source', version: 0, person, topic: '信任', text: '無權補上來源身份', references: evidence(input), reason: '不能把診斷或未知身份當聯絡人' }] } : {}, async (_inputs, advance) => { assert.equal((await advance()).status, 502); assert.deepEqual((await read()).characters, before.characters); });
   }
 });
 test('pressure review candidates remain an actionable subset after the shared input budget selects visible beliefs', async () => {
-  const w = seedWorld(), c = w.characters[0]; c.memories = [];
+  const w = worldWithAdjudication(), c = w.characters[0]; c.memories = [];
   c.shortTerm = Array.from({ length: 20 }, (_, i) => ({ id: `large-recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(875), source: { kind: 'experience' } }));
   c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `b${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '乙'.repeat(133), conviction: 'leaning', references: [], contradictions: [], reason: '仍有影響' })), relationshipTags: [], trace: [] }; store.install(w); assert.equal((await GET()).status, 200);
   await withModel(input => input.self.id === 'cass' ? { cognitiveUpdates: [{ kind: 'belief', operation: 'withdraw', id: input.self.cognition.reviewCandidates.at(-1).id, version: 1, references: evidence(input), reason: '從本次展示的有限整理候選放下一個看法' }] } : {}, async (inputs, advance) => {
@@ -219,7 +221,7 @@ test('pressure review candidates remain an actionable subset after the shared in
   });
 });
 test('current review and metadata history handles share at most eight maintenance candidates under joint pressure', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `current-${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '目前理解', conviction: 'leaning', references: [], contradictions: [], reason: '仍影響意圖' })), relationshipTags: [], trace: Array.from({ length: 24 }, (_, i) => ({ traceId: `history-${i}`, kind: 'belief', id: `past-${i}`, version: 1, operation: 'withdraw', time: i, reason: '曾經相信後來放下', references: [] })) }; store.install(w);
   await withModel(() => ({}), async (inputs, advance) => {
     assert.equal((await advance()).status, 200); const cognition = inputs.find(input => input.self.id === 'cass').self.cognition;
@@ -229,7 +231,7 @@ test('current review and metadata history handles share at most eight maintenanc
   });
 });
 test('combined cognition and memory maintenance validates the net shared trace capacity', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   c.longTerm = [{ id: 'key', characterId: c.id, version: 1, time: 0, text: '重要片段', source: { kind: 'experience' }, origin: { id: 'origin', version: 1 }, reason: '保留' }];
   c.cognition = { beliefs: [{ id: 'personal-space', characterId: c.id, version: 1, time: 0, topic: '相處距離', text: '目前看法', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' }], relationshipTags: [], trace: [] };
   c.memoryTrace = Array.from({ length: 24 }, (_, i) => ({ id: `keep-${i}`, version: 1, type: 'keep', from: [{ id: 'key', version: 1 }], to: { id: 'key', version: 1 }, reason: '仍在乎' })); store.install(w);
@@ -238,7 +240,7 @@ test('combined cognition and memory maintenance validates the net shared trace c
   });
 });
 test('combined memory and cognition pressure exposes at most eight maintenance handles', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   c.longTerm = Array.from({ length: 48 }, (_, i) => ({ id: `long-${i}`, characterId: c.id, version: 1, time: 0, text: '片段', source: { kind: 'experience' }, origin: { id: `o-${i}`, version: 1 }, reason: '保留' }));
   c.cognition = { beliefs: Array.from({ length: 18 }, (_, i) => ({ id: `belief-${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '想法', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' })), relationshipTags: [], trace: Array.from({ length: 9 }, (_, i) => ({ traceId: `cog-${i}`, kind: 'belief', id: `past-${i}`, version: 1, operation: 'withdraw', time: 0, reason: '放下', references: [] })) };
   c.memoryTrace = Array.from({ length: 9 }, (_, i) => ({ id: `mem-${i}`, version: 1, type: 'forget', from: [{ id: `forgot-${i}`, version: 1 }], reason: '放下' })); store.install(w);
@@ -250,7 +252,7 @@ test('combined memory and cognition pressure exposes at most eight maintenance h
 });
 test('invalid final cognition restores the whole world and replays failure after candidate composition', async () => {
   for (const invalid of ['unresolved-contradiction', 'belief-capacity']) {
-    const w = seedWorld(), subject = w.characters[1];
+    const w = worldWithAdjudication(), subject = w.characters[1];
     const current = { id: 'personal-space', characterId: subject.id, version: 1, time: 0, topic: '相處距離', text: '我仍需要自己的空間', conviction: 'leaning', references: [], contradictions: [], reason: '仍會影響未來選擇' };
     subject.cognition = { beliefs: invalid === 'belief-capacity'
       ? Array.from({ length: 24 }, (_, i) => ({ ...current, id: `current-${i}`, topic: `既有主題${i}` }))
@@ -270,7 +272,7 @@ test('invalid final cognition restores the whole world and replays failure after
   }
 });
 test('all simultaneous memory pressures retain a trace handle for a legal shared-capacity tradeoff', async () => {
-  const w = seedWorld(), c = w.characters[0];
+  const w = worldWithAdjudication(), c = w.characters[0];
   c.shortTerm = Array.from({ length: 80 }, (_, i) => ({ id: `short-${i}`, characterId: c.id, version: 1, time: i, text: '近期片段', source: { kind: 'experience' } }));
   c.longTerm = Array.from({ length: 48 }, (_, i) => ({ id: `long-${i}`, characterId: c.id, version: 1, time: 0, text: '長期片段', source: { kind: 'experience' }, origin: { id: `origin-${i}`, version: 1 }, reason: '保留' }));
   c.cognition = { beliefs: Array.from({ length: 18 }, (_, i) => ({ id: `belief-${i}`, characterId: c.id, version: 1, time: 0, topic: `topic-${i}`, text: '目前理解', conviction: 'leaning', references: [], contradictions: [], reason: '在乎' })), relationshipTags: [], trace: [] };
@@ -286,11 +288,11 @@ test('all simultaneous memory pressures retain a trace handle for a legal shared
 test('observer analysis reads existing cognition and limited corrections without models, writes or cross-account disclosure', async () => {
   const auth = build('auth'), previous = global.fetch, originalNow = Date.now;
   const fixedTime = Date.now();Date.now = () => fixedTime;
-  const w = seedWorld(), c = w.characters[0], short = c.shortTerm[0];
+  const w = worldWithAdjudication(), c = w.characters[0], short = c.shortTerm[0];
   c.longTerm = [{ id: 'summary', characterId: c.id, version: 2, time: w.minute, text: '只餘被尊重的印象', kind: 'summary', state: 'active', source: { kind: 'experience' }, origin: { id: short.id, version: 1 }, rememberedSources: [], reason: '留下印象' }];
   c.cognition = { beliefs: [{ id: 'space', characterId: c.id, version: 2, time: w.minute, topic: '距離', text: '我可以有自己的界線', conviction: 'leaning', references: [{ kind: 'long', id: 'summary', version: 1 }], contradictions: [], reason: '新的理解' }], relationshipTags: [], trace: [{ traceId: 'old', kind: 'belief', id: 'space', version: 1, nextVersion: 2, operation: 'upsert', time: w.minute, reason: '只有改觀理由，沒有舊原文', references: [{ kind: 'short', id: 'forgotten', version: 1 }] }] };
   store.install(w);
-  const other = seedWorld();other.characters[0].shortTerm[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';other.characters[0].memories[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';
+  const other = worldWithAdjudication();other.characters[0].shortTerm[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';other.characters[0].memories[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';
   store.installForOwner('other-owner', other);
   global.fetch = async () => { throw Error('analysis must never dispatch a model or index request'); };
   try {

@@ -22,10 +22,12 @@ async function model(respond, run) {
 async function read() { return (await (await GET()).json()).world; }
 
 function busyWorld() {
-  const world = seedWorld();
+  const world = worldWithAdjudication();
   for (const c of world.characters) c.plan = { action: { type: 'rest' }, startedAt: world.minute - 15, until: world.minute + 75, attention: '', modelKey: 'openai:gpt-6-luna' };
   return world;
 }
+
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
 test('NPC sees its current activity progress when a known message prompts a decision', async () => {
   const world = busyWorld(); record(world, 'observer', '稍後想聊聊', 'intervention', ['cass']); store.install(world);
@@ -90,7 +92,7 @@ test('private thoughts and messages to other recipients do not trigger unrelated
 });
 
 test('a continuation without a current activity rolls back the round and retains paid usage', async () => {
-  const world = seedWorld(); store.install(world);
+  const world = worldWithAdjudication(); store.install(world);
   await model(() => action('continue'), async () => {
     assert.equal((await advance()).status, 502);
     const saved = await read();

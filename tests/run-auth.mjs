@@ -6,7 +6,10 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-auth-'));
 try {
-  const sources = ['lib/costs.ts', 'lib/cognition.ts', 'lib/recall.ts', 'lib/recall-services.ts', 'lib/memory.ts', 'lib/world.ts', 'lib/attention.ts', 'lib/perception.ts', 'lib/false-perception.ts', 'lib/d20.ts', 'lib/habits.ts', 'lib/activities.ts', 'lib/models.ts', 'lib/model-keys.ts', 'lib/playbook.ts', 'lib/store.ts', 'lib/auth.ts', 'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts'];
+  const sources = [
+    ...(await readdir('lib')).filter(file => file.endsWith('.ts')).map(file => `lib/${file}`),
+    'app/api/world/route.ts', 'app/api/auth/github/route.ts', 'app/api/auth/github/callback/route.ts', 'app/api/auth/logout/route.ts',
+  ];
   for (const source of sources) {
     const output = join(directory, source.replace(/\.ts$/, '.cjs'));
     await mkdir(dirname(output), { recursive: true });

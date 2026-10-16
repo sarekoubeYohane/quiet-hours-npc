@@ -1,3 +1,4 @@
+import { knownWorldObjects, knownWorldSupplies, type SceneSupply, type WorldObject, type ActivityPhase } from './world-effects';
 import type { CostLedger, ModelPrice } from './costs';
 import { cognitiveProjection, type CognitiveState } from './cognition';
 import { memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
@@ -6,15 +7,15 @@ import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownSc
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string};
-export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string};
+export type ActivityPlan={action:Action;startedAt:number;until:number;attention:string;modelKey:string;phases?:{stages:ActivityPhase[];cursor:number;origin:string}};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number;costs?:CostLedger};
 export type Habit={key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
 export type Character={id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
-export type World={minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
-export type Action={type:'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string};
+export type World={freeTrials?:Record<string,Resolution>;supplies?:SceneSupply[];objects?:WorldObject[];adjudication?:{provider:'openai'|'openrouter';model:string};minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
+export type Action={type:'propose'|'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string;purpose?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -35,12 +36,12 @@ export function seedWorld():World{return normalizeWorld({minute:1260,turn:0,last
 // belongs to the account rather than to the story, so it is carried over; saved decisions are
 // a statistic of the old story and start from zero. The daily ledger planned in #27 must live
 // outside the world row so that a reset cannot clear it.
-export function resetWorld(previous:World):World{const fresh=seedWorld();if(previous.modelPrices)fresh.modelPrices=structuredClone(previous.modelPrices);if(previous.playerBudget)fresh.playerBudget={...previous.playerBudget};if(previous.aiUsage)fresh.aiUsage={...previous.aiUsage,savedDecisions:0};return fresh;}
+export function resetWorld(previous:World):World{const fresh=seedWorld();if(previous.adjudication)fresh.adjudication={...previous.adjudication};if(previous.modelPrices)fresh.modelPrices=structuredClone(previous.modelPrices);if(previous.playerBudget)fresh.playerBudget={...previous.playerBudget};if(previous.aiUsage)fresh.aiUsage={...previous.aiUsage,savedDecisions:0};return fresh;}
 export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string){
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
 w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
 }
-export function perception(w:World,c:Character){return {time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,cognition:cognitiveProjection(c),shortTerm:memoryProjection(c),longTerm:recallableMemoryProjection(c),memoryReview:[] as MemoryReview[],memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
+export function perception(w:World,c:Character){return {objects:knownWorldObjects(w,c),supplies:knownWorldSupplies(w,c),time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,cognition:cognitiveProjection(c),shortTerm:memoryProjection(c),longTerm:recallableMemoryProjection(c),memoryReview:[] as MemoryReview[],memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
 if(tags.includes('完全不懂髮飾設計'))return -4;
@@ -68,6 +69,7 @@ else {
 if(region&&region.id!==defaultRegion(dest.id))throw Error('請先前往場所入口');
 if(fromRegion!==defaultRegion(from)){const exit=connectingDoor(fromRegion,defaultRegion(from));if(!exit||(w.scene?.doors[exit.id]||'open')!=='open')throw Error('請先打開通往出口的門');}
 }
+for(const object of w.objects||[])if(object.lifecycle==='active'&&object.holder===c.id){object.region=nextRegion;object.revision++;}
 audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.region=nextRegion;c.activity=`剛走到${region?.name||dest.name}。`;text=`${c.name} 步行前往${region?.name||dest.name}，在這段時間結束時抵達。`;
 }
 else if(a.type==='door'){

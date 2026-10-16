@@ -1,10 +1,11 @@
+import { advanceFreePhases, commitFreeAction, type EffectCandidate } from './world-effects';
 import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
 import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
-export type ActivityDecision = { longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -18,7 +19,7 @@ export function budgetReached(usage: AIUsage, limits: BudgetLimits): boolean {
     (limits.tokens !== null && usage.inputTokens + usage.outputTokens >= limits.tokens);
 }
 export const activityDurations = [15, 30, 60, 90];
-const sustained = new Set<Action['type']>(['rest', 'work', 'reflect', 'observe']);
+const sustained = new Set<Action['type']>(['propose', 'rest', 'work', 'reflect', 'observe']);
 const attentionKinds = new Set(['message', 'intervention']);
 
 export class BudgetExceeded extends Error {
@@ -45,7 +46,7 @@ export function attentionMarker(world: World, character: Character): string {
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;
   return !!plan && sustained.has(plan.action.type) && plan.modelKey === modelKey &&
-    world.minute <= plan.until;
+    (world.minute <= plan.until || !!plan.phases);
 }
 
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
@@ -111,6 +112,7 @@ export async function advanceActivities(world: World, options: {
       continue;
     }
     if (canContinue(world, character, modelKey)) {
+      if(character.plan?.phases){advanceFreePhases(world,character);if(ai)usage.savedDecisions++;continue;}
       const left = Math.max(0, character.plan!.until - world.minute);
       // Do not repeatedly say the same line, produce new thoughts, or add duplicate memories.
       record(world, character.id, `${character.name} 繼續原本的活動${left ? `，還有約 ${left} 分鐘` : '，這段活動已完成'}。`, 'continue', [character.id], { from: character.location, to: character.location });
@@ -153,21 +155,29 @@ export async function advanceActivities(world: World, options: {
       if (decision.intents) character.intents = decision.intents;
       if (typeof decision.action.mood === 'string') character.mood = decision.action.mood;
       character.plan!.attention = attentionMarker(world, character);
+      if(character.plan?.phases){record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from,to:character.location});advanceFreePhases(world,character);continue;}
       record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan!.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
       continue;
     }
     if (decision.intents) character.intents = decision.intents;
     delete character.plan;
     try {
-      resolve(world, character, decision.action);
+      if(decision.action.type==='propose'){
+        if(!decision.freeCandidate)throw Error('自由提案缺少裁定。');
+        const phases=decision.freeCandidate.stages||[];
+        if(phases.some(p=>p.afterMinutes>decision.durationMinutes))throw Error('活動階段時點超出本次計畫。');
+        const accepted=commitFreeAction(world,character,decision.freeCandidate);
+        if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+decision.durationMinutes,attention:attentionMarker(world,character),modelKey,phases:{stages:phases,cursor:0,origin:character.region!}};advanceFreePhases(world,character);}
+      }
+      else resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
       const duration = activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
-      if (sustained.has(decision.action.type) && duration > minutes) {
+      if (decision.action.type!=='propose' && sustained.has(decision.action.type) && duration > minutes) {
         character.plan = { action: decision.action, startedAt: world.minute - minutes,
           until: world.minute - minutes + duration, attention: attentionMarker(world, character), modelKey };
       }
     } catch (error) {
-      if (error instanceof MemoryValidationError) throw error;
+      if (error instanceof MemoryValidationError || decision.action.type==='propose') throw error;
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
   }

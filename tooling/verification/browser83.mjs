@@ -10,7 +10,7 @@ let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({reducedMotion:'reduce'});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.clock.install({time:instant});await page.clock.pauseAt(instant);
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.request.post(url+'/api/world',{data:{operation:'set-adjudication',operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',adjudication:{provider:'openai',model:'gpt-6-luna'}}});
  await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();
  await navigate(page,'分析');const panel=page.getByRole('region',{name:'未來一小時費用推估',exact:true});await panel.waitFor({timeout:2000});assert.match(await panel.innerText(),/資料不足/);
  await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await navigate(page,'分析');

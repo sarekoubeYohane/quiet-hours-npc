@@ -34,7 +34,7 @@ export function habitLabel(habit: Habit, characters: Character[]): string {
   const person = characters.find(character => character.id === habit.target)?.name || '朋友';
   const activity = habit.type === 'move' ? `前往${destination}` : habit.type === 'say' ? `與 ${person} 聊聊` :
     habit.type === 'shout' ? `向 ${person} 大聲說話` : habit.type === 'persuade' ? `嘗試說服 ${person}` : habit.type === 'message' ? `傳訊息給 ${person}` : habit.type === 'work' ? ({ tea: '泡茶', tidy: '整理', craft: '畫髮飾' }[habit.target] || '工作') :
-    ({ door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動');
+    ({ propose:'自由方法', door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動');
   return `${habitPeriods[habit.period]}在${place}，常會${activity}`;
 }
 

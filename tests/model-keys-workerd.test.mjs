@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
-for (const name of ['costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
+for (const name of ['world-effects', 'adjudication', 'model-adapter', 'costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
@@ -66,6 +66,7 @@ test('world API encrypts keys in real Workers/D1 and rejects damaged ciphertext 
     assert.ok(!JSON.stringify(storage).includes('ab'.repeat(32)));
     const status = await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: second } });
     assert.equal((await status.json()).modelKeys.openai.configured, true);
+    assert.equal((await post({ operation: 'set-adjudication', mode: 'demo', adjudication: { provider: 'openai', model: 'gpt-6-luna' } })).status, 200);
     const advance = () => post({ operation: 'advance', mode: 'openai', minutes: 15, model: 'gpt-6-luna' });
     assert.equal((await advance()).status, 200);
     await db.prepare("UPDATE account_model_keys SET expires_at = expires_at + 1").run();

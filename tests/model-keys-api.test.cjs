@@ -33,7 +33,11 @@ async function status(cookie) {
   assert.equal(response.status, 200);
   return response.json();
 }
-const save = (cookie, mode = 'openai', key = fakeKey) => post(cookie, { operation: 'set-model-key', mode, key });
+const save = async (cookie, mode = 'openai', key = fakeKey) => {
+  const response = await post(cookie, { operation: 'set-model-key', mode, key });
+  if (response.ok) await post(cookie, { operation: 'set-adjudication', mode: 'demo', adjudication: { provider: mode === 'openai' ? 'openai' : 'openrouter', model: 'gpt-6-luna' } });
+  return response;
+};
 const advance = cookie => post(cookie, { operation: 'advance', mode: 'openai', minutes: 15, model: 'gpt-6-luna' });
 const modelReply = () => Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '休息一下', mood: '平靜', durationMinutes: 60, intents: [] }) } }] });
 

@@ -5,8 +5,10 @@ const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
 const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await(await GET()).json()).world;
 const owner=w=>w.characters.find(c=>c.id==='owner');
-function setup(){const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}return w;}
+function setup(){const w=worldWithAdjudication();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}return w;}
 async function model(run,action=()=>({})){const old=global.fetch,inputs=[];global.fetch=async(_,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[],attentionConditions:[],...action(input)})}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs,()=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,limits:{calls:120,tokens:500000}})));}finally{global.fetch=old;}}
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('critical failure saves a subjective distortion without copying private speech, and return preserves it without observer diagnostics',async()=>{
  const w=setup();store.install(w);const random=Math.random;Math.random=()=>0;
  try{await model(async(inputs,advance)=>{
@@ -53,7 +55,7 @@ test('expressed expectations weight related identities 3 to 1 while other known 
 test('an incompatible template produces no new clue or draw, and direct footsteps survive another sense critical failure',async()=>{
  const rules=build('false-perception').falsePerceptionRules,templates=rules.templates;
  rules.templates=[{id:'unavailable-door',type:'distortion',sense:'sight',clueKinds:['door'],kind:'door',text:'門似乎晃了一下。'}];
- const w=seedWorld();owner(w).control={mode:'taken-over'};w.scene.occluded=['cafe-front'];store.install(w);
+ const w=worldWithAdjudication();owner(w).control={mode:'taken-over'};w.scene.occluded=['cafe-front'];store.install(w);
  const random=Math.random;let draws=0;Math.random=()=>{draws++;return 0;};
  try{await model(async(_inputs,advance)=>{
   assert.equal((await advance()).status,200);const saved=await read(),trace=saved.events.find(e=>e.actor==='vera'&&e.kind==='move').perception.find(t=>t.characterId==='owner');

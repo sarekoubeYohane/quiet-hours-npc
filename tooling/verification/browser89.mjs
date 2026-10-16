@@ -29,7 +29,7 @@ try {
  await page.getByRole('button',{name:'開始自動',exact:true}).waitFor();await tick(60000);assert.equal(advances(),2,'background must stop the shared loop');
  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));});
  await page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='GET');
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.reload();
+ await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.request.post(url+'/api/world',{data:{operation:'set-adjudication',operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',adjudication:{provider:'openai',model:'gpt-6-luna'}}});await page.reload();
  await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();await nav('設定').click();
  await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();
  await page.request.post(url+'/__fixture',{data:{modelFault:429}});await page.getByRole('button',{name:'開始自動',exact:true}).click();

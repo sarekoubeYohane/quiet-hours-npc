@@ -10,8 +10,10 @@ const req=body=>new Request('https://test.invalid/api/world',{method:'POST',head
 const read=async()=>(await (await GET()).json()).world;
 const owner=w=>w.characters.find(c=>c.id==='owner');
 const act=async action=>{assert.equal((await POST(req({operation:'direct',action}))).status,200);assert.equal((await POST(req({operation:'advance',minutes:15}))).status,200);return read();};
+const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+
 test('cafe region and door operations persist and a closed door blocks movement without historical observations',async()=>{
- store.install(seedWorld());
+ store.install(worldWithAdjudication());
  const initial=await read();
  assert.equal(owner(initial).region,'cafe-front');
  assert.equal(initial.scene.doors['cafe-door'],'open');
@@ -32,7 +34,7 @@ const withModel=async(actions,run)=>{
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs,()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits:{calls:120,tokens:500000}})));}finally{global.fetch=old;}
 };
 test('quiet speech remains clear under visual occlusion without identifying its speaker or rolling dice',async()=>{
- const w=seedWorld();w.scene.occluded=['cafe-front'];owner(w).control={mode:'taken-over'};
+ const w=worldWithAdjudication();w.scene.occluded=['cafe-front'];owner(w).control={mode:'taken-over'};
  for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region=id==='cass'?'cafe-storeroom':'cafe-front';}
  store.install(w);const random=Math.random;Math.random=()=>{throw Error('clear words must not roll');};
  try{await withModel({vera:{type:'say',target:'cass',content:'聽得到但看不見的話'}},async(_inputs,advance)=>{
@@ -43,7 +45,7 @@ test('quiet speech remains clear under visual occlusion without identifying its 
  });}finally{Math.random=random;}
 });
 test('direct loud speech shares speech validation and finishes once instead of becoming a sustained activity',async()=>{
- const w=seedWorld(),cass=w.characters.find(c=>c.id==='cass');cass.location='cafe';cass.region='cafe-front';store.install(w);
+ const w=worldWithAdjudication(),cass=w.characters.find(c=>c.id==='cass');cass.location='cafe';cass.region='cafe-front';store.install(w);
  await POST(req({operation:'takeover'}));
  for(const action of [{type:'shout',target:'cass',content:''},{type:'shout',target:'vera',content:'太遠了'},{type:'shout',target:'owner',content:'自己'}])assert.equal((await POST(req({operation:'direct',action}))).status,400);
  const saved=await act({type:'shout',target:'cass',content:'請過來一下！'});assert.equal(owner(saved).plan,undefined);assert.equal(owner(saved).control.pending,undefined);
@@ -52,7 +54,7 @@ test('direct loud speech shares speech validation and finishes once instead of b
  assert.equal((await read()).events.filter(e=>e.actor==='owner'&&e.kind==='shout').length,1);
 });
 test('closed-door arrival gives a waiting owner only anonymous footsteps, persists once and stays subjective after return',async()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';w.scene={doors:{'cafe-door':'closed'},noise:{},occluded:[]};store.install(w);
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';w.scene={doors:{'cafe-door':'closed'},noise:{},occluded:[]};store.install(w);
  await POST(req({operation:'takeover'}));
  await withModel({vera:{type:'move',target:'cafe'}},async(inputs,advance)=>{
   assert.equal((await advance()).status,200);
@@ -72,7 +74,7 @@ test('closed-door arrival gives a waiting owner only anonymous footsteps, persis
  });
 });
 test('opening a door reveals current people without replaying speech or private content; clear speech uses no dice',async()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';
  for(const id of ['cass','vera']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
  w.scene.doors['cafe-door']='closed';store.install(w);await POST(req({operation:'takeover'}));
  const actions={vera:{type:'say',target:'cass',content:'門外先前的私下話'},cass:{type:'reflect',content:'不能流出的內心'},kris:{type:'message',target:'cass',content:'遠方的私人訊息'}};
@@ -98,7 +100,7 @@ test('opening a door reveals current people without replaying speech or private 
  });
 });
 test('old-world migration and free text cannot fabricate door state or replay historical events',async()=>{
- const w=seedWorld();delete w.scene;for(const c of w.characters){delete c.region;delete c.observations;}
+ const w=worldWithAdjudication();delete w.scene;for(const c of w.characters){delete c.region;delete c.observations;}
  w.events.push({id:'hidden-history',time:1200,actor:'vera',kind:'say',text:'不能補發的歷史',audience:['vera'],scene:{from:'cafe',to:'cafe',target:'cass',content:'不能補發的歷史'}});
  store.install(w);const initial=await read();assert.equal(initial.scene.doors['cafe-door'],'open');
  assert.ok(initial.characters.every(c=>c.observations.length===0));
@@ -107,7 +109,7 @@ test('old-world migration and free text cannot fabricate door state or replay hi
  assert.equal(JSON.stringify(owner(saved)).includes('不能補發的歷史'),false);
 });
 test('scene and subjective observations roll back with a failed round or conflicting save',async()=>{
- const w=seedWorld();w.turn=3;store.install(w);
+ const w=worldWithAdjudication();w.turn=3;store.install(w);
  const old=global.fetch;let calls=0;
  global.fetch=async()=>{if(++calls===2)throw Error('provider unavailable');return Response.json({choices:[{message:{content:JSON.stringify({type:'door',target:'cafe-door',content:'close',mood:'',durationMinutes:15,intents:[]})}}]});};
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));assert.equal((await POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna'}))).status,502);}finally{global.fetch=old;}
@@ -117,12 +119,12 @@ test('scene and subjective observations roll back with a failed round or conflic
  assert.deepEqual(saved.scene,before.scene);assert.deepEqual(saved.characters,before.characters);assert.deepEqual(saved.events,before.events);
 });
 test('a closed internal door also blocks leaving through the public entrance',async()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';store.install(w);
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';store.install(w);
  assert.equal((await POST(req({operation:'direct',action:{type:'move',target:'kris-home'}}))).status,400);
  assert.equal(owner(await read()).region,'cafe-storeroom');
 });
 test('uncertain closed-door speech has one saved D20 outcome without revealing words or identity',async()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';w.scene.doors['cafe-door']='closed';
  const vera=w.characters.find(c=>c.id==='vera');vera.location='cafe';vera.region='cafe-front';const cass=w.characters.find(c=>c.id==='cass');cass.location='cafe';cass.region='cafe-front';store.install(w);
  await POST(req({operation:'takeover'}));
  const random=Math.random;Math.random=()=>0.95;
@@ -139,7 +141,7 @@ test('uncertain closed-door speech has one saved D20 outcome without revealing w
 });
 test('sustained observation boosts only the chosen sense and a perceptible target or direction',async()=>{
  for(const [content,target,visible,attention] of [['hearing','cafe-front',false,2],['sight','',false,0],['hearing','vera',false,0],['hearing','vera',true,2]]){
-  const w=seedWorld();owner(w).region=visible?'cafe-front':'cafe-storeroom';owner(w).control={mode:'taken-over'};
+  const w=worldWithAdjudication();owner(w).region=visible?'cafe-front':'cafe-storeroom';owner(w).control={mode:'taken-over'};
   w.scene.doors['cafe-door']=visible?'open':'closed';if(visible)w.scene.noise['cafe-front']='loud';
   owner(w).plan={action:{type:'observe',target,content},startedAt:w.minute,until:w.minute+90,attention:'',modelKey:'openai:gpt-6-luna'};
   for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
@@ -153,7 +155,7 @@ test('sustained observation boosts only the chosen sense and a perceptible targe
 });
 test('perception uses existing five outcomes, controlled ability and competing attention, and keeps ordinary passive failures silent',async()=>{
  for(const [roll,tags,working,outcome,modifier] of [[20,[],false,'critical-success',0],[12,[],false,'success',0],[6,[],false,'mixed',0],[2,[],false,'failure',0],[1,[],false,'critical-failure',0],[10,['聽覺敏銳','擅長髮飾設計'],false,'success',2],[12,['擅長髮飾設計'],true,'mixed',-2],[10,[],'observe','success',2],[8,['聽覺極敏銳'],'observe','success',4]]){
-  const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).abilityTags=tags;w.scene.doors['cafe-door']='closed';
+  const w=worldWithAdjudication();owner(w).region='cafe-storeroom';owner(w).abilityTags=tags;w.scene.doors['cafe-door']='closed';
   if(working)owner(w).plan={action:{type:working===true?'work':'observe',target:working==='observe'?'cafe-front':'cafe-storeroom',content:working==='observe'?'hearing':'整理杯子'},startedAt:w.minute,until:w.minute+120,attention:'',modelKey:'demo'};
   for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
   owner(w).control={mode:'taken-over'};store.install(w);
@@ -176,7 +178,7 @@ test('perception uses existing five outcomes, controlled ability and competing a
 });
 test('occluded arrival combines sight and hearing in one roll, while failure preserves obvious footsteps',async()=>{
  for(const noisy of [true,false]){
-  const w=seedWorld();w.scene.occluded=['cafe-front'];w.scene.noise['cafe-front']=noisy?'loud':'quiet';owner(w).control={mode:'taken-over'};store.install(w);
+  const w=worldWithAdjudication();w.scene.occluded=['cafe-front'];w.scene.noise['cafe-front']=noisy?'loud':'quiet';owner(w).control={mode:'taken-over'};store.install(w);
   let rolls=0;const random=Math.random;Math.random=()=>{rolls++;return noisy?0.95:0;};
   try{await withModel({vera:{type:'move',target:'cafe'}},async(_inputs,advance)=>{
    assert.equal((await advance()).status,200);const saved=await read();
@@ -189,7 +191,7 @@ test('occluded arrival combines sight and hearing in one roll, while failure pre
  }
 });
 test('uncertain results roll back on conflict and later unrelated events never replay them',async()=>{
- const w=seedWorld();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';
+ const w=worldWithAdjudication();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';
  for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}
  store.install(w);const random=Math.random;let rolls=0;Math.random=()=>{rolls++;return 0.6;};
  const actions={vera:{type:'say',target:'cass',content:'conflicting words'}};
