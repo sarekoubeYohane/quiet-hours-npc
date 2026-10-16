@@ -43,7 +43,7 @@ try {
  assert.match(await profile.innerText(),new RegExp((await readWorld()).characters.find(c=>c.id==='cass').mood));
  await page.getByRole('button',{name:'暫停自動',exact:true}).click();await tick(60000);assert.equal((await readWorld()).turn,before+1);
  // Images can fail without preventing status and interaction.
- await page.route('**/pixel/vera.png',route=>route.abort());
+ await page.route('**/characters/vera/portrait.webp',route=>route.abort());
  await profile.getByRole('button',{name:'返回觀察',exact:true}).click();await panel.getByRole('button',{name:'Vera',exact:true}).click();await panel.getByRole('button',{name:'人物檔案',exact:true}).click();
  await profile.getByRole('img',{name:'Vera 的人物圖暫不可用',exact:true}).waitFor();await profile.getByRole('button',{name:'互動',exact:true}).click();await page.getByLabel('你想說的話或發生的事').waitFor();
  // The owner keeps its distinct direct-control lifecycle.

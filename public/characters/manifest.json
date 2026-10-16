@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "characters": {
+    "cass": {
+      "master": {
+        "src": "/characters/cass/master.webp",
+        "width": 1024,
+        "height": 1536,
+        "format": "webp",
+        "transparent": false,
+        "quality": 95
+      },
+      "portrait": {
+        "src": "/characters/cass/portrait.webp",
+        "width": 768,
+        "height": 1152,
+        "format": "webp",
+        "transparent": false
+      },
+      "avatar": {
+        "src": "/characters/cass/avatar.webp",
+        "width": 256,
+        "height": 256,
+        "format": "webp",
+        "transparent": false
+      },
+      "pixel": {
+        "src": "/characters/cass/idle.png",
+        "width": 48,
+        "height": 96,
+        "format": "png",
+        "transparent": true,
+        "frames": 1,
+        "columns": 1,
+        "rows": 1,
+        "direction": "front-three-quarter",
+        "baselineY": 92,
+        "sampling": "nearest-neighbor",
+        "alpha": "binary"
+      },
+      "fallback": "initial",
+      "generatedMaster": "exec-e16efc34-41e4-4da4-9c92-a7772a3e3bd6.png",
+      "generatedPixel": "exec-9f2374df-cc04-4303-ae63-a6f425461421.png"
+    },
+    "vera": {
+      "master": {
+        "src": "/characters/vera/master.webp",
+        "width": 1024,
+        "height": 1536,
+        "format": "webp",
+        "transparent": false,
+        "quality": 95
+      },
+      "portrait": {
+        "src": "/characters/vera/portrait.webp",
+        "width": 768,
+        "height": 1152,
+        "format": "webp",
+        "transparent": false
+      },
+      "avatar": {
+        "src": "/characters/vera/avatar.webp",
+        "width": 256,
+        "height": 256,
+        "format": "webp",
+        "transparent": false
+      },
+      "pixel": {
+        "src": "/characters/vera/idle.png",
+        "width": 48,
+        "height": 96,
+        "format": "png",
+        "transparent": true,
+        "frames": 1,
+        "columns": 1,
+        "rows": 1,
+        "direction": "front-three-quarter",
+        "baselineY": 92,
+        "sampling": "nearest-neighbor",
+        "alpha": "binary"
+      },
+      "fallback": "initial",
+      "generatedMaster": "exec-75137fde-2d50-41de-8bf3-a5a1c60f868a.png",
+      "generatedPixel": "exec-3e89d64d-94c9-463a-8e68-d7d7a0fda4eb.png"
+    },
+    "kris": {
+      "master": {
+        "src": "/characters/kris/master.webp",
+        "width": 1024,
+        "height": 1536,
+        "format": "webp",
+        "transparent": false,
+        "quality": 95
+      },
+      "portrait": {
+        "src": "/characters/kris/portrait.webp",
+        "width": 768,
+        "height": 1152,
+        "format": "webp",
+        "transparent": false
+      },
+      "avatar": {
+        "src": "/characters/kris/avatar.webp",
+        "width": 256,
+        "height": 256,
+        "format": "webp",
+        "transparent": false
+      },
+      "pixel": {
+        "src": "/characters/kris/idle.png",
+        "width": 48,
+        "height": 96,
+        "format": "png",
+        "transparent": true,
+        "frames": 1,
+        "columns": 1,
+        "rows": 1,
+        "direction": "front-three-quarter",
+        "baselineY": 92,
+        "sampling": "nearest-neighbor",
+        "alpha": "binary"
+      },
+      "fallback": "initial",
+      "generatedMaster": "exec-01c8e697-26f7-4ed3-a1ac-9cc6059b670c.png",
+      "generatedPixel": "exec-4c9c060f-28e7-4390-8033-5bc89cc7b4e5.png"
+    },
+    "owner": {
+      "master": {
+        "src": "/characters/owner/master.webp",
+        "width": 1024,
+        "height": 1536,
+        "format": "webp",
+        "transparent": false,
+        "quality": 95
+      },
+      "portrait": {
+        "src": "/characters/owner/portrait.webp",
+        "width": 768,
+        "height": 1152,
+        "format": "webp",
+        "transparent": false
+      },
+      "avatar": {
+        "src": "/characters/owner/avatar.webp",
+        "width": 256,
+        "height": 256,
+        "format": "webp",
+        "transparent": false
+      },
+      "pixel": {
+        "src": "/characters/owner/idle.png",
+        "width": 48,
+        "height": 96,
+        "format": "png",
+        "transparent": true,
+        "frames": 1,
+        "columns": 1,
+        "rows": 1,
+        "direction": "front-three-quarter",
+        "baselineY": 92,
+        "sampling": "nearest-neighbor",
+        "alpha": "binary"
+      },
+      "fallback": "initial",
+      "generatedMaster": "exec-b8942434-52a7-417d-af42-50b1b69efb86.png",
+      "generatedPixel": "exec-3c8cf6b6-be85-45f4-a13b-361f6dffd6b5.png"
+    }
+  }
+}
