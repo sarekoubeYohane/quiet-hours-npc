@@ -1,5 +1,7 @@
 # Local browser verification
 
+Observation integration (#89/#95/#90/#56): run `browser89.mjs`, `browser95.mjs`, `browser90.mjs`, `browser56.mjs`, and `browser-action-analysis.mjs` for shared navigation, authoritative map state, profiles/interactions, read-only cognition, and saved action/perception judgements. Existing `browser80–83.mjs` now navigate through Settings/Analysis explicitly. See `docs/verification/observation-interface-integration-2026-10-16.md` for results and screenshots.
+
 These scripts render the real `WorldApp` in Chromium and route its HTTP requests through the real world GET/POST handlers. A D1-compatible adapter executes SQL against Node's in-memory SQLite. Auth, Worker bindings and model transports are fixture boundaries; external model calls return fixed usage (1,000 input / 200 output tokens). No real API key or paid service is used.
 
 Run from the repository root, with repository dependencies installed and Node >=22.13:
@@ -26,3 +28,5 @@ When running an individual temporary-build runner directly, retain the boundary 
 ```sh
 NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-activities.mjs
 ```
+
+`browser95.mjs` verifies authoritative day/night, region and door state through world API operations, generic activity text, interrupted movement/reload/background recovery, old worlds, reduced motion and 375px image-failure fallbacks. It uses existing assets; no image generation or paid model calls.

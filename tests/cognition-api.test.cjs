@@ -282,3 +282,33 @@ test('all simultaneous memory pressures retain a trace handle for a legal shared
     const saved = (await read()).characters[0]; assert.equal(saved.cognition.beliefs[0].version, 2); assert.equal(saved.memoryTrace.length + saved.cognition.trace.length, 24);
   });
 });
+
+test('observer analysis reads existing cognition and limited corrections without models, writes or cross-account disclosure', async () => {
+  const auth = build('auth'), previous = global.fetch, originalNow = Date.now;
+  const fixedTime = Date.now();Date.now = () => fixedTime;
+  const w = seedWorld(), c = w.characters[0], short = c.shortTerm[0];
+  c.longTerm = [{ id: 'summary', characterId: c.id, version: 2, time: w.minute, text: '只餘被尊重的印象', kind: 'summary', state: 'active', source: { kind: 'experience' }, origin: { id: short.id, version: 1 }, rememberedSources: [], reason: '留下印象' }];
+  c.cognition = { beliefs: [{ id: 'space', characterId: c.id, version: 2, time: w.minute, topic: '距離', text: '我可以有自己的界線', conviction: 'leaning', references: [{ kind: 'long', id: 'summary', version: 1 }], contradictions: [], reason: '新的理解' }], relationshipTags: [], trace: [{ traceId: 'old', kind: 'belief', id: 'space', version: 1, nextVersion: 2, operation: 'upsert', time: w.minute, reason: '只有改觀理由，沒有舊原文', references: [{ kind: 'short', id: 'forgotten', version: 1 }] }] };
+  store.install(w);
+  const other = seedWorld();other.characters[0].shortTerm[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';other.characters[0].memories[0].text = 'OTHER_ACCOUNT_PRIVATE_MEMORY';
+  store.installForOwner('other-owner', other);
+  global.fetch = async () => { throw Error('analysis must never dispatch a model or index request'); };
+  try {
+    const before = await (await GET()).json();
+    const scoped = await (await GET(new Request('https://test.invalid/api/world?owner=other-owner&character=cass'))).json();
+    assert.deepEqual(scoped.world, before.world);assert.equal(scoped.version, before.version);
+    assert.doesNotMatch(JSON.stringify(scoped), /OTHER_ACCOUNT_PRIVATE_MEMORY/);
+    assert.equal(scoped.world.characters[0].cognition.beliefs[0].conviction, 'leaning');
+    assert.equal(scoped.world.characters[0].longTerm[0].rememberedSources.length, 0);
+    assert.equal(scoped.world.characters[0].cognition.trace[0].reason, '只有改觀理由，沒有舊原文');
+    auth.setUserId('other-owner');
+    const otherResponse = await (await GET(new Request('https://test.invalid/api/world?owner=test-owner'))).json();
+    assert.match(JSON.stringify(otherResponse.world), /OTHER_ACCOUNT_PRIVATE_MEMORY/);
+    assert.doesNotMatch(JSON.stringify(otherResponse.world), /只餘被尊重的印象/);
+    auth.setUserId(null);assert.equal((await GET()).status, 401);
+    auth.setUserId('test-owner');
+    const denied = await POST(request({ operation: 'set-belief', target: 'cass', text: 'observer edited belief' }));
+    assert.equal(denied.status, 400);
+    const after = await (await GET()).json();assert.deepEqual(after.world, before.world);assert.equal(after.version, before.version);
+  } finally { auth.setUserId('test-owner');global.fetch = previous;Date.now = originalNow; }
+});

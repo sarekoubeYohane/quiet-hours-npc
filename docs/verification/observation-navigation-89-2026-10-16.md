@@ -20,3 +20,13 @@
 主頁僅保留大地圖、最近 5 則動靜、按需完整生活紀錄、輕量狀態及既有互動；感知／意圖等既有詳情移至分析。感知線索改為「視覺線索／聽覺線索」避免與原內容「看見／聽見」重複，不改判定。
 
 本切片不實作追溯、裁定引擎或 #56 新記憶展示。#90 將接續擴充輕量角色面板／人物檔案；素材 #88 未接管。
+
+## Code review 修正：分析頁補回行動判定
+
+Spec review 發現分析頁原先只有事件敘述及感知詳情，漏掉已保存的行動 D20 數字；觀察頁完整紀錄則有顯示。新增共用 `ActionResolution`，讓兩處展示同一已保存 `resolution`，不重新判定、不改模型或世界狀態。
+
+- `tooling/verification/browser-action-analysis.mjs`：真實 Chromium 經世界 API 指定店主合法專家設計挑戰、固定骰子 10，API 重讀確認 modifier +4、DC 16、total -2、部分成功。
+- Red：分析頁 article 只有事件文字及「感知詳情（觀察者）」，缺少 `D20 10 +4 − DC 16 = -2 · 部分成功`，斷言失敗。
+- Green：分析頁顯示相同數字與結果、可展開該次感知線索；切觀察頁完整生活紀錄仍顯示相同判定，無 pageerror。
+- `NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-activities.mjs`：216／216 通過，含全部 D20 API outcomes、能力／難度、真實 world 保存及記憶邊界回歸。
+- typecheck 通過；變更檔案 ESLint 0 errors，保留已記錄的既有計時 effect dependency warning。

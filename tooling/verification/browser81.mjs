@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {url,server,store,load} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
+const navigate=(page,name)=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
 const env=load('cloudflare-workers').env;
 const action={type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]};
 const world=()=>{const w=load('world').seedWorld();for(const c of w.characters)c.control={mode:'taken-over'};w.characters[0].control={mode:'autonomous'};return w;};
@@ -10,8 +11,8 @@ try{
  const page=await browser.newPage();await page.addInitScript(()=>{Date.now=()=>Date.parse('2026-10-15T16:00:00Z');});
  const read=async()=>(await(await page.request.get(url+'/api/world')).json()).world;
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
- const setup=async()=>{await page.context().clearCookies();store.install(world());await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'test-key'}});await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();await page.getByRole('button',{name:'模型設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();};
- await setup();assert.match(await page.getByRole('region',{name:'付費方與限制'}).innerText(),/目前未啟用/);console.log('PASS disabled owner service payer panel');
+ const setup=async()=>{await page.context().clearCookies();store.install(world());await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'test-key'}});await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();};
+ await setup();await navigate(page,'分析');assert.match(await page.getByRole('region',{name:'付費方與限制'}).innerText(),/目前未啟用/);console.log('PASS disabled owner service payer panel');
  // Provider boundary fault; browser still operates actual WorldApp and real world API.
  globalThis.fetch=async()=>new Response('{}',{status:429});await page.getByRole('button',{name:'下一回合',exact:true}).click();await page.getByRole('alert').filter({hasText:'供應商額度／速率：'}).waitFor();console.log('PASS provider quota visible scope');
  await setup();env.RECALL_ENABLED='true';env.RECALL_USAGE_DB=store.database();env.OWNER_EMBEDDING_KEY='owner-key';env.MEMORY_VECTOR_INDEX={upsert:async()=>({}),deleteByIds:async()=>({}),getByIds:async()=>[],queryById:async()=>({matches:[]}),query:async()=>({matches:[]})};env.RECALL_BUDGET_LIMITS=JSON.stringify({embedding:{ownerMonthly:0,accountMonthly:0}});
