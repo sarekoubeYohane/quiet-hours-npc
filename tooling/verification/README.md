@@ -1,5 +1,7 @@
 # Local browser verification
 
+Character assets (#88): `browser88.mjs` verifies the four approved master/profile/avatar/pixel files, dimensions, alpha, baseline, real map/profile rendering and unchanged world state. Set `BROWSER_FONT_DIR` for readable CJK evidence. `prepare-character-assets.py <generated_images-directory>` exports the approved source IDs with ImageMagick; see `docs/design/character-visual-assets.md`.
+
 Observation integration (#89/#95/#90/#56): run `browser89.mjs`, `browser95.mjs`, `browser90.mjs`, `browser56.mjs`, and `browser-action-analysis.mjs` for shared navigation, authoritative map state, profiles/interactions, read-only cognition, and saved action/perception judgements. Existing `browser80–83.mjs` now navigate through Settings/Analysis explicitly. See `docs/verification/observation-interface-integration-2026-10-16.md` for results and screenshots.
 
 These scripts render the real `WorldApp` in Chromium and route its HTTP requests through the real world GET/POST handlers. A D1-compatible adapter executes SQL against Node's in-memory SQLite. Auth, Worker bindings and model transports are fixture boundaries; external model calls return fixed usage (1,000 input / 200 output tokens). No real API key or paid service is used.

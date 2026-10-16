@@ -186,7 +186,7 @@ AI 成功執行的自主行動按時段（深夜、上午、下午、晚上）�
 
 `WorldEvent.scene` 為可選欄位，記錄行動前後地點、對象與當面說話內容。舊世界和舊事件可以繼續載入，無需資料庫遷移。私訊和私密想法不放入公共泡泡；原有知情範圍與記憶規則保留。
 
-地圖與角色採測試外觀，非小說正式設定。使用內建 ImageGen 生成地圖與透明角色圖集，從圖集抽出角色，保留 alpha。素材保存於 `public/pixel/`：`night-map.png`、`cass.png`、`vera.png`、`kris.png`。素材風格提示為：夜色海軍藍與青綠、琥珀燈光、俯視屋頂剖面的三個相連空間；三位成人角色分別採橘紅開襟外套、銀髮藍裙、橄欖綠外套的像素 RPG 小人。實際路線按成品房門與空地座標配置。
+地圖底圖沿內建 ImageGen 生成的 `public/pixel/night-map.png`，仍為測試場景。#88 新角色素材經使用者逐版選定：Cass、Vera、Kris、店主各有動畫主視覺、人物圖、頭像與透明像素單幀，存於 `public/characters/`，由共用清單接入人物檔案與地圖。舊 `public/pixel/` 人物圖保留供回退，不再作目前外觀依據。素材、來源與生成提示詞見 [角色圖像接點](docs/design/character-visual-assets.md)，實際畫面見 [驗證紀錄](docs/verification/character-assets-88-2026-10-16.md)。素材更新不改寫小說 Canon 或已保存世界。
 
 
 ### 多頁面操作與網路重試

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NPC 觀察室 · 角色素材對照</title>
+<style>
+body{margin:0;padding:24px;font:16px system-ui,sans-serif;background:#17212b;color:#ede8df}h1{font-size:24px}p{line-height:1.6;color:#bfccd5}main{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}article{background:#25323f;padding:16px;border:1px solid #57636b;border-radius:10px}h2{margin:0 0 16px}.portrait{width:100%;height:360px;object-fit:contain;background:#f7f2e8}.details{display:flex;align-items:center;justify-content:space-around;gap:8px;flex-wrap:wrap;margin-top:16px}.avatar{width:80px;height:80px;border-radius:50%}.pixel{image-rendering:pixelated;object-fit:contain}.scale{display:flex;align-items:flex-end;gap:8px;padding:8px;background:#dedbd5}.native{width:48px;height:96px}.map{width:30px;height:60px}.mobile{width:17px;height:33px}a{color:#b9d5ee}small{display:block;margin-top:8px;color:#c4cfd7}@media(max-width:800px){main{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:450px){main{grid-template-columns:1fr}.portrait{height:300px}}
+</style>
+<h1>角色主視覺／頭像／像素對照</h1>
+<p>2026-10-16 選定外觀。像素區依序為原生 48×96、桌機代表尺寸 30×60、窄畫面代表尺寸約 17×33；正式地圖由既有容器等比縮放。素材更新不修改世界資料或小說 Canon。</p>
+<main id="characters"></main>
+<script type="module">
+const {characters}=await(await fetch('/characters/manifest.json')).json();
+const names={cass:'Cass',vera:'Vera',kris:'Kris',owner:'店主'};
+for(const [id,asset] of Object.entries(characters)){
+ const card=document.createElement('article');card.dataset.character=id;
+ const heading=document.createElement('h2');heading.textContent=names[id]||id;card.append(heading);
+ const img=(src,alt,className)=>{const el=document.createElement('img');Object.assign(el,{src,alt,className});return el;};
+ card.append(img(asset.portrait.src,`${names[id]} 主視覺`,'portrait'));
+ const details=document.createElement('div');details.className='details';
+ details.append(img(asset.avatar.src,`${names[id]} 頭像`,'avatar'));
+ const scale=document.createElement('div');scale.className='scale';
+ for(const size of ['native','map','mobile'])scale.append(img(asset.pixel.src,`${names[id]} 像素 ${size}`,`pixel ${size}`));
+ details.append(scale);card.append(details);
+ const link=document.createElement('a');link.href=asset.master.src;link.textContent='全尺寸定妝主圖';card.append(link);
+ const meta=document.createElement('small');meta.textContent=`${id} · 單幀待機 · 腳底基準 y=92 · PNG alpha`;card.append(meta);
+ document.querySelector('main').append(card);
+}
+</script></html>
