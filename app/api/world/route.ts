@@ -1,3 +1,4 @@
+import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
 import { authorityForProposal, effectCandidateSchema, parseEffectCandidate } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
@@ -151,7 +152,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, costSummary:costSummary(loaded.world.aiUsage!), operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -182,7 +183,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    let b: { adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action };
+    let b: { worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
@@ -194,7 +195,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -233,7 +234,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
+    if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
+    if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
+    if (b.operation === 'exit-acceptance' && !world.acceptance?.original) return reply({error:'沒有可返回的原世界。'},400);
+    if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
     if(b.operation==='advance'&&b.mode!=='demo'){
@@ -270,7 +275,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
-    if (b.operation === 'set-price') {
+    if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
+      try {
+        world = b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world);
+        journal.floor = Math.max(journal.floor, issuedAt - 1);
+      } catch (error) { failure = error instanceof Error ? error : new Error('無法切換驗收場景。'); }
+    } else if (b.operation === 'set-price') {
       savePrice(world,b.price!);
     } else if (b.operation === 'set-adjudication') {
       world.adjudication={provider:b.adjudication!.provider,model:b.adjudication!.model.trim()};
@@ -336,7 +346,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               return reservationId;
             };
             const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
-              enabled: env.RECALL_ENABLED === 'true',
+              enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
               verifyCurrent: verifyLease,
               signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
               beforeContinuation: async () => {
@@ -373,7 +383,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         failure = e instanceof Error ? e : new Error('模型決策失敗，本回合沒有推進。');
       }
     }
-    if (env.RECALL_ENABLED === 'true') {
+    if (env.RECALL_ENABLED === 'true' && !world.acceptance) {
       try { await boundRecallStorage(world, id); }
       catch (error) {
         restoreWorld(world,beforeOperation);
@@ -382,8 +392,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     const usage = currentUsage(world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world, version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure) } }
-      : { status: 200, body: { world, version: version + 1, limitReached: b.mode !== 'demo' && budgetReached(usage, limits) } };
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure) } }
+      : { status: 200, body: { world:worldForClient(world), version: version + 1, limitReached: b.mode !== 'demo' && budgetReached(usage, limits) } };
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);

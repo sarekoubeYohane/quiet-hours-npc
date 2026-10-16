@@ -6,9 +6,9 @@ import ts from 'typescript';
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/world-effects.ts', 'world-effects'], ['lib/costs.ts', 'costs'], ['lib/cognition.ts', 'cognition'], ['lib/recall.ts', 'recall'], ['lib/recall-services.ts', 'recall-services'], ['lib/memory.ts', 'memory'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/model-adapter.ts', 'model-adapter'], ['lib/adjudication.ts', 'adjudication'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
+  for (const [source, output] of [['lib/acceptance-scene.ts', 'acceptance-scene'], ['lib/world-effects.ts', 'world-effects'], ['lib/costs.ts', 'costs'], ['lib/cognition.ts', 'cognition'], ['lib/recall.ts', 'recall'], ['lib/recall-services.ts', 'recall-services'], ['lib/memory.ts', 'memory'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/model-adapter.ts', 'model-adapter'], ['lib/adjudication.ts', 'adjudication'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(world-effects|costs|cognition|recall|recall-services|memory|world|attention|false-perception|perception|habits|activities|models|adjudication|model-adapter|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(acceptance-scene|world-effects|costs|cognition|recall|recall-services|memory|world|attention|false-perception|perception|habits|activities|models|adjudication|model-adapter|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
       .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
       .replace('require("@/lib/auth")', 'require("./auth.cjs")').replace(/require\("(?:@\/lib\/|\.\/)store"\)/g, 'require("./store.cjs")');
     await writeFile(join(directory, `${output}.cjs`), code);
@@ -60,7 +60,7 @@ try {
   `);
   const allTests = ['tests/model-contract-api.test.cjs', 'tests/costs-api.test.cjs', 'tests/budgets-api.test.cjs', 'tests/recovery-ui.test.cjs', 'tests/recall-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
-  allTests.push('tests/free-actions-api.test.cjs');
+  allTests.push('tests/free-actions-api.test.cjs', 'tests/acceptance-scene-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
