@@ -1,7 +1,12 @@
-import type { Character, World } from './world';
+import type { Action, Character, World } from './world';
 import { canSee, regionOf, regions } from './perception';
 import { record } from './world';
 import { judgeD20, rollD20, type Difficulty, type Advantage } from './d20';
+
+// Legacy tea changes physical objects too; it must use the same verified effects.
+export function requiresWorldEffects(action: Action): boolean {
+ return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
+}
 
 export type SceneSupply={id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};

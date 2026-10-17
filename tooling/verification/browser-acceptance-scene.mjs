@@ -94,6 +94,15 @@ try {
     assert.equal((await read()).objects.find(o => o.id === 'acceptance-meal:1').lifecycle, 'consumed');
     console.log('PASS acquire/eat through real app and persisted object after reload');
 
+    actor = 'vera'; choice = { ...rest, type: 'work', target: 'tea', durationMinutes: 60 };
+    candidate = { status: 'denied', effects: [], check: null, stages: [] };
+    await wake('Vera'); world = await advance();
+    assert.equal(world.objects[0].state.contents, 'empty');
+    assert.deepEqual(world.objects[0].allowedTo, ['owner']);
+    assert.doesNotMatch(JSON.stringify(world.events), /泡了一壺茶/);
+    assert.ok(modelRequests.some(r => { const input = JSON.parse(r.messages[1].content); return input.contractVersion === 'world-adjudication.v1' && input.action.type === 'work' && input.action.target === 'tea'; }));
+    console.log('PASS legacy tea is adjudicated without rewriting action; no false success before permission');
+
     actor = 'owner'; choice = proposal('acceptance-cup');
     setEffects([{ kind: 'grant', targetId: 'acceptance-cup', recipient: 'vera' }]); await wake('店主'); await advance();
     actor = 'vera'; choice = proposal('acceptance-cup');
@@ -107,7 +116,7 @@ try {
     assert.equal(world.objects[0].holder, null); assert.equal(world.objects[0].revision, 7); assert.equal(world.objects[0].state.clean, 'yes');
     console.log('PASS autonomous grant, borrow/carry/wash/return keeps same cup');
 
-    choice = { ...proposal('acceptance-cup'), durationMinutes: 60 };
+    choice = { ...rest, type: 'work', target: 'tea', content: '用已獲准的杯子泡茶', durationMinutes: 60 };
     candidate = { status: 'accepted', effects: [], check: null, stages: [
       { afterMinutes: 30, preconditions: [{ objectId: 'acceptance-cup', revision: 7, region: 'cafe-front', holder: null, state: { contents: 'empty' } }], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 7, key: 'contents', value: 'water' }] },
       { afterMinutes: 60, preconditions: [{ objectId: 'acceptance-cup', revision: 8, region: 'cafe-front', holder: null, state: { contents: 'water' } }], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 8, key: 'contents', value: 'tea' }] },

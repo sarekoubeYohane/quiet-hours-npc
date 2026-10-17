@@ -105,7 +105,8 @@ audience=witnesses;
 else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
-const tasks:Record<string,string>={tea:'泡了一壺茶，放在桌上。',tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。','craft-easy-challenge':'嘗試設計一個簡單的髮飾變化。','craft-expert-challenge':'嘗試設計非常複雜的髮飾樣式。','study-craft':'研究現場能接觸到的髮飾與布料參考。'};
+if(a.target==='tea')throw Error('泡茶需要已驗證的物件效果；請由 AI 提出活動，規則／直接指定目前不支援。');
+const tasks:Record<string,string>={tidy:'收拾桌面，整理眼前的小東西。',craft:'在紙上畫下一個簡單的髮飾樣式。','craft-challenge':'嘗試構思一份較困難的髮飾設計。','craft-easy-challenge':'嘗試設計一個簡單的髮飾變化。','craft-expert-challenge':'嘗試設計非常複雜的髮飾樣式。','study-craft':'研究現場能接觸到的髮飾與布料參考。'};
 if(!a.target||!tasks[a.target])throw Error('工作無效');
 const challenges:Record<string,Difficulty>={'craft-easy-challenge':8,'craft-challenge':12,'craft-expert-challenge':16};
 if(a.target==='study-craft'){
