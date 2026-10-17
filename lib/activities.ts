@@ -1,4 +1,4 @@
-import { advanceFreePhases, commitFreeAction, EffectValidationError, type EffectCandidate } from './world-effects';
+import { requiresWorldEffects, advanceFreePhases, commitFreeAction, EffectValidationError, type EffectCandidate } from './world-effects';
 import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
@@ -45,7 +45,7 @@ export function attentionMarker(world: World, character: Character): string {
 
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;
-  return !!plan && sustained.has(plan.action.type) && plan.modelKey === modelKey &&
+  return !!plan && (!requiresWorldEffects(plan.action) || !!plan.phases) && sustained.has(plan.action.type) && plan.modelKey === modelKey &&
     (world.minute <= plan.until || !!plan.phases);
 }
 
@@ -86,6 +86,13 @@ export async function advanceActivities(world: World, options: {
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     const control = character.control;
+    // Old tea plans have no validated effects. Replan without replaying their
+    // historical success text or changing earlier committed story/memories.
+    if (character.plan?.action.type === 'work' && character.plan.action.target === 'tea' && !character.plan.phases) {
+      delete character.plan;
+      if (control) delete control.active;
+      character.activity = '泡茶尚未完成，需要重新確認物件條件。';
+    }
     if (control?.pending) {
       const action = control.pending;
       delete control.pending; delete control.active; delete character.plan;
@@ -162,8 +169,13 @@ export async function advanceActivities(world: World, options: {
     if (decision.intents) character.intents = decision.intents;
     delete character.plan;
     try {
-      if(decision.action.type==='propose'){
-        if(!decision.freeCandidate)throw Error('自由提案缺少裁定。');
+      if(requiresWorldEffects(decision.action)){
+        if(!decision.freeCandidate){
+          if(ai)throw Error('物件行動缺少裁定。');
+          character.activity='泡茶尚未完成：目前規則模式不支援這項物件活動。';
+          record(world,character.id,`${character.name} ${character.activity}`,'unsupported',[character.id]);
+          continue;
+        }
         const phases=decision.freeCandidate.stages||[];
         if(phases.some(p=>p.afterMinutes>decision.durationMinutes))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
         const accepted=commitFreeAction(world,character,decision.freeCandidate);
@@ -172,12 +184,12 @@ export async function advanceActivities(world: World, options: {
       else resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
       const duration = activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
-      if (decision.action.type!=='propose' && sustained.has(decision.action.type) && duration > minutes) {
+      if (!requiresWorldEffects(decision.action) && sustained.has(decision.action.type) && duration > minutes) {
         character.plan = { action: decision.action, startedAt: world.minute - minutes,
           until: world.minute - minutes + duration, attention: attentionMarker(world, character), modelKey };
       }
     } catch (error) {
-      if (error instanceof MemoryValidationError || decision.action.type==='propose') throw error;
+      if (error instanceof MemoryValidationError || requiresWorldEffects(decision.action)) throw error;
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
   }

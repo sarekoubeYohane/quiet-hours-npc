@@ -32,7 +32,7 @@ test('a response after the operation work deadline retains known usage but canno
 });
 test('injected adjudication receives separate minimal authority input while the existing action still uses program execution and persistence',async()=>{
  store.install(worldWithAdjudication());const original=global.fetch,inputs=[];
- global.fetch=async()=>Response.json({usage:{prompt_tokens:7,completion_tokens:2},choices:[{message:{content:JSON.stringify({...candidate,type:'work',target:'tea'})}}]});
+ global.fetch=async()=>Response.json({usage:{prompt_tokens:7,completion_tokens:2},choices:[{message:{content:JSON.stringify({...candidate,type:'work',target:'tidy'})}}]});
  try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));
  const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}),{adjudicateExistingAction:async input=>{inputs.push(input);return {status:'accepted'};}});
  assert.equal(response.status,200);assert.equal(inputs.length,4);assert.equal(inputs[0].contractVersion,'world-adjudication.v1');assert.equal(inputs[0].action.type,'work');

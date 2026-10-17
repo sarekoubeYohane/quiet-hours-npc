@@ -1,5 +1,5 @@
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { authorityForProposal, effectCandidateSchema, parseEffectCandidate, EffectValidationError } from '@/lib/world-effects';
+import { requiresWorldEffects, authorityForProposal, effectCandidateSchema, parseEffectCandidate, EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
@@ -365,7 +365,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               },
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });
-            if(decision.action.type==='propose'){
+            if(requiresWorldEffects(decision.action) && !decision.continueExisting){
               const config=w.adjudication!;
               await guard('chat',1);
               const key=await readModelKey(id,config.provider);
