@@ -1,6 +1,6 @@
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { authorityForProposal, effectCandidateSchema, parseEffectCandidate } from '@/lib/world-effects';
-import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, type WorldTaskServices } from '@/lib/adjudication';
+import { authorityForProposal, effectCandidateSchema, parseEffectCandidate, EffectValidationError } from '@/lib/world-effects';
+import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
@@ -111,6 +111,7 @@ async function observeWorldRequest(run: (trace: WorldTrace) => Promise<Response>
   }
 }
 function stopReason(error: unknown) {
+  if (error instanceof EffectValidationError) return {scope:'adjudication',code:'candidate_contract'};
   if (error instanceof BudgetExceeded) return {scope:'player',code:'player_budget'};
   if (error instanceof RecallServiceError) return {scope:error.code === 'provider_limit' ? 'provider' : 'owner',code:error.code};
   if (error instanceof Error && (error as Error & {code?:string}).code === 'provider_limit') return {scope:'provider',code:'provider_limit'};
@@ -134,16 +135,19 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read');
     const loaded = await loadWorld(id);
     let operation;
+    const row = await database().prepare('SELECT operations, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;state:string;version:number}>();
+    // Return the current story and diagnostics from the same committed row.
+    loaded.world = JSON.parse(row!.state);
+    loaded.version = row!.version;
+    const journal = JSON.parse(row!.operations) as Journal;
+    const last = Object.values(journal.results).at(-1);
+    const lastFailure = last && 'status' in last ? last.body.adjudicationFailure as AdjudicationFailure | undefined : undefined;
+    const adjudicationFailure = lastFailure?.contextId === loaded.world.contextId ? lastFailure : undefined;
     if (operationId) {
       // Read only: reload must never dispatch a request that may not have reached us.
-      const row = await database().prepare('SELECT operations, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;state:string;version:number}>();
-      // Keep the world and its operation result from the same committed row.
-      loaded.world = JSON.parse(row!.state);
-      loaded.version = row!.version;
-      const journal = JSON.parse(row!.operations) as Journal;
       const result = journal.results[operationId];
       operation = result && 'status' in result
-        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error, stopReason: result.body.stopReason }
+        ? { state: result.body.operationUncertain ? 'uncertain' : 'settled', status: result.status, error: result.body.error, stopReason: result.body.stopReason, adjudicationFailure: result.body.adjudicationFailure }
         : result && 'pending' in result
           ? { state: result.pending > Date.now() ? 'pending' : 'uncertain' }
           : { state: isOperationExpired(Number(operationId.split(':')[0]), journal.floor) ? 'expired' : 'unknown' };
@@ -152,7 +156,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), operation, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), operation, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -275,6 +279,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     let failure: Error | undefined;
+    let adjudicationFailure: AdjudicationFailure | undefined;
+    let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
     if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {
         world = await (b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world));
@@ -330,6 +336,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           decide: async (w, c, onUsage) => {
+            adjudicationAttempt = undefined;
             const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
             const price=w.modelPrices?.find(p=>p.provider===provider && p.model===b.model!.trim());
             let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
@@ -365,9 +372,15 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const raw=await requestAdjudication({...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c)}, {key,provider:config.provider,model:config.model}, effectCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
+              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes};
+              // Freeze the exact input before effects mutate objects or permissions.
+              const inputSnapshot=JSON.stringify(input);
+              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, effectCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
-              decision.freeCandidate=parseEffectCandidate(raw);
+              adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
+              try{decision.freeCandidate=parseEffectCandidate(raw);}
+              catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
+              adjudicationAttempt.stage='effects';
             }
             if (typeof services?.adjudicateExistingAction === 'function' && !decision.continueExisting) {
               const candidate = await services.adjudicateExistingAction(buildAdjudicationInput(w,c,decision.action));
@@ -378,6 +391,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           },
         });
       } catch (e) {
+        if(e instanceof EffectValidationError && adjudicationAttempt){
+          const attempt=adjudicationAttempt;
+          adjudicationFailure=captureAdjudicationFailure({operationId,requestId:trace.requestId,contextId:world.contextId,actorId:attempt.actorId,stage:attempt.stage},attempt.input,attempt.raw,e.details,attempt.secrets);
+        }
         // Roll back the incomplete round, but retain paid attempts and reported tokens.
         restoreWorld(world,before);
         failure = e instanceof Error ? e : new Error('模型決策失敗，本回合沒有推進。');
@@ -392,7 +409,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     const usage = currentUsage(world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure) } }
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
       : { status: 200, body: { world:worldForClient(world), version: version + 1, limitReached: b.mode !== 'demo' && budgetReached(usage, limits) } };
     journal.results[operationId] = result;
     // The current exact response may exceed the historical byte budget by itself.

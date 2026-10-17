@@ -8,11 +8,59 @@ export type AdjudicationInput = {
   actor: { id: string; location: string; region?: string; abilityTags: string[] };
   target?: { id: string; location: string; region?: string };
   rules: string[];
+  durationMinutes?: number;
 };
 export type WorldTaskServices = {
   // Dependency injection at the server handler, never selectable by a JSON request.
   adjudicateExistingAction?: (input: AdjudicationInput) => Promise<unknown>;
 };
+export type AdjudicationFailure = {
+  operationId: string;
+  requestId: string;
+  contextId?: string;
+  actorId: string;
+  stage: 'parse' | 'effects';
+  input: string;
+  candidate: string;
+  validation: Record<string, unknown>;
+  truncated: boolean;
+};
+
+// A bounded failure receipt, stored with the operation rather than in story
+// events or NPC memory. Only the already-filtered adjudication input is accepted.
+export function captureAdjudicationFailure(
+  context: Pick<AdjudicationFailure, 'operationId' | 'requestId' | 'contextId' | 'actorId' | 'stage'>,
+  input: unknown, raw: string, details: Record<string, unknown>, secrets: string[],
+): AdjudicationFailure {
+  const redact = (text: string) => {
+    for (const secret of secrets.filter(Boolean)) text = text.split(JSON.stringify(secret).slice(1, -1)).join('<REDACTED>');
+    return text.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer <REDACTED>')
+      .replace(/sk-[A-Za-z0-9_-]+/g, '<REDACTED>')
+      .replace(/("(?:authorization|api[_-]?key)"\s*:\s*)"(?:\\.|[^"\\])*"/gi, '$1"<REDACTED>"');
+  };
+  let truncated = false;
+  const snapshot = (value: unknown, limit: number) => {
+    const text = redact(typeof value === 'string' ? value : JSON.stringify(value));
+    if (text.length <= limit) return text;
+    truncated = true;
+    return text.slice(0, limit);
+  };
+  const validationText = snapshot(details, 4000);
+  let validation: Record<string, unknown>;
+  try { validation = JSON.parse(validationText); }
+  catch { validation = { reason: details.reason, snapshot: validationText }; }
+  const result: AdjudicationFailure = {
+    ...context, actorId: snapshot(context.actorId, 120), contextId: context.contextId === undefined ? undefined : snapshot(context.contextId, 120),
+    input: snapshot(input, 9000), candidate: snapshot(raw, 8192), validation, truncated,
+  };
+  // Account for JSON escaping as well as the individual field bounds.
+  while (JSON.stringify(result).length > 24000) {
+    result.input = result.input.slice(0, Math.floor(result.input.length / 2));
+    result.candidate = result.candidate.slice(0, Math.floor(result.candidate.length / 2));
+    result.truncated = true;
+  }
+  return result;
+}
 export function buildAdjudicationInput(world: World, actor: Character, action: Action): AdjudicationInput {
   const target = world.characters.find(character => character.id === action.target);
   return {
