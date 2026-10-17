@@ -139,5 +139,32 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
    assert.equal((await (await GET()).json()).world.aiUsage.totalCalls,1);
    assert.equal((await (await GET()).json()).world.turn,historyTurns+1);
   }finally{release();await running;global.fetch=transport;}
+  // A rejected candidate remains inspectable after a fresh UI read without
+  // replaying a paid action or inserting technical details in story events.
+  const scene=await build('acceptance-scene').enterAcceptanceScene(build('world').seedWorld());
+  scene.adjudication={provider:'openai',model:'gpt-6.1-sol'};
+  scene.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});
+  store.install(scene);sessionStorage.clear();
+  await send({operation:'set-model-key',mode:'openai',key:'test-key',worldContext:scene.contextId});
+  const routeTransport=global.fetch;let rejectedCalls=0;
+  global.fetch=async(input,options)=>{
+   if(!String(input).startsWith('https://api.openai.com/'))return routeTransport(input,options);
+   rejectedCalls++;
+   const task=JSON.parse(JSON.parse(options.body).messages[1].content);
+   const value=task.contractVersion==='world-adjudication.v1'
+    ?{status:'accepted',effects:[{kind:'consume',objectId:'acceptance-cup',expectedRevision:1}],check:null,stages:[]}
+    :{type:'propose',target:'acceptance-cup',content:'喝點茶',purpose:'休息',mood:'平靜',durationMinutes:15,intents:[]};
+   return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+  };
+  try{
+   assert.equal((await send({operation:'advance',minutes:15,mode:'openai',model:'gpt-6.1-sol',worldContext:scene.contextId})).status,502);
+   await click('重新載入');
+   const details=document.querySelector('[data-adjudication-failure]');
+   assert.ok(details,'reload exposes the saved candidate diagnosis');
+   assert.match(details.textContent,/裁定候選不合法|本回合未提交/);
+   assert.match(details.textContent,/owner|acceptance-cup|not_consumable/);
+   assert.doesNotMatch(details.textContent,/test-key/);
+   assert.equal(rejectedCalls,2);assert.equal((await (await GET()).json()).world.turn,0);
+  }finally{global.fetch=routeTransport;}
  }finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;Date.now=clock;global.setTimeout=timer;await window.happyDOM.close();}
 });

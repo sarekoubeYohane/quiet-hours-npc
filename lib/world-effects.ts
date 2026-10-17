@@ -9,6 +9,26 @@ export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[]};
 export type EffectCandidate={stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export class EffectValidationError extends Error {
+ constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
+}
+// These rules are sent with the schema: JSON shape alone cannot teach the model
+// identity, sequential revisions or the authority required by applyEffects.
+const effectRules = [
+ 'accepted 必須包含至少一個可執行效果或活動階段；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
+ 'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
+ 'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
+ 'consume：僅 food 且 holder=actor.id 才可食用，之後 lifecycle=consumed、holder=null，不會補貨。桌上食物必須先 transfer 拿取再 consume，第二步版本加一。不能 consume 杯子或茶具；飲用杯中液體須用支援的 state 轉換，無法表達時 unsupported。',
+ '物件效果必須使用已知、active、本地、owner=actor.id 或 allowedTo 含 actor.id 的物件；物件須由 actor 持有，或無人持有且 actor 看得到。不可操作其他角色持有的物件。',
+ 'transfer：toRegion 必須是 actor 當前 region；toHolder=null 是放下，toHolder=actor.id 是拿取。交給其他角色需要同區域、allowedTo 與該角色先前 consent 形成的 acceptedBy；不能代對方同意。移動另用 NPC move，不得遠端轉移。',
+ 'grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。',
+ 'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。destroy 只能毀壞自己所有的物件，不能毀壞借來物品。',
+ 'state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。',
+ 'stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過 durationMinutes。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
+ '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
+ '確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。',
+];
+const materializedObjectId = (supply: SceneSupply) => `${supply.id}:${supply.remaining}`;
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(k=>k in value);
 const integer=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
 const reference=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=120;
@@ -49,46 +69,50 @@ export function knownWorldSupplies(w:World,c:Character){
 export function authorityForProposal(w:World,c:Character){
  const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
  const supplies=knownWorldSupplies(w,c).map(s=>w.supplies!.find(full=>full.id===s.id)!);
- return {objects,supplies,effectContract:effectCandidateSchema};
+ return {objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v2',effectRules,effectContract:effectCandidateSchema};
 }
-function applyEffects(w:World,c:Character,effects:Effect[]):string[]{
+function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null):string[]{
  const results:string[]=[];
- for(const e of effects){
+ for(const [effectIndex,e] of effects.entries()){
+  const fail:(reason:string,message:string)=>never=(reason,message)=>{
+   const id='objectId' in e?e.objectId:'supplyId' in e?e.supplyId:e.targetId;
+   throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:e,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
+  };
   if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
-   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))throw Error('裁定供應前提無效。');
-   const id=`${s.id}:${s.remaining}`;
-   if(w.objects?.some(o=>o.id===id))throw Error('供應身份已被使用。');
+   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))fail('supply_precondition','裁定供應前提無效。');
+   const id=materializedObjectId(s);
+   if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
    const o:WorldObject={id,source:s.id,label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
    (w.objects??=[]).push(o);s.remaining--;results.push(`取得${o.label}`);
   }else if(e.kind==='grant'){
    const target=w.objects?.find(o=>o.id===e.targetId)||w.supplies?.find(s=>s.id===e.targetId);
    const recipient=w.characters.find(x=>x.id===e.recipient);
-   if(!target||!target.knownTo.includes(c.id)||!canSee(w,c,target.region)||target.owner!==c.id||target.region!==regionOf(c)||!recipient||!canSee(w,c,regionOf(recipient))||('lifecycle' in target&&target.lifecycle!=='active'))throw Error('無權代替所有者同意。');
+   if(!target||!target.knownTo.includes(c.id)||!canSee(w,c,target.region)||target.owner!==c.id||target.region!==regionOf(c)||!recipient||!canSee(w,c,regionOf(recipient))||('lifecycle' in target&&target.lifecycle!=='active'))fail('owner_consent','無權代替所有者同意。');
    if(!target.allowedTo.includes(recipient.id))target.allowedTo.push(recipient.id);
    if(!target.knownTo.includes(recipient.id))target.knownTo.push(recipient.id);
    results.push(`同意 ${recipient.name} 使用${target.label}`);
   }else if(e.kind==='consent'){
    const o=w.objects?.find(o=>o.id===e.objectId);
-   if(!o||o.lifecycle!=='active'||!o.knownTo.includes(c.id)||!canSee(w,c,o.region)||!o.allowedTo.includes(c.id))throw Error('無法同意接收未知或未獲准物件。');
+   if(!o||o.lifecycle!=='active'||!o.knownTo.includes(c.id)||!canSee(w,c,o.region)||!o.allowedTo.includes(c.id))fail('receiving_consent','無法同意接收未知或未獲准物件。');
    o.acceptedBy=[...new Set([...(o.acceptedBy||[]),c.id])];results.push(`同意接收${o.label}`);
   }else{
    const o=w.objects?.find(o=>o.id===e.objectId);
-   if(!o||o.revision!==e.expectedRevision||o.lifecycle!=='active'||o.region!==regionOf(c)||!(o.owner===c.id||o.allowedTo.includes(c.id))||!(o.holder===c.id||o.holder===null&&o.knownTo.includes(c.id)&&canSee(w,c,o.region)))throw Error('裁定物件前提無效。');
+   if(!o||o.revision!==e.expectedRevision||o.lifecycle!=='active'||o.region!==regionOf(c)||!(o.owner===c.id||o.allowedTo.includes(c.id))||!(o.holder===c.id||o.holder===null&&o.knownTo.includes(c.id)&&canSee(w,c,o.region)))fail('object_precondition','裁定物件前提無效。');
    if(e.kind==='consume'){
-    if(o.kind!=='food'||o.holder!==c.id)throw Error('不能食用這件物品。');
+    if(o.kind!=='food'||o.holder!==c.id)fail('not_consumable','不能食用這件物品。');
     o.lifecycle='consumed';o.holder=null;results.push(`食用${o.label}`);
    }else if(e.kind==='destroy'){
-    if(o.owner!==c.id)throw Error('不能毀壞借來的物品。');
+    if(o.owner!==c.id)fail('not_owned','不能毀壞借來的物品。');
     o.lifecycle='destroyed';o.holder=null;results.push(`處理了已損毀的${o.label}`);
    }else if(e.kind==='state'){
-    if(!o.stateTransitions?.[e.key]?.includes(e.value)||o.state[e.key]===e.value)throw Error('物件不支援這個狀態轉換。');
+    if(!o.stateTransitions?.[e.key]?.includes(e.value)||o.state[e.key]===e.value)fail('state_transition','物件不支援這個狀態轉換。');
     o.state[e.key]=e.value;results.push(`${o.label}：${e.key}=${e.value}`);
    }else{
-    if(e.toRegion!==regionOf(c)||!regions.some(r=>r.id===e.toRegion))throw Error('不能跨地點遠端轉移物件。');
+    if(e.toRegion!==regionOf(c)||!regions.some(r=>r.id===e.toRegion))fail('remote_transfer','不能跨地點遠端轉移物件。');
     if(e.toHolder!==null&&e.toHolder!==c.id){
      const recipient=w.characters.find(x=>x.id===e.toHolder);
-     if(!recipient||regionOf(recipient)!==e.toRegion||!o.allowedTo.includes(recipient.id)||!o.acceptedBy?.includes(recipient.id))throw Error('對方尚未同意接收。');
+     if(!recipient||regionOf(recipient)!==e.toRegion||!o.allowedTo.includes(recipient.id)||!o.acceptedBy?.includes(recipient.id))fail('recipient_consent','對方尚未同意接收。');
      o.acceptedBy=o.acceptedBy.filter(id=>id!==recipient.id);
     }
     o.holder=e.toHolder;o.region=e.toRegion;results.push(`${o.label}${e.toHolder?'已交付持有人':'留在現場'}`);
@@ -108,7 +132,15 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
  const clone=structuredClone(w),actor=clone.characters.find(x=>x.id===c.id)!;
  const results=applyEffects(clone,actor,candidate.effects);
  const predicted=structuredClone(clone),predictedActor=predicted.characters.find(x=>x.id===c.id)!;
- for(const phase of candidate.stages||[]){if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects);}
+ for(const [phaseIndex,phase] of (candidate.stages||[]).entries()){
+  try{
+   if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
+   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);
+  }catch(error){
+   if(error instanceof EffectValidationError)throw error;
+   throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>predicted.objects?.find(o=>o.id===p.objectId)||null)});
+  }
+ }
  let resolution;
  if(candidate.check){
   const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,val])=>[key,canonical(val)])):value;

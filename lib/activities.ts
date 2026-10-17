@@ -1,4 +1,4 @@
-import { advanceFreePhases, commitFreeAction, type EffectCandidate } from './world-effects';
+import { advanceFreePhases, commitFreeAction, EffectValidationError, type EffectCandidate } from './world-effects';
 import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
@@ -165,7 +165,7 @@ export async function advanceActivities(world: World, options: {
       if(decision.action.type==='propose'){
         if(!decision.freeCandidate)throw Error('自由提案缺少裁定。');
         const phases=decision.freeCandidate.stages||[];
-        if(phases.some(p=>p.afterMinutes>decision.durationMinutes))throw Error('活動階段時點超出本次計畫。');
+        if(phases.some(p=>p.afterMinutes>decision.durationMinutes))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
         const accepted=commitFreeAction(world,character,decision.freeCandidate);
         if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+decision.durationMinutes,attention:attentionMarker(world,character),modelKey,phases:{stages:phases,cursor:0,origin:character.region!}};advanceFreePhases(world,character);}
       }
