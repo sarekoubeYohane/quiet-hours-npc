@@ -75,3 +75,13 @@ ordinary 背景以 `SceneSupply.background={ruleId,sequence}` 與有限供應分
 本切片普通泡茶 immediate 建立或取得當前合法空杯並加水，30 分鐘階段才改成茶；仍沿 #100 的前提、取消、回合保存及重送。第一次、重用的觀察者資訊在有界 64 條 `routineAudit`，不放進 events、NPC 記憶或決策投影。正常物理成果則沿既有感知與記憶路徑。規則命中不派送額外模型，NPC 正常決策及費用保留。
 
 後續界線：#110 要將此 tracer 擴充成同組多種活動的有界效果範本與明確材料分類；不能只靠增加固定動詞清單宣稱通用任意活動。#111 完整障礙／恢復與例外；#112 權限、知情、能力及場所共用。#104／#106 的正式站驗收未因此關閉。
+
+## #110：可組合日常活動與一份飲品
+
+`RoutineTemplate` 將普通單份請求分成 literal verb／subject／purpose 選擇槽與受限 result（brew／serve／consume／clean／release）；保存資料驅動比對，並重用同一 materialize／state／consume／transfer 引擎。不是將自由提案全轉回人物／動詞白名單：未匹配方法、用途、規模及新例外仍交回原裁定。模板最多 16 組、每槽最多 16 個有界字串；字串先 escape，result 僅接受已實作種類、內容與時間，未知／無效模板不匹配，不執行模型產生的程式。
+
+首次 ordinary scope 一次核准茶、咖啡、簡餐、飲用、清洗與放回；新活動各自綁定當前物件，並非重播舊效果。`knownRoutineMethods` 只提供已知且適用的普通方法選擇，不投影 rule ID 或 audit。自然語言只匹配可安全解讀的單份組合；其他表述保留裁定 fallback。
+
+杯子是 utensil，準備中 contents=water；30 分鐘後才具體化具有 `state.vessel` 的 food 飲品。該生產供應為一次性有限 output：pending 時不向 NPC／裁定投影，也不能立即 materialize；依到期 phase 產出後 remaining=0。一般材料／備品背景與這份成品不同。飲用會 consume 該飲品 tombstone 並使原杯 contents=dirty；清洗原杯為 empty、歸還放在同一 region，owner 不變。有限成品不是日後可任意補出的材料來源。
+
+明確食物供應優先；指定最後一份蛋糕不可透過換詞、重載或 ordinary 背景補回。日常背景不繞過具體目標、權限、損壞及已移走事實。最多 512 個物件或供應時拒絕新背景產出，不刪歷史以洗身份。

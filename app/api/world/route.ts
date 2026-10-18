@@ -367,7 +367,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });
             if(requiresWorldEffects(decision.action) && !decision.continueExisting){
-              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes);
+              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes,undefined,b.minutes);
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
               await guard('chat',1);
@@ -381,7 +381,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
-              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes);}
+              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes);}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
               adjudicationAttempt.stage='effects';
               }

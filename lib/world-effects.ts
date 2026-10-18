@@ -8,12 +8,12 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type SceneSupply={pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[]};
-export type EffectCandidate={stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type EffectCandidate={blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
@@ -69,7 +69,7 @@ export function knownWorldObjects(w:World,c:Character){
  return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:o.state,revision:o.revision,kind:o.kind}));
 }
 export function knownWorldSupplies(w:World,c:Character){
- return (w.supplies||[]).filter(s=>s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind}));
+ return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind}));
 }
 export function authorityForProposal(w:World,c:Character){
  const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
@@ -85,11 +85,11 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
   };
   if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
-   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))fail('supply_precondition','裁定供應前提無效。');
+   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&phaseIndex===null)||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))fail('supply_precondition','裁定供應前提無效。');
    const id=materializedObjectId(s);
    if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
    const o:WorldObject={id,source:s.id,label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
-   (w.objects??=[]).push(o);if(s.background)s.background.sequence++;else s.remaining--;results.push(`取得${o.label}`);
+   (w.objects??=[]).push(o);delete s.pending;if(s.background)s.background.sequence++;else s.remaining--;results.push(`取得${o.label}`);
   }else if(e.kind==='grant'){
    const target=w.objects?.find(o=>o.id===e.targetId)||w.supplies?.find(s=>s.id===e.targetId);
    const recipient=w.characters.find(x=>x.id===e.recipient);
@@ -130,7 +130,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
 }
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):boolean{
  if(candidate.status!=='accepted'){
-  c.activity=candidate.status==='denied'?'這次方法沒有成功。':'目前的方法無法落實。';
+  c.activity=candidate.blockedReason||(candidate.status==='denied'?'這次方法沒有成功。':'目前的方法無法落實。');
   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);return false;
  }
  // Validate complete effects on a copy before randomness or any world mutation.
@@ -140,6 +140,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
  for(const [phaseIndex,phase] of (candidate.stages||[]).entries()){
   try{
    if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
+   predicted.minute=Math.max(predicted.minute,w.minute+phase.afterMinutes);
    checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
@@ -178,6 +179,7 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
  for(const p of phase.preconditions){
   const o=w.objects?.find(o=>o.id===p.objectId);
   if(!o||o.lifecycle!=='active'||o.revision!==p.revision||o.region!==p.region||o.holder!==p.holder||Object.entries(p.state).some(([k,v])=>o.state[k]!==v))throw Error('活動前提已改變。');
+  if(o.state.condition==='broken'&&phase.effects.some(e=>e.kind==='state'&&e.objectId===o.id&&e.key==='contents'))throw Error('活動器具已損壞。');
  }
  if(phase.effects.some(e=>e.kind==='grant'||e.kind==='consent'))throw Error('活動需要新的角色選擇。');
  if(c.plan?.phases&&regionOf(c)!==c.plan.phases.origin)throw Error('角色已離開活動場景。');
@@ -188,7 +190,7 @@ export function advanceFreePhases(w:World,c:Character):void{
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=w.minute-plan.startedAt){
   const phase=phases.stages[phases.cursor],clone=structuredClone(w),actor=clone.characters.find(x=>x.id===c.id)!;
   let results:string[];
-  try{checkPhase(clone,actor,phase);results=applyEffects(clone,actor,phase.effects);}catch{
+  try{checkPhase(clone,actor,phase);results=applyEffects(clone,actor,phase.effects,phases.cursor);}catch{
    c.activity='原活動的條件已改變，尚未完成。';
    record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);delete c.plan;return;
   }

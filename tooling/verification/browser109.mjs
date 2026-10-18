@@ -18,9 +18,9 @@ try{
  await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await choose();
  let w=await advance();assert.equal(w.objects[0].state.contents,'water');assert.equal(w.routineRules.length,1);assert.equal(adjudication,1);
  w=await advance();assert.equal(w.objects[0].state.contents,'tea');assert.equal(w.characters[0].plan,undefined);
- await page.reload();await choose();w=await advance();assert.equal(w.objects.length,2);assert.equal(w.objects[1].state.contents,'water');assert.equal(adjudication,1);assert.equal(npc,2);
- const replay=await page.request.post(url+'/api/world',{data:requests.filter(r=>r.operation==='advance').at(-1)});assert.equal(replay.status(),200);assert.equal((await replay.json()).world.objects.length,2);assert.equal(modelRequests.length,3);
- w=await advance();assert.equal(w.objects[1].state.contents,'tea');assert.equal(w.aiUsage.totalCalls,3);
+ await page.reload();await choose();w=await advance();assert.equal(w.objects.filter(o=>o.kind==='utensil').length,2);assert.equal(w.objects.filter(o=>o.kind==='utensil')[1].state.contents,'water');assert.equal(adjudication,1);assert.equal(npc,2);
+ const replay=await page.request.post(url+'/api/world',{data:requests.filter(r=>r.operation==='advance').at(-1)});assert.equal(replay.status(),200);assert.equal((await replay.json()).world.objects.filter(o=>o.kind==='utensil').length,2);assert.equal(modelRequests.length,3);
+ w=await advance();assert.equal(w.objects.filter(o=>o.kind==='utensil')[1].state.contents,'tea');assert.equal(w.aiUsage.totalCalls,3);
  await navigate(page,'分析');await page.getByRole('region',{name:'日常規則與成果',exact:true}).getByText('沿用日常規則，無新增裁定',{exact:false}).waitFor();await page.screenshot({path:outputPath('browser109-reused.png'),fullPage:true});assert.deepEqual(errors,[]);
  console.log('PASS #109 actual application Chromium: first rule/background approval, timed water→tea, new activity after completion and reload, replay, observer analysis, no diagnostic NPC leakage; 2 NPC + 1 adjudication dispatch, 120 reported tokens.');
 }finally{await browser?.close();server.close();}
