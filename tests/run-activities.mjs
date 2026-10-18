@@ -60,7 +60,7 @@ try {
   `);
   const allTests = ['tests/model-contract-api.test.cjs', 'tests/costs-api.test.cjs', 'tests/budgets-api.test.cjs', 'tests/recovery-ui.test.cjs', 'tests/recall-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
-  allTests.push('tests/routine-sharing-api.test.cjs', 'tests/routine-obstacles-api.test.cjs', 'tests/routine-api.test.cjs', 'tests/tea-api.test.cjs', 'tests/free-actions-api.test.cjs', 'tests/acceptance-scene-api.test.cjs', 'tests/adjudication-failure-api.test.cjs');
+  allTests.push('tests/routine-first-approval-api.test.cjs', 'tests/routine-sharing-api.test.cjs', 'tests/routine-obstacles-api.test.cjs', 'tests/routine-api.test.cjs', 'tests/tea-api.test.cjs', 'tests/free-actions-api.test.cjs', 'tests/acceptance-scene-api.test.cjs', 'tests/adjudication-failure-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

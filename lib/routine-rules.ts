@@ -20,16 +20,17 @@ const templates:RoutineTemplate[]=[
 export type RoutineRule={id:string;version:1;family:'cafe-service';operations:RoutineOperation[];templates?:RoutineTemplate[];origin:string;knownTo:string[]};
 export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string[];confirmedOperations?:RoutineOperation[]};
 
-export const routineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]}},required:['family','version'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
+export const routineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:['tea','coffee','food','drink','wash','return',null]},subject:{type:['string','null'],maxLength:40}},required:['family','version','operation','subject'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
 export function parseRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15):EffectCandidate {
  if(raw.length>8192)throw Error('裁定候選超出容量。');
  const parsed=JSON.parse(raw),approval=parsed?.routine;
  if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;const candidate=parseEffectCandidate(JSON.stringify(parsed));const rule=w.routineRules?.find(r=>r.knownTo.includes(c.id));if(rule)audit(w,c,rule,'exception');return candidate;}
- if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||!approval||typeof approval!=='object'||Object.keys(approval).sort().join(',')!=='family,version'||approval.family!=='cafe-service'||approval.version!==1)throw Error('日常規則核准格式無效。');
+ const approvalKeys=approval&&typeof approval==='object'?Object.keys(approval).sort().join(','):'';
+ if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||!['family,version','family,operation,version','family,operation,subject,version'].includes(approvalKeys)||approval.family!=='cafe-service'||approval.version!==1||approval.operation!=null&&!templates.some(t=>t.operation===approval.operation)||approval.subject!=null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40))throw Error('日常規則核准格式無效。');
  return bindRoutine(w,c,a,duration,approval,elapsedMinutes)!;
 }
 
-export type RoutineApproval={family:'cafe-service';version:1};
+export type RoutineApproval={family:'cafe-service';version:1;operation?:RoutineOperation|null;subject?:string|null};
 const escapePattern=(s:string)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function validTemplate(t:RoutineTemplate):boolean {
  if(!t||typeof t!=='object'||!t.result||typeof t.result!=='object')return false;
@@ -83,20 +84,25 @@ function localComplete(w:World,c:Character,op:RoutineOperation){
 export function routineOffer(w:World,c:Character,a:Action){
  const place=localPlace(w,c),scope=w.routineRules?.find(r=>r.family==='cafe-service'&&r.knownTo.includes(c.id))?.templates||templates;
  const op=routineOperation(a,scope);
- if(!op||!place||!place.operators.includes(c.id)||!capable(w,c,op))return null;
- // A home confirms only the requested domestic procedure, never a café job.
- const selected=place.purpose==='home'?templates.filter(t=>t.operation===op):templates;
+ if(!place||!place.operators.includes(c.id))return null;
+ // First interpretation belongs to the existing adjudication slot. Exact
+ // wording is needed for free deterministic reuse, not to offer interpretation.
+ const selected=(place.purpose==='cafe'?templates:op?templates.filter(t=>t.operation===op):scope).filter(t=>validTemplate(t)&&capable(w,c,t.operation));
+ if(!selected.length||op&&!capable(w,c,op))return null;
  return {family:'cafe-service',version:1,operations:selected.map(t=>t.operation),templates:structuredClone(selected),background:'ordinary local materials and utensils only; explicit finite supplies and object facts take precedence',place};
 }
-export function matchingRoutine(w:World,c:Character,a:Action){
+export function matchingRoutine(w:World,c:Character,a:Action):RoutineRule|undefined {
  const matches=(w.routineRules||[]).filter(r=>r.version===1&&r.family==='cafe-service'&&!!requestTemplate(a,r.templates||templates.filter(t=>Array.isArray(r.operations)&&r.operations.includes(t.operation))));
  return matches.find(r=>r.knownTo.includes(c.id))||matches[0];
 }
 export function bindRoutine(w:World,c:Character,a:Action,duration:number,approval?:RoutineApproval,elapsedMinutes=15):EffectCandidate|undefined {
  let rule=matchingRoutine(w,c,a);
  if(!rule&&!approval)return;
- if(!requestTemplate(a,rule?.templates||templates)||!rule&&!routineOffer(w,c,a)||approval&&(approval.family!=='cafe-service'||approval.version!==1))throw new EffectValidationError('日常規則不適用於當前提案。',{reason:'routine_scope'});
- const template=requestTemplate(a,rule?.templates||templates)!;
+ const offer=approval?routineOffer(w,c,a):null;
+ const literal=requestTemplate(a,rule?.templates||templates);
+ const template=approval?.operation?offer?.templates.find(t=>t.operation===approval.operation):literal;
+ if(!template||literal&&template.operation!==literal.operation||approval&&(!offer||approval.family!=='cafe-service'||approval.version!==1)||approval?.subject&&!template.subjects.includes(approval.subject))throw new EffectValidationError('日常規則不適用於當前提案。',{reason:'routine_scope'});
+ if(!rule&&approval?.operation)rule=w.routineRules?.find(r=>r.version===1&&r.family==='cafe-service'&&r.knownTo.includes(c.id)&&(r.templates||[]).some(t=>validTemplate(t)&&t.operation===template.operation));
  if(rule){
   audit(w,c,rule,'reused');
   if(!rule.knownTo.includes(c.id)||!capable(w,c,template.operation)||!localRight(w,c,template.operation))return blockedRoutine(w,c,'目前尚不具備這次方法所需的知識、能力或使用條件。');
@@ -108,8 +114,9 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  if(duration<template.result.minutes)throw new EffectValidationError('泡茶活動至少需要三十分鐘。',{reason:'routine_duration'});
  if(!rule){
   if((w.routineRules?.length||0)>=32)throw new EffectValidationError('日常規則已達容量。',{reason:'routine_capacity'});
-  const offered=routineOffer(w,c,a)!;
-  rule={id:crypto.randomUUID(),version:1,family:'cafe-service',operations:offered.operations,templates:offered.templates,origin:c.location,knownTo:[c.id]};(w.routineRules??=[]).push(rule);
+  // A home confirms only this interpreted procedure, never the entire café role.
+  const selected=localPlace(w,c)?.purpose==='home'?[template]:offer!.templates;
+  rule={id:crypto.randomUUID(),version:1,family:'cafe-service',operations:selected.map(t=>t.operation),templates:structuredClone(selected),origin:c.location,knownTo:[c.id]};(w.routineRules??=[]).push(rule);
   audit(w,c,rule,'approved');
  }
  if(approval){
@@ -129,7 +136,10 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  const canUse=(o:WorldObject)=>usableRoutineObject(o,c.id);
  const targetCup=targetObject?.kind==='utensil'?targetObject:undefined;
  if(['consume','clean','release'].includes(template.result.kind)){
-  const requested=template.result.kind==='consume'?requestedDrink(a,template):undefined;
+  const literalDrink=template.result.kind==='consume'?requestedDrink(a,template):undefined;
+  const interpretedDrink=approval?.subject==='咖啡'?'coffee':approval?.subject&&/茶/.test(approval.subject)?'tea':undefined;
+  if(literalDrink&&interpretedDrink&&literalDrink!==interpretedDrink)throw new EffectValidationError('飲品種類與提案不符。',{reason:'routine_subject'});
+  const requested=template.result.kind==='consume'?literalDrink||interpretedDrink:undefined;
   const availableDrink=(v:WorldObject)=>visible.find(o=>o.kind==='food'&&o.state.vessel===v.id&&canUse(o)&&o.state.beverage===v.state.contents&&(!requested||o.state.beverage===requested));
   const vessel=targetCup||(!target?visible.find(o=>o.kind==='utensil'&&canUse(o)&&(template.result.kind!=='consume'||availableDrink(o))):undefined);
   if(!vessel||!canUse(vessel))return blockedRoutine(w,c,'目前沒有符合這次方法的可用器具或飲品。');
@@ -150,7 +160,9 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   return {status:'accepted',effects,check:null,stages:[]};
  }
  if(template.result.kind==='serve'){
-  const subject=template.subjects.find(subject=>(a.content||'').includes(subject))!;
+  const literalSubject=template.subjects.find(subject=>(a.content||'').includes(subject));
+  const subject=approval?.subject||literalSubject;
+  if(!subject||literalSubject&&subject!==literalSubject)throw new EffectValidationError('日常餐點種類未確認或與提案不符。',{reason:'routine_subject'});
   const explicit=(w.supplies||[]).filter(s=>!s.background&&s.region===region&&s.kind==='food'&&(target?s.id===target:s.label.includes(subject)));
   let supply=explicit.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id));
   if(targetObject||target&&!targetSupply||explicit.length&&!supply)return denied;
