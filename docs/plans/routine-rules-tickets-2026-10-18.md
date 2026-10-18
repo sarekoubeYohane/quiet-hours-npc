@@ -1,55 +1,57 @@
-# 日常規則與供應背景：工作票拆分草稿
+# 日常規則與供應背景：工作票拆分
 
-狀態：待使用者確認拆分；尚未發布工作票、修改父票或開始實作。
-日期：2026-10-18（Asia/Taipei）
+狀態：使用者於 2026-10-18 12:45（Asia/Taipei）批准四張拆分與依賴，已發布 #109–#112，均標記 ready-for-agent。尚未開始實作。
 父規格：[#108](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/108)
-流程：to-tickets。依 skill 先提供完整垂直切片、阻擋關係與驗收，確認後才按依賴順序發布。
-查證 main：cab08092ac5204d997742ae7210225d59dad8018。#108 完整內容未變、無留言；未找到既有同範圍工作票。
+流程：to-tickets；依使用者已確認的草稿發布，父規格未修改或關閉。
+查證 main：cab08092ac5204d997742ae7210225d59dad8018；發布前再次核對 #108 完整內容與留言，內容未變、無留言，沒有同範圍重複工作票。
 
-## 建議拆分
+## 已發布拆分
 
-- **T1：首次確認日常背景，完成活動並跨次重用** — Blocked by：無。店主第一次泡茶取得有效日常規則與背景，實際完成；活動結束後再次泡茶及重載後重做，都沿用規則而不新增裁定。
-- **T2：同一日常範圍承接多種活動，保留供應與物件差異** — Blocked by：T1。一次核准咖啡館一般餐飲服務後，茶與咖啡／簡餐都能真實執行；一般背景不逐份盤點，最後一份蛋糕與借出的杯子仍正確追蹤。
-- **T3：已知障礙免重複裁定，新例外與條件恢復可接續** — Blocked by：T1。茶壺壞了、已缺貨或沒有使用權時直接處理；相同條件重試不增加裁定，條件改善後可繼續，真正的新方法才裁定。
-- **T4：符合條件的角色與場所共用日常規則** — Blocked by：T3。另一角色取得許可後、或同一角色回到條件齊全的家中，可直接沿用泡茶規則；未知當地背景才確認，物資與權限不會被複製。
+| 草稿代號 | 工作票 | 直接前置 | 完整交付 |
+| --- | --- | --- | --- |
+| T1 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)：首次確認日常背景，完成活動並跨次重用 | 無 | 店主第一次泡茶取得有效日常規則與背景，實際完成；活動結束後再次泡茶及重載後重做，都沿用規則而不新增裁定。 |
+| T2 | [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)：同一日常範圍承接多種活動，保留供應與物件差異 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) | 一次核准咖啡館一般餐飲服務後，茶與咖啡／簡餐都能真實執行；一般背景不逐份盤點，最後一份蛋糕與借出的杯子仍正確追蹤。 |
+| T3 | [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)：已知障礙免重複裁定，新例外與條件恢復可接續 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) | 茶壺壞了、已缺貨或沒有使用權時直接處理；相同條件重試不增加裁定，條件改善後可繼續，真正的新方法才裁定。 |
+| T4 | [#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112)：符合條件的角色與場所共用日常規則 | [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) | 另一角色取得許可後、或同一角色回到條件齊全的家中，可直接沿用泡茶規則；未知當地背景才確認，物資與權限不會被複製。 |
 
-依賴圖：T1 → T2；T1 → T3 → T4。T1 完成後 T2／T3 可分別推進；T4 不等待 T2。
-每張票都包含資料／世界行為、API、保存、既有畫面及測試的窄而完整路徑。沒有獨立的 schema、UI 或「最後才補測試」水平票。
-目前沒有證據需要寬廣機械重構；必要局部整理在 T1／對應切片的功能修改前完成，維持測試綠燈。
+依賴：#109 → #110；#109 → #111 → #112。
+目前可開始 #109；完成後 #110／#111 可分別推進，#112 等 #111，不等待 #110。
+每張票都包含資料／世界行為、API、保存、既有畫面及測試的窄而完整路徑，並覆蓋自己的相容性與失敗分支。
+目前沒有證據需要寬廣機械重構；必要局部整理在對應切片功能修改前完成，保持既有路徑可用。
 
 ## 與既有工作的關係
 
 - #93／#94／#100 已關閉，其裁定、物件與活動階段能力作為基礎，不重開重做。
-- main 已有 #104／#106 相關修正，兩票仍開啟並保留正式站後續驗收責任；不把它們的待線上驗收狀態當成本輪本機新功能開發的全面阻擋。
-- 沿 #108 已確認的世界 API／真實應用瀏覽器驗收；各票明示完成與尚待擴充範圍。
-- 發布會使用 ready-for-agent，依 T1、T2、T3、T4 順序取得真實 Issue 編號並代換下文暫名。依現有工具能力，以 Parent／Blocked by 記錄關係；若可用原生寫入能力再使用，不虛稱已建立。
-- 本流程不修改或關閉父規格 #108。使用者尚未批准這份拆分，故此文件不是已發布工作票。
+- main 已有 #104／#106 相關修正，兩票仍開啟並保留正式站後續驗收責任；不把待線上驗收狀態當成本輪本機新功能開發的全面阻擋。
+- 沿 #108 已確認的世界 API／真實應用瀏覽器驗收；各票明示完成與尚待擴充範圍，不要求重新 Grill。
+- 可用 GitHub 工具未提供原生 sub-issue／blocking 寫入能力，工作票用 Parent／Blocked by 明示父子及依賴，未建立原生關聯。
+- 本輪只發布工作票並核對內容／標籤／依賴，沒有修改父規格 #108，沒有執行 runtime 測試、付費測試、重置世界、合併或部署。
 
 ## #108 驗收覆蓋
 
 | 父規格驗收 | 交付切片 |
 | --- | --- |
-| 首次建立並完成 | T1 |
-| 跨活動重用 | T1、T2 |
-| 合理表述與邊界 | T1、T2、T3 |
-| 供應精細度並存 | T2 |
-| 留白與事實分開 | T1、T2、T3 |
-| 具體物件連續性 | T2 |
-| 同場所角色共用 | T4 |
-| 跨場所沿用 | T4 |
-| 已知障礙與恢復 | T3 |
-| 新例外 | T3 |
-| 活動階段 | T1；T2–T4 沿用並驗必要變體 |
-| 自主與資訊隔離 | T1、T3、T4 |
-| 保存與舊世界 | T1；各票驗自己的新增行為 |
-| 重送、衝突與失敗 | T1；各票驗自己的新增行為 |
-| 付費與停止原因 | T1、T3；T2、T4 驗新增裁定為零 |
-| 既有路徑回歸 | T1；後續每票保留 |
+| 首次建立並完成 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) |
+| 跨活動重用 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110) |
+| 合理表述與邊界 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)、[#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) |
+| 供應精細度並存 | [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110) |
+| 留白與事實分開 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)、[#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) |
+| 具體物件連續性 | [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110) |
+| 同場所角色共用 | [#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112) |
+| 跨場所沿用 | [#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112) |
+| 已知障礙與恢復 | [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) |
+| 新例外 | [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) |
+| 活動階段 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)；[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)–[#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112) 沿用並驗必要變體 |
+| 自主與資訊隔離 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)、[#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112) |
+| 保存與舊世界 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)；各票驗自己的新增行為 |
+| 重送、衝突與失敗 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)；各票驗自己的新增行為 |
+| 付費與停止原因 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)；[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)、[#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112) 驗新增裁定為零 |
+| 既有路徑回歸 | [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)；後續每票保留 |
 | 真實應用操作 | 每張票各自包含 |
 
-## 完整工作票草稿
+## 已發布工作票內容
 
-### T1：首次確認日常背景，完成活動並跨次重用
+### [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)：首次確認日常背景，完成活動並跨次重用
 
 ## Parent
 
@@ -59,7 +61,7 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 交付第一條可操作的完整路徑：咖啡館已有明確定位，店主首次提出泡茶，一般材料尚未逐份設定；天上意志在既有裁定上限內確認合理日常背景與可執行規則，活動留下真實成果。該活動結束後，新的泡茶活動及重載後再次泡茶沿用規則，不重複付費裁定。
 
-本切片建立可表達「一組活動範圍」的通用契約，先以泡茶跑通完整路徑；同組不同活動由 T2 擴充，不能把單一泡茶情境當成 #108 全部完成。必要的局部整理先於功能修改，保持既有路徑可用；不另開只做資料結構或框架的前置票。
+本切片建立可表達「一組活動範圍」的通用契約，先以泡茶跑通完整路徑；同組不同活動由 [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110) 擴充，不能把單一泡茶情境當成 #108 全部完成。必要的局部整理先於功能修改，保持既有路徑可用；不另開只做資料結構或框架的前置票。
 
 ## Acceptance criteria
 
@@ -86,11 +88,11 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 開始前核對最新 main、父票、本票及前置票的完整內容與留言。不得重新 Grill 已確認決策；必要工程選擇在本切片內提出並驗證，不只交文件。依父規格保留角色自主、資訊隔離、受限效果、D20、玩家預算與技術回合原子提交。沒有真實付費測試、重置正式世界、合併或部署授權。
 
-發布時標記 ready-for-agent；這不代表可跳過尚未完成的前置。若原生 sub-issue／blocking 寫入能力仍不可用，以 Parent／Blocked by 明示關係，不宣稱已建立原生關聯。
+本票依使用者 2026-10-18 批准的四張拆分發布，已標記 ready-for-agent；必須先完成尚未解除的前置。目前可用工具未提供原生 sub-issue／blocking 寫入能力，父子及阻擋關係以 Parent／Blocked by 連結明示，未建立原生關聯。
 
 ---
 
-### T2：同一日常範圍承接多種活動，保留供應與物件差異
+### [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)：同一日常範圍承接多種活動，保留供應與物件差異
 
 ## Parent
 
@@ -100,7 +102,7 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 讓一次核准的咖啡館一般餐飲範圍承接真正不同的活動，至少由泡茶延伸至咖啡或簡餐，並包含餐具清洗的物件連續性。玩家能看到不同活動的可重讀成果，後續活動不用逐項向天上意志重新核准。
 
-一般日常材料不要求逐份庫存；既有有限供應、明確稀缺與指定物件仍有效。本票沿 T1 的通用規則／背景與原有物件引擎擴充，不另造物件系統或只加一份固定咖啡館動詞清單。
+一般日常材料不要求逐份庫存；既有有限供應、明確稀缺與指定物件仍有效。本票沿 [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) 的通用規則／背景與原有物件引擎擴充，不另造物件系統或只加一份固定咖啡館動詞清單。
 
 ## Acceptance criteria
 
@@ -111,15 +113,15 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 - [ ] 正常種類、用途與規模受核准範圍限制；大型宴席、特殊改造或不相容用途不能以普通營業規則直接完成，交回既有自由提案裁定路徑。既有已明確損壞／不存在事實保持。
 - [ ] 新合法飲品具有必要身份與消耗結果，已喝掉的同一份不復生；借杯／使用／清洗／歸還沿同一杯子，保持位置、持有與所有權區分。
 - [ ] 指定杯子已被移走或耗損時，不生成替代杯冒充該物件；活動不能暗中改方法或選擇別的對象。一般備品背景不抹除具體物件後果。
-- [ ] 新產物及有限供應結果保存／重載一致；重送與保存失敗沿 T1 保證不重複具體化、消耗或計費，較早成果保持。
+- [ ] 新產物及有限供應結果保存／重載一致；重送與保存失敗沿 [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) 保證不重複具體化、消耗或計費，較早成果保持。
 - [ ] 既有畫面可分辨各活動成果、有限供應耗盡與具體物件狀態；角色只看見可知資訊。查看不派送，不新增庫存編輯器或完整菜單設定工作。
 - [ ] 用 API／瀏覽器 fixture 走同組跨活動、飲品消耗、有限蛋糕與同杯清洗歸還，核對呼叫計數與重讀世界；明示同意、有限供應與一般背景，不能把 fixture 細節當成正式場景固定菜單。
 
 ## Blocked by
 
-- T1：需要已保存、可匹配及執行的日常規則／背景與首條完整路徑。
+- [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)：需要已保存、可匹配及執行的日常規則／背景與首條完整路徑。
 
-本票不依賴 T3／T4：沿用既有自由提案 fallback 及有效場景條件即可獨立驗證上述行為，完整障礙重試與跨角色／跨場所另由相應票補齊。
+本票不依賴 [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)／[#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112)：沿用既有自由提案 fallback 及有效場景條件即可獨立驗證上述行為，完整障礙重試與跨角色／跨場所另由相應票補齊。
 
 ## 執行邊界
 
@@ -127,11 +129,11 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 開始前核對最新 main、父票、本票及前置票的完整內容與留言。不得重新 Grill 已確認決策；必要工程選擇在本切片內提出並驗證，不只交文件。依父規格保留角色自主、資訊隔離、受限效果、D20、玩家預算與技術回合原子提交。沒有真實付費測試、重置正式世界、合併或部署授權。
 
-發布時標記 ready-for-agent；這不代表可跳過尚未完成的前置。若原生 sub-issue／blocking 寫入能力仍不可用，以 Parent／Blocked by 明示關係，不宣稱已建立原生關聯。
+本票依使用者 2026-10-18 批准的四張拆分發布，已標記 ready-for-agent；必須先完成尚未解除的前置。目前可用工具未提供原生 sub-issue／blocking 寫入能力，父子及阻擋關係以 Parent／Blocked by 連結明示，未建立原生關聯。
 
 ---
 
-### T3：已知障礙免重複裁定，新例外與條件恢復可接續
+### [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)：已知障礙免重複裁定，新例外與條件恢復可接續
 
 ## Parent
 
@@ -141,7 +143,7 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 角色在已核准日常活動中遇到明確障礙時，世界依規則回饋可知的未完成結果。相同相關條件下再次嘗試不重複付費裁定；障礙真實解除後能按新條件執行，未涵蓋的新方法／用途才重新交給天上意志。
 
-以同一泡茶規則走完器具損壞／已知缺貨／無使用權、重試、真實條件改善，以及提出新方法的完整 API→保存→畫面流程。沿 T1 與既有有限供應／物件能力即可驗證，不等待 T2 的多種餐飲擴充。
+以同一泡茶規則走完器具損壞／已知缺貨／無使用權、重試、真實條件改善，以及提出新方法的完整 API→保存→畫面流程。沿 [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) 與既有有限供應／物件能力即可驗證，不等待 [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110) 的多種餐飲擴充。
 
 ## Acceptance criteria
 
@@ -159,9 +161,9 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 ## Blocked by
 
-- T1：需要日常規則匹配、當前前提綁定、可重用執行與保存路徑。
+- [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)：需要日常規則匹配、當前前提綁定、可重用執行與保存路徑。
 
-本票不依賴 T2：可用已核准泡茶、原有有限供應／物件和明示狀態變更獨立驗證。
+本票不依賴 [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)：可用已核准泡茶、原有有限供應／物件和明示狀態變更獨立驗證。
 
 ## 執行邊界
 
@@ -169,11 +171,11 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 開始前核對最新 main、父票、本票及前置票的完整內容與留言。不得重新 Grill 已確認決策；必要工程選擇在本切片內提出並驗證，不只交文件。依父規格保留角色自主、資訊隔離、受限效果、D20、玩家預算與技術回合原子提交。沒有真實付費測試、重置正式世界、合併或部署授權。
 
-發布時標記 ready-for-agent；這不代表可跳過尚未完成的前置。若原生 sub-issue／blocking 寫入能力仍不可用，以 Parent／Blocked by 明示關係，不宣稱已建立原生關聯。
+本票依使用者 2026-10-18 批准的四張拆分發布，已標記 ready-for-agent；必須先完成尚未解除的前置。目前可用工具未提供原生 sub-issue／blocking 寫入能力，父子及阻擋關係以 Parent／Blocked by 連結明示，未建立原生關聯。
 
 ---
 
-### T4：符合條件的角色與場所共用日常規則
+### [#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112)：符合條件的角色與場所共用日常規則
 
 ## Parent
 
@@ -183,12 +185,12 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 已建立的日常規則可以由符合條件的其他角色共用，也可以在另一個條件已確認的場所沿用。玩家能實際看到另一角色獲准後泡茶，以及同一角色回家後沿用適用做法，兩者都不因單純換人／換地點而重新付費核准。
 
-當地背景尚未確認時，才以有界裁定確認；物資、權限、所有權與整套營業職責不隨規則搬移。依 T3 已完成的權限／相關條件處理，以真實可知投影與跨場景狀態完成整條路徑。
+當地背景尚未確認時，才以有界裁定確認；物資、權限、所有權與整套營業職責不隨規則搬移。依 [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) 已完成的權限／相關條件處理，以真實可知投影與跨場景狀態完成整條路徑。
 
 ## Acceptance criteria
 
 - [ ] 同場所另一角色在知情、能力、有效使用許可及當下條件成立時，沿用規則完成活動並保存真實成果，新增裁定為 0；不因不同角色識別而重做相同核准。
-- [ ] 未知物件／配備、無使用權、能力條件不成立或他人未同意接收的變體不能得到同樣結果；沿 T3 的已知障礙與資訊邊界，不以規則共用替他人同意。
+- [ ] 未知物件／配備、無使用權、能力條件不成立或他人未同意接收的變體不能得到同樣結果；沿 [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) 的已知障礙與資訊邊界，不以規則共用替他人同意。
 - [ ] 沿既有合法角色選擇建立有效許可，再由受許可角色執行的流程可驗證；口頭肯定本身不自動生成授權。借用與物件所有權、接收同意仍分開。
 - [ ] 另一場所已有合適配備、材料及使用權時，沿用適用規則完成新活動，新增裁定為 0；將規則條件綁定新場所的實際對象，不套原場所物件身份／版本。
 - [ ] 另一場所合理日常背景尚未確認時，僅在相關提案觸發有界確認；明確不足／缺貨不能當成留白。確認後重載及新活動可沿用，不形成每次換地點重新付費迴圈。
@@ -201,10 +203,10 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 ## Blocked by
 
-- T3：需要已完成的相關前提判定、無權／已知障礙、條件解除與例外裁定，才能正確決定換角色／場所時可沿用、受阻或確認。
-- T1 是 T3 的傳遞前置，不重複列為直接阻擋。
+- [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)：需要已完成的相關前提判定、無權／已知障礙、條件解除與例外裁定，才能正確決定換角色／場所時可沿用、受阻或確認。
+- [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109) 是 [#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111) 的傳遞前置，不重複列為直接阻擋。
 
-本票不依賴 T2：先用泡茶即可驗證角色／場所共用；與多活動範圍整合時沿同一規則契約，由後合併者補必要組合驗證。
+本票不依賴 [#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)：先用泡茶即可驗證角色／場所共用；與多活動範圍整合時沿同一規則契約，由後合併者補必要組合驗證。
 
 ## 執行邊界
 
@@ -212,4 +214,5 @@ Part of [#108：天上意志日常規則重用與供應背景](https://github.co
 
 開始前核對最新 main、父票、本票及前置票的完整內容與留言。不得重新 Grill 已確認決策；必要工程選擇在本切片內提出並驗證，不只交文件。依父規格保留角色自主、資訊隔離、受限效果、D20、玩家預算與技術回合原子提交。沒有真實付費測試、重置正式世界、合併或部署授權。
 
-發布時標記 ready-for-agent；這不代表可跳過尚未完成的前置。若原生 sub-issue／blocking 寫入能力仍不可用，以 Parent／Blocked by 明示關係，不宣稱已建立原生關聯。
+本票依使用者 2026-10-18 批准的四張拆分發布，已標記 ready-for-agent；必須先完成尚未解除的前置。目前可用工具未提供原生 sub-issue／blocking 寫入能力，父子及阻擋關係以 Parent／Blocked by 連結明示，未建立原生關聯。
+
