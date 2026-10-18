@@ -113,4 +113,4 @@
 - 設計紀錄與 GLOSSARY.md 已保存於本分支，新增「日常供應」「日常規則」用語。
 - 本輪只完成查證與設計確認；沒有修改 runtime、重置世界、執行付費測試、合併或部署。
 - 2026-10-18 使用者要求 to-spec，已發布 [#108：天上意志日常規則重用與供應背景](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/108)，標記 ready-for-agent，並在 #87 追加後續規格連結及契約變更說明。已核對 #87／#93／#94／#100／#104／#106 的最新完整內容與留言，沿用先前批准的世界 API 與瀏覽器驗收介面。
-- #108 自含 26 條使用者故事與 17 項驗收條件，明確一般背景／有限供應並存、跨活動與跨場所重用、角色權限與資訊隔離、零新增裁定的範圍、用量與原子保存。未拆工作票或修改 runtime；下一階段按使用者指示進行 to-tickets。
+- #108 自含 26 條使用者故事與 17 項驗收條件，明確一般背景／有限供應並存、跨活動與跨場所重用、角色權限與資訊隔離、零新增裁定的範圍、用量與原子保存。使用者隨後要求 to-tickets，並於 2026-10-18 12:45（Asia/Taipei）批准四張完整切片及依賴；已發布 [#109](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/109)、[#110](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/110)、[#111](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/111)、[#112](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/112)，均標記 ready-for-agent。依賴為 #109→#110、#109→#111→#112；父規格未修改，runtime 尚未實作。完整拆分與驗收覆蓋見 [工作票紀錄](../plans/routine-rules-tickets-2026-10-18.md)。
