@@ -86,6 +86,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
   if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
    if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&phaseIndex===null)||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))fail('supply_precondition','裁定供應前提無效。');
+   if((w.objects?.length||0)>=512)fail('object_capacity','具體物件已達保存容量。');
    const id=materializedObjectId(s);
    if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
    const o:WorldObject={id,source:s.id,label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
@@ -124,6 +125,20 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    }
    o.revision++;
 
+  }
+ }
+ // A linked serving is a concrete identity inside its vessel. Validate the
+ // complete batch so explicit, separately authorized transfers can move both;
+ // never manufacture an implicit transfer or recipient consent.
+ const touched=new Set(effects.flatMap(e=>'objectId' in e?[e.objectId]:[]));
+ for(const drink of w.objects||[]){
+  if(drink.kind!=='food'||!drink.state.vessel||(!touched.has(drink.id)&&!touched.has(drink.state.vessel)))continue;
+  const vessel=w.objects?.find(o=>o.id===drink.state.vessel);
+  const active=drink.lifecycle==='active';
+  const separated=active&&(!vessel||vessel.lifecycle!=='active'||vessel.region!==drink.region||vessel.holder!==drink.holder||vessel.state.contents!==drink.state.beverage);
+  const consumedStillFull=drink.lifecycle==='consumed'&&touched.has(drink.id)&&vessel&&['tea','coffee'].includes(vessel.state.contents);
+  if(separated||consumedStillFull){
+   throw new EffectValidationError('飲品與容器的結果不一致。',{reason:'vessel_continuity',phaseIndex,objectId:drink.id});
   }
  }
  return results;

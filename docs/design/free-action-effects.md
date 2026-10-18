@@ -85,3 +85,5 @@ ordinary 背景以 `SceneSupply.background={ruleId,sequence}` 與有限供應分
 杯子是 utensil，準備中 contents=water；30 分鐘後才具體化具有 `state.vessel` 的 food 飲品。該生產供應為一次性有限 output：pending 時不向 NPC／裁定投影，也不能立即 materialize；依到期 phase 產出後 remaining=0。一般材料／備品背景與這份成品不同。飲用會 consume 該飲品 tombstone 並使原杯 contents=dirty；清洗原杯為 empty、歸還放在同一 region，owner 不變。有限成品不是日後可任意補出的材料來源。
 
 明確食物供應優先；指定最後一份蛋糕不可透過換詞、重載或 ordinary 背景補回。日常背景不繞過具體目標、權限、損壞及已移走事實。最多 512 個物件或供應時拒絕新背景產出，不刪歷史以洗身份。
+
+完整效果批次結束時，受影響的 active `state.vessel` 成品與具體杯子須保持同一 holder／region、杯子 active 且內容與 beverage 一致；喝完的該份成品不能留下仍標為茶／咖啡的杯內容。只交付杯子而把成品留在原持有人、或只消耗成品卻保留滿杯的候選會整批拒絕。合法交付須明確列出杯子與成品各自通過權限／接收同意的效果，不隱含搬運或他人同意；沒有 linked 成品的舊杯子維持原契約。
