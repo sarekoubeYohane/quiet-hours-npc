@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
-for (const name of ['acceptance-scene', 'world-effects', 'adjudication', 'model-adapter', 'costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
+for (const name of ['routine-materials', 'routine-obstacles', 'routine-rules', 'acceptance-scene', 'world-effects', 'adjudication', 'model-adapter', 'costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')

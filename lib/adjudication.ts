@@ -68,7 +68,7 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
-    rules: ['僅回應當前行動，不產生背景事件。', '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。'],
+    rules: ['僅回應當前行動，不產生背景事件。若 routineOffer 非空且當前普通活動符合，可回傳 routine={family: routineOffer.family,version:1}，同時 accepted、check=null、effects=[]、stages=[]；由程式綁定當前合法物件與背景。不適用時 routine=null，沿既有受限效果。不接受額外規則、背景或 world patch。', '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。'],
   };
 }
 // Separate task transcript and service configuration; NPC chat history is never reused.

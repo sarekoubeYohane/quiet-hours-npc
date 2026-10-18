@@ -32,7 +32,7 @@ export function AcceptanceSceneStatus({ world }: { world: World }) {
     <details><summary>供應、物件與活動階段</summary>
       <p className="hint">以下只顯示目前保存的結果。台詞不代表物件已變更；未到時間的階段也不算完成。</p>
       <div className="acceptance-state-grid">
-        {(world.supplies || []).map(supply => <article key={supply.id} aria-label={supply.label + '供應'}><h3>{supply.label}</h3><p>剩餘 {supply.remaining} 份 · 不自動補貨</p><p>可使用：{supply.allowedTo.map(person).join('、') || '尚未授權'}</p><small>識別：{supply.id}</small></article>)}
+        {(world.supplies || []).map(supply => <article key={supply.id} aria-label={supply.label + '供應'}><h3>{supply.label}</h3><p>{supply.background?'已確認日常背景':`剩餘 ${supply.remaining} 份 · 不自動補貨`}</p><p>可使用：{supply.allowedTo.map(person).join('、') || '尚未授權'}</p><small>識別：{supply.id}</small></article>)}
         {(world.objects || []).map(object => <article key={object.id} aria-label={object.label + '物件'}><h3>{object.label}</h3><p>狀態：{({ active: '可用', consumed: '已消耗', destroyed: '已損毀' })[object.lifecycle]}</p><p>持有：{person(object.holder)} · 所有：{person(object.owner)}</p><p>位置：{object.region}</p>{Object.entries(object.state).map(([key, value]) => <p key={key}>{stateLabel[key] || key}：{stateLabel[value] || value}</p>)}<p>可使用：{object.allowedTo.map(person).join('、') || '尚未授權'}</p><small>識別：{object.id} · 版本 {object.revision}</small></article>)}
       </div>
       <h3>分階段活動</h3>

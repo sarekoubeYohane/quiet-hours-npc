@@ -63,3 +63,27 @@ NPC 的新提示以 `propose` 表達有具體對象與方法的泡茶；仍接�
 既有沒有 phases 的茶活動計畫不再被當成已驗證活動續做；下次推進清除未來計畫，重新交由角色選擇，保留既有歷史及記憶，不以發版重寫過去。規則試玩的泡茶明示尚未完成／不支援，不新增模型呼叫或實體物件。直接指定沒有提供受限效果的能力，因此 `work/tea` 在 API 前檢查拒絕，介面不再提供這個虛假成功選項；舊 pending 指令亦不能透過 resolve 產生成功。
 
 口頭同意不自動變成 grant。提示說明，若物件所有者自行選擇授權，須提出對象及權限目的由世界驗證；不要求其必須同意，也不替借用者選擇接收／方法。
+
+## 日常規則第一條路徑（#109）
+
+`lib/routine-rules.ts` 在原自由效果前提供確定性匹配與當前對象綁定；首次裁定可從本次 `routineOffer` 選擇封閉的 `{family,version}` 核准，不能提供任意規則、程式或世界 patch。`routineCandidateSchema` 為正式派送 schema，`routine:null` 沿既有 effects；舊 fixture 缺少欄位仍可解析。核准須 accepted、無額外效果、無骰值，程式建立版本 1、有界 32 條的 `RoutineRule`。每條保存活動集合、來源場所與知情者；#109 的集合先有 tea，#110 擴充同組活動。不得以單一茶路徑宣稱 #108 完成。
+
+種子與舊世界正規化沿既有內建咖啡館／店主角色加入 `RoutinePlace`：場所 purpose=cafe、operators 指向既有角色。這是內建世界設定，不以 NPC 台詞、名字字串或任意聲稱推導權限。#109 限本地經營者；#112 才擴充其他角色與本地條件。
+
+ordinary 背景以 `SceneSupply.background={ruleId,sequence}` 與有限供應分開。其 `remaining=1` 是既有 effect adapter 的可取得標記，不是庫存份數；materialize 使用 sequence 產生不可重複物件身份並遞增，既有有限供應仍按 remaining 遞減。畫面明示背景而不呈現「剩餘一份」。每次產出仍有具體 owner／holder／region／revision／lifecycle。最多保存 512 個具體物件時停止新的背景產出，不刪歷史洗身份。指定物件不會被其他杯子暗中代換；明確有限杯子／茶葉與損壞條件優先。
+
+本切片普通泡茶 immediate 建立或取得當前合法空杯並加水，30 分鐘階段才改成茶；仍沿 #100 的前提、取消、回合保存及重送。第一次、重用的觀察者資訊在有界 64 條 `routineAudit`，不放進 events、NPC 記憶或決策投影。正常物理成果則沿既有感知與記憶路徑。規則命中不派送額外模型，NPC 正常決策及費用保留。
+
+後續界線：#110 要將此 tracer 擴充成同組多種活動的有界效果範本與明確材料分類；不能只靠增加固定動詞清單宣稱通用任意活動。#111 完整障礙／恢復與例外；#112 權限、知情、能力及場所共用。#104／#106 的正式站驗收未因此關閉。
+
+## #110：可組合日常活動與一份飲品
+
+`RoutineTemplate` 將普通單份請求分成 literal verb／subject／purpose 選擇槽與受限 result（brew／serve／consume／clean／release）；保存資料驅動比對，並重用同一 materialize／state／consume／transfer 引擎。不是將自由提案全轉回人物／動詞白名單：未匹配方法、用途、規模及新例外仍交回原裁定。模板最多 16 組、每槽最多 16 個有界字串；字串先 escape，result 僅接受已實作種類、內容與時間，未知／無效模板不匹配，不執行模型產生的程式。
+
+首次 ordinary scope 一次核准茶、咖啡、簡餐、飲用、清洗與放回；新活動各自綁定當前物件，並非重播舊效果。`knownRoutineMethods` 只提供已知且適用的普通方法選擇，不投影 rule ID 或 audit。自然語言只匹配可安全解讀的單份組合；其他表述保留裁定 fallback。
+
+杯子是 utensil，準備中 contents=water；30 分鐘後才具體化具有 `state.vessel` 的 food 飲品。該生產供應為一次性有限 output：pending 時不向 NPC／裁定投影，也不能立即 materialize；依到期 phase 產出後 remaining=0。一般材料／備品背景與這份成品不同。飲用會 consume 該飲品 tombstone 並使原杯 contents=dirty；清洗原杯為 empty、歸還放在同一 region，owner 不變。有限成品不是日後可任意補出的材料來源。
+
+明確食物供應優先；指定最後一份蛋糕不可透過換詞、重載或 ordinary 背景補回。日常背景不繞過具體目標、權限、損壞及已移走事實。最多 512 個物件或供應時拒絕新背景產出，不刪歷史以洗身份。
+
+完整效果批次結束時，受影響的 active `state.vessel` 成品與具體杯子須保持同一 holder／region、杯子 active 且內容與 beverage 一致；喝完的該份成品不能留下仍標為茶／咖啡的杯內容。只交付杯子而把成品留在原持有人、或只消耗成品卻保留滿杯的候選會整批拒絕。合法交付須明確列出杯子與成品各自通過權限／接收同意的效果，不隱含搬運或他人同意；沒有 linked 成品的舊杯子維持原契約。
