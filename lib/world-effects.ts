@@ -8,7 +8,7 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type SceneSupply={background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
@@ -33,7 +33,7 @@ const effectRules = [
  '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
  '確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。',
 ];
-const materializedObjectId = (supply: SceneSupply) => `${supply.id}:${supply.remaining}`;
+const materializedObjectId = (supply: SceneSupply) => `${supply.id}:${supply.background?.sequence??supply.remaining}`;
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(k=>k in value);
 const integer=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
 const reference=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=120;
@@ -89,7 +89,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    const id=materializedObjectId(s);
    if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
    const o:WorldObject={id,source:s.id,label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
-   (w.objects??=[]).push(o);s.remaining--;results.push(`取得${o.label}`);
+   (w.objects??=[]).push(o);if(s.background)s.background.sequence++;else s.remaining--;results.push(`取得${o.label}`);
   }else if(e.kind==='grant'){
    const target=w.objects?.find(o=>o.id===e.targetId)||w.supplies?.find(s=>s.id===e.targetId);
    const recipient=w.characters.find(x=>x.id===e.recipient);

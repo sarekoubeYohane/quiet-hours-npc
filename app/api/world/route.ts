@@ -1,5 +1,6 @@
+import { bindRoutine, routineOffer, routineCandidateSchema, parseRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { requiresWorldEffects, authorityForProposal, effectCandidateSchema, parseEffectCandidate, EffectValidationError } from '@/lib/world-effects';
+import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
@@ -366,23 +367,26 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });
             if(requiresWorldEffects(decision.action) && !decision.continueExisting){
+              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes);
+              if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
               await guard('chat',1);
               const key=await readModelKey(id,config.provider);
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes};
+              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,routineOffer:routineOffer(w,c,decision.action)};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, effectCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
+              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
-              try{decision.freeCandidate=parseEffectCandidate(raw);}
+              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes);}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
               adjudicationAttempt.stage='effects';
+              }
             }
-            if (typeof services?.adjudicateExistingAction === 'function' && !decision.continueExisting) {
+            if (typeof services?.adjudicateExistingAction === 'function' && !decision.continueExisting && !requiresWorldEffects(decision.action)) {
               const candidate = await services.adjudicateExistingAction(buildAdjudicationInput(w,c,decision.action));
               await verifyLease();
               validateExistingAdjudication(candidate);
