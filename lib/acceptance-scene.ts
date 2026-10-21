@@ -100,7 +100,7 @@ export async function enterAcceptanceScene(previous: World): Promise<World> {
   const people = world.characters.map(c => c.id);
   world.supplies = [{ id: 'acceptance-meal', label: '驗收餐點', region: 'cafe-front', remaining: 1, owner: 'owner', knownTo: people, allowedTo: ['cass'], kind: 'food', initialState: {} }];
   world.objects = [
-    { id: 'acceptance-cup', source: 'acceptance-cup', label: '驗收杯子', region: 'cafe-front', holder: null, owner: 'owner', revision: 1, state: { contents: 'empty', clean: 'yes' }, lifecycle: 'active', kind: 'utensil', knownTo: people, allowedTo: ['owner'], stateTransitions: { contents: ['empty', 'water', 'tea'], clean: ['yes', 'no'] } },
+    { id: 'acceptance-cup', source: 'acceptance-cup', label: '驗收杯子', region: 'cafe-front', holder: null, owner: 'owner', revision: 1, state: { contents: 'empty', clean: 'yes' }, lifecycle: 'active', kind: 'utensil', knownTo: people, allowedTo: ['owner'], stateTransitions: { contents: ['empty', 'water', 'tea', 'dirty'], clean: ['yes', 'no'] } },
     { id: 'acceptance-tea-kit', source: 'acceptance-tea-kit', label: '共用茶具（熱水與茶包）', region: 'cafe-front', holder: null, owner: 'owner', revision: 1, state: { available: 'yes' }, lifecycle: 'active', kind: 'utensil', knownTo: people, allowedTo: people },
   ];
   normalizeWorld(world);
