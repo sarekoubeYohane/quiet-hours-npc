@@ -138,3 +138,13 @@ test('a failed-save receipt observes the journal byte budget and evicts old resu
   const e=(await response.json()).operationEvidence;assert.equal(e.outcome,'not-committed');assert.equal((await s.post(e.replay)).status,502);
  }finally{s.restore();}
 });
+test('credential headers and quoted assignments never leak trailing authentication fragments in receipts or legacy diagnostics',async()=>{
+ const content='泡茶 Authorization: Basic Zm9vOmJhcg==\nCookie: session=first-secret; auth=second-secret\napi_key="first secret second"';
+ const s=await setup(x=>({...x,completionMinutes:5}),x=>({...x,content}));try{
+  const response=await s.post({operation:'advance',minutes:15}),body=await response.json();assert.equal(response.status,502);
+  const stored=JSON.stringify({evidence:body.operationEvidence,legacy:body.adjudicationFailure});
+  for(const secret of ['Zm9vOmJhcg==','first-secret','second-secret','first secret second','secret second'])assert.ok(!stored.includes(secret),secret);
+  assert.equal(body.operationEvidence.redacted,true);assert.equal(body.operationEvidence.counts.npc,1);assert.equal(body.operationEvidence.counts.adjudication,1);
+  assert.deepEqual((await s.read()).operationEvidence,body.operationEvidence);
+ }finally{s.restore();}
+});

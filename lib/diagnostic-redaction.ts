@@ -7,8 +7,10 @@ export function redactDiagnosticText(text:string,secrets:Iterable<string>):strin
     clean=clean.split(secret).join('<REDACTED>');
     clean=clean.split(JSON.stringify(secret).slice(1,-1)).join('<REDACTED>');
   }
-  return clean.replace(/Bearer\s+[^\s"\\,;]+/gi,'Bearer <REDACTED>')
+  return clean.replace(/\b(Bearer|Basic)\s+[^\s"\\,;]+/gi,'$1 <REDACTED>')
     .replace(/sk-[A-Za-z0-9_-]+/g,'<REDACTED>')
     .replace(/("(?:authorization|api[_-]?key|cookie|access[_-]?token|refresh[_-]?token)"\s*:\s*)"(?:\\.|[^"\\])*"/gi,'$1"<REDACTED>"')
-    .replace(/((?:authorization|api[_-]?key|cookie|access[_-]?token|refresh[_-]?token)\s*[=:]\s*)[^\s,;]+/gi,'$1<REDACTED>');
+    // A header/assignment may contain spaces (Basic or quoted keys) and
+    // semicolons (all Cookie pairs). Mask the whole value, not its first word.
+    .replace(/((?:authorization|api[_-]?key|cookie|access[_-]?token|refresh[_-]?token)\s*[=:]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\r\n]*)/gi,'$1<REDACTED>');
 }

@@ -1,0 +1,91 @@
+{
+  "fixture": true,
+  "scenario": "transport-failure",
+  "evidence": {
+    "schemaVersion": 1,
+    "operationId": "1792080000000:fc5d15d5-fd46-4095-afc5-51cce08672d1",
+    "requestId": "3c000d0e-03ac-43a8-84b4-3a724fd84f91",
+    "contextId": "5d529761-2760-46ee-b147-d1e14944320f",
+    "deployment": {
+      "name": "local",
+      "commit": "unknown",
+      "builtAt": "unknown"
+    },
+    "operation": "advance",
+    "baseVersion": 0,
+    "outcome": "rolled-back",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792080000000:fc5d15d5-fd46-4095-afc5-51cce08672d1",
+      "worldContext": "5d529761-2760-46ee-b147-d1e14944320f",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 1,
+      "adjudication": 1
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "eed233c3-ef5b-4ad8-a5aa-d460b7532700",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "type": "propose",
+            "target": "acceptance-tea-kit",
+            "content": "我想用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶。",
+            "purpose": "飲用",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "owner",
+        "requestId": "1792080000000:fc5d15d5-fd46-4095-afc5-51cce08672d1:owner:adjudication:e4876702-b8bc-43d6-acfa-bf97d79c6740",
+        "provider": "openai",
+        "model": "fixture-adjudicator",
+        "usage": null
+      }
+    ],
+    "truncated": false,
+    "redacted": false,
+    "resultVersion": 1,
+    "result": {
+      "turn": 0,
+      "minute": 720,
+      "actors": [
+        {
+          "id": "owner",
+          "activity": "在咖啡館前台，看看今天想做什麼。",
+          "plan": null
+        }
+      ],
+      "rules": [],
+      "objects": []
+    }
+  },
+  "checks": {
+    "reload": true,
+    "sameOperationReplay": true,
+    "unchangedWorld": true,
+    "noAdditionalDispatch": true
+  }
+}
