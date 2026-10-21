@@ -1,3 +1,4 @@
+import { routineProgramRules } from './routine-program-contract';
 import { requestModel, type ModelService } from './model-adapter';
 import type { Action, Character, World } from './world';
 
@@ -61,7 +62,7 @@ export function captureAdjudicationFailure(
   }
   return result;
 }
-export function buildAdjudicationInput(world: World, actor: Character, action: Action): AdjudicationInput {
+export function buildAdjudicationInput(world: World, actor: Character, action: Action, routinePrograms=false): AdjudicationInput {
   const target = world.characters.find(character => character.id === action.target);
   return {
     contractVersion: adjudicationContractVersion,
@@ -69,7 +70,8 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
     rules: [
-      '只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，選一個模板 operation，回傳 routine={family:routineOffer.family,version:1,operation,subject,timings}；accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多90；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊15分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。',
+      ...(routinePrograms?routineProgramRules:[]),
+      '只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，依 version=2 程序契約確認一個模板 operation、subject、完整timings與programs。version=1空效果核准僅供舊候選相容，不用於新確認。兩版日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多90；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊15分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。',
       '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
     ],
   };
