@@ -1,0 +1,1116 @@
+{
+  "first": {
+    "schemaVersion": 1,
+    "operationId": "1792574549286:fd99d762-22f3-4a47-8b4a-cf3bf585ba29",
+    "requestId": "647b5234-0c4c-4939-80f2-8bd91989b966",
+    "contextId": "95590657-14eb-42ed-94c2-9878c8ad4603",
+    "deployment": {
+      "name": "production",
+      "commit": "3b352cb",
+      "builtAt": "2026-10-21T09:06:33.403Z"
+    },
+    "operation": "advance",
+    "baseVersion": 315,
+    "outcome": "committed",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792574549286:fd99d762-22f3-4a47-8b4a-cf3bf585ba29",
+      "worldContext": "95590657-14eb-42ed-94c2-9878c8ad4603",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 4,
+      "adjudication": 3
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "cass",
+        "requestId": "38b26546-c93a-40ed-a87e-933ae72c2c83",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7049,
+          "outputTokens": 262,
+          "cachedInputTokens": 0
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-meal",
+            "content": "我想取用這份餐點並吃掉，先讓我填填肚子。",
+            "purpose": "吃點東西，照顧自己",
+            "durationMinutes": 30,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "cass",
+        "requestId": "1792574549286:fd99d762-22f3-4a47-8b4a-cf3bf585ba29:cass:adjudication:61fc18da-1c7d-43f9-b12d-68d33b03e638",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 5261,
+          "outputTokens": 75,
+          "cachedInputTokens": 0
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "accepted",
+            "completionMinutes": 20,
+            "effects": [
+              {
+                "kind": "materialize",
+                "supplyId": "acceptance-meal",
+                "expectedRemaining": 1
+              },
+              {
+                "kind": "consume",
+                "objectId": "acceptance-meal:1",
+                "expectedRevision": 1
+              }
+            ],
+            "check": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 3,
+        "task": "npc",
+        "actorId": "vera",
+        "requestId": "685aad30-d52c-4269-8289-e9045d3c7c77",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7226,
+          "outputTokens": 413,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-tea-kit",
+            "content": "我想用共用茶具、熱水和茶包，先往茶具裡加水並沖泡一杯茶，給自己安靜享用。",
+            "purpose": "照顧自己，也尊重 Cass 的空間",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 4,
+        "task": "adjudication",
+        "actorId": "vera",
+        "requestId": "1792574549286:fd99d762-22f3-4a47-8b4a-cf3bf585ba29:vera:adjudication:fd20ab1c-2455-4236-b934-dea63749f595",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 5279,
+          "outputTokens": 80,
+          "cachedInputTokens": 2304
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "unsupported",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 5,
+        "task": "npc",
+        "actorId": "kris",
+        "requestId": "eca69929-81d4-4cb8-82b8-87b9d859c3ad",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7159,
+          "outputTokens": 241,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-meal",
+            "content": "我打算取用這份餐點吃午餐，請依現場狀況確認。",
+            "purpose": "先處理眼前的午餐",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 6,
+        "task": "adjudication",
+        "actorId": "kris",
+        "requestId": "1792574549286:fd99d762-22f3-4a47-8b4a-cf3bf585ba29:kris:adjudication:fc8e064e-0a22-4230-af37-3ec8b3802a41",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 5252,
+          "outputTokens": 37,
+          "cachedInputTokens": 2304
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "denied",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 7,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "72730960-5ee8-4c3b-b797-74aa83f67d46",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7041,
+          "outputTokens": 284,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "rest",
+            "target": "",
+            "content": "在前台安靜待一會兒，留意 Cass 的活動進展。",
+            "purpose": "看見 Cass 正在進行活動，尊重對方空間，先在前台安靜等候並留意情況。",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "open-ended",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    ],
+    "truncated": true,
+    "redacted": false,
+    "resultVersion": 316,
+    "result": {
+      "turn": 1,
+      "minute": 735,
+      "actors": [
+        {
+          "id": "cass",
+          "activity": "開始進行這項活動；活動尚未完成。",
+          "plan": {
+            "startedAt": 720,
+            "until": 750,
+            "action": {
+              "type": "propose",
+              "target": "acceptance-meal",
+              "content": "我想取用這份餐點並吃掉，先讓我填填肚子。"
+            },
+            "phaseCursor": 0
+          }
+        },
+        {
+          "id": "vera",
+          "activity": "目前的方法無法落實。",
+          "plan": null
+        },
+        {
+          "id": "kris",
+          "activity": "這次方法沒有成功。",
+          "plan": null
+        },
+        {
+          "id": "owner",
+          "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+          "plan": null
+        }
+      ],
+      "rules": [],
+      "objects": []
+    }
+  },
+  "second": {
+    "schemaVersion": 1,
+    "operationId": "1792574652512:fa60ffaf-b56d-4ef0-8448-607e34cff772",
+    "requestId": "b3ae5336-cc00-46a8-9b7b-1356613e6c50",
+    "contextId": "95590657-14eb-42ed-94c2-9878c8ad4603",
+    "deployment": {
+      "name": "production",
+      "commit": "3b352cb",
+      "builtAt": "2026-10-21T09:06:33.403Z"
+    },
+    "operation": "advance",
+    "baseVersion": 317,
+    "outcome": "committed",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792574652512:fa60ffaf-b56d-4ef0-8448-607e34cff772",
+      "worldContext": "95590657-14eb-42ed-94c2-9878c8ad4603",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 3,
+      "adjudication": 3
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "vera",
+        "requestId": "4c82901f-2606-489c-8349-d98cb14880d9",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7777,
+          "outputTokens": 310,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-tea-kit",
+            "content": "我想用這套共用茶具和茶包泡一杯茶，請確認是否能直接用茶具沖泡，不借用店主的杯子。",
+            "purpose": "依已知茶具與熱水提出泡茶方法，先不使用店主的杯子。",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "vera",
+        "requestId": "1792574652512:fa60ffaf-b56d-4ef0-8448-607e34cff772:vera:adjudication:137a888b-7f93-42d4-8b1d-7b875d764701",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 5289,
+          "outputTokens": 36,
+          "cachedInputTokens": 2304
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "unsupported",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 3,
+        "task": "npc",
+        "actorId": "kris",
+        "requestId": "dd09bdcc-c15e-4503-82e7-571f12a655de",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7557,
+          "outputTokens": 258,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-meal",
+            "content": "我想取用這份餐點，當作午餐吃。",
+            "purpose": "處理午餐意圖，向世界提出取用前台餐點的具體方法。",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 4,
+        "task": "adjudication",
+        "actorId": "kris",
+        "requestId": "1792574652512:fa60ffaf-b56d-4ef0-8448-607e34cff772:kris:adjudication:9dc9a99d-4a88-4471-a1c9-dc5a905dde9b",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 5258,
+          "outputTokens": 37,
+          "cachedInputTokens": 2304
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "denied",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 5,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "1c595de4-9733-48e2-bc4b-4ab35728d997",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 7628,
+          "outputTokens": 289,
+          "cachedInputTokens": 5619
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "contractVersion": "npc-decision.v1",
+            "type": "propose",
+            "target": "acceptance-tea-kit",
+            "content": "我想用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶。",
+            "purpose": "用共用茶具替自己泡一杯普通的茶。",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 6,
+        "task": "adjudication",
+        "actorId": "owner",
+        "requestId": "1792574652512:fa60ffaf-b56d-4ef0-8448-607e34cff772:owner:adjudication:fdc3294b-c65b-447a-bfb2-12b0221b8471",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "inputTokens": 6557,
+          "outputTokens": 913,
+          "cachedInputTokens": 2304
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "accepted",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": {
+              "family": "cafe-service",
+              "version": 2,
+              "operation": "tea",
+              "subject": "茶",
+              "timings": [
+                {
+                  "operation": "tea",
+                  "minutes": 5
+                },
+                {
+                  "operation": "coffee",
+                  "minutes": 5
+                },
+                {
+                  "operation": "food",
+                  "minutes": 10
+                },
+                {
+                  "operation": "drink",
+                  "minutes": 5
+                },
+                {
+                  "operation": "wash",
+                  "minutes": 5
+                },
+                {
+                  "operation": "return",
+                  "minutes": 1
+                }
+              ]
+            },
+            "stages": []
+          },
+          "truncated": true,
+          "redacted": false
+        }
+      }
+    ],
+    "truncated": true,
+    "redacted": false,
+    "resultVersion": 318,
+    "result": {
+      "turn": 2,
+      "minute": 750,
+      "actors": [
+        {
+          "id": "cass",
+          "activity": "取得驗收餐點，食用驗收餐點；活動已完成。",
+          "plan": null
+        },
+        {
+          "id": "vera",
+          "activity": "目前的方法無法落實。",
+          "plan": null
+        },
+        {
+          "id": "kris",
+          "activity": "這次方法沒有成功。",
+          "plan": null
+        },
+        {
+          "id": "owner",
+          "activity": "驗收杯子：contents=tea，取得一份茶；這次嘗試已結束。",
+          "plan": null
+        }
+      ],
+      "rules": [
+        {
+          "id": "bb58b3a3-2f7f-4b61-947d-b3d5f9ef9404",
+          "version": 2,
+          "family": "cafe-service",
+          "timings": [
+            {
+              "operation": "tea",
+              "minutes": 15
+            },
+            {
+              "operation": "coffee",
+              "minutes": 15
+            },
+            {
+              "operation": "food",
+              "minutes": 15
+            },
+            {
+              "operation": "drink",
+              "minutes": 15
+            },
+            {
+              "operation": "wash",
+              "minutes": 15
+            },
+            {
+              "operation": "return",
+              "minutes": 15
+            }
+          ]
+        }
+      ],
+      "objects": [
+        {
+          "id": "acceptance-cup",
+          "revision": 3,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "utensil",
+          "state": {
+            "contents": "tea",
+            "clean": "yes"
+          }
+        },
+        {
+          "id": "supply:5c657b7c-392d-49c8-bb0e-052e1a87b67c:1",
+          "revision": 1,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "food",
+          "state": {
+            "vessel": "acceptance-cup",
+            "beverage": "tea"
+          }
+        },
+        {
+          "id": "acceptance-meal:1",
+          "revision": 2,
+          "region": "cafe-front",
+          "holder": null,
+          "owner": "owner",
+          "lifecycle": "consumed",
+          "kind": "food",
+          "state": {}
+        }
+      ]
+    }
+  },
+  "saved": {
+    "version": 318,
+    "turn": 2,
+    "minute": 750,
+    "objects": [
+      {
+        "id": "acceptance-cup",
+        "source": "acceptance-cup",
+        "label": "驗收杯子",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 3,
+        "state": {
+          "contents": "tea",
+          "clean": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "stateTransitions": {
+          "contents": [
+            "empty",
+            "water",
+            "tea"
+          ],
+          "clean": [
+            "yes",
+            "no"
+          ]
+        }
+      },
+      {
+        "id": "acceptance-tea-kit",
+        "source": "acceptance-tea-kit",
+        "label": "共用茶具（熱水與茶包）",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "available": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ]
+      },
+      {
+        "id": "supply:5c657b7c-392d-49c8-bb0e-052e1a87b67c:1",
+        "source": "supply:5c657b7c-392d-49c8-bb0e-052e1a87b67c",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "lifecycle": "active",
+        "kind": "food",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ]
+      },
+      {
+        "id": "acceptance-meal:1",
+        "source": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 2,
+        "state": {},
+        "lifecycle": "consumed",
+        "kind": "food",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ]
+      }
+    ],
+    "supplies": [
+      {
+        "id": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ],
+        "kind": "food",
+        "initialState": {}
+      },
+      {
+        "id": "supply:5c657b7c-392d-49c8-bb0e-052e1a87b67c",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "kind": "food",
+        "initialState": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "availableAt": 750
+      }
+    ],
+    "routineRules": [
+      {
+        "id": "bb58b3a3-2f7f-4b61-947d-b3d5f9ef9404",
+        "version": 2,
+        "programs": [
+          {
+            "operation": "tea",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "consume",
+                    "role": "material"
+                  },
+                  {
+                    "kind": "state",
+                    "role": "vessel",
+                    "key": "contents",
+                    "value": "tea"
+                  },
+                  {
+                    "kind": "materialize",
+                    "role": "productSupply"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "kind": "materialize",
+                "role": "materialSupply"
+              },
+              {
+                "kind": "materialize",
+                "role": "vesselSupply"
+              },
+              {
+                "kind": "transfer",
+                "role": "vessel",
+                "toHolder": "actor"
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "coffee",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "consume",
+                    "role": "material"
+                  },
+                  {
+                    "kind": "state",
+                    "role": "vessel",
+                    "key": "contents",
+                    "value": "coffee"
+                  },
+                  {
+                    "kind": "materialize",
+                    "role": "productSupply"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "kind": "materialize",
+                "role": "materialSupply"
+              },
+              {
+                "kind": "materialize",
+                "role": "vesselSupply"
+              },
+              {
+                "kind": "transfer",
+                "role": "vessel",
+                "toHolder": "actor"
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "food",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "role": "productSupply"
+                  }
+                ]
+              }
+            ],
+            "effects": [],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "drink",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "role": "vessel",
+                    "toHolder": "actor"
+                  },
+                  {
+                    "kind": "transfer",
+                    "role": "drink",
+                    "toHolder": "actor"
+                  },
+                  {
+                    "kind": "consume",
+                    "role": "drink"
+                  },
+                  {
+                    "kind": "state",
+                    "role": "vessel",
+                    "key": "contents",
+                    "value": "dirty"
+                  }
+                ]
+              }
+            ],
+            "effects": [],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "wash",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "state",
+                    "role": "vessel",
+                    "key": "contents",
+                    "value": "empty"
+                  },
+                  {
+                    "kind": "state",
+                    "role": "vessel",
+                    "key": "clean",
+                    "value": "yes"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "kind": "transfer",
+                "role": "vessel",
+                "toHolder": "actor"
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "return",
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "role": "vessel",
+                    "toHolder": null
+                  }
+                ]
+              }
+            ],
+            "effects": [],
+            "check": null,
+            "branches": null
+          }
+        ],
+        "family": "cafe-service",
+        "operations": [
+          "tea",
+          "coffee",
+          "food",
+          "drink",
+          "wash",
+          "return"
+        ],
+        "templates": [
+          {
+            "operation": "tea",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶"
+            ],
+            "purposes": [
+              "泡茶",
+              "喝茶",
+              "準備茶",
+              "飲用",
+              "日常泡茶",
+              "招待客人",
+              "提供茶飲"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "tea",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "coffee",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡",
+              "沖"
+            ],
+            "subjects": [
+              "咖啡"
+            ],
+            "purposes": [
+              "泡咖啡",
+              "喝咖啡",
+              "準備咖啡",
+              "飲用",
+              "招待客人"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "coffee",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "food",
+            "verbs": [
+              "準備",
+              "製作",
+              "取得",
+              "取用",
+              "拿取"
+            ],
+            "subjects": [
+              "簡餐",
+              "蛋糕",
+              "三明治"
+            ],
+            "purposes": [
+              "用餐",
+              "食用",
+              "招待客人",
+              "準備簡餐"
+            ],
+            "result": {
+              "kind": "serve",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "drink",
+            "verbs": [
+              "喝",
+              "喝掉",
+              "飲用"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶",
+              "咖啡",
+              "飲品"
+            ],
+            "purposes": [
+              "飲用",
+              "解渴",
+              "喝茶",
+              "喝咖啡"
+            ],
+            "result": {
+              "kind": "consume",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "wash",
+            "verbs": [
+              "清洗",
+              "洗",
+              "洗淨"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "清洗餐具",
+              "清潔",
+              "清洗"
+            ],
+            "result": {
+              "kind": "clean",
+              "contents": "empty",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "return",
+            "verbs": [
+              "歸還",
+              "放回"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "歸還",
+              "歸還餐具",
+              "歸還杯子"
+            ],
+            "result": {
+              "kind": "release",
+              "minutes": 15
+            }
+          }
+        ],
+        "origin": "cafe",
+        "knownTo": [
+          "owner"
+        ]
+      }
+    ]
+  },
+  "replayComparison": {
+    "version": true,
+    "objects": true,
+    "rules": true,
+    "events": true,
+    "usage": true,
+    "evidence": true
+  }
+}
