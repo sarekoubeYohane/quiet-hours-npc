@@ -22,6 +22,8 @@ NPC 雲端／本機轉接共用行為指導與輸出語義；目前正式轉接�
 
 世界 API 的當前回合技術回復與遊戲內活動中斷是兩件事：技術失敗回復當前候選且保留已知費用，早先已提交的事實仍存在。確定動作及已驗證階段的純續做由程式承接，沒有背景模型事件或無限格式修復。
 
+操作驗收證據由既有 journal 保存，僅供觀察者查閱，不進入 World 或 NPC 上下文。成功成果不能反推未保存的提案 target 或原始裁定；原執行與重送的 requestId 亦須區分。最小修正範圍、敏感欄位與原驗收杯能力限制見 [操作證據設計](docs/design/operation-evidence.md)、[ADR 0004](docs/adr/0004-operation-evidence-stays-outside-story.md)。
+
 ## 接手閱讀
 
 - `AGENTS.md`、`docs/agents/matt-pocock.md`：工程流程。

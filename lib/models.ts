@@ -1,5 +1,5 @@
 import { knownRoutineMethods } from './routine-rules';
-import { requestModel } from './model-adapter';
+import { requestModel, type ModelObserver } from './model-adapter';
 export const npcContractVersion = 'npc-decision.v1';
 import { cognitionForDecision, cognitiveUpdatesSchema, knownPeopleForDecision, relationshipsProjection, updateCognition, type CognitiveDecisionContext } from './cognition';
 import { budgetMemoryInput, memoryBytes, memorySelectionSchema, evaluateMemories, memoryOperationSchema } from './memory';
@@ -71,7 +71,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood, ...(data.type==='propose'?{purpose:data.purpose}:{}) } as Action;
   return { timeIntent, cognition, interpretation: data.interpretation as string | undefined, ...evaluateMemories({ ...character, ...(cognition ? { cognition } : {}) }, data.memorySelections, data.memoryOperations, context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { observer?: ModelObserver; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
@@ -89,7 +89,7 @@ for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
 // context. The route rechecks operation version/lease after completion.
-const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId});
+const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
 await recall?.verifyCurrent?.();
 try {
   const value = JSON.parse(raw.replace(/^\s*`{3}(?:json)?\s*/, '').replace(/\s*`{3}\s*$/, ''));

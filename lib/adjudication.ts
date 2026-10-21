@@ -1,3 +1,4 @@
+import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 import { requestModel, type ModelService } from './model-adapter';
 import type { Action, Character, World } from './world';
 
@@ -33,10 +34,21 @@ export function captureAdjudicationFailure(
   input: unknown, raw: string, details: Record<string, unknown>, secrets: string[],
 ): AdjudicationFailure {
   const redact = (text: string) => {
-    for (const secret of secrets.filter(Boolean)) text = text.split(JSON.stringify(secret).slice(1, -1)).join('<REDACTED>');
-    return text.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer <REDACTED>')
-      .replace(/sk-[A-Za-z0-9_-]+/g, '<REDACTED>')
-      .replace(/("(?:authorization|api[_-]?key)"\s*:\s*)"(?:\\.|[^"\\])*"/gi, '$1"<REDACTED>"');
+    // Candidates can encode credentials as {key:"authorization",value:"..."}.
+    // Mask this structured form before applying the existing text snapshots.
+    const scrub=(value:unknown,depth=0):unknown=>{
+      if(depth>12){truncated=true;return '<OMITTED>';}
+      if(typeof value==='string')return redactDiagnosticText(value,secrets);
+      if(Array.isArray(value)){if(value.length>64)truncated=true;return value.slice(0,64).map(item=>scrub(item,depth+1));}
+      if(value&&typeof value==='object'){
+        const item=value as Record<string,unknown>;
+        if(Object.keys(item).length>64)truncated=true;
+        return Object.fromEntries(Object.entries(item).slice(0,64).map(([key,content])=>[key,sensitiveDiagnosticKey.test(key)||(key==='value'&&typeof item.key==='string'&&sensitiveDiagnosticKey.test(item.key))?'<REDACTED>':scrub(content,depth+1)]));
+      }
+      return value;
+    };
+    try{return redactDiagnosticText(JSON.stringify(scrub(JSON.parse(text))),secrets);}
+    catch{return redactDiagnosticText(text,secrets);}
   };
   let truncated = false;
   const snapshot = (value: unknown, limit: number) => {
