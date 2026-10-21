@@ -42,3 +42,5 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-
 `TEA_ACTION=legacy node tooling/verification/browser100.mjs` 使用舊 `work/tea` 決策驗證同一階段契約（完成／明示續做／重送、中斷、保存失敗與他人移動物件）；未設定時維持 `propose` fixture。`browser-acceptance-scene.mjs` 亦覆蓋未授權舊茶動作不假成功及其合法階段，沿相同 Chromium 環境執行。
 
 `browser128.mjs` 驗證 v2 日常模型程序：首次核准、階段完成、不同杯子免費重綁、接管／交還、喝茶／清洗／歸還、重載與重送。沿相同 Chromium 環境執行，只有模型 transport 使用 fixture，沒有付費或正式世界操作。
+
+`browser-live-gaps.mjs` 從實際 UI 新建最小驗收場景，驗證 v2 首次核准／原始程序證據、跨回合泡茶、喝洗同杯重用、店主自主 grant fixture 與借用攜帶洗還、餐點消耗、UI 原 ID 重送及保存前後故障。篩選 JSON／截圖預設輸出 `docs/verification/assets/live-gaps/`；全部為本機 fixture，不還原 #143 缺失的原始候選，也不呼叫正式模型。
