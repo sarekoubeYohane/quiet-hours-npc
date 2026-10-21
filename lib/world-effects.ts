@@ -2,7 +2,7 @@ import type { Action, Character, World } from './world';
 import { canSee, regionOf, regions } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
-import { judgeD20, rollD20, type Difficulty, type Advantage } from './d20';
+import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
 
 // Legacy tea changes physical objects too; it must use the same verified effects.
 export function requiresWorldEffects(action: Action): boolean {
@@ -14,14 +14,19 @@ export type WorldObject={id:string;source:string;label:string;region:string;hold
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
-export type EffectCandidate={preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
+// Internal only: a trusted routine binder can identify each current vessel/material
+// attempt without storing model-authored IDs or the first historical die in a rule.
+export type TrialBinding={operation:import('./routine-rules').RoutineOperation;subject:string;references:string[]};
+export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
+export type EffectCandidate={branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 const effectRules = [
- '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段；日常核准分支（routine 非 null）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
+ '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
  'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
  'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
  'consume：僅 food 且 holder=actor.id 才可食用，之後 lifecycle=consumed、holder=null，不會補貨。桌上食物必須先 transfer 拿取再 consume，第二步版本加一。不能 consume 杯子或茶具；飲用杯中液體須用支援的 state 轉換，無法表達時 unsupported。',
@@ -31,6 +36,7 @@ const effectRules = [
  'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。destroy 只能毀壞自己所有的物件，不能毀壞借來物品。',
  'state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。',
  'completionMinutes：一般效果分支（routine=null）有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多90）；一般 durationMinutes 只是角色估時。程式向上對齊15。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時15。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多4項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
+ '結果分支：routine=null 的完成活動可用 branches 確認 1 至 5 組 {outcomes,effects,stages}，此時頂層 effects/stages 必須空。outcomes 必須恰好各涵蓋 critical-success/success/mixed/failure/critical-failure 一次，可共用後果；每組沿相同受限效果及時間契約，失敗可消耗、部分成果用合法狀態表示，不能自動套用成功效果。確定活動 check=null 時僅一組涵蓋全部級別；不擲骰。無變化的失敗分支允許空效果，仍消耗確認時間。所有分支在擲骰前驗證。不確定自由活動 target 必須是當前可知具體物件／供應；改措辭、難度或分支表示不取得重擲資格。branches=null 保留舊效果契約。',
  '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
  '確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。',
 ];
@@ -41,14 +47,39 @@ const reference=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=120;
 const variant=(properties:Record<string,object>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
 export const effectSchema={anyOf:[variant({kind:{const:'transfer',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},toHolder:{anyOf:[{type:'null'},{type:'string'}]},toRegion:{type:'string'}}),variant({kind:{const:'state',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},key:{type:'string'},value:{type:'string'}}),variant({kind:{const:'grant',type:'string'},targetId:{type:'string'},recipient:{type:'string'}}),variant({kind:{const:'consent',type:'string'},objectId:{type:'string'}}),variant({kind:{const:'destroy',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}}),variant({kind:{const:'materialize',type:'string'},supplyId:{type:'string'},expectedRemaining:{type:'integer'}}),variant({kind:{const:'consume',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}})]};
 const phaseConditionSchema=variant({objectId:{type:'string'},revision:{type:'integer'},region:{type:'string'},holder:{anyOf:[{type:'null'},{type:'string'}]},state:{type:'array',maxItems:8,items:variant({key:{type:'string'},value:{type:'string'}})}});
-const phaseSchema=variant({afterMinutes:{type:'integer',enum:[15,30,45,60,75,90]},preconditions:{type:'array',maxItems:4,items:phaseConditionSchema},effects:{type:'array',minItems:1,maxItems:4,items:effectSchema}});
-export const effectCandidateSchema=variant({completionMinutes:{anyOf:[{type:'null'},{type:'number',exclusiveMinimum:0,maximum:90}]},stages:{type:'array',maxItems:4,items:phaseSchema},status:{type:'string',enum:['accepted','denied','unsupported']},effects:{type:'array',maxItems:4,items:effectSchema},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[8,12,16]},ability:{type:'string',maxLength:100}})]}});
+const effectReference={$ref:'#/$defs/effect'};
+const phaseReference={$ref:'#/$defs/phase'};
+const phaseSchema=variant({afterMinutes:{type:'integer',enum:[15,30,45,60,75,90]},preconditions:{type:'array',maxItems:4,items:phaseConditionSchema},effects:{type:'array',minItems:1,maxItems:4,items:effectReference}});
+const outcomes:Outcome[]=['critical-success','success','mixed','failure','critical-failure'];
+const branchSchema=variant({outcomes:{type:'array',minItems:1,maxItems:5,items:{type:'string',enum:outcomes}},effects:{type:'array',maxItems:4,items:effectReference},stages:{type:'array',maxItems:4,items:phaseReference}});
+export const effectCandidateSchema={...variant({branches:{anyOf:[{type:'null'},{type:'array',minItems:1,maxItems:5,items:branchSchema}]},completionMinutes:{anyOf:[{type:'null'},{type:'number',exclusiveMinimum:0,maximum:90}]},stages:{type:'array',maxItems:4,items:phaseReference},status:{type:'string',enum:['accepted','denied','unsupported']},effects:{type:'array',maxItems:4,items:effectReference},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[8,12,16]},ability:{type:'string',maxLength:100}})]}}),$defs:{effect:effectSchema,phase:phaseSchema}};
 export function scheduleCompletionMinutes(value:unknown):number {
  if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>90)throw Error('完成耗時必須是至多九十分鐘的有限正數。');
  return Math.ceil(value/15)*15;
 }
 export function parseEffectCandidate(raw:string):EffectCandidate{
  let v:unknown;try{v=JSON.parse(raw);}catch{throw Error('裁定未回傳有效候選。');}
+ if(v&&typeof v==='object'&&!Array.isArray(v)&&'branches' in v){
+  const envelope=v as Record<string,unknown>,branches=envelope.branches;
+  delete envelope.branches;
+  if(branches!==null){
+   if(raw.length>8192||!exact(envelope,['status','effects','stages','check','completionMinutes'])||envelope.status!=='accepted'||!Array.isArray(envelope.effects)||envelope.effects.length||!Array.isArray(envelope.stages)||envelope.stages.length||!Array.isArray(branches)||!branches.length||branches.length>5)throw Error('結果分支契約無效。');
+   const duration=scheduleCompletionMinutes(envelope.completionMinutes),seen:Outcome[]=[];
+   const parsed=branches.map((branch:unknown):ResultBranch=>{
+    if(!exact(branch,['outcomes','effects','stages'])||!Array.isArray(branch.outcomes)||!branch.outcomes.length||branch.outcomes.some(value=>!outcomes.includes(value as Outcome))||!Array.isArray(branch.effects)||!Array.isArray(branch.stages))throw Error('結果分支格式無效。');
+    seen.push(...branch.outcomes as Outcome[]);
+    let effects:Effect[],stages:ActivityPhase[];
+    if(!branch.effects.length&&!branch.stages.length){effects=[];stages=[];}
+    else {const parsed=parseEffectCandidate(JSON.stringify({status:'accepted',effects:branch.effects,stages:branch.stages,check:null,completionMinutes:envelope.completionMinutes}));effects=parsed.effects;stages=parsed.stages||[];}
+    if(stages.some(stage=>stage.afterMinutes>duration)||stages.length&&stages.at(-1)!.afterMinutes!==duration)throw Error('分支最後階段須與確認完成時間一致。');
+    if(!stages.length&&duration>15){stages=[{afterMinutes:duration,preconditions:[],effects}];effects=[];}
+    return {outcomes:branch.outcomes as Outcome[],effects,stages};
+   });
+   if(seen.length!==5||new Set(seen).size!==5||envelope.check===null&&branches.length!==1)throw Error('結果分支須唯一涵蓋五段判定；確定活動只用一組後果。');
+   if(envelope.check!==null&&(!exact(envelope.check,['difficulty','ability'])||![8,12,16].includes(envelope.check.difficulty as number)||!reference(envelope.check.ability)))throw Error('裁定不可指定骰值或結果。');
+   return {status:'accepted',effects:[],stages:[],check:envelope.check as EffectCandidate['check'],confirmedDurationMinutes:duration,branches:parsed};
+  }
+ }
  let confirmedDurationMinutes:number|undefined;
  if(v&&typeof v==='object'&&!Array.isArray(v)&&'completionMinutes' in v){
   const completion=(v as Record<string,unknown>).completionMinutes;
@@ -101,7 +132,7 @@ export function knownWorldSupplies(w:World,c:Character){
 export function authorityForProposal(w:World,c:Character){
  const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
  const supplies=knownWorldSupplies(w,c).map(s=>w.supplies!.find(full=>full.id===s.id)!);
- return {objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v2',effectRules,effectContract:effectCandidateSchema};
+ return {objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v3',effectRules,effectContract:effectCandidateSchema};
 }
 function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null):string[]{
  const results:string[]=[];
@@ -170,7 +201,50 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
  }
  return results;
 }
-export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):boolean{
+function canonical(value:unknown):unknown {return Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,val])=>[key,canonical(val)])):value;}
+function abilityAdvantage(c:Character,ability:string):Advantage {
+ const tags=(c.abilityTags||[]).filter(tag=>tag.replace(/^(非常擅長|非常不擅長|不擅長|擅長)/,'')===ability);
+ return tags.some(t=>t.startsWith('非常不擅長'))?-4:tags.some(t=>t.startsWith('不擅長'))?-2:tags.some(t=>t.startsWith('非常擅長'))?4:tags.some(t=>t.startsWith('擅長'))?2:0;
+}
+// The first validated attempt freezes the relevant physical scope. A later
+// candidate cannot obtain a new die by appending unrelated effect references.
+function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:Action):Resolution {
+ const target=w.objects?.find(o=>o.id===action.target)||w.supplies?.find(s=>s.id===action.target);
+ if(!candidate.trialBinding&&(!target||!target.knownTo.includes(c.id)||target.region!==regionOf(c)))throw new EffectValidationError('不確定活動需要當前可知的具體對象。',{reason:'branch_subject'});
+ const scope=JSON.stringify(['results.v1',c.id,candidate.trialBinding?['routine',candidate.trialBinding.operation,candidate.trialBinding.subject]:['free',action.target]]);
+ const refs=new Set<string>(target?[target.id]:[]);
+ for(const branch of candidate.branches||[])for(const effect of [...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])refs.add('objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId);
+ const currentRefs=[...refs].filter(id=>w.objects?.some(o=>o.id===id)||w.supplies?.some(s=>s.id===id)).sort();
+ let frozen=candidate.trialBinding?.references||w.branchTrialScopes?.[scope]||currentRefs;
+ const facts=(references:string[])=>references.map(id=>{
+  const o=w.objects?.find(o=>o.id===id),s=w.supplies?.find(s=>s.id===id);
+  return o?{id:o.id,source:o.source,region:o.region,holder:o.holder,owner:o.owner,state:o.state,lifecycle:o.lifecycle,allowed:o.owner===c.id||o.allowedTo.includes(c.id)}:s?{id:s.id,region:s.region,owner:s.owner,remaining:s.remaining,sequence:s.background?.sequence,state:s.initialState,allowed:s.allowedTo.includes(c.id)}:{id,missing:true};
+ });
+ const identity=(references:string[])=>JSON.stringify(canonical([scope,regionOf(c),[...(c.abilityTags||[])].sort(),[...(c.craftInsights||[])].sort(),facts(references)]));
+ let key=identity(frozen),prior=w.freeTrials?.[key];
+ // Only after a trusted fact in the frozen footprint really changed may a new
+ // attempt bind its current material unit. Mere branch/reference edits cannot.
+ if(!prior&&!candidate.trialBinding){frozen=currentRefs;key=identity(frozen);prior=w.freeTrials?.[key];}
+ if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
+ const result=prior||judgeD20(rollD20(),abilityAdvantage(c,candidate.check!.ability),candidate.check!.difficulty);
+ if(!prior){if(!candidate.trialBinding)(w.branchTrialScopes??={})[scope]=frozen;(w.freeTrials??={})[key]=result;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,result);w.events.at(-1)!.attemptKey=key;}
+ return result;
+}
+export function validateResultBranches(w:World,c:Character,candidate:EffectCandidate):void {
+ for(const branch of candidate.branches||[]){const clone=structuredClone(w),actor=clone.characters.find(actor=>actor.id===c.id)!;commitFreeAction(clone,actor,{...candidate,branches:undefined,check:null,effects:branch.effects,stages:branch.stages});}
+}
+export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action):boolean{
+ if(candidate.branches){
+  validateResultBranches(w,c,candidate);
+  if(!action)throw Error('結果分支缺少活動對象。');
+  const resolution=candidate.check?branchResolution(w,c,candidate,action):undefined;
+  const branchIndex=resolution?candidate.branches.findIndex(branch=>branch.outcomes.includes(resolution.outcome)):0;
+  const branch=candidate.branches[branchIndex];
+  candidate.selectedResult={outcome:resolution?.outcome||null,...(resolution?{resolution}:{}),branch:branchIndex};
+  candidate.effects=branch.effects;candidate.stages=branch.stages;candidate.check=null;
+  delete candidate.branches;
+ }
+
  if(candidate.status!=='accepted'){
   c.activity=candidate.blockedReason||(candidate.status==='denied'?'這次方法沒有成功。':'目前的方法無法落實。');
   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);return false;
@@ -203,9 +277,8 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>predicted.objects?.find(o=>o.id===p.objectId)||null)});
   }
  }
- let resolution;
+ let resolution=candidate.selectedResult?.resolution;
  if(candidate.check){
-  const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,val])=>[key,canonical(val)])):value;
   const allEffects=[...candidate.effects,...(candidate.stages||[]).flatMap(stage=>stage.effects)];
   const references=new Set(allEffects.map(e=>'objectId' in e?e.objectId:'supplyId' in e?e.supplyId:e.targetId));
   for(const stage of candidate.stages||[])for(const p of stage.preconditions)references.add(p.objectId);
@@ -214,18 +287,13 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
   const key=JSON.stringify(canonical(['free',c.id,regionOf(c),[...(c.abilityTags||[])].sort(),candidate.effects,phases,conditions]));
   const prior=w.freeTrials?.[key];
   if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
-  const relevant=(c.abilityTags||[]).filter(tag=>tag.replace(/^(非常擅長|非常不擅長|不擅長|擅長)/,'')===candidate.check!.ability);
-  let advantage:Advantage=0;
-  if(relevant.some(tag=>tag.startsWith('非常不擅長')))advantage=-4;
-  else if(relevant.some(tag=>tag.startsWith('不擅長')))advantage=-2;
-  else if(relevant.some(tag=>tag.startsWith('非常擅長')))advantage=4;
-  else if(relevant.some(tag=>tag.startsWith('擅長')))advantage=2;
-  resolution=prior||judgeD20(rollD20(),advantage,candidate.check.difficulty);
+  resolution=prior||judgeD20(rollD20(),abilityAdvantage(c,candidate.check.ability),candidate.check.difficulty);
   if(!prior){(w.freeTrials??={})[key]=resolution;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);w.events.at(-1)!.attemptKey=key;}
   if(!['success','critical-success'].includes(resolution.outcome)){c.activity='嘗試尚未完成。';return false;}
  }
  w.supplies=clone.supplies;w.objects=clone.objects;
- c.activity=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'完成這次行動'))+(candidate.stages?.length?'；活動尚未完成。':'');
+ const outcomeLabel=resolution?.outcome==='critical-failure'?'大失敗':resolution?.outcome==='failure'?'失敗':resolution?.outcome==='mixed'?'部分成功':'完成';
+ c.activity=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':candidate.selectedResult?`這次嘗試的結果為${outcomeLabel}`:'完成這次行動'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
  record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
  return true;

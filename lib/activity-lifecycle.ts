@@ -1,4 +1,4 @@
-import { requiresWorldEffects, commitFreeAction, commitActivityPhase, EffectValidationError, type Effect } from './world-effects';
+import { requiresWorldEffects, commitFreeAction, commitActivityPhase, validateResultBranches, EffectValidationError, type Effect } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
 import { regionOf } from './perception';
 import type { ActivityDecision } from './activities';
@@ -45,10 +45,16 @@ function advancePhases(w:World,c:Character):void{
    record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);cancelActivity(w,c);return;
   }
   phases.cursor++;
-  c.activity=results.join('，');
-  record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
+  const outcome=plan.selectedResult?.outcome;
+  const label=outcome==='critical-failure'?'大失敗':outcome==='failure'?'失敗':outcome==='mixed'?'部分成功':'完成';
+  c.activity=results.join('，')||`這次嘗試的結果為${label}`;
+  record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
  }
- if(phases.cursor===phases.stages.length&&w.minute>=plan.until){c.activity+='；活動已完成。';cancelActivity(w,c);}
+ if(phases.cursor===phases.stages.length&&w.minute>=plan.until){
+  const outcome=plan.selectedResult?.outcome;
+  const label=outcome==='critical-failure'?'大失敗':outcome==='failure'?'失敗':outcome==='mixed'?'部分成功':outcome==='critical-success'?'大成功':'成功';
+  c.activity+=plan.selectedResult?`；這次嘗試已結束${outcome?`（${label}）`:''}。`:'；活動已完成。';cancelActivity(w,c);
+ }
 }
 
 // A control transition, an autonomous continuation and an explicit NPC continue
@@ -91,19 +97,19 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(candidate.confirmedDurationMinutes===undefined)throw new EffectValidationError('完成目標缺少世界確認耗時。',{reason:'completion_time_missing'});
       const duration=candidate.confirmedDurationMinutes;
       if(instantaneousRights&&duration!==15)throw new EffectValidationError('授權與同意是一次性選擇。',{reason:'rights_duration'});
-      if(!(candidate.stages?.length)&&duration>minutes)candidate={...candidate,effects:[],stages:[{afterMinutes:duration,preconditions:[],effects:candidate.effects}]};
-      if(candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
+      if(!candidate.branches&&!(candidate.stages?.length)&&duration>minutes)candidate={...candidate,effects:[],stages:[{afterMinutes:duration,preconditions:[],effects:candidate.effects}]};
+      if(!candidate.branches&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
-        commitFreeAction(validation,actor,{...candidate,check:null});
+        if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null});
         candidate={status:'denied',effects:[],stages:[],check:null,blockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
       }
     }
-    const phases=candidate.stages||[];
     const duration=candidate.confirmedDurationMinutes??decision.durationMinutes;
-    if(phases.some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
-    const accepted=commitFreeAction(world,character,candidate);
-    if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
+    if((candidate.stages||[]).some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
+    const accepted=commitFreeAction(world,character,candidate,decision.action);
+    const phases=candidate.stages||[];
+    if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
   }
   else {
     if(decision.timeIntent?.kind==='completion'){
