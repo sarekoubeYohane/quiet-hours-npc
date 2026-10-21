@@ -1,5 +1,7 @@
 # Local browser verification
 
+`browser-operation-evidence.mjs` 使用真正 WorldApp → GET/POST → SQLite，驗證原長句與茶具 target 的原杯／未記錄杯成功、矛盾裁定、服務失敗，及原候選、六項未對齊時間、派送／usage、UI/API 重載與同 ID 重送。四組篩選證據 JSON／截圖寫入 `docs/verification/assets/operation-evidence/`；所有模型輸出仍是本機 transport fixture。沿下方 Chromium 環境執行，詳見 [整合報告](../../docs/verification/operation-evidence-integration-2026-10-21.md)；正式站另依 [部署後流程](../../docs/verification/operation-evidence-live-runbook.md)。
+
 `browser-acceptance-scene.mjs` 使用真正的場景進入／返回 API，驗證取消、原世界保存、餐點取得／食用、店主自主授權與借杯／攜帶／洗淨／歸還、泡茶中斷、跨分頁舊操作、重載及共用用量。桌機與 390px 截圖寫入 `docs/verification/assets/acceptance-scene/`（可由 `BROWSER_ARTIFACT_DIR` 改變）。沿下方相同 Playwright／Chromium 環境執行，不使用真實 Key 或玩家世界。
 
 Character assets (#88): `browser88.mjs` verifies the four approved master/profile/avatar/pixel files, dimensions, alpha, baseline, real map/profile rendering and unchanged world state. Set `BROWSER_FONT_DIR` for readable CJK evidence. `prepare-character-assets.py <generated_images-directory>` exports the approved source IDs with ImageMagick; see `docs/design/character-visual-assets.md`.

@@ -144,6 +144,14 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   rule={id:crypto.randomUUID(),version:approval?.version||1,...(approval?.programs?{programs:structuredClone(approval.programs)}:{}),family:'cafe-service',operations:selected.map(t=>t.operation),templates:structuredClone(selected),origin:c.location,knownTo:[c.id]};(w.routineRules??=[]).push(rule);
   audit(w,c,rule,'approved');
  }else if(confirmedTemplates){
+  // Legacy confirmations may retain an unchanged model program, but cannot
+  // replace its time/scope without supplying the matching v2 program too.
+  const savedTemplates=rule.templates;
+  const incompatibleLegacy=rule.version===2&&approval?.version===1&&(
+   confirmedTemplates.length!==savedTemplates?.length||
+   confirmedTemplates.some(template=>savedTemplates?.find(saved=>saved.operation===template.operation)?.result.minutes!==template.result.minutes)
+  );
+  if(incompatibleLegacy)throw new EffectValidationError('舊版核准不能改寫既有新版程序的範圍或耗時。',{reason:'routine_version_conflict'});
   if(approval?.version===2){rule.version=2;rule.programs=structuredClone(approval.programs);}
   rule.operations=confirmedTemplates.map(t=>t.operation);
   rule.templates=structuredClone(confirmedTemplates);

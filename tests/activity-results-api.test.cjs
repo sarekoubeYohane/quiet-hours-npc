@@ -64,3 +64,20 @@ test('transport schema and instructions distinguish result branches from legacy 
 test('independent real material units produce fresh attempts instead of inheriting the first historical die forever',async()=>{
  const s=await scenario();try{await advance(s);await advance(s);for(const id of ['material-2','material-3']){const w=await s.read(),fresh={...structuredClone(w.objects[1]),id,source:id,revision:1,lifecycle:'active',holder:'owner'};w.objects.push(fresh);store.replaceCommittedWorld(w);const r=candidate();r.branches[2].effects=[{kind:'consume',objectId:id,expectedRevision:1}];s.reply(r);await advance(s);const result=await advance(s);assert.equal(result.objects.find(o=>o.id===id).lifecycle,'consumed');}assert.deepEqual(s.counts(),{npc:3,judgments:3,dice:3});}finally{s.restore();}
 });
+
+test('a changed confirmed phase tool earns a new attempt while appended prerequisites cannot wash it',async()=>{
+ const reply=candidate(); reply.branches[2].effects=[];
+ reply.branches[0].effects=[];reply.branches[0].stages=[{afterMinutes:30,preconditions:[{objectId:'tool',revision:1,region:'cafe-front',holder:'owner',state:[{key:'condition',value:'basic'}]}],effects:[state('complete')]}];
+ const s=await scenario({reply});try{
+  const w=await s.read();w.objects.push({id:'tool',source:'fixture-tool',label:'加工工具',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{condition:'basic'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{condition:['basic','improved']}});store.replaceCommittedWorld(w);
+  await advance(s);await advance(s);assert.equal(s.counts().dice,1);
+  s.choose({...proposal,target:'tool',content:'改善工具的實際狀態',durationMinutes:15});s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'tool',expectedRevision:1,key:'condition',value:'improved'}],stages:[],check:null,branches:null,routine:null});await advance(s);
+  const improved=await s.read();assert.equal(improved.objects.find(o=>o.id==='tool').state.condition,'improved');
+  reply.branches[0].stages[0].preconditions[0].revision=2;reply.branches[0].stages[0].preconditions[0].state[0].value='improved';s.reply(reply);s.choose(proposal);await advance(s);
+  assert.equal(s.counts().dice,2,'a real changed required tool must not inherit the old failure');
+  await advance(s);
+  const beforeAppend=await s.read();beforeAppend.objects.push({...structuredClone(beforeAppend.objects.find(o=>o.id==='tool')),id:'unrelated-tool',source:'unrelated-tool'});store.replaceCommittedWorld(beforeAppend);
+  reply.branches[0].stages[0].preconditions.push({objectId:'unrelated-tool',revision:2,region:'cafe-front',holder:'owner',state:[{key:'condition',value:'improved'}]});
+  s.reply(reply);await advance(s);assert.equal(s.counts().dice,2,'appending a new prerequisite cannot expand the frozen attempt');
+ }finally{s.restore();}
+});

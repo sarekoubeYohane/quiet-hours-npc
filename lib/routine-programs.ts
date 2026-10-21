@@ -9,6 +9,21 @@ import type { RoutineProgram } from './routine-program-contract';
 // optional roles and sequential guards before the existing validator executes.
 export function bindRoutineProgram(w:World,c:Character,legacy:EffectCandidate,program:RoutineProgram):EffectCandidate {
  if(legacy.status!=='accepted')return legacy;
+ if(program.branches){
+  const branches=program.branches.map(branch=>{
+   const compiled=bindRoutineProgram(w,c,legacy,{operation:program.operation,effects:branch.effects,stages:branch.stages});
+   return {...compiled.branches![0],outcomes:branch.outcomes};
+  });
+  const effects=[...legacy.effects,...(legacy.stages||[]).flatMap(s=>s.effects)];
+  const vessels=effects.flatMap(e=>e.kind==='state'?[e.objectId]:[]);
+  const materialized=effects.flatMap(e=>e.kind==='materialize'?[e.supplyId]:[]);
+  const existing=effects.flatMap(e=>'objectId' in e&&w.objects?.some(o=>o.id===e.objectId)?[e.objectId]:[]);
+  const references=[...new Set([...existing,...vessels,...materialized,...(legacy.stages||[]).flatMap(s=>s.requiredTools||[])])].filter(id=>!w.supplies?.find(s=>s.id===id)?.pending).sort();
+  const vessel=vessels[0]||materialized.find(id=>w.supplies?.find(s=>s.id===id)?.kind==='utensil');
+  const subject=vessel||references[0];if(!subject)throw Error('日常判定缺少受信任的本次對象。');
+  return {status:'accepted',effects:[],stages:[],check:program.check||null,confirmedDurationMinutes:legacy.confirmedDurationMinutes,preparationSupplies:legacy.preparationSupplies,branches,trialBinding:{operation:program.operation,subject,references},pendingResultSupplies:materialized.filter(id=>w.supplies?.find(s=>s.id===id)?.pending)};
+ }
+
  const all=[...legacy.effects,...(legacy.stages||[]).flatMap(s=>s.effects)],roles=new Map<string,string>();
  for(const phase of legacy.stages||[])for(const condition of phase.preconditions){const o=w.objects?.find(o=>o.id===condition.objectId);if(o?.kind==='utensil'&&'contents' in o.state)roles.set('vessel',o.id);}
  for(const e of all){
@@ -46,6 +61,7 @@ export function bindRoutineProgram(w:World,c:Character,legacy:EffectCandidate,pr
 
  }
  const initial=stages[0]?.afterMinutes===0?stages.shift()!.effects:[];
+ if(!stages.length)stages.push({afterMinutes:legacy.confirmedDurationMinutes!,preconditions:[],effects:[]});
  return {status:'accepted',effects:[],stages:[],check:null,confirmedDurationMinutes:legacy.confirmedDurationMinutes,preparationSupplies:legacy.preparationSupplies,branches:[{outcomes:['critical-success','success','mixed','failure','critical-failure'],effects:initial,stages}]};
 }
 

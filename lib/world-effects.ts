@@ -19,10 +19,18 @@ export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPha
 // attempt without storing model-authored IDs or the first historical die in a rule.
 export type TrialBinding={operation:import('./routine-rules').RoutineOperation;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
-export type EffectCandidate={branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
+// Only candidate-owned future supplies are discardable. A concrete identity
+// remains a world fact even if its source is still marked pending.
+export function discardPendingSupplies(world:World,ids:ReadonlySet<string>):void {
+ if(!ids.size||!world.supplies)return;
+ const materialized=new Set((world.objects||[]).map(object=>object.source));
+ world.supplies=world.supplies.filter(supply=>!ids.has(supply.id)||!supply.pending||materialized.has(supply.id));
+}
+
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 const effectRules = [
@@ -213,7 +221,10 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
  if(!candidate.trialBinding&&(!target||!target.knownTo.includes(c.id)||target.region!==regionOf(c)))throw new EffectValidationError('不確定活動需要當前可知的具體對象。',{reason:'branch_subject'});
  const scope=JSON.stringify(['results.v1',c.id,candidate.trialBinding?['routine',candidate.trialBinding.operation,candidate.trialBinding.subject]:['free',action.target]]);
  const refs=new Set<string>(target?[target.id]:[]);
- for(const branch of candidate.branches||[])for(const effect of [...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])refs.add('objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId);
+ for(const branch of candidate.branches||[]){
+  for(const effect of [...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])refs.add('objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId);
+  for(const stage of branch.stages)for(const condition of stage.preconditions)refs.add(condition.objectId);
+ }
  const currentRefs=[...refs].filter(id=>w.objects?.some(o=>o.id===id)||w.supplies?.some(s=>s.id===id)).sort();
  let frozen=candidate.trialBinding?.references||w.branchTrialScopes?.[scope]||currentRefs;
  const facts=(references:string[])=>references.map(id=>{
@@ -242,6 +253,9 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   const branch=candidate.branches[branchIndex];
   candidate.selectedResult={outcome:resolution?.outcome||null,...(resolution?{resolution}:{}),branch:branchIndex};
   candidate.effects=branch.effects;candidate.stages=branch.stages;candidate.check=null;
+  const used=new Set([...branch.effects,...branch.stages.flatMap(stage=>stage.effects)].flatMap(effect=>effect.kind==='materialize'?[effect.supplyId]:[]));
+  const unselected=new Set((candidate.pendingResultSupplies||[]).filter(id=>!used.has(id)));
+  discardPendingSupplies(w,unselected);
   delete candidate.branches;
  }
 

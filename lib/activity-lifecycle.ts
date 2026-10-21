@@ -1,4 +1,4 @@
-import { requiresWorldEffects, commitFreeAction, commitActivityPhase, validateResultBranches, EffectValidationError, type Effect } from './world-effects';
+import { requiresWorldEffects, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
 import { regionOf } from './perception';
 import type { ActivityDecision } from './activities';
@@ -28,7 +28,7 @@ export function cancelActivity(w:World,c:Character):void {
  const phases=c.plan?.phases;
  if(phases&&w.supplies){
   const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).filter((effect):effect is Extract<Effect,{kind:'materialize'}>=>effect.kind==='materialize').map(effect=>effect.supplyId));
-  w.supplies=w.supplies.filter(supply=>!pending.has(supply.id)||!supply.pending||(w.objects||[]).some(object=>object.source===supply.id));
+  discardPendingSupplies(w,pending);
  }
  delete c.plan;
  if(c.control)delete c.control.active;

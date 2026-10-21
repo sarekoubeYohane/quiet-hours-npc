@@ -1,0 +1,3 @@
+const uncertain=(approval)=>{const reply=approval();for(const p of reply.routine.programs){p.check=null;p.branches=null;}const p=reply.routine.programs[0],start=p.stages[0];p.check={difficulty:12,ability:'泡茶'};p.branches=[{outcomes:['critical-success','success'],effects:[],stages:structuredClone(p.stages)},{outcomes:['mixed'],effects:[],stages:[structuredClone(start),{afterMinutes:30,effects:[]}]},{outcomes:['failure','critical-failure'],effects:[{kind:'materialize',role:'materialSupply'},{kind:'consume',role:'material'}],stages:[]}];p.effects=[];p.stages=[];return reply;};
+const raw=()=>[{id:'raw-tea',label:'茶包',region:'cafe-front',remaining:3,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];
+module.exports={uncertain,raw};

@@ -1,0 +1,197 @@
+{
+  "fixture": true,
+  "scenario": "existing",
+  "evidence": {
+    "schemaVersion": 1,
+    "operationId": "1792080000000:e8400e02-1463-4ebd-b0eb-ca00d5f7246c",
+    "requestId": "44fbfe22-8df5-4247-a93f-99175a3bf1e0",
+    "contextId": "b8ed8b6d-a0e1-44d4-87d1-4883defc6298",
+    "deployment": {
+      "name": "local",
+      "commit": "unknown",
+      "builtAt": "unknown"
+    },
+    "operation": "advance",
+    "baseVersion": 0,
+    "outcome": "committed",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792080000000:e8400e02-1463-4ebd-b0eb-ca00d5f7246c",
+      "worldContext": "b8ed8b6d-a0e1-44d4-87d1-4883defc6298",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 1,
+      "adjudication": 1
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "9aa39a7e-56e5-48f7-b479-382b305049eb",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "type": "propose",
+            "target": "acceptance-tea-kit",
+            "content": "我想用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶。",
+            "purpose": "飲用",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "owner",
+        "requestId": "1792080000000:e8400e02-1463-4ebd-b0eb-ca00d5f7246c:owner:adjudication:f10ef0c3-83a6-40c8-b061-b67b2ceccc7a",
+        "provider": "openai",
+        "model": "fixture-adjudicator",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "accepted",
+            "completionMinutes": null,
+            "effects": [],
+            "check": null,
+            "routine": {
+              "family": "cafe-service",
+              "version": 1,
+              "operation": "tea",
+              "subject": "茶",
+              "timings": [
+                {
+                  "operation": "tea",
+                  "minutes": 5
+                },
+                {
+                  "operation": "coffee",
+                  "minutes": 6
+                },
+                {
+                  "operation": "food",
+                  "minutes": 10
+                },
+                {
+                  "operation": "drink",
+                  "minutes": 8
+                },
+                {
+                  "operation": "wash",
+                  "minutes": 3
+                },
+                {
+                  "operation": "return",
+                  "minutes": 1
+                }
+              ]
+            },
+            "stages": []
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    ],
+    "truncated": false,
+    "redacted": false,
+    "resultVersion": 1,
+    "result": {
+      "turn": 1,
+      "minute": 735,
+      "actors": [
+        {
+          "id": "owner",
+          "activity": "驗收杯子：contents=tea，取得一份茶；活動已完成。",
+          "plan": null
+        }
+      ],
+      "rules": [
+        {
+          "id": "ec65688e-ac43-4310-b12d-43952a8902b3",
+          "version": 1,
+          "family": "cafe-service",
+          "timings": [
+            {
+              "operation": "tea",
+              "minutes": 15
+            },
+            {
+              "operation": "coffee",
+              "minutes": 15
+            },
+            {
+              "operation": "food",
+              "minutes": 15
+            },
+            {
+              "operation": "drink",
+              "minutes": 15
+            },
+            {
+              "operation": "wash",
+              "minutes": 15
+            },
+            {
+              "operation": "return",
+              "minutes": 15
+            }
+          ]
+        }
+      ],
+      "objects": [
+        {
+          "id": "acceptance-cup",
+          "revision": 4,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "utensil",
+          "state": {
+            "contents": "tea",
+            "clean": "yes"
+          }
+        },
+        {
+          "id": "supply:748798c0-3c93-4d99-b26d-ee2b24352907:1",
+          "revision": 1,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "food",
+          "state": {
+            "vessel": "acceptance-cup",
+            "beverage": "tea"
+          }
+        }
+      ]
+    }
+  },
+  "checks": {
+    "reload": true,
+    "sameOperationReplay": true,
+    "unchangedWorld": true,
+    "noAdditionalDispatch": true
+  }
+}
