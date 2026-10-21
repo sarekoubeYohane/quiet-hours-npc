@@ -11,3 +11,7 @@ status: accepted
 本輪限天上意志的世界裁定，包括日常核准、一般自由活動與 #125 的結果分支；NPC 決策／回想契約另行整理，保留不同角色目的與資訊邊界。未選擇將規則綁定併入契約模組、各處手寫同一限制僅靠測試對齊，或一併重構所有模型契約；這些方案分別增加副作用耦合、維護漂移或變更範圍。既有 D20、錯誤處理、預算／派送上限及保存／回復規則維持原契約。
 
 來源：[本輪 Grill 紀錄](../design/adjudication-contract-grill-2026-10-21.md)、[主規格 #125](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/125)。使用者於 2026-10-21 確認整體理解；accepted 表示設計已確認，不表示模組已完成實作、驗收或部署。具體介面、生成工具、版本表示及遷移方式仍待工程落實。
+
+## 實作狀態（#137）
+
+一般自由裁定已接至 `lib/adjudication-contract.ts` 的集中規則、schema 與純解析，世界效果仍由活動執行。日常候選綁定分離與全部分支共同限制尚依 #138、#139 接續；[本地 fixture 驗證](../verification/adjudication-contract-137-2026-10-21.md) 不等於正式站驗收。
