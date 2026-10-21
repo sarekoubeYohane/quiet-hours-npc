@@ -1,6 +1,7 @@
 import type { Action, Character, World } from './world';
 import { canSee, regionOf, regions } from './perception';
 import { record } from './world';
+import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage } from './d20';
 
 // Legacy tea changes physical objects too; it must use the same verified effects.
@@ -12,7 +13,7 @@ export type SceneSupply={pending?:boolean;availableAt?:number;background?:{ruleI
 export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[]};
+export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
 export type EffectCandidate={preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
@@ -20,7 +21,7 @@ export class EffectValidationError extends Error {
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 const effectRules = [
- 'accepted 必須包含至少一個可執行效果或活動階段；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
+ '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段；日常核准分支（routine 非 null）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
  'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
  'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
  'consume：僅 food 且 holder=actor.id 才可食用，之後 lifecycle=consumed、holder=null，不會補貨。桌上食物必須先 transfer 拿取再 consume，第二步版本加一。不能 consume 杯子或茶具；飲用杯中液體須用支援的 state 轉換，無法表達時 unsupported。',
@@ -29,7 +30,7 @@ const effectRules = [
  'grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。',
  'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。destroy 只能毀壞自己所有的物件，不能毀壞借來物品。',
  'state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。',
- 'completionMinutes：有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多90）；一般 durationMinutes 只是角色估時。程式向上對齊15。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時15。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多4項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
+ 'completionMinutes：一般效果分支（routine=null）有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多90）；一般 durationMinutes 只是角色估時。程式向上對齊15。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時15。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多4項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
  '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
  '確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。',
 ];
@@ -231,6 +232,12 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
 }
 
 function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
+ // Internal routine plans retain tools separately from their result vessel.
+ // They remain local, known and authorized at every scheduled phase.
+ for(const id of phase.requiredTools||[]){
+  const tool=w.objects?.find(o=>o.id===id);
+  if(!tool||!usableRoutineObject(tool,c.id)||tool.region!==regionOf(c)||!tool.knownTo.includes(c.id))throw Error('活動工具已不可使用。');
+ }
  for(const p of phase.preconditions){
   const o=w.objects?.find(o=>o.id===p.objectId);
   if(!o||o.lifecycle!=='active'||o.revision!==p.revision||o.region!==p.region||o.holder!==p.holder||Object.entries(p.state).some(([k,v])=>o.state[k]!==v))throw Error('活動前提已改變。');

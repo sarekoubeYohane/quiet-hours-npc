@@ -68,7 +68,10 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
-    rules: ['僅回應當前行動，不產生背景事件。若 routineOffer 非空且當前普通活動符合，依提案語義從 routineOffer.templates 選擇一個 operation，回傳 routine={family: routineOffer.family,version:1,operation,subject,timings}；timings 必須一次涵蓋 routineOffer.operations 全部項目，每項 {operation,minutes}，依方法與場所條件確認合理完成分鐘，正數且至多90，不能預設茶或咖啡固定時間。NPC durationMinutes 僅為一般估時，不限制完成時間，程式會向上對齊15分鐘，同時 accepted、check=null、effects=[]、stages=[]；由程式綁定當前合法物件與背景。subject 從所選模板的 subjects 選擇；餐點須明示是哪種，飲用須區分茶、咖啡或泛指飲品，其他活動可用 null。這是有界單份普通活動的解讀，不要求 NPC 使用範例原句；supplies/objects 留白不等於已耗盡或不存在，可依場所定位確認普通背景。明確缺貨、損壞、物件權限仍優先；特殊方法、大量規模、授權與交付不屬普通背景核准。不適用時 routine=null，沿既有受限效果。不接受額外規則、背景或 world patch。', '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。'],
+    rules: [
+      '只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，選一個模板 operation，回傳 routine={family:routineOffer.family,version:1,operation,subject,timings}；accepted、check=null、effects=[]、stages=[]、completionMinutes=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多90；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊15分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。',
+      '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
+    ],
   };
 }
 // Separate task transcript and service configuration; NPC chat history is never reused.

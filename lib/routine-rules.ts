@@ -3,7 +3,7 @@ import type { Action, Character, World } from './world';
 import type { EffectCandidate, SceneSupply, WorldObject, Effect } from './world-effects';
 import { effectCandidateSchema, parseEffectCandidate, scheduleCompletionMinutes, EffectValidationError } from './world-effects';
 import { regionOf } from './perception';
-import { rawRoutineMaterial, supportsRoutineDrink, usableRoutineObject } from './routine-materials';
+import { rawRoutineMaterial, supportsRoutineDrink, usableRoutineObject, emptyRoutineVessel } from './routine-materials';
 
 // Declarative interpreter versions, never model-authored code or world patches.
 export type RoutineOperation='tea'|'coffee'|'food'|'drink'|'wash'|'return';
@@ -20,7 +20,10 @@ const templates:RoutineTemplate[]=[
 export type RoutineRule={id:string;version:1;family:'cafe-service';operations:RoutineOperation[];templates?:RoutineTemplate[];origin:string;knownTo:string[]};
 export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string[];confirmedOperations?:RoutineOperation[]};
 
-export const routineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:['tea','coffee','food','drink','wash','return',null]},subject:{type:['string','null'],maxLength:40},timings:{type:'array',minItems:1,maxItems:6,items:{type:'object',properties:{operation:{type:'string',enum:['tea','coffee','food','drink','wash','return']},minutes:{type:'number',exclusiveMinimum:0,maximum:90}},required:['operation','minutes'],additionalProperties:false}}},required:['family','version','operation','subject','timings'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
+// OpenAI strict schemas require an object root and do not support cross-field
+// if/then constraints. Describe the two branches on the supported fields;
+// parseRoutineCandidate remains the authority for their joint invariants.
+export const routineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,completionMinutes:{...effectCandidateSchema.properties.completionMinutes,description:'routine 非 null 時必須為 null，唯一耗時來源是完整 routine.timings；routine=null 的一般完成目標 accepted 時才填正數，denied/unsupported 或開放式時段為 null。'},effects:{...effectCandidateSchema.properties.effects,description:'routine 非 null 的日常核准必須為空陣列；routine=null 的一般 accepted 必須在 effects 或 stages 提供可執行效果。'},stages:{...effectCandidateSchema.properties.stages,description:'routine 非 null 的日常核准必須為空陣列；一般活動階段依完成耗時契約。'},check:{...effectCandidateSchema.properties.check,description:'routine 非 null、denied 或 unsupported 時必須為 null。'},routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:['tea','coffee','food','drink','wash','return',null]},subject:{type:['string','null'],maxLength:40},timings:{type:'array',minItems:1,maxItems:6,items:{type:'object',properties:{operation:{type:'string',enum:['tea','coffee','food','drink','wash','return']},minutes:{type:'number',exclusiveMinimum:0,maximum:90}},required:['operation','minutes'],additionalProperties:false}}},required:['family','version','operation','subject','timings'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
 export function parseRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15,maxMinutes:number|null=null):EffectCandidate {
  if(raw.length>8192)throw Error('裁定候選超出容量。');
  const parsed=JSON.parse(raw),approval=parsed?.routine;
@@ -162,7 +165,9 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  const targetSupply=target?w.supplies?.find(s=>s.id===target&&s.knownTo.includes(c.id)&&s.region===region):undefined;
  if(target&&!targetObject&&!targetSupply)return denied;
  const canUse=(o:WorldObject)=>usableRoutineObject(o,c.id);
- const targetCup=targetObject?.kind==='utensil'?targetObject:undefined;
+ const targetCup=targetObject?.kind==='utensil'&&'contents' in targetObject.state?targetObject:undefined;
+ const targetTool=targetObject?.kind==='utensil'&&!targetCup?targetObject:undefined;
+ if((targetObject&&!targetCup&&!targetTool)||(targetTool&&!canUse(targetTool)))return blockedRoutine(w,c,'目前沒有可使用的指定工具。');
  if(['consume','clean','release'].includes(template.result.kind)){
   const requested=template.result.kind==='consume'?literalDrink||interpretedDrink:undefined;
   const availableDrink=(v:WorldObject)=>visible.find(o=>o.kind==='food'&&o.state.vessel===v.id&&canUse(o)&&o.state.beverage===v.state.contents&&(!requested||o.state.beverage===requested));
@@ -176,8 +181,10 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
    if(drink.holder!==c.id)effects.push({kind:'transfer',objectId:drink.id,expectedRevision:drink.revision,toHolder:c.id,toRegion:region});
    effects.push({kind:'consume',objectId:drink.id,expectedRevision:drink.revision+(drink.holder!==c.id?1:0)},{kind:'state',objectId:vessel.id,expectedRevision:revision,key:'contents',value:'dirty'});
   }else if(template.result.kind==='clean'){
-   if(vessel.state.contents!=='dirty')return denied;
-   effects.push({kind:'state',objectId:vessel.id,expectedRevision:revision,key:'contents',value:'empty'});
+   if(vessel.state.contents!=='dirty'&&!(vessel.state.contents==='empty'&&vessel.state.clean==='no'))return denied;
+   if(vessel.state.clean==='no'&&!vessel.stateTransitions?.clean?.includes('yes'))return denied;
+   if(vessel.state.contents!=='empty')effects.push({kind:'state',objectId:vessel.id,expectedRevision:revision++,key:'contents',value:'empty'});
+   if(vessel.state.clean==='no')effects.push({kind:'state',objectId:vessel.id,expectedRevision:revision,key:'clean',value:'yes'});
   }else{
    if(vessel.state.contents!=='empty')return denied;
    effects.push({kind:'transfer',objectId:vessel.id,expectedRevision:revision,toHolder:null,toRegion:region});
@@ -194,18 +201,19 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   return {status:'accepted',confirmedDurationMinutes,effects:[],check:null,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[],effects:[{kind:'materialize',supplyId:supply.id,expectedRemaining:supply.remaining}]}]};
  }
 
- const teaObjects=visible.filter(o=>(!target||o.id===target)&&o.kind==='utensil'&&'contents' in o.state);
+ const vesselTarget=targetTool?undefined:target;
+ const teaObjects=visible.filter(o=>(!vesselTarget||o.id===vesselTarget)&&o.kind==='utensil'&&'contents' in o.state);
  // A concrete utensil is never repaired, replenished or teleported by background.
- let cup:WorldObject|undefined=teaObjects.find(o=>supportsRoutineDrink(o.stateTransitions?.contents,contents)&&o.state.contents==='empty'&&usableRoutineObject(o,c.id));
- const explicit=(w.supplies||[]).filter(s=>s.region===region&&!s.background&&(!target||s.id===target)&&s.kind==='utensil'&&'contents' in s.initialState);
+ let cup:WorldObject|undefined=teaObjects.find(o=>supportsRoutineDrink(o.stateTransitions?.contents,contents)&&emptyRoutineVessel(o.state)&&usableRoutineObject(o,c.id));
+ const explicit=(w.supplies||[]).filter(s=>s.region===region&&!s.background&&(!vesselTarget||s.id===vesselTarget)&&s.kind==='utensil'&&'contents' in s.initialState);
  const effects:Effect[]=[],preparationSupplies:string[]=[];
  const materials=(w.supplies||[]).filter(s=>!s.background&&s.region===region&&rawRoutineMaterial(s,contents));
  if(materials.length){const material=materials.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id));if(!material)return denied;preparationSupplies.push(material.id);effects.push({kind:'materialize',supplyId:material.id,expectedRemaining:material.remaining},{kind:'consume',objectId:`${material.id}:${material.remaining}`,expectedRevision:1});}
  if(!cup){
-  if(targetObject)return denied;
-  if(teaObjects.some(o=>!(w.supplies||[]).find(s=>s.id===o.source)?.background))return denied;
+  if(targetCup)return denied;
+  if(teaObjects.some(o=>!canUse(o)))return denied;
   if(teaObjects.some(o=>o.lifecycle!=='active'||o.state.condition==='broken')&&!teaObjects.some(o=>o.lifecycle==='active'&&o.state.condition!=='broken'))return denied;
-  let supply:SceneSupply|undefined=explicit.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id)&&supportsRoutineDrink(s.stateTransitions?.contents,contents));
+  let supply:SceneSupply|undefined=explicit.find(s=>s.remaining>0&&emptyRoutineVessel(s.initialState)&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id)&&supportsRoutineDrink(s.stateTransitions?.contents,contents));
   if(explicit.length&&!supply)return denied;
   if(!supply){
    if((w.objects?.length||0)>=512||(w.supplies?.length||0)>=512)throw new EffectValidationError('具體物件已達保存容量。',{reason:'object_capacity'});
@@ -223,7 +231,7 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  beverage.pending=true;
  beverage.availableAt=w.minute+Math.max(0,confirmedDurationMinutes-elapsedMinutes);
 
- return {status:'accepted',preparationSupplies,confirmedDurationMinutes,check:null,effects,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[{objectId:cup.id,revision:revision+1,region,holder:c.id,state:{contents:'water'}}],effects:[{kind:'state',objectId:cup.id,expectedRevision:revision+1,key:'contents',value:contents},{kind:'materialize',supplyId:beverage.id,expectedRemaining:beverage.remaining}]}]};
+ return {status:'accepted',preparationSupplies,confirmedDurationMinutes,check:null,effects,stages:[{afterMinutes:confirmedDurationMinutes,...(targetTool?{requiredTools:[targetTool.id]}:{}),preconditions:[{objectId:cup.id,revision:revision+1,region,holder:c.id,state:{contents:'water'}},...(targetTool?[{objectId:targetTool.id,revision:targetTool.revision,region,holder:targetTool.holder,state:{...targetTool.state}}]:[])],effects:[{kind:'state',objectId:cup.id,expectedRevision:revision+1,key:'contents',value:contents},{kind:'materialize',supplyId:beverage.id,expectedRemaining:beverage.remaining}]}]};
 }
 
 function audit(w:World,c:Character,r:RoutineRule,result:'approved'|'reused'|'exception'|'confirmed'){w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:r.id,result}].slice(-64);}
