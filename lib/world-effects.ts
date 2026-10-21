@@ -1,7 +1,13 @@
-import { effectCandidateSchema, effectRules } from './adjudication-contract';
+import { validQuantity } from './world-formation-contract';
+import { applyFormation } from './world-formation';
+import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
+import { applyWorldStateChange, worldTargetSnapshot, commitWorldChanges, stateConditionsHold, type StateCondition, type ExternalConsequence } from './world-state';
+export { applyBoundedStateChanges, commitWorldChanges } from './world-state';
+import { effectCandidateSchema, effectRules, validObjectKind } from './adjudication-contract';
+import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
 import type { Action, Character, World } from './world';
-import { canSee, regionOf, regions } from './perception';
+import { canSee, regionOf, regions, connectingDoor } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
@@ -11,10 +17,16 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:'food'|'utensil';initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
-export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
-export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
-export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
+export type SceneSupply={stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type PhysicalHistory={actorId:string;minute:number;operation:string;permitted:boolean;priorHolder:string|null};
+export type WorldObject={stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
+export type StateChange={key:string;from:string|null;value:string};
+export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
+export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
+export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation:'materialize';supplyId:string;expectedRemaining:number}|{operation:'take'|'place'|'consume'|'destroy';objectId:string;expectedRevision:number});
+export type Effect=PhysicalEffect|FormationEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
+export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
+export type PhaseCondition=LegacyPhaseCondition|StateCondition;
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
 export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
 // Internal only: a trusted routine binder can identify each current vessel/material
@@ -22,6 +34,25 @@ export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPha
 export type TrialBinding={operation:import('./routine-rules').RoutineOperation;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
 export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export function hasObjectPermission(object:{owner:string;allowedTo:string[];coOwners?:string[]},actorId:string):boolean {
+ return object.allowedTo.includes(actorId)||(!object.coOwners||object.coOwners.length<=1)&&object.owner===actorId;
+}
+export function canPhysicallyReachObject(w:World,c:Character,object:WorldObject):boolean {
+ const holder=object.holder===null?undefined:w.characters.find(person=>person.id===object.holder);
+ return object.lifecycle==='active'&&object.region===regionOf(c)&&object.knownTo.includes(c.id)&&canSee(w,c,object.region)&&(object.holder===null||!!holder&&regionOf(holder)===object.region);
+}
+export function retainPhysicalHistory(object:WorldObject,c:Character,minute:number,operation:string,priorHolder:string|null,permitted=hasObjectPermission(object,c.id)):void {
+ const history=[...(object.physicalHistory||[]),{actorId:c.id,minute,operation,permitted,priorHolder}];
+ object.physicalHistoryDropped=(object.physicalHistoryDropped||0)+Math.max(0,history.length-physicalEffectLimits.maxHistory);
+ object.physicalHistory=history.slice(-physicalEffectLimits.maxHistory);
+ if(!permitted)object.unpermittedCount=(object.unpermittedCount||0)+1;
+}
+export function effectReferenceId(effect:Effect):string {
+ return effect.kind==='form'?effect.inputs[0].objectId:effect.kind==='change-state'?effect.target.id:'objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId;
+}
+export function effectReferenceIds(effect:Effect):string[] {
+ return effect.kind==='form'?effect.inputs.map(input=>input.objectId):[effectReferenceId(effect)];
+}
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
@@ -35,7 +66,7 @@ export function discardPendingSupplies(world:World,ids:ReadonlySet<string>):void
 
 const materializedObjectId = (supply: SceneSupply) => `${supply.id}:${supply.background?.sequence??supply.remaining}`;
 export function knownWorldObjects(w:World,c:Character){
- return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:o.state,revision:o.revision,kind:o.kind}));
+ return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:Object.fromEntries(Object.entries(o.state).filter(([key])=>o.stateExposure?.[key]!=='hidden')),revision:o.revision,kind:o.kind,...(o.quantity?{quantity:o.quantity}:{}),...(o.consumable===undefined?{}:{consumable:o.consumable})}));
 }
 export function knownWorldSupplies(w:World,c:Character){
  return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind}));
@@ -43,27 +74,60 @@ export function knownWorldSupplies(w:World,c:Character){
 export function authorityForProposal(w:World,c:Character){
  const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
  const supplies=knownWorldSupplies(w,c).map(s=>w.supplies!.find(full=>full.id===s.id)!);
- return {objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v3',effectRules,effectContract:effectCandidateSchema};
+ return {external:{bodies:w.characters.filter(person=>regionOf(person)===regionOf(c)&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:regionOf(c)})},objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v4',effectRules,effectContract:effectCandidateSchema};
+}
+function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect> {
+ if(effect.operation==='materialize')return {kind:'materialize',supplyId:effect.supplyId,expectedRemaining:effect.expectedRemaining};
+ if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
+ return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
 }
 function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null):string[]{
  const results:string[]=[];
- for(const [effectIndex,e] of effects.entries()){
+ const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
+ for(const [effectIndex,original] of effects.entries()){
+  const physical=original.kind==='physical';
+  const e=physical?physicalPrimitive(original,c):original;
   const fail:(reason:string,message:string)=>never=(reason,message)=>{
-   const id='objectId' in e?e.objectId:'supplyId' in e?e.supplyId:e.targetId;
-   throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:e,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
+   const id=effectReferenceId(e);
+   throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
   };
-  if(e.kind==='materialize'){
+  if(e.kind==='form'||e.kind==='separate'){
+   results.push(...applyFormation(e,{world:w,actor:c,hasPermission:hasObjectPermission,canReach:canPhysicallyReachObject,retainPhysical:retainPhysicalHistory,fail}));
+  }else if(e.kind==='change-state'){
+   const current=worldTargetSnapshot(w,e.target);
+   if(!current||current.revision!==e.expectedRevision||current.region!==regionOf(c))fail('external_precondition','外在狀態前提無效。');
+   if(e.target.type==='object'){
+    const o=w.objects!.find(object=>object.id===e.target.id)!;
+    if(!canPhysicallyReachObject(w,c,o)||e.access==='authorized'&&(!hasObjectPermission(o,c.id)||!(o.holder===c.id||o.holder===null)))fail('object_precondition','裁定物件前提無效。');
+   }else if(e.target.type==='body'){
+    if(e.target.id!==c.id&&!canSee(w,c,current.region))fail('body_precondition','目前無法接觸這個身體對象。');
+   }else if(!canSee(w,c,current.region))fail('environment_precondition','目前無法接觸這個環境。');
+   try{applyWorldStateChange(w,e.target,e.changes,'exposure' in e?e.exposure:undefined);}catch(error){fail('state_precondition',error instanceof Error?error.message:'外在狀態前提無效。');}
+   if(e.target.type==='object'&&e.access==='physical'){const o=w.objects!.find(object=>object.id===e.target.id)!;retainPhysicalHistory(o,c,w.minute,'state',o.holder);}
+   results.push('已進行這個步驟');
+  }else if(e.kind==='displace-body'){
+   const target=w.characters.find(person=>person.id===e.targetId),destination=regions.find(region=>region.id===e.toRegion);
+   const door=connectingDoor(e.expectedRegion,e.toRegion);
+   if(!target||!destination||regionOf(target)!==e.expectedRegion||regionOf(target)!==regionOf(c)||(target.physical?.revision||0)!==e.expectedRevision||target.id!==c.id&&!canSee(w,c,regionOf(target))||destination.location!==target.location||!door||(w.scene?.doors[door.id]||'open')!=='open')fail('body_displacement','目前無法把這個身體移到指定位置。');
+   target.region=destination.id;target.location=destination.location;
+   target.physical={revision:e.expectedRevision+1,state:{...target.physical?.state},exposure:{...target.physical?.exposure}};
+   for(const object of w.objects||[])if(object.lifecycle==='active'&&object.holder===target.id){object.region=destination.id;object.revision++;}
+   results.push('身體外在位置已改變');
+  }else if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
-   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&phaseIndex===null)||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!s.allowedTo.includes(c.id)||s.region!==regionOf(c))fail('supply_precondition','裁定供應前提無效。');
+   if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&(physical||phaseIndex===null))||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!physical&&!s.allowedTo.includes(c.id)||s.region!==regionOf(c)||physical&&!canSee(w,c,s.region))fail('supply_precondition','裁定供應前提無效。');
+   if(!validQuantity(s.quantity??{amount:1,unit:'item'})||s.consumable!==undefined&&typeof s.consumable!=='boolean')fail('quantity_precondition','供應份量或消耗能力無法安全承接。');
+   if(!validObjectKind(s.kind))fail('object_kind','物件種類超出有界資料契約。');
    if((w.objects?.length||0)>=512)fail('object_capacity','具體物件已達保存容量。');
    const id=materializedObjectId(s);
    if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
-   const o:WorldObject={id,source:s.id,label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
+   const o:WorldObject={id,source:s.id,sources:[{type:'supply',id:s.id,revision:null,amount:s.quantity?.amount??1,unit:s.quantity?.unit??'item',owner:s.owner}],quantity:{...(s.quantity??{amount:1,unit:'item'})},consumable:s.consumable??s.kind==='food',formation:{operation:'materialize',at:w.minute,inputs:[s.id]},...(s.coOwners?{coOwners:[...s.coOwners]}:{}),label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},...(s.stateExposure?{stateExposure:{...s.stateExposure}}:{}),lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};
+   if(physical)retainPhysicalHistory(o,c,w.minute,'materialize',null,hasObjectPermission(s,c.id));
    (w.objects??=[]).push(o);delete s.pending;if(s.background)s.background.sequence++;else s.remaining--;results.push(`取得${o.label}`);
   }else if(e.kind==='grant'){
    const target=w.objects?.find(o=>o.id===e.targetId)||w.supplies?.find(s=>s.id===e.targetId);
    const recipient=w.characters.find(x=>x.id===e.recipient);
-   if(!target||!target.knownTo.includes(c.id)||!canSee(w,c,target.region)||target.owner!==c.id||target.region!==regionOf(c)||!recipient||!canSee(w,c,regionOf(recipient))||('lifecycle' in target&&target.lifecycle!=='active'))fail('owner_consent','無權代替所有者同意。');
+   if(!target||!target.knownTo.includes(c.id)||!canSee(w,c,target.region)||target.owner!==c.id||('coOwners' in target&&(target.coOwners?.length||0)>1)||target.region!==regionOf(c)||!recipient||!canSee(w,c,regionOf(recipient))||('lifecycle' in target&&target.lifecycle!=='active'))fail('owner_consent','無權代替所有者同意。');
    if(!target.allowedTo.includes(recipient.id))target.allowedTo.push(recipient.id);
    if(!target.knownTo.includes(recipient.id))target.knownTo.push(recipient.id);
    results.push(`同意 ${recipient.name} 使用${target.label}`);
@@ -73,40 +137,45 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    o.acceptedBy=[...new Set([...(o.acceptedBy||[]),c.id])];results.push(`同意接收${o.label}`);
   }else{
    const o=w.objects?.find(o=>o.id===e.objectId);
-   if(!o||o.revision!==e.expectedRevision||o.lifecycle!=='active'||o.region!==regionOf(c)||!(o.owner===c.id||o.allowedTo.includes(c.id))||!(o.holder===c.id||o.holder===null&&o.knownTo.includes(c.id)&&canSee(w,c,o.region)))fail('object_precondition','裁定物件前提無效。');
+   if(!o||o.revision!==e.expectedRevision||(physical?!canPhysicallyReachObject(w,c,o):o.lifecycle!=='active'||o.region!==regionOf(c)||!hasObjectPermission(o,c.id)||!(o.holder===c.id||o.holder===null&&o.knownTo.includes(c.id)&&canSee(w,c,o.region))))fail('object_precondition','裁定物件前提無效。');
+   const priorHolder=o.holder;
    if(e.kind==='consume'){
-    if(o.kind!=='food'||o.holder!==c.id)fail('not_consumable','不能食用這件物品。');
-    o.lifecycle='consumed';o.holder=null;results.push(`食用${o.label}`);
+    if(!(o.consumable??o.kind==='food')||o.holder!==c.id)fail('not_consumable','不能食用這件物品。');
+    o.lifecycle='consumed';o.holder=null;if(o.quantity)o.quantity.amount=0;results.push(`食用${o.label}`);
    }else if(e.kind==='destroy'){
-    if(o.owner!==c.id)fail('not_owned','不能毀壞借來的物品。');
-    o.lifecycle='destroyed';o.holder=null;results.push(`處理了已損毀的${o.label}`);
+    if(!physical&&o.owner!==c.id)fail('not_owned','不能毀壞借來的物品。');
+    o.lifecycle='destroyed';o.holder=null;if(o.quantity)o.quantity.amount=0;results.push(physical?`${o.label}已損毀`:`處理了已損毀的${o.label}`);
    }else if(e.kind==='state'){
     if(!o.stateTransitions?.[e.key]?.includes(e.value)||o.state[e.key]===e.value)fail('state_transition','物件不支援這個狀態轉換。');
     o.state[e.key]=e.value;results.push(`${o.label}：${e.key}=${e.value}`);
    }else{
+    if(physical&&o.holder===e.toHolder)fail('unchanged_holder','物件已由該持有人持有。');
     if(e.toRegion!==regionOf(c)||!regions.some(r=>r.id===e.toRegion))fail('remote_transfer','不能跨地點遠端轉移物件。');
     if(e.toHolder!==null&&e.toHolder!==c.id){
      const recipient=w.characters.find(x=>x.id===e.toHolder);
      if(!recipient||regionOf(recipient)!==e.toRegion||!o.allowedTo.includes(recipient.id)||!o.acceptedBy?.includes(recipient.id))fail('recipient_consent','對方尚未同意接收。');
      o.acceptedBy=o.acceptedBy.filter(id=>id!==recipient.id);
     }
-    o.holder=e.toHolder;o.region=e.toRegion;results.push(`${o.label}${e.toHolder?'已交付持有人':'留在現場'}`);
+    o.holder=e.toHolder;o.region=e.toRegion;results.push(physical?`${o.label}的實際持有位置已改變`:`${o.label}${e.toHolder?'已交付持有人':'留在現場'}`);
    }
    o.revision++;
+   if(physical)retainPhysicalHistory(o,c,w.minute,original.operation,priorHolder);
 
   }
  }
  // A linked serving is a concrete identity inside its vessel. Validate the
  // complete batch so explicit, separately authorized transfers can move both;
  // never manufacture an implicit transfer or recipient consent.
- const touched=new Set(effects.flatMap(e=>'objectId' in e?[e.objectId]:[]));
+ const touched=new Set([...effects.flatMap(effect=>[...effectReferenceIds(effect),...(effect.kind==='form'?effect.outputs.map(output=>output.id):effect.kind==='separate'?[effect.outputId]:[])]),...(w.objects||[]).filter(object=>!previousIdentities.has(object.id)).map(object=>object.id)]);
  for(const drink of w.objects||[]){
-  if(drink.kind!=='food'||!drink.state.vessel||(!touched.has(drink.id)&&!touched.has(drink.state.vessel)))continue;
+  if(!drink.state.vessel||(!touched.has(drink.id)&&!touched.has(drink.state.vessel)))continue;
   const vessel=w.objects?.find(o=>o.id===drink.state.vessel);
   const active=drink.lifecycle==='active';
-  const separated=active&&(!vessel||vessel.lifecycle!=='active'||vessel.region!==drink.region||vessel.holder!==drink.holder||vessel.state.contents!==drink.state.beverage);
-  const consumedStillFull=drink.lifecycle==='consumed'&&touched.has(drink.id)&&vessel&&['tea','coffee'].includes(vessel.state.contents);
-  if(separated||consumedStillFull){
+  const separated=active&&(!vessel||vessel.id===drink.id||vessel.lifecycle!=='active'||vessel.region!==drink.region||vessel.holder!==drink.holder||vessel.state.contents!==drink.state.beverage);
+  const activeServings=(w.objects||[]).filter(object=>object.lifecycle==='active'&&object.state.vessel===drink.state.vessel);
+  const replacement=activeServings.some(object=>object.id!==drink.id&&object.state.beverage===vessel?.state.contents);
+  const terminalStillFull=drink.lifecycle!=='active'&&touched.has(drink.id)&&vessel&&vessel.state.contents===drink.state.beverage&&!replacement;
+  if(separated||terminalStillFull||activeServings.length>1){
    throw new EffectValidationError('飲品與容器的結果不一致。',{reason:'vessel_continuity',phaseIndex,objectId:drink.id});
   }
  }
@@ -121,18 +190,33 @@ function abilityAdvantage(c:Character,ability:string):Advantage {
 // candidate cannot obtain a new die by appending unrelated effect references.
 function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:Action):Resolution {
  const target=w.objects?.find(o=>o.id===action.target)||w.supplies?.find(s=>s.id===action.target);
- if(!candidate.trialBinding&&(!target||!target.knownTo.includes(c.id)||target.region!==regionOf(c)))throw new EffectValidationError('不確定活動需要當前可知的具體對象。',{reason:'branch_subject'});
+ const person=w.characters.find(person=>person.id===action.target),environment=regions.find(region=>region.id===action.target);
+ const localPerson=!!person&&regionOf(person)===regionOf(c)&&(person.id===c.id||canSee(w,c,regionOf(person)));
+ const localEnvironment=!!environment&&environment.id===regionOf(c)&&canSee(w,c,environment.id);
+ if(!candidate.trialBinding&&(!(target&&target.knownTo.includes(c.id)&&target.region===regionOf(c))&&!localPerson&&!localEnvironment))throw new EffectValidationError('不確定活動需要當前可知的具體對象。',{reason:'branch_subject'});
  const scope=JSON.stringify(['results.v1',c.id,candidate.trialBinding?['routine',candidate.trialBinding.operation,candidate.trialBinding.subject]:['free',action.target]]);
- const refs=new Set<string>(target?[target.id]:[]);
+ const refs=new Set<string>(target?[target.id]:[]),external=new Map<string,{type:'body'|'environment';id:string;keys:Set<string>}>();
+ const rememberExternal=(type:'body'|'environment',id:string,keys:string[])=>{const key=type+':'+id,entry=external.get(key)||{type,id,keys:new Set<string>()};for(const item of keys)entry.keys.add(item);external.set(key,entry);};
+ if(localPerson)rememberExternal('body',person!.id,[]);else if(localEnvironment)rememberExternal('environment',environment!.id,[]);
  for(const branch of candidate.branches||[]){
-  for(const effect of [...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])refs.add('objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId);
-  for(const stage of branch.stages)for(const condition of stage.preconditions)refs.add(condition.objectId);
+  for(const effect of [...branch.effects,...branch.stages.flatMap(stage=>stage.effects)]){
+   if(effect.kind==='change-state'&&effect.target.type!=='object')rememberExternal(effect.target.type,effect.target.id,effect.changes.map(change=>change.key));
+   else if(effect.kind==='displace-body')rememberExternal('body',effect.targetId,[]);
+   else for(const id of effectReferenceIds(effect))refs.add(id);
+  }
+  for(const stage of branch.stages)for(const condition of stage.preconditions){
+   if('target' in condition&&condition.target.type!=='object')rememberExternal(condition.target.type,condition.target.id,condition.state.map(entry=>entry.key));
+   else refs.add('target' in condition?condition.target.id:condition.objectId);
+  }
  }
- const currentRefs=[...refs].filter(id=>w.objects?.some(o=>o.id===id)||w.supplies?.some(s=>s.id===id)).sort();
+ for(const item of external.values())refs.add(JSON.stringify({external:item.type,id:item.id,keys:[...item.keys].sort()}));
+ const externalReference=(id:string):{external:'body'|'environment';id:string;keys:string[]}|undefined=>{try{const ref=JSON.parse(id);return ref&&['body','environment'].includes(ref.external)&&typeof ref.id==='string'&&Array.isArray(ref.keys)?ref:undefined;}catch{return;}};
+ const currentRefs=[...refs].filter(id=>{const ref=externalReference(id);return ref?!!worldTargetSnapshot(w,{type:ref.external,id:ref.id}):w.objects?.some(o=>o.id===id)||w.supplies?.some(s=>s.id===id);}).sort();
  let frozen=candidate.trialBinding?.references||w.branchTrialScopes?.[scope]||currentRefs;
  const facts=(references:string[])=>references.map(id=>{
+  const ref=externalReference(id);if(ref){const current=worldTargetSnapshot(w,{type:ref.external,id:ref.id});return current?{id,region:current.region,state:ref.keys.map(key=>({key,value:Object.hasOwn(current.state,key)?current.state[key]:null}))}:{id,missing:true};}
   const o=w.objects?.find(o=>o.id===id),s=w.supplies?.find(s=>s.id===id);
-  return o?{id:o.id,source:o.source,region:o.region,holder:o.holder,owner:o.owner,state:o.state,lifecycle:o.lifecycle,allowed:o.owner===c.id||o.allowedTo.includes(c.id)}:s?{id:s.id,region:s.region,owner:s.owner,remaining:s.remaining,sequence:s.background?.sequence,state:s.initialState,allowed:s.allowedTo.includes(c.id)}:{id,missing:true};
+  return o?{id:o.id,source:o.source,region:o.region,holder:o.holder,owner:o.owner,coOwners:o.coOwners,quantity:o.quantity,consumable:o.consumable,state:o.state,lifecycle:o.lifecycle,allowed:hasObjectPermission(o,c.id)}:s?{id:s.id,region:s.region,owner:s.owner,remaining:s.remaining,sequence:s.background?.sequence,state:s.initialState,allowed:s.allowedTo.includes(c.id)}:{id,missing:true};
  });
  const identity=(references:string[])=>JSON.stringify(canonical([scope,regionOf(c),[...(c.abilityTags||[])].sort(),[...(c.craftInsights||[])].sort(),facts(references)]));
  let key=identity(frozen),prior=w.freeTrials?.[key];
@@ -196,14 +280,14 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
    checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);validateResultTime(predicted,phase.afterMinutes);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
-   throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>predicted.objects?.find(o=>o.id===p.objectId)||null)});
+   throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>'target' in p?worldTargetSnapshot(predicted,p.target):predicted.objects?.find(o=>o.id===p.objectId)||null)});
   }
  }
  let resolution=candidate.selectedResult?.resolution;
  if(candidate.check){
   const allEffects=[...candidate.effects,...(candidate.stages||[]).flatMap(stage=>stage.effects)];
-  const references=new Set(allEffects.map(e=>'objectId' in e?e.objectId:'supplyId' in e?e.supplyId:e.targetId));
-  for(const stage of candidate.stages||[])for(const p of stage.preconditions)references.add(p.objectId);
+  const references=new Set(allEffects.flatMap(effectReferenceIds));
+  for(const stage of candidate.stages||[])for(const p of stage.preconditions)references.add('target' in p?p.target.id:p.objectId);
   const conditions=[...references].sort().map(id=>w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null);
   const phases=(candidate.stages||[]).map(stage=>({preconditions:stage.preconditions,effects:stage.effects}));
   const key=JSON.stringify(canonical(['free',c.id,regionOf(c),[...(c.abilityTags||[])].sort(),candidate.effects,phases,conditions]));
@@ -213,7 +297,8 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   if(!prior){(w.freeTrials??={})[key]=resolution;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);w.events.at(-1)!.attemptKey=key;}
   if(!['success','critical-success'].includes(resolution.outcome)){c.activity='嘗試尚未完成。';return false;}
  }
- w.supplies=clone.supplies;w.objects=clone.objects;
+ commitWorldChanges(w,clone);
+ emitExternalConsequences(w,c.id,candidate.effects);
  const outcomeLabel=resolution?.outcome==='critical-failure'?'大失敗':resolution?.outcome==='failure'?'失敗':resolution?.outcome==='mixed'?'部分成功':'完成';
  c.activity=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':candidate.selectedResult?`這次嘗試的結果為${outcomeLabel}`:'完成這次行動'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
@@ -229,6 +314,12 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
   if(!tool||!usableRoutineObject(tool,c.id)||tool.region!==regionOf(c)||!tool.knownTo.includes(c.id))throw Error('活動工具已不可使用。');
  }
  for(const p of phase.preconditions){
+  if('target' in p){
+   const snapshot=worldTargetSnapshot(w,p.target);
+   const known=p.target.type!=='object'||w.objects?.some(o=>o.id===p.target.id&&o.knownTo.includes(c.id));
+   if(!snapshot||snapshot.region!==regionOf(c)||!known||p.target.type==='body'&&p.target.id!==c.id&&!canSee(w,c,snapshot.region)||p.target.type!=='body'&&!canSee(w,c,snapshot.region)||!stateConditionsHold(w,[p]))throw Error('活動外在條件已改變。');
+   continue;
+  }
   const o=w.objects?.find(o=>o.id===p.objectId);
   if(!o||o.lifecycle!=='active'||o.revision!==p.revision||o.region!==p.region||o.holder!==p.holder||Object.entries(p.state).some(([k,v])=>o.state[k]!==v))throw Error('活動前提已改變。');
   if(o.state.condition==='broken'&&phase.effects.some(e=>e.kind==='state'&&e.objectId===o.id&&e.key==='contents'))throw Error('活動器具已損壞。');
@@ -241,6 +332,15 @@ export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,inde
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
  const results=applyEffects(clone,actor,phase.effects,index);
- w.objects=clone.objects;w.supplies=clone.supplies;
+ commitWorldChanges(w,clone);
+ emitExternalConsequences(w,c.id,phase.effects);
  return results;
+}
+
+// Only external sensory facts leave the authority batch; reasons stay in receipts.
+export function emitExternalConsequences(w:World,actorId:string,effects:Effect[]):void {
+ const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:regions.find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&e.target.type!=='object'?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
+ if(!externalChanges.length)return;
+ const actor=w.characters.find(c=>c.id===actorId),region=actor?regionOf(actor):externalChanges.find(change=>change.target.type==='environment')?.target.id;
+ record(w,actorId,'外在狀況發生變化。','external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges});
 }

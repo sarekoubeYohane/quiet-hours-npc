@@ -1,0 +1,209 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "counts": {
+    "npc": 2,
+    "adjudication": 2
+  },
+  "checks": {
+    "uiAdvance": true,
+    "sqliteReload": true,
+    "sameObject": true,
+    "sameOperationReplay": true,
+    "differentConfirmedConsequences": true
+  },
+  "receipt": {
+    "schemaVersion": 2,
+    "operationId": "1792080002000:c6739c12-529a-45f1-8156-d4f909f518d1",
+    "requestId": "2b250c6c-6baf-4d60-acc2-73cdb9851d7d",
+    "contextId": "browser-object-146",
+    "deployment": {
+      "name": "local",
+      "commit": "unknown",
+      "builtAt": "unknown"
+    },
+    "operation": "advance",
+    "baseVersion": 1,
+    "outcome": "committed",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792080002000:c6739c12-529a-45f1-8156-d4f909f518d1",
+      "worldContext": "browser-object-146",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 1,
+      "adjudication": 1
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "45972b33-a44a-4adc-af71-061b9e34c9e4",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "type": "propose",
+            "target": "original-cup",
+            "content": "整理杯子外側留下的痕跡",
+            "purpose": "整理物件",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "owner",
+        "requestId": "1792080002000:c6739c12-529a-45f1-8156-d4f909f518d1:owner:adjudication:387e1722-fbe7-4f9b-ad3a-c634af71562a",
+        "provider": "openai",
+        "model": "fixture-world",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "accepted",
+            "completionMinutes": 15,
+            "effects": [
+              {
+                "version": 1,
+                "access": "authorized",
+                "target": {
+                  "type": "object",
+                  "id": "original-cup"
+                },
+                "changes": [
+                  {
+                    "key": "surface",
+                    "from": "茶漬",
+                    "value": "濕潤"
+                  }
+                ],
+                "reason": "觀察者裁定理由，不能作為角色已知的隱藏原因。",
+                "kind": "change-state",
+                "expectedRevision": 2
+              }
+            ],
+            "check": null,
+            "branches": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    ],
+    "truncated": false,
+    "redacted": false,
+    "resultVersion": 2,
+    "result": {
+      "turn": 2,
+      "minute": 1290,
+      "actors": [
+        {
+          "id": "owner",
+          "activity": "原杯子的外在狀態已改變",
+          "plan": null
+        }
+      ],
+      "rules": [],
+      "objects": [
+        {
+          "id": "original-cup",
+          "source": "original-supply",
+          "revision": 3,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "utensil",
+          "state": {
+            "contents": "empty"
+          },
+          "stateEntries": [
+            {
+              "key": "contents",
+              "value": "empty"
+            },
+            {
+              "key": "surface",
+              "value": "濕潤"
+            }
+          ]
+        }
+      ],
+      "beforeObjects": [
+        {
+          "id": "original-cup",
+          "source": "original-supply",
+          "revision": 2,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "lifecycle": "active",
+          "kind": "utensil",
+          "stateEntries": [
+            {
+              "key": "contents",
+              "value": "empty"
+            },
+            {
+              "key": "surface",
+              "value": "茶漬"
+            }
+          ]
+        }
+      ],
+      "resolutions": []
+    }
+  },
+  "objects": [
+    {
+      "id": "original-cup",
+      "source": "original-supply",
+      "label": "原杯子",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "revision": 3,
+      "state": {
+        "contents": "empty",
+        "surface": "濕潤"
+      },
+      "lifecycle": "active",
+      "kind": "utensil",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "stateTransitions": {
+        "contents": [
+          "empty",
+          "water",
+          "tea"
+        ]
+      }
+    }
+  ]
+}

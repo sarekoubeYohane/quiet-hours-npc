@@ -1,7 +1,7 @@
 import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
-import { bindRoutine, routineOffer, routineCandidateSchema, parseRoutineCandidate } from '@/lib/routine-rules';
+import { bindRoutine, routineOffer, routineCandidateSchema, resolveRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
 import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
@@ -403,7 +403,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:evidence?.observer('adjudication',c.id,config.provider,config.model,key),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
-              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes);}
+              try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes);}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
               adjudicationAttempt.stage='effects';
               }

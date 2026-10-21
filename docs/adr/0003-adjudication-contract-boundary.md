@@ -15,3 +15,7 @@ status: accepted
 ## 實作狀態（#137）
 
 一般自由裁定已接至 `lib/adjudication-contract.ts` 的集中規則、schema 與純解析，世界效果仍由活動執行。日常候選綁定分離與全部分支共同限制尚依 #138、#139 接續；[本地 fixture 驗證](../verification/adjudication-contract-137-2026-10-21.md) 不等於正式站驗收。
+
+#138 已將日常schema、核准提示及純候選解析接至集中契約；世界綁定／規則保存移至明示 `resolveRoutineCandidate` 執行步驟。範圍及相容證據見 [#138驗證](../verification/adjudication-contract-138-2026-10-21.md)。
+
+#139 已將一般與日常結果分支接至共同限制，公開純解析及實際提示／schema均由此責任維護；唯讀的本次允許operation列表可供核准範圍驗證。舊候選與舊世界保持原義，當前世界的合法性仍於綁定／活動執行檢查。三票完整本地fixture、相容與五段／故障驗證見 [#139整合紀錄](../verification/adjudication-contract-139-2026-10-21.md)；不代表正式站／真實模型已通過。#145新增通用後果仍為後續交付。

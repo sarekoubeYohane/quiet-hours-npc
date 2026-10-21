@@ -1,7 +1,8 @@
 import type { World } from '@/lib/world';
-import { locations } from '@/lib/world';
+import { locations, timeLabel } from '@/lib/world';
 import { regions } from '@/lib/perception';
 const operations:Record<string,string>={tea:'泡茶',coffee:'咖啡',food:'簡餐',drink:'飲用',wash:'清洗',return:'歸還'};
+const formationLabels:Record<string,string>={materialize:'取得形成',partition:'分拆',transform:'轉化',separate:'細分'};
 const states:Record<string,string>={empty:'空',water:'準備中',tea:'茶',coffee:'咖啡',dirty:'待清洗',broken:'損壞',sound:'完好',active:'可用',consumed:'已消耗',destroyed:'已損毀',food:'食物',utensil:'器具'};
 export function RoutineStatus({world}:{world:World}) {
  const person=(id:string|null)=>id?world.characters.find(c=>c.id===id)?.name||id:'已放下';
@@ -13,7 +14,9 @@ export function RoutineStatus({world}:{world:World}) {
  {(world.routineAudit||[]).slice(-8).reverse().map((item,index)=><p key={index}>回合 {item.turn+1} · {person(item.actorId)}{item.location?` · ${place(item.location)}`:''} · {item.result==='approved'?`首次裁定確認${item.reason?`，當前受阻：${item.reason}`:''}`:item.result==='confirmed'?'當地日常背景確認，已計入實際用量':item.result==='exception'?'新方法／用途的例外裁定，已計入實際用量':item.result==='blocked'?`規則受阻，無新增裁定：${item.reason||'當前條件不成立'}`:`沿用日常規則，無新增裁定${item.reason?`：${item.reason}`:''}`}</p>)}
  {(world.supplies||[]).filter(s=>s.background).map(s=><p key={s.id}>{s.label}：已確認日常背景，具體產物分別保存。</p>)}
  {(world.supplies||[]).filter(s=>!s.background).map(s=><p key={s.id}>{s.label}：{s.pending?'尚在準備，未形成成品':`有限供應 ${s.remaining}`}  · {place(s.region)}</p>)}
- {(world.objects||[]).map(o=><p key={o.id}>{o.label} · {states[o.lifecycle]||o.lifecycle} · {states[o.state.contents]||states[o.state.beverage]||states[o.kind]||o.kind}{o.state.condition?` · ${states[o.state.condition]||o.state.condition}`:''} · {place(o.region)} · 持有：{person(o.holder)} · 所有：{person(o.owner)} · 版本 {o.revision}</p>)}
+ {(world.objects||[]).map(o=><p key={o.id}>{o.label} · {o.endedByFormation&&o.lifecycle==='consumed'?'原物已分拆／轉化':states[o.lifecycle]||o.lifecycle} · {states[o.state.contents]||states[o.state.beverage]||states[o.kind]||o.kind}{o.state.condition?` · ${states[o.state.condition]||o.state.condition}`:''} · {place(o.region)} · 持有：{person(o.holder)} · 所有：{o.coOwners?.length?o.coOwners.map(person).join('、'):person(o.owner)}{o.coOwners&&o.coOwners.length>1?'（共同來源權利）':''} · 版本 {o.revision}<br/><small>狀態：{Object.entries(o.state).map(([key,value])=>`${states[key]||key}：${states[value]||value}`).join(' · ')} · 來源：{o.source}{o.quantity?` · 餘量 ${o.quantity.amount} ${o.quantity.unit}`:''}{o.formation?` · ${formationLabels[o.formation.operation]||o.formation.operation}於 ${timeLabel(o.formation.at)}`:''}{o.sources?.length?` · 形成來源：${o.sources.map(source=>`${source.id} (${source.amount} ${source.unit}，${person(source.owner)})`).join('、')}`:''}{o.physicalHistory?.length?<span> · 最近物理操作：{o.physicalHistory.at(-1)!.operation}（事前{o.physicalHistory.at(-1)!.permitted?'已獲許可':'未獲許可'}） · 未獲許可累計 {o.unpermittedCount||0} 次{o.physicalHistoryDropped?` · ${o.physicalHistoryDropped} 筆舊細節已省略`:null}</span>:null}</small></p>)}
+ {Object.entries(world.scene?.external||{}).map(([region,bag])=><p key={region}>環境 · {place(region)} · {Object.entries(bag.state).map(([key,value])=>`${key}：${value}`).join('、')} · 版本 {bag.revision}</p>)}
+ {world.characters.filter(actor=>actor.physical).map(actor=><p key={'body:'+actor.id}>身體 · {actor.name} · {Object.entries(actor.physical!.state).map(([key,value])=>`${key}：${value}`).join('、')} · 版本 {actor.physical!.revision}</p>)}
  {!(world.routineRules?.length)&&<p>尚未確認日常規則。</p>}
  </section>;
 }

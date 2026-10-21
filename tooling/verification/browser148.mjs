@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {url,server,store,load,requests,setModelResponder} from './browser-fixture.mjs';
+import {launchBrowser,outputPath} from './browser-runtime.mjs';
+
+process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/world-external');
+await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
+const w=load('world').seedWorld();
+w.characters=['owner','vera','kris'].map(id=>w.characters.find(c=>c.id===id));
+w.characters[0].location=w.characters[1].location='cafe';w.characters[0].region=w.characters[1].region='cafe-front';
+w.characters[2].location='kris-home';w.characters[2].region='kris-home-main';
+w.turn=0;w.adjudication={provider:'openai',model:'fixture-world'};w.playerBudget={calls:120,tokens:1000000};
+w.objects=[{id:'cup',source:'fixture-cup',label:'熱茶杯',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{volume:'full'},lifecycle:'active',kind:'utensil',knownTo:['owner','vera'],allowedTo:['owner']}];
+w.scene={doors:{'cafe-door':'open'},noise:{},occluded:[],external:{'cafe-front':{revision:0,state:{桌面:'乾燥'}}}};
+store.install(w);
+const rest={type:'rest',target:'',content:'休息',mood:'平靜',durationMinutes:15,intents:[]};
+const proposal={...rest,type:'propose',target:'cup',content:'熱茶意外灑出，承接杯子、桌面與手的實際影響',purpose:'移動熱茶',timeIntent:{kind:'completion',maxMinutes:null}};
+const change=(type,id,key,from,value,revision=0)=>({kind:'change-state',version:1,access:type==='object'?'authorized':'physical',target:{type,id},exposure:'public',expectedRevision:revision,changes:[{key,from,value}],reason:'observer-only:熱茶接觸造成外在變化'});
+const candidate={status:'accepted',completionMinutes:15,effects:[change('object','cup','volume','full','less',1),change('environment','cafe-front','桌面','乾燥','濕潤'),change('body','vera','手背',null,'燙紅')],stages:[],branches:null,check:null,routine:null};
+let npc=0,judgments=0;const inputs=[];
+setModelResponder(request=>{
+ const input=JSON.parse(request.messages[1].content);inputs.push(input);
+ const adjudication=input.contractVersion==='world-adjudication.v1';if(adjudication)judgments++;else npc++;
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(adjudication?candidate:input.self.id==='owner'?proposal:rest)}}]});
+});
+let browser;
+try{
+ browser=await launchBrowser();const page=await browser.newPage({reducedMotion:'reduce',viewport:{width:1440,height:1000}});page.setDefaultTimeout(15000);
+ await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
+ const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
+ const read=async id=>{const r=await page.request.get(url+'/api/world'+(id?'?operationId='+id:''));assert.equal(r.status(),200);return r.json();};
+ await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
+ const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');
+ await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,await response.text());
+ await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');
+ const id=requests.filter(r=>r.operation==='advance').at(-1).operationId;let saved=await read(id);
+ assert.equal(saved.world.objects[0].state.volume,'less');assert.equal(saved.world.scene.external['cafe-front'].state.桌面,'濕潤');assert.equal(saved.world.characters.find(c=>c.id==='vera').physical.state.手背,'燙紅');
+ const vera=inputs.find(i=>i.self?.id==='vera'),kris=inputs.find(i=>i.self?.id==='kris');assert.equal(vera.self.physical.state.手背,'燙紅');assert.doesNotMatch(JSON.stringify(kris),/濕潤|燙紅|observer-only/);
+ assert.deepEqual({npc,judgments},{npc:3,judgments:1});
+ await nav('分析');const panel=page.getByRole('region',{name:'日常規則與成果',exact:true});assert.match(await panel.innerText(),/桌面.*濕潤/);assert.match(await panel.innerText(),/手背.*燙紅/);
+ await panel.scrollIntoViewIfNeeded();await page.screenshot({path:outputPath('external-states.png')});
+ const before={objects:saved.world.objects,scene:saved.world.scene,physical:saved.world.characters.map(c=>c.physical),version:saved.version,usage:saved.world.aiUsage};
+ await page.reload();await nav('分析');const evidence=page.getByRole('region',{name:'操作驗收證據',exact:true});await evidence.getByText('查看操作驗收證據',{exact:true}).click();
+ const replay=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operationId===id);await evidence.getByRole('button',{name:'重送同一操作（不新增回合）',exact:true}).click();assert.equal((await replay).status(),200);
+ saved=await read(id);assert.deepEqual({objects:saved.world.objects,scene:saved.world.scene,physical:saved.world.characters.map(c=>c.physical),version:saved.version,usage:saved.world.aiUsage},before);assert.deepEqual({npc,judgments},{npc:3,judgments:1});
+ await nav('觀察');await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'Vera',exact:true}).click();await page.getByRole('button',{name:'人物檔案',exact:true}).click();assert.match(await page.getByRole('region',{name:'人物檔案'}).innerText(),/手背.*燙紅/);
+ await page.screenshot({path:outputPath('body-profile.png')});assert.deepEqual(errors,[]);
+ await writeFile(outputPath('browser148.json'),JSON.stringify({fixture:true,realPaidModelCalls:0,counts:{npc,judgments},checks:{combinedConsequences:true,informationIsolation:true,sameIdReplay:true,profile:true,uiReload:true},world:{objects:saved.world.objects,scene:saved.world.scene,physical:saved.world.characters.map(c=>({id:c.id,physical:c.physical}))}},null,2)+'\n');
+ console.log('PASS #148 real WorldApp/UI/API/SQLite combined consequences, knowable NPC inputs, profile, reload and same-ID replay; 3 NPC + 1 ruling fixture, zero paid calls.');
+}finally{await browser?.close();server.close();}

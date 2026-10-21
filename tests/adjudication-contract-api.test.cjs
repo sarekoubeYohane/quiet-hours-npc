@@ -43,3 +43,33 @@ test('the world API sends the centralized free contract and executes only after 
   assert.equal(store.snapshot().supplies[0].remaining,0);
  }finally{global.fetch=original;}
 });
+test('routine approval parsing returns a candidate without binding or changing an existing world',()=>{
+ const contract=load('adjudication-contract'),{approval}=require('./routine-program-fixture.cjs');
+ const world=seedWorld(),before=structuredClone(world),raw=approval();
+ const parsed=contract.parseAdjudicationCandidate(JSON.stringify(raw));
+ assert.equal(parsed.kind,'routine');assert.equal(parsed.approval.version,2);
+ assert.deepEqual(parsed.approval.timings,raw.routine.timings);
+ assert.deepEqual(world,before);
+ for(const mutate of [v=>{v.completionMinutes=15;},v=>{v.routine.timings[0].minutes=0;},v=>{v.routine.timings.push(v.routine.timings[0]);},v=>{v.effects=[effect];}]){
+  const invalid=structuredClone(raw);mutate(invalid);assert.throws(()=>contract.parseAdjudicationCandidate(JSON.stringify(invalid)));assert.deepEqual(world,before);
+ }
+});
+test('denied candidates cannot request a die and the shared ability bound applies to ordinary and result candidates',()=>{
+ for(const status of ['denied','unsupported'])assert.throws(()=>parseEffectCandidate(JSON.stringify({status,effects:[],check:{difficulty:12,ability:'處理'}})));
+ for(const ability of ['', 'x'.repeat(101)])assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,check:{difficulty:12,ability}})));
+ assert.equal(parseEffectCandidate(JSON.stringify({...accepted,check:{difficulty:12,ability:'x'.repeat(100)}})).check.ability.length,100);
+});
+test('pure completion candidates reject a final phase contradicting their confirmed time',()=>{
+ const staged={...accepted,effects:[],stages:[{afterMinutes:30,preconditions:[],effects:[effect]}]};
+ assert.throws(()=>parseEffectCandidate(JSON.stringify(staged)));
+ assert.equal(parseEffectCandidate(JSON.stringify({...staged,completionMinutes:30})).stages.at(-1).afterMinutes,30);
+});
+test('pure routine parsing verifies an offered scope without receiving mutable world references',()=>{
+ const {parseAdjudicationCandidate}=load('adjudication-contract'),{approval}=require('./routine-program-fixture.cjs');
+ const candidate=approval(),offered=['tea','coffee','food','drink','wash','return'];
+ assert.equal(parseAdjudicationCandidate(JSON.stringify(candidate),{routineOperations:offered}).kind,'routine');
+ assert.throws(()=>parseAdjudicationCandidate(JSON.stringify(candidate),{routineOperations:[]}));
+ assert.throws(()=>parseAdjudicationCandidate(JSON.stringify(candidate),{routineOperations:['tea']}));
+ const one=structuredClone(candidate);one.routine.timings=one.routine.timings.slice(0,1);one.routine.programs=one.routine.programs.slice(0,1);
+ assert.equal(parseAdjudicationCandidate(JSON.stringify(one),{routineOperations:['tea']}).kind,'routine');
+});

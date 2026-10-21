@@ -1,48 +1,104 @@
-import type { Effect, EffectCandidate, ActivityPhase, ResultBranch } from './world-effects';
+import { formationSchemas, formationRules, validFormationEffect } from './world-formation-contract';
+import type { StateCondition } from './world-state';
+import { validateRoutinePrograms, routineProgramSchema, routineProgramRules, type RoutineProgram } from './routine-program-contract';
+import type { RoutineOperation } from './routine-rules';
+import type { Effect, EffectCandidate, ActivityPhase, ResultBranch, ChangeStateEffect, DisplaceBodyEffect, PhysicalEffect } from './world-effects';
 import type { Outcome } from './d20';
 
 // Shared bounds drive prompt, provider schema and local candidate validation.
 // This module accepts no World and performs no binding, randomness or effects.
-export const adjudicationLimits = {
- statuses: ['accepted','denied','unsupported'],
- difficulties: [8,12,16],
- outcomes: ['critical-success','success','mixed','failure','critical-failure'],
- phaseMinutes: [15,30,45,60,75,90],
- maxMinutes: 90,
- minuteStep: 15,
- maxEffects: 4,
- maxStages: 4,
- maxBranches: 5,
- maxConditions: 4,
- maxStateEntries: 8,
- maxCandidateLength: 8192,
- maxReferenceLength: 120,
- maxValueLength: 100,
-} as const;
+import { adjudicationLimits, routineOperations, effectKinds, stateChangeLimits, externalStateLimits, physicalEffectLimits } from './adjudication-limits';
+export { adjudicationLimits, routineOperations, effectKinds, stateChangeLimits, externalStateLimits, physicalEffectLimits } from './adjudication-limits';
+
+// Keys remain data in a state bag; identity, rights and lifecycle have their
+// own restricted effects and may never be shadowed by a state descriptor.
+const reservedStateKeys = new Set(['__proto__','constructor','prototype','id','source','sources','owner','holder','region','location','revision','kind','lifecycle','quantity','coowners','consumable','formation','endedbyformation','physicalhistory','physicalhistorydropped','unpermittedcount','knownto','allowedto','acceptedby','statetransitions','stateexposure','exposure','physical','external','state','authorization','api_key','apikey','cookie','access_token','refresh_token']);
+export function validStateKey(value:unknown):value is string {
+ return typeof value==='string'&&value.length>0&&value.length<=stateChangeLimits.maxKeyLength&&value.trim()===value&&!/[\u0000-\u001f\u007f]/.test(value)&&!value.split('.').some(part=>reservedStateKeys.has(part.toLowerCase()));
+}
+export function validObjectKind(value:unknown):value is string {
+ return typeof value==='string'&&!!value.trim()&&value.trim()===value&&value.length<=stateChangeLimits.maxKindLength&&!/[\u0000-\u001f\u007f]/.test(value);
+}
+export function assertBoundedState(value:unknown):asserts value is Record<string,string> {
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>stateChangeLimits.maxEntries||Object.entries(value).some(([key,item])=>!validStateKey(key)||typeof item!=='string'||item.length>stateChangeLimits.maxValueLength)||new TextEncoder().encode(JSON.stringify(value)).length>stateChangeLimits.maxStateBytes)throw Error('外在狀態超出有界資料契約。');
+}
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 export const effectRules = [
- `共同界線：status=${adjudicationLimits.statuses.join('/')}；effects 至多${adjudicationLimits.maxEffects}；stages 至多${adjudicationLimits.maxStages}；completionMinutes 必須是正數且至多${adjudicationLimits.maxMinutes}，向上對齊${adjudicationLimits.minuteStep}分鐘；階段時點=${adjudicationLimits.phaseMinutes.join('/')}；不確定難度=${adjudicationLimits.difficulties.join('/')}。`,
+ ...formationRules,
+ `共同界線：effects kinds=${Object.values(effectKinds).join("/")}；status=${adjudicationLimits.statuses.join('/')}；effects 至多${adjudicationLimits.maxEffects}；stages 至多${adjudicationLimits.maxStages}；completionMinutes 必須是正數且至多${adjudicationLimits.maxMinutes}，向上對齊${adjudicationLimits.minuteStep}分鐘；階段時點=${adjudicationLimits.phaseMinutes.join('/')}；不確定難度=${adjudicationLimits.difficulties.join('/')}。`,
  '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
  'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
  'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
  'consume：僅 food 且 holder=actor.id 才可食用，之後 lifecycle=consumed、holder=null，不會補貨。桌上食物必須先 transfer 拿取再 consume，第二步版本加一。不能 consume 杯子或茶具；飲用杯中液體須用支援的 state 轉換，無法表達時 unsupported。',
- '物件效果必須使用已知、active、本地、owner=actor.id 或 allowedTo 含 actor.id 的物件；物件須由 actor 持有，或無人持有且 actor 看得到。不可操作其他角色持有的物件。',
+ '舊kind state/transfer/consume/destroy的授權模式及change-state access=authorized：物件必須已知、active、本地且獲准，並由actor持有或無人持有。這是舊核准方法的適用範圍，不代表所有物理方法都不可能；需要未經許可或對他人持有物件的外在後果時明示新physical契約。',
  'transfer：toRegion 必須是 actor 當前 region；toHolder=null 是放下，toHolder=actor.id 是拿取。交給其他角色需要同區域、allowedTo 與該角色先前 consent 形成的 acceptedBy；不能代對方同意。移動另用 NPC move，不得遠端轉移。',
  'grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。',
- 'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。destroy 只能毀壞自己所有的物件，不能毀壞借來物品。',
+ 'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。舊destroy只允許處理自己的物件；借用意外或未經許可的外在損毀須明示physical destroy，不能偽造grant。',
+ `change-state version=${stateChangeLimits.version}、access=${stateChangeLimits.accesses.join('/')}：target={type:object,id}、exposure=${stateChangeLimits.exposures.join('/')}，public是有感知機會才可知、hidden只供權威條件。舊物件缺曝光元資料的舊state保留原可知原義，不補歷史；expectedRevision為當前正整數版本，changes最多${stateChangeLimits.maxChanges}筆{key,from,value}；from=null明示原本無該鍵，否則須等於當前值。key最多${stateChangeLimits.maxKeyLength}字、value最多${stateChangeLimits.maxValueLength}字；物件state最多${stateChangeLimits.maxEntries}鍵及${stateChangeLimits.maxStateBytes} UTF-8 bytes。允許未預列的新外在狀態；reason必須提供（最多${stateChangeLimits.maxReasonLength}字），僅供觀察者裁定證據，不是NPC已知內情。不能寫核心身份、來源、數量、位置、歸屬、許可、生命週期或prototype鍵；資料文字不作為指令執行。每項效果增加一次revision，不能以狀態複製物件或復活成果。`,
+ `change-state另承接target.type=${externalStateLimits.targets.join('/')}，access=${externalStateLimits.access}；環境id是本地區域，身體id是在場角色，沒有新欄位的當前狀況為空state、revision=0。body必填exposure=${externalStateLimits.exposures.join('/')}、environment必填exposure=${externalStateLimits.environmentExposures.join('/')}：public是可見外在表徵，subject是本人有依據能感到的身體狀況，hidden只是權威事實（連本人也不自動知悉），不可把看得到區域當成知道該區所有內情；禁止情緒、意願、記憶、信念與反應。理由不進NPC。物理後果不等於對方同意。`,
+ 'displace-body version=1：targetId為在場可接觸的角色，expectedRegion/expectedRevision為當前外在位置及版本，toRegion限同場所相鄰且通路開啟；reason只供觀察者查證。只改外在位置並同步攜物，不產生同意、選擇、情緒或後續反應。需要不確定判定時沿原D20結果分支。',
+ 'state-condition version=1：target可為object/environment/body，state是1至4個必要key/value（null表示不存在），只檢查相關鍵，無關狀態不使其失效。可選guard={region:null或區域id,holder:{check:boolean,value:null或角色id}}；缺guard或region=null不檢查位置，holder.check=false只許value=null；check=true僅object可用並明確檢查持有（null是要求無人持有）。條件不補造世界事實，不用全revision替代相關條件。',
+ `physical version=${physicalEffectLimits.version}：operation=materialize引用supplyId/expectedRemaining；operation=${physicalEffectLimits.objectOperations.join('/')}引用objectId/expectedRevision。reason必填且至多${physicalEffectLimits.maxReasonLength}字，只供觀察者證據。已知、本地、可見、active及正確版本/有限供應仍必須成立；物主許可與物理可行性分開，允許確認的意外或未經許可後果，包括其他在場角色持有的物件。take只改為actor持有，place只放在actor當前區域；不能直接強迫第三者接收、grant或consent。consume仍需本身可食用且先在actor手上；destroy不復活、不轉移owner。change-state access=physical沿同一物理邊界，不改角色意願。物件保留有界事前許可歷史，原權利不因後果改寫。`,
  'state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。',
  `completionMinutes：一般效果分支（routine=null）有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多${adjudicationLimits.maxMinutes}）；一般 durationMinutes 只是角色估時。程式向上對齊${adjudicationLimits.minuteStep}。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時${adjudicationLimits.minuteStep}。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多${adjudicationLimits.maxEffects}項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。`,
- `結果分支：routine=null 的完成活動可用 branches 確認 1 至 ${adjudicationLimits.maxBranches} 組 {outcomes,effects,stages}，此時頂層 effects/stages 必須空。outcomes 必須恰好各涵蓋 ${adjudicationLimits.outcomes.join("/")} 一次，可共用後果；每組沿相同受限效果及時間契約，失敗可消耗、部分成果用合法狀態表示，不能自動套用成功效果。確定活動 check=null 時僅一組涵蓋全部級別；不擲骰。無變化的失敗分支允許空效果，仍消耗確認時間。所有分支在擲骰前驗證。不確定自由活動 target 必須是當前可知具體物件／供應；改措辭、難度或分支表示不取得重擲資格。branches=null 保留舊效果契約。`,
+ `結果分支：routine=null 的完成活動可用 branches 確認 1 至 ${adjudicationLimits.maxBranches} 組 {outcomes,effects,stages}，此時頂層 effects/stages 必須空。outcomes 必須恰好各涵蓋 ${adjudicationLimits.outcomes.join("/")} 一次，可共用後果；每組沿相同受限效果及時間契約，失敗可消耗、部分成果用合法狀態表示，不能自動套用成功效果。確定活動 check=null 時僅一組涵蓋全部級別；不擲骰。無變化的失敗分支允許空效果，仍消耗確認時間。所有分支在擲骰前驗證。不確定自由活動 target 必須是當前可知具體物件／供應，或本地可接觸角色／區域；改措辭、難度或分支表示不取得重擲資格。branches=null 保留舊效果契約。`,
  '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
  `確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=${adjudicationLimits.difficulties.join("/")} 與相關 ability；不得擲骰或指定結果。`,
 ];
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(k=>k in value);
 const integer=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
-const reference=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=adjudicationLimits.maxReferenceLength;
+const reference=(v:unknown):v is string=>typeof v==='string'&&v.length>0&&v.length<=adjudicationLimits.maxReferenceLength;
 const variant=(properties:Record<string,object>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
-export const effectSchema={anyOf:[variant({kind:{const:'transfer',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},toHolder:{anyOf:[{type:'null'},{type:'string'}]},toRegion:{type:'string'}}),variant({kind:{const:'state',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},key:{type:'string'},value:{type:'string'}}),variant({kind:{const:'grant',type:'string'},targetId:{type:'string'},recipient:{type:'string'}}),variant({kind:{const:'consent',type:'string'},objectId:{type:'string'}}),variant({kind:{const:'destroy',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}}),variant({kind:{const:'materialize',type:'string'},supplyId:{type:'string'},expectedRemaining:{type:'integer'}}),variant({kind:{const:'consume',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}})]};
-const phaseConditionSchema=variant({objectId:{type:'string'},revision:{type:'integer'},region:{type:'string'},holder:{anyOf:[{type:'null'},{type:'string'}]},state:{type:'array',maxItems:adjudicationLimits.maxStateEntries,items:variant({key:{type:'string'},value:{type:'string'}})}});
+const mentalStateKeys=new Set(['mood','emotion','emotions','cognition','belief','beliefs','intent','intents','will','willingness','consent','forgiveness','personality','memory','memories','relationships','意願','情緒','信念','同意','原諒','性格','記憶','意圖']);
+export const validBodyStateKey=(key:unknown):key is string=>validStateKey(key)&&!key.split('.').some(part=>mentalStateKeys.has(part.toLowerCase()));
+const stateValueSchema={type:'string',maxLength:stateChangeLimits.maxValueLength};
+const physicalEnvelope={kind:{type:'string',const:effectKinds.physical},version:{type:'integer',const:physicalEffectLimits.version},reason:{type:'string',minLength:1,maxLength:physicalEffectLimits.maxReasonLength}};
+export const physicalEffectSchema={anyOf:[variant({...physicalEnvelope,operation:{type:'string',const:'materialize'},supplyId:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength},expectedRemaining:{type:'integer',minimum:1}}),variant({...physicalEnvelope,operation:{type:'string',enum:[...physicalEffectLimits.objectOperations]},objectId:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength},expectedRevision:{type:'integer',minimum:1}})]};
+export function validPhysicalEffect(value:unknown):value is PhysicalEffect {
+ if(!value||typeof value!=='object'||Array.isArray(value))return false;
+ const effect=value as Record<string,unknown>;
+ if(effect.kind!==effectKinds.physical||effect.version!==physicalEffectLimits.version||typeof effect.reason!=='string'||!effect.reason.trim()||effect.reason.length>physicalEffectLimits.maxReasonLength)return false;
+ return effect.operation==='materialize'
+  ?exact(effect,['kind','version','operation','supplyId','expectedRemaining','reason'])&&reference(effect.supplyId)&&integer(effect.expectedRemaining)&&(effect.expectedRemaining as number)>0
+  :exact(effect,['kind','version','operation','objectId','expectedRevision','reason'])&&(physicalEffectLimits.objectOperations as readonly unknown[]).includes(effect.operation)&&reference(effect.objectId)&&integer(effect.expectedRevision)&&(effect.expectedRevision as number)>0;
+}
+export const changeStateSchema=variant({exposure:{type:'string',enum:[...stateChangeLimits.exposures]},kind:{type:'string',const:effectKinds.changeState},version:{type:'integer',const:stateChangeLimits.version},access:{type:'string',enum:[...stateChangeLimits.accesses]},target:variant({type:{type:'string',enum:[...stateChangeLimits.targets]},id:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength}}),expectedRevision:{type:'integer',minimum:1},changes:{type:'array',minItems:1,maxItems:stateChangeLimits.maxChanges,items:variant({key:{type:'string',minLength:1,maxLength:stateChangeLimits.maxKeyLength},from:{anyOf:[{type:'null'},stateValueSchema]},value:stateValueSchema})},reason:{type:'string',minLength:1,maxLength:stateChangeLimits.maxReasonLength}});
+const externalStateSchemas=externalStateLimits.targets.map(type=>variant({...changeStateSchema.properties,access:{type:'string',const:externalStateLimits.access},target:variant({type:{type:'string',const:type},id:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength}}),expectedRevision:{type:'integer',minimum:0},exposure:{type:'string',enum:[...(type==='body'?externalStateLimits.exposures:externalStateLimits.environmentExposures)]}}));
+export function validStateChange(value:unknown):value is ChangeStateEffect {
+ if(!value||typeof value!=='object'||Array.isArray(value))return false;
+ const v=value as Record<string,unknown>,target=v.target as Record<string,unknown>|undefined;
+ const body=target?.type==='body',external=(externalStateLimits.targets as readonly unknown[]).includes(target?.type);
+ if(!exact(value,['kind','version','access','target','expectedRevision','changes','reason','exposure'])||value.kind!==effectKinds.changeState||value.version!==stateChangeLimits.version||!exact(value.target,['type','id'])||!reference(value.target.id)||(!external&&!(stateChangeLimits.targets as readonly unknown[]).includes(value.target.type))||!(external?value.access===externalStateLimits.access:(stateChangeLimits.accesses as readonly unknown[]).includes(value.access))||!(external?(body?externalStateLimits.exposures as readonly unknown[]:externalStateLimits.environmentExposures as readonly unknown[]):stateChangeLimits.exposures as readonly unknown[]).includes(value.exposure)||!integer(value.expectedRevision)||(value.expectedRevision as number)<(external?0:1)||typeof value.reason!=='string'||!value.reason.trim()||value.reason.length>stateChangeLimits.maxReasonLength||!Array.isArray(value.changes)||!value.changes.length||value.changes.length>stateChangeLimits.maxChanges)return false;
+ const keys=new Set<string>();
+ return value.changes.every(entry=>{
+  if(!exact(entry,['key','from','value'])||!validStateKey(entry.key)||body&&!validBodyStateKey(entry.key)||keys.has(entry.key)||entry.from!==null&&(typeof entry.from!=='string'||entry.from.length>stateChangeLimits.maxValueLength)||typeof entry.value!=='string'||entry.value.length>stateChangeLimits.maxValueLength||entry.from===entry.value)return false;
+  keys.add(entry.key);return true;
+ });
+}
+
+export const displaceBodySchema=variant({kind:{type:'string',const:effectKinds.displaceBody},version:{type:'integer',const:1},targetId:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength},expectedRegion:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength},expectedRevision:{type:'integer',minimum:0},toRegion:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength},reason:{type:'string',minLength:1,maxLength:stateChangeLimits.maxReasonLength}});
+export function validBodyDisplacement(value:unknown):value is DisplaceBodyEffect {
+ return exact(value,['kind','version','targetId','expectedRegion','expectedRevision','toRegion','reason'])&&value.kind===effectKinds.displaceBody&&value.version===1&&reference(value.targetId)&&reference(value.expectedRegion)&&reference(value.toRegion)&&value.expectedRegion!==value.toRegion&&integer(value.expectedRevision)&&typeof value.reason==='string'&&!!value.reason.trim()&&value.reason.length<=stateChangeLimits.maxReasonLength;
+}
+export const effectSchema={anyOf:[...formationSchemas,...physicalEffectSchema.anyOf,changeStateSchema,...externalStateSchemas,displaceBodySchema,variant({kind:{const:effectKinds.transfer,type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},toHolder:{anyOf:[{type:'null'},{type:'string'}]},toRegion:{type:'string'}}),variant({kind:{const:effectKinds.state,type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},key:{type:'string'},value:{type:'string'}}),variant({kind:{const:effectKinds.grant,type:'string'},targetId:{type:'string'},recipient:{type:'string'}}),variant({kind:{const:effectKinds.consent,type:'string'},objectId:{type:'string'}}),variant({kind:{const:effectKinds.destroy,type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}}),variant({kind:{const:effectKinds.materialize,type:'string'},supplyId:{type:'string'},expectedRemaining:{type:'integer'}}),variant({kind:{const:effectKinds.consume,type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}})]};
+const legacyPhaseConditionSchema=variant({objectId:{type:'string'},revision:{type:'integer'},region:{type:'string'},holder:{anyOf:[{type:'null'},{type:'string'}]},state:{type:'array',maxItems:adjudicationLimits.maxStateEntries,items:variant({key:{type:'string'},value:{type:'string'}})}});
+export const stateConditionSchema=variant({kind:{type:'string',const:'state-condition'},version:{type:'integer',const:1},target:variant({type:{type:'string',enum:[...stateChangeLimits.targets,...externalStateLimits.targets]},id:{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength}}),state:{type:'array',minItems:1,maxItems:stateChangeLimits.maxChanges,items:variant({key:{type:'string',minLength:1,maxLength:stateChangeLimits.maxKeyLength},value:{anyOf:[{type:'null'},stateValueSchema]}})}});
+const stateGuardSchema=variant({region:{anyOf:[{type:'null'},{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength}]},holder:variant({check:{type:'boolean'},value:{anyOf:[{type:'null'},{type:'string',minLength:1,maxLength:adjudicationLimits.maxReferenceLength}]}})});
+export const guardedStateConditionSchema=variant({...stateConditionSchema.properties,guard:stateGuardSchema});
+export function validStateCondition(value:unknown):value is StateCondition {
+ if(!(exact(value,['kind','version','target','state'])||exact(value,['kind','version','target','state','guard']))||value.kind!=='state-condition'||value.version!==1||!exact(value.target,['type','id'])||![...stateChangeLimits.targets,...externalStateLimits.targets].includes(value.target.type as 'object')||!reference(value.target.id)||!Array.isArray(value.state)||!value.state.length||value.state.length>stateChangeLimits.maxChanges)return false;
+ if('guard' in value){const guard=value.guard;if(!exact(guard,['region','holder'])||guard.region!==null&&!reference(guard.region)||!exact(guard.holder,['check','value'])||typeof guard.holder.check!=='boolean'||guard.holder.value!==null&&!reference(guard.holder.value)||!guard.holder.check&&guard.holder.value!==null||guard.holder.check&&value.target.type!=='object')return false;}
+ const body=value.target.type==='body';
+ const keys=new Set<string>();return value.state.every(entry=>{
+  if(!exact(entry,['key','value'])||!validStateKey(entry.key)||body&&!validBodyStateKey(entry.key)||keys.has(entry.key)||entry.value!==null&&(typeof entry.value!=='string'||entry.value.length>stateChangeLimits.maxValueLength))return false;
+  keys.add(entry.key);return true;
+ });
+}
+export function parseStateCondition(value:unknown):StateCondition {
+ if(!validStateCondition(value))throw Error('外在狀態條件格式無效。');return structuredClone(value);
+}
+const phaseConditionSchema={anyOf:[legacyPhaseConditionSchema,stateConditionSchema,guardedStateConditionSchema]};
 const effectReference={$ref:'#/$defs/effect'};
 const phaseReference={$ref:'#/$defs/phase'};
 const phaseSchema=variant({afterMinutes:{type:'integer',enum:[...adjudicationLimits.phaseMinutes]},preconditions:{type:'array',maxItems:adjudicationLimits.maxConditions,items:phaseConditionSchema},effects:{type:'array',minItems:1,maxItems:adjudicationLimits.maxEffects,items:effectReference}});
@@ -72,7 +128,7 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
     return {outcomes:branch.outcomes as Outcome[],effects,stages};
    });
    if(seen.length!==outcomes.length||new Set(seen).size!==outcomes.length||envelope.check===null&&branches.length!==1)throw Error('結果分支須唯一涵蓋五段判定；確定活動只用一組後果。');
-   if(envelope.check!==null&&(!exact(envelope.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(envelope.check.difficulty as number)||!reference(envelope.check.ability)))throw Error('裁定不可指定骰值或結果。');
+   if(envelope.check!==null&&(!exact(envelope.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(envelope.check.difficulty as number)||(!reference(envelope.check.ability)||envelope.check.ability.length>adjudicationLimits.maxValueLength)))throw Error('裁定不可指定骰值或結果。');
    return {status:'accepted',effects:[],stages:[],check:envelope.check as EffectCandidate['check'],confirmedDurationMinutes:duration,branches:parsed};
   }
  }
@@ -90,17 +146,19 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
    if(!exact(stage,['afterMinutes','preconditions','effects'])||!(adjudicationLimits.phaseMinutes as readonly number[]).includes(stage.afterMinutes as number)||(stage.afterMinutes as number)<=previous||!Array.isArray(stage.preconditions)||stage.preconditions.length>adjudicationLimits.maxConditions||!Array.isArray(stage.effects)||!stage.effects.length)throw Error('活動階段格式無效。');
    previous=stage.afterMinutes as number;
    for(const p of stage.preconditions){
+    if(validStateCondition(p))continue;
     if(p&&typeof p==='object'&&Array.isArray(p.state)){const entries=p.state;if(entries.some((entry:unknown)=>!exact(entry,['key','value'])||!reference(entry.key)||typeof entry.value!=='string'||entry.value.length>adjudicationLimits.maxValueLength)||new Set(entries.map((entry:{key:string})=>entry.key)).size!==entries.length)throw Error('活動狀態前提格式無效。');p.state=Object.fromEntries(entries.map((entry:{key:string;value:string})=>[entry.key,entry.value]));}
     if(!exact(p,['objectId','revision','region','holder','state'])||!reference(p.objectId)||!integer(p.revision)||!reference(p.region)||(p.holder!==null&&!reference(p.holder))||!p.state||typeof p.state!=='object'||Array.isArray(p.state)||Object.keys(p.state).length>adjudicationLimits.maxStateEntries||Object.entries(p.state).some(([k,val])=>!reference(k)||typeof val!=='string'||val.length>adjudicationLimits.maxValueLength))throw Error('活動前提格式無效。');
    }
    parseEffectCandidate(JSON.stringify({status:'accepted',effects:stage.effects,check:null}));
-   if(stage.effects.some((e:Effect)=>e.kind==='grant'||e.kind==='consent'))throw Error('活動階段不能代替他人作新選擇。');
+   if(stage.effects.some((e:Effect)=>e.kind===effectKinds.grant||e.kind===effectKinds.consent))throw Error('活動階段不能代替他人作新選擇。');
   }
  }
  if(v.status==='accepted'&&!v.effects.length&&!(Array.isArray(v.stages)&&v.stages.length))throw Error('通過候選必須包含可執行世界效果。');
  if(v.status!=='accepted'&&(v.effects.length||(Array.isArray(v.stages)&&v.stages.length)))throw Error('否決候選不能含世界效果。');
- if(v.check!==null&&(!exact(v.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(v.check.difficulty as number)||!reference(v.check.ability)))throw Error('裁定不可指定骰值或結果。');
- for(const e of v.effects){if(!(exact(e,['kind','supplyId','expectedRemaining'])&&e.kind==='materialize'&&reference(e.supplyId)&&integer(e.expectedRemaining))&&!(exact(e,['kind','objectId','expectedRevision'])&&['consume','destroy'].includes(e.kind as string)&&reference(e.objectId)&&integer(e.expectedRevision))&&!(exact(e,['kind','objectId','expectedRevision','toHolder','toRegion'])&&e.kind==='transfer'&&reference(e.objectId)&&integer(e.expectedRevision)&&(e.toHolder===null||reference(e.toHolder))&&reference(e.toRegion))&&!(exact(e,['kind','objectId','expectedRevision','key','value'])&&e.kind==='state'&&reference(e.objectId)&&integer(e.expectedRevision)&&reference(e.key)&&typeof e.value==='string'&&e.value.length<=adjudicationLimits.maxValueLength)&&!(exact(e,['kind','targetId','recipient'])&&e.kind==='grant'&&reference(e.targetId)&&reference(e.recipient))&&!(exact(e,['kind','objectId'])&&e.kind==='consent'&&reference(e.objectId)))throw Error('裁定效果格式無效。');}
+ if(v.status!=='accepted'&&v.check!==null)throw Error('否決候選不能要求判定。');
+ if(v.check!==null&&(!exact(v.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(v.check.difficulty as number)||(!reference(v.check.ability)||v.check.ability.length>adjudicationLimits.maxValueLength)))throw Error('裁定不可指定骰值或結果。');
+ for(const e of v.effects){if(!validFormationEffect(e,assertBoundedState)&&!validPhysicalEffect(e)&&!validStateChange(e)&&!validBodyDisplacement(e)&&!(exact(e,['kind','supplyId','expectedRemaining'])&&e.kind===effectKinds.materialize&&reference(e.supplyId)&&integer(e.expectedRemaining))&&!(exact(e,['kind','objectId','expectedRevision'])&&([effectKinds.consume,effectKinds.destroy] as readonly string[]).includes(e.kind as string)&&reference(e.objectId)&&integer(e.expectedRevision))&&!(exact(e,['kind','objectId','expectedRevision','toHolder','toRegion'])&&e.kind===effectKinds.transfer&&reference(e.objectId)&&integer(e.expectedRevision)&&(e.toHolder===null||reference(e.toHolder))&&reference(e.toRegion))&&!(exact(e,['kind','objectId','expectedRevision','key','value'])&&e.kind===effectKinds.state&&reference(e.objectId)&&integer(e.expectedRevision)&&reference(e.key)&&typeof e.value==='string'&&e.value.length<=adjudicationLimits.maxValueLength)&&!(exact(e,['kind','targetId','recipient'])&&e.kind===effectKinds.grant&&reference(e.targetId)&&reference(e.recipient))&&!(exact(e,['kind','objectId'])&&e.kind===effectKinds.consent&&reference(e.objectId)))throw Error('裁定效果格式無效。');}
  if(v.status!=='accepted'&&confirmedDurationMinutes!==undefined)throw Error('未核准活動不能宣稱完成耗時。');
  const candidate={...v,...(confirmedDurationMinutes===undefined?{}:{confirmedDurationMinutes})} as unknown as EffectCandidate;
  // Under the completion contract top-level effects are final results. A model
@@ -117,5 +175,41 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
   }
   candidate.effects=[];candidate.stages=stages;
  }
+ if(confirmedDurationMinutes!==undefined&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==confirmedDurationMinutes)throw Error('最後階段須與確認完成時間一致。');
  return candidate;
+}
+
+export type RoutineApproval={family:'cafe-service';version:1|2;programs?:RoutineProgram[];operation?:RoutineOperation|null;subject?:string|null;timings:{operation:RoutineOperation;minutes:number}[]};
+// OpenAI strict schemas require an object root and do not support cross-field
+// if/then constraints. Describe the two branches on the supported fields;
+// parseAdjudicationCandidate remains the authority for their joint invariants.
+const legacyRoutineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,completionMinutes:{...effectCandidateSchema.properties.completionMinutes,description:'routine 非 null 時必須為 null，唯一耗時來源是完整 routine.timings；routine=null 的一般完成目標 accepted 時才填正數，denied/unsupported 或開放式時段為 null。'},effects:{...effectCandidateSchema.properties.effects,description:'routine 非 null 的日常核准必須為空陣列；routine=null 的一般 accepted 必須在 effects/stages 提供可執行效果，或用非 null branches 提供受限結果分支，此時頂層 effects/stages 為空。'},stages:{...effectCandidateSchema.properties.stages,description:'routine 非 null 的日常核准必須為空陣列；一般活動階段依完成耗時契約。'},check:{...effectCandidateSchema.properties.check,description:'routine 非 null、denied 或 unsupported 時必須為 null。'},routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:[...routineOperations,null]},subject:{type:['string','null'],maxLength:40},timings:{type:'array',minItems:1,maxItems:routineOperations.length,items:{type:'object',properties:{operation:{type:'string',enum:routineOperations},minutes:{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}},required:['operation','minutes'],additionalProperties:false}}},required:['family','version','operation','subject','timings'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
+const legacyApprovalSchema=legacyRoutineCandidateSchema.properties.routine.anyOf[1];
+export const routineCandidateSchema={...legacyRoutineCandidateSchema,properties:{...legacyRoutineCandidateSchema.properties,routine:{anyOf:[...legacyRoutineCandidateSchema.properties.routine.anyOf,{...legacyApprovalSchema,properties:{...legacyApprovalSchema.properties,version:{type:'integer',enum:[2]},programs:{type:'array',minItems:1,maxItems:routineOperations.length,items:routineProgramSchema}},required:[...(legacyApprovalSchema.required||[]),'programs']}]}}};
+export type AdjudicationCandidate = {kind:'routine';approval:RoutineApproval}|{kind:'effects';candidate:EffectCandidate};
+export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:readonly RoutineOperation[]}={}):AdjudicationCandidate {
+ if(raw.length>adjudicationLimits.maxCandidateLength)throw Error('裁定候選超出容量。');
+ const parsed=JSON.parse(raw),approval=parsed?.routine;
+ if(approval!=null&&parsed.branches===null)delete parsed.branches;
+ if(approval!=null&&parsed.completionMinutes!==undefined){if(parsed.completionMinutes!==null)throw Error('日常耗時須由整組規則確認。');delete parsed.completionMinutes;}
+ if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;return {kind:'effects',candidate:parseEffectCandidate(JSON.stringify(parsed))};}
+ const approvalKeys=approval&&typeof approval==='object'?Object.keys(approval).sort().join(','):'';
+ if(approval?.version===2){
+  if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||approvalKeys!=='family,operation,programs,subject,timings,version'||approval.family!=='cafe-service'||!Array.isArray(approval.timings))throw Error('日常模型程序核准格式無效。');
+  validateRoutinePrograms(approval.programs,approval.timings);
+ }else if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||!['family,timings,version','family,operation,timings,version','family,operation,subject,timings,version'].includes(approvalKeys)||approval.family!=='cafe-service'||approval.version!==1||approval.operation!=null&&!routineOperations.includes(approval.operation)||approval.subject!=null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40))throw Error('日常規則核准格式無效。');
+ if(approval.operation!=null&&!routineOperations.includes(approval.operation)||approval.subject!=null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40))throw Error('日常選擇格式無效。');
+ if(!Array.isArray(approval.timings)||!approval.timings.length||approval.timings.length>routineOperations.length||new Set(approval.timings.map((t:{operation:unknown})=>t?.operation)).size!==approval.timings.length||approval.timings.some((t:unknown)=>!exact(t,['operation','minutes'])||!routineOperations.includes(t.operation as RoutineOperation)))throw Error('日常耗時格式無效。');
+ for(const timing of approval.timings)scheduleCompletionMinutes(timing.minutes);
+ if(scope.routineOperations&&(approval.timings.length!==scope.routineOperations.length||approval.timings.some((timing:{operation:RoutineOperation})=>!scope.routineOperations!.includes(timing.operation))))throw Error('日常範圍須完整涵蓋本次允許活動。');
+ return {kind:'routine',approval:approval as RoutineApproval};
+}
+
+
+export function adjudicationRules(routinePrograms:boolean):string[]{
+ return [
+      ...(routinePrograms?routineProgramRules:[]),
+      `只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，依 version=2 程序契約確認一個模板 operation、subject、完整timings與programs。version=1空效果核准僅供舊候選相容，不用於新確認。兩版日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多${adjudicationLimits.maxMinutes}；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊${adjudicationLimits.minuteStep}分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。`,
+      '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
+ ];
 }
