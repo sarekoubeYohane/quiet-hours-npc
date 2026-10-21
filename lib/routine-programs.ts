@@ -64,4 +64,3 @@ export function bindRoutineProgram(w:World,c:Character,legacy:EffectCandidate,pr
  if(!stages.length)stages.push({afterMinutes:legacy.confirmedDurationMinutes!,preconditions:[],effects:[]});
  return {status:'accepted',effects:[],stages:[],check:null,confirmedDurationMinutes:legacy.confirmedDurationMinutes,preparationSupplies:legacy.preparationSupplies,branches:[{outcomes:['critical-success','success','mixed','failure','critical-failure'],effects:initial,stages}]};
 }
-
