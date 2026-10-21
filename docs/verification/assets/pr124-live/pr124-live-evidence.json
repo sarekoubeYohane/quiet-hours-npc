@@ -1,0 +1,1119 @@
+{
+  "baseline": {
+    "version": 311,
+    "minute": 720,
+    "turn": 0,
+    "objects": [
+      {
+        "id": "acceptance-cup",
+        "source": "acceptance-cup",
+        "label": "驗收杯子",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "contents": "empty",
+          "clean": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "stateTransitions": {
+          "contents": [
+            "empty",
+            "water",
+            "tea"
+          ],
+          "clean": [
+            "yes",
+            "no"
+          ]
+        }
+      },
+      {
+        "id": "acceptance-tea-kit",
+        "source": "acceptance-tea-kit",
+        "label": "共用茶具（熱水與茶包）",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "available": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ]
+      }
+    ],
+    "supplies": [
+      {
+        "id": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "remaining": 1,
+        "owner": "owner",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ],
+        "kind": "food",
+        "initialState": {}
+      }
+    ],
+    "routineRules": [],
+    "routineAudit": [],
+    "owner": {
+      "id": "owner",
+      "activity": "在咖啡館前台，看看今天想做什麼。",
+      "plan": null
+    },
+    "usage": {
+      "totalCalls": 533,
+      "totalInputTokens": 6943407,
+      "totalOutputTokens": 156007,
+      "cohorts": [
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 216,
+          "input": 3313028,
+          "output": 72192,
+          "cachedInput": 1048357
+        },
+        {
+          "task": "adjudication",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 29,
+          "input": 84528,
+          "output": 1661,
+          "cachedInput": 0
+        },
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "calls": 22,
+          "input": 143587,
+          "output": 6580,
+          "cachedInput": 94365
+        }
+      ]
+    }
+  },
+  "completed": {
+    "version": 313,
+    "minute": 735,
+    "turn": 1,
+    "objects": [
+      {
+        "id": "acceptance-cup",
+        "source": "acceptance-cup",
+        "label": "驗收杯子",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 4,
+        "state": {
+          "contents": "tea",
+          "clean": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "stateTransitions": {
+          "contents": [
+            "empty",
+            "water",
+            "tea"
+          ],
+          "clean": [
+            "yes",
+            "no"
+          ]
+        }
+      },
+      {
+        "id": "acceptance-tea-kit",
+        "source": "acceptance-tea-kit",
+        "label": "共用茶具（熱水與茶包）",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "available": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ]
+      },
+      {
+        "id": "acceptance-meal:1",
+        "source": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 2,
+        "state": {},
+        "lifecycle": "consumed",
+        "kind": "food",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ]
+      },
+      {
+        "id": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247:1",
+        "source": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "lifecycle": "active",
+        "kind": "food",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ]
+      }
+    ],
+    "supplies": [
+      {
+        "id": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ],
+        "kind": "food",
+        "initialState": {}
+      },
+      {
+        "id": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "kind": "food",
+        "initialState": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "availableAt": 735
+      }
+    ],
+    "routineRules": [
+      {
+        "id": "94d72970-66b2-4126-87aa-a613f8981a0b",
+        "version": 1,
+        "family": "cafe-service",
+        "operations": [
+          "tea",
+          "coffee",
+          "food",
+          "drink",
+          "wash",
+          "return"
+        ],
+        "templates": [
+          {
+            "operation": "tea",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶"
+            ],
+            "purposes": [
+              "泡茶",
+              "喝茶",
+              "準備茶",
+              "飲用",
+              "日常泡茶",
+              "招待客人",
+              "提供茶飲"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "tea",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "coffee",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡",
+              "沖"
+            ],
+            "subjects": [
+              "咖啡"
+            ],
+            "purposes": [
+              "泡咖啡",
+              "喝咖啡",
+              "準備咖啡",
+              "飲用",
+              "招待客人"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "coffee",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "food",
+            "verbs": [
+              "準備",
+              "製作",
+              "取得",
+              "取用",
+              "拿取"
+            ],
+            "subjects": [
+              "簡餐",
+              "蛋糕",
+              "三明治"
+            ],
+            "purposes": [
+              "用餐",
+              "食用",
+              "招待客人",
+              "準備簡餐"
+            ],
+            "result": {
+              "kind": "serve",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "drink",
+            "verbs": [
+              "喝",
+              "喝掉",
+              "飲用"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶",
+              "咖啡",
+              "飲品"
+            ],
+            "purposes": [
+              "飲用",
+              "解渴",
+              "喝茶",
+              "喝咖啡"
+            ],
+            "result": {
+              "kind": "consume",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "wash",
+            "verbs": [
+              "清洗",
+              "洗",
+              "洗淨"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "清洗餐具",
+              "清潔",
+              "清洗"
+            ],
+            "result": {
+              "kind": "clean",
+              "contents": "empty",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "return",
+            "verbs": [
+              "歸還",
+              "放回"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "歸還",
+              "歸還餐具",
+              "歸還杯子"
+            ],
+            "result": {
+              "kind": "release",
+              "minutes": 15
+            }
+          }
+        ],
+        "origin": "cafe",
+        "knownTo": [
+          "owner"
+        ]
+      }
+    ],
+    "routineAudit": [
+      {
+        "turn": 0,
+        "actorId": "owner",
+        "location": "cafe",
+        "ruleId": "94d72970-66b2-4126-87aa-a613f8981a0b",
+        "result": "approved"
+      }
+    ],
+    "owner": {
+      "id": "owner",
+      "activity": "驗收杯子：contents=tea，取得一份茶；活動已完成。",
+      "plan": null
+    },
+    "usage": {
+      "totalCalls": 541,
+      "totalInputTokens": 6989929,
+      "totalOutputTokens": 157540,
+      "cohorts": [
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 216,
+          "input": 3313028,
+          "output": 72192,
+          "cachedInput": 1048357
+        },
+        {
+          "task": "adjudication",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 33,
+          "input": 101947,
+          "output": 1946,
+          "cachedInput": 3999
+        },
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "calls": 26,
+          "input": 172690,
+          "output": 7828,
+          "cachedInput": 111222
+        }
+      ]
+    }
+  },
+  "reloaded": {
+    "version": 313,
+    "minute": 735,
+    "turn": 1,
+    "objects": [
+      {
+        "id": "acceptance-cup",
+        "source": "acceptance-cup",
+        "label": "驗收杯子",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 4,
+        "state": {
+          "contents": "tea",
+          "clean": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "stateTransitions": {
+          "contents": [
+            "empty",
+            "water",
+            "tea"
+          ],
+          "clean": [
+            "yes",
+            "no"
+          ]
+        }
+      },
+      {
+        "id": "acceptance-tea-kit",
+        "source": "acceptance-tea-kit",
+        "label": "共用茶具（熱水與茶包）",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "available": "yes"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ]
+      },
+      {
+        "id": "acceptance-meal:1",
+        "source": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 2,
+        "state": {},
+        "lifecycle": "consumed",
+        "kind": "food",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ]
+      },
+      {
+        "id": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247:1",
+        "source": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 1,
+        "state": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "lifecycle": "active",
+        "kind": "food",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ]
+      }
+    ],
+    "supplies": [
+      {
+        "id": "acceptance-meal",
+        "label": "驗收餐點",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "cass",
+          "vera",
+          "kris",
+          "owner"
+        ],
+        "allowedTo": [
+          "cass"
+        ],
+        "kind": "food",
+        "initialState": {}
+      },
+      {
+        "id": "supply:b8cc37b6-3378-44fa-a3ca-a78c087e4247",
+        "label": "一份茶",
+        "region": "cafe-front",
+        "remaining": 0,
+        "owner": "owner",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "kind": "food",
+        "initialState": {
+          "vessel": "acceptance-cup",
+          "beverage": "tea"
+        },
+        "availableAt": 735
+      }
+    ],
+    "routineRules": [
+      {
+        "id": "94d72970-66b2-4126-87aa-a613f8981a0b",
+        "version": 1,
+        "family": "cafe-service",
+        "operations": [
+          "tea",
+          "coffee",
+          "food",
+          "drink",
+          "wash",
+          "return"
+        ],
+        "templates": [
+          {
+            "operation": "tea",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶"
+            ],
+            "purposes": [
+              "泡茶",
+              "喝茶",
+              "準備茶",
+              "飲用",
+              "日常泡茶",
+              "招待客人",
+              "提供茶飲"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "tea",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "coffee",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡",
+              "沖"
+            ],
+            "subjects": [
+              "咖啡"
+            ],
+            "purposes": [
+              "泡咖啡",
+              "喝咖啡",
+              "準備咖啡",
+              "飲用",
+              "招待客人"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "coffee",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "food",
+            "verbs": [
+              "準備",
+              "製作",
+              "取得",
+              "取用",
+              "拿取"
+            ],
+            "subjects": [
+              "簡餐",
+              "蛋糕",
+              "三明治"
+            ],
+            "purposes": [
+              "用餐",
+              "食用",
+              "招待客人",
+              "準備簡餐"
+            ],
+            "result": {
+              "kind": "serve",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "drink",
+            "verbs": [
+              "喝",
+              "喝掉",
+              "飲用"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶",
+              "咖啡",
+              "飲品"
+            ],
+            "purposes": [
+              "飲用",
+              "解渴",
+              "喝茶",
+              "喝咖啡"
+            ],
+            "result": {
+              "kind": "consume",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "wash",
+            "verbs": [
+              "清洗",
+              "洗",
+              "洗淨"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "清洗餐具",
+              "清潔",
+              "清洗"
+            ],
+            "result": {
+              "kind": "clean",
+              "contents": "empty",
+              "minutes": 15
+            }
+          },
+          {
+            "operation": "return",
+            "verbs": [
+              "歸還",
+              "放回"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "歸還",
+              "歸還餐具",
+              "歸還杯子"
+            ],
+            "result": {
+              "kind": "release",
+              "minutes": 15
+            }
+          }
+        ],
+        "origin": "cafe",
+        "knownTo": [
+          "owner"
+        ]
+      }
+    ],
+    "routineAudit": [
+      {
+        "turn": 0,
+        "actorId": "owner",
+        "location": "cafe",
+        "ruleId": "94d72970-66b2-4126-87aa-a613f8981a0b",
+        "result": "approved"
+      }
+    ],
+    "owner": {
+      "id": "owner",
+      "activity": "驗收杯子：contents=tea，取得一份茶；活動已完成。",
+      "plan": null
+    },
+    "usage": {
+      "totalCalls": 541,
+      "totalInputTokens": 6989929,
+      "totalOutputTokens": 157540,
+      "cohorts": [
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 216,
+          "input": 3313028,
+          "output": 72192,
+          "cachedInput": 1048357
+        },
+        {
+          "task": "adjudication",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "calls": 33,
+          "input": 101947,
+          "output": 1946,
+          "cachedInput": 3999
+        },
+        {
+          "task": "npc",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "calls": 26,
+          "input": 172690,
+          "output": 7828,
+          "cachedInput": 111222
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "id": "4dace71c-0da7-4ce0-a7a6-5ac88b6b0f04",
+      "time": 720,
+      "actor": "observer",
+      "text": "觀察者對 店主 說：「若你現在想喝茶，可以用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶。先只泡茶，喝茶與清洗之後再決定；是否要做由你自行決定。」",
+      "kind": "intervention",
+      "audience": [
+        "owner"
+      ]
+    },
+    {
+      "id": "40cb12b0-c12f-4d22-b3a3-c9345e0d1585",
+      "time": 735,
+      "actor": "cass",
+      "text": "Cass 取得驗收餐點，食用驗收餐點。",
+      "kind": "work",
+      "audience": [
+        "cass",
+        "vera",
+        "kris",
+        "owner"
+      ],
+      "scene": {
+        "from": "cafe",
+        "to": "cafe",
+        "fromRegion": "cafe-front",
+        "toRegion": "cafe-front"
+      },
+      "perception": [
+        {
+          "characterId": "vera",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Cass 取得驗收餐點，食用驗收餐點。",
+              "clarity": "clear",
+              "source": "cass",
+              "region": "cafe-front",
+              "id": "40cb12b0-c12f-4d22-b3a3-c9345e0d1585:vera:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "kris",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Cass 取得驗收餐點，食用驗收餐點。",
+              "clarity": "clear",
+              "source": "cass",
+              "region": "cafe-front",
+              "id": "40cb12b0-c12f-4d22-b3a3-c9345e0d1585:kris:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "owner",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Cass 取得驗收餐點，食用驗收餐點。",
+              "clarity": "clear",
+              "source": "cass",
+              "region": "cafe-front",
+              "id": "40cb12b0-c12f-4d22-b3a3-c9345e0d1585:owner:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        }
+      ]
+    },
+    {
+      "id": "73f1f79a-7225-4501-baef-2425542b2bfc",
+      "time": 735,
+      "actor": "vera",
+      "text": "Vera 目前的方法無法落實。",
+      "kind": "blocked",
+      "audience": [
+        "vera"
+      ]
+    },
+    {
+      "id": "c11b4928-47ba-4f5d-aaf6-31042f81e8e9",
+      "time": 735,
+      "actor": "kris",
+      "text": "Kris 這次方法沒有成功。",
+      "kind": "blocked",
+      "audience": [
+        "kris"
+      ]
+    },
+    {
+      "id": "d9a6fadc-8ae1-42c9-9fe6-972857dcb835",
+      "time": 735,
+      "actor": "owner",
+      "text": "店主 驗收杯子已交付持有人，驗收杯子：contents=water；活動尚未完成。。",
+      "kind": "work",
+      "audience": [
+        "cass",
+        "vera",
+        "kris",
+        "owner"
+      ],
+      "scene": {
+        "from": "cafe",
+        "to": "cafe",
+        "fromRegion": "cafe-front",
+        "toRegion": "cafe-front"
+      },
+      "perception": [
+        {
+          "characterId": "cass",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子已交付持有人，驗收杯子：contents=water；活動尚未完成。。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "d9a6fadc-8ae1-42c9-9fe6-972857dcb835:cass:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "vera",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子已交付持有人，驗收杯子：contents=water；活動尚未完成。。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "d9a6fadc-8ae1-42c9-9fe6-972857dcb835:vera:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "kris",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子已交付持有人，驗收杯子：contents=water；活動尚未完成。。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "d9a6fadc-8ae1-42c9-9fe6-972857dcb835:kris:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        }
+      ]
+    },
+    {
+      "id": "50dc34a5-2d8e-4d80-bc3f-27e588c1d771",
+      "time": 735,
+      "actor": "owner",
+      "text": "店主 驗收杯子：contents=tea，取得一份茶。",
+      "kind": "work",
+      "audience": [
+        "cass",
+        "vera",
+        "kris",
+        "owner"
+      ],
+      "scene": {
+        "from": "cafe",
+        "to": "cafe",
+        "fromRegion": "cafe-front",
+        "toRegion": "cafe-front"
+      },
+      "perception": [
+        {
+          "characterId": "cass",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子：contents=tea，取得一份茶。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "50dc34a5-2d8e-4d80-bc3f-27e588c1d771:cass:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "vera",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子：contents=tea，取得一份茶。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "50dc34a5-2d8e-4d80-bc3f-27e588c1d771:vera:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        },
+        {
+          "characterId": "kris",
+          "status": "direct",
+          "observations": [
+            {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 驗收杯子：contents=tea，取得一份茶。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "50dc34a5-2d8e-4d80-bc3f-27e588c1d771:kris:0",
+              "time": 735
+            }
+          ],
+          "reason": "直接察覺"
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "sameObjects": true,
+    "sameRules": true,
+    "sameEvents": true,
+    "sameCalls": true
+  }
+}
