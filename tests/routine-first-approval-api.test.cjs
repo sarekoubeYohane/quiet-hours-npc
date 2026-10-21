@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
+const ordinaryTimes=offer=>(offer?.operations||[]).map(operation=>({operation,minutes:['tea','coffee'].includes(operation)?30:15}));
 const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
 
 async function setup(modify=()=>{}){
@@ -20,7 +21,7 @@ test('first natural-language cafe proposal reaches bounded background approval a
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);
   if(input.contractVersion==='world-adjudication.v1'){
    adjudications++;offered=input.routineOffer;
-   return completion(offered?{status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,operation:'tea'}}:{status:'denied',effects:[],stages:[],check:null,routine:null});
+   return completion(offered?{status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes(input.routineOffer),operation:'tea'}}:{status:'denied',effects:[],stages:[],check:null,routine:null});
   }
   npc++;return completion(npc===1?{type:'propose',target:'cafe',content:'為自己沖泡一杯普通的茶',purpose:'給自己一點暖意',mood:'平靜',durationMinutes:30,intents:[]}:{type:'propose',target:'cafe',content:'準備一杯咖啡',purpose:'飲用',mood:'平靜',durationMinutes:30,intents:[]});
  };
@@ -39,7 +40,7 @@ test('first natural-language cafe proposal reaches bounded background approval a
 async function firstApproval(modify=()=>{},operation='tea',decision={type:'propose',target:'cafe',content:'為自己沖泡一杯普通的茶',purpose:'給自己一點暖意',mood:'平靜',durationMinutes:30,intents:[]},subject){
  const {post}=await setup(modify);
  const previous=global.fetch;let offer;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){offer=input.routineOffer;return completion({status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,operation,...(subject===undefined?{}:{subject})}});}return completion(decision);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){offer=input.routineOffer;return completion({status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes(input.routineOffer),operation,...(subject===undefined?{}:{subject})}});}return completion(decision);};
  try{const response=await post({operation:'advance',minutes:15});return {response,body:await response.json(),world:(await(await GET()).json()).world,offer};}finally{global.fetch=previous;}
 }
 
@@ -95,6 +96,6 @@ test('unknown operations and contradictory literal interpretations fail atomical
 test('an unrecognized free method still requires an adjudication after approval; denied exception does not fabricate results',async()=>{
  const {post}=await setup();
  const previous=global.fetch;let adjudications=0,npc=0;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudications++;return completion(adjudications===1?{status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,operation:'tea'}}:{status:'unsupported',effects:[],stages:[],check:null,routine:null});}npc++;return completion({type:'propose',target:'cafe',content:npc===1?'為自己沖泡一杯普通的茶':'用魔法製作一百杯茶',purpose:npc===1?'給自己一點暖意':'大型宴席',mood:'平靜',durationMinutes:30,intents:[]});};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudications++;return completion(adjudications===1?{status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes(input.routineOffer),operation:'tea'}}:{status:'unsupported',effects:[],stages:[],check:null,routine:null});}npc++;return completion({type:'propose',target:'cafe',content:npc===1?'為自己沖泡一杯普通的茶':'用魔法製作一百杯茶',purpose:npc===1?'給自己一點暖意':'大型宴席',mood:'平靜',durationMinutes:30,intents:[]});};
  try{await post({operation:'advance',minutes:15});await post({operation:'advance',minutes:15});const before=(await(await GET()).json()).world;assert.equal((await post({operation:'advance',minutes:15})).status,200);const saved=(await(await GET()).json()).world;assert.equal(adjudications,2);assert.deepEqual(saved.objects,before.objects);assert.equal(saved.routineRules.length,1);}finally{global.fetch=previous;}
 });

@@ -13,7 +13,7 @@ export type WorldObject={id:string;source:string;label:string;region:string;hold
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[]};
-export type EffectCandidate={blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type EffectCandidate={preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
@@ -29,7 +29,7 @@ const effectRules = [
  'grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。',
  'consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。destroy 只能毀壞自己所有的物件，不能毀壞借來物品。',
  'state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。',
- 'stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過 durationMinutes。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
+ 'completionMinutes：有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多90）；一般 durationMinutes 只是角色估時。程式向上對齊15。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時15。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多4項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。',
  '例如供應 meal 的 materializedObjectId="meal:1"：effects=[{kind:"materialize",supplyId:"meal",expectedRemaining:1},{kind:"consume",objectId:"meal:1",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。',
  '確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。',
 ];
@@ -41,9 +41,19 @@ const variant=(properties:Record<string,object>)=>({type:'object',properties,req
 export const effectSchema={anyOf:[variant({kind:{const:'transfer',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},toHolder:{anyOf:[{type:'null'},{type:'string'}]},toRegion:{type:'string'}}),variant({kind:{const:'state',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'},key:{type:'string'},value:{type:'string'}}),variant({kind:{const:'grant',type:'string'},targetId:{type:'string'},recipient:{type:'string'}}),variant({kind:{const:'consent',type:'string'},objectId:{type:'string'}}),variant({kind:{const:'destroy',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}}),variant({kind:{const:'materialize',type:'string'},supplyId:{type:'string'},expectedRemaining:{type:'integer'}}),variant({kind:{const:'consume',type:'string'},objectId:{type:'string'},expectedRevision:{type:'integer'}})]};
 const phaseConditionSchema=variant({objectId:{type:'string'},revision:{type:'integer'},region:{type:'string'},holder:{anyOf:[{type:'null'},{type:'string'}]},state:{type:'array',maxItems:8,items:variant({key:{type:'string'},value:{type:'string'}})}});
 const phaseSchema=variant({afterMinutes:{type:'integer',enum:[15,30,45,60,75,90]},preconditions:{type:'array',maxItems:4,items:phaseConditionSchema},effects:{type:'array',minItems:1,maxItems:4,items:effectSchema}});
-export const effectCandidateSchema=variant({stages:{type:'array',maxItems:4,items:phaseSchema},status:{type:'string',enum:['accepted','denied','unsupported']},effects:{type:'array',maxItems:4,items:effectSchema},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[8,12,16]},ability:{type:'string',maxLength:100}})]}});
+export const effectCandidateSchema=variant({completionMinutes:{anyOf:[{type:'null'},{type:'number',exclusiveMinimum:0,maximum:90}]},stages:{type:'array',maxItems:4,items:phaseSchema},status:{type:'string',enum:['accepted','denied','unsupported']},effects:{type:'array',maxItems:4,items:effectSchema},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[8,12,16]},ability:{type:'string',maxLength:100}})]}});
+export function scheduleCompletionMinutes(value:unknown):number {
+ if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>90)throw Error('完成耗時必須是至多九十分鐘的有限正數。');
+ return Math.ceil(value/15)*15;
+}
 export function parseEffectCandidate(raw:string):EffectCandidate{
  let v:unknown;try{v=JSON.parse(raw);}catch{throw Error('裁定未回傳有效候選。');}
+ let confirmedDurationMinutes:number|undefined;
+ if(v&&typeof v==='object'&&!Array.isArray(v)&&'completionMinutes' in v){
+  const completion=(v as Record<string,unknown>).completionMinutes;
+  if(completion!==null)confirmedDurationMinutes=scheduleCompletionMinutes(completion);
+  delete (v as Record<string,unknown>).completionMinutes;
+ }
  if(raw.length>8192||!((exact(v,['status','effects','check']))||(exact(v,['status','effects','check','stages'])))||!['accepted','denied','unsupported'].includes(v.status as string)||!Array.isArray(v.effects)||v.effects.length>4)throw Error('裁定候選格式無效。');
  if(v.stages!==undefined){
   if(!Array.isArray(v.stages)||v.stages.length>4)throw Error('活動階段超出範圍。');
@@ -63,7 +73,23 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
  if(v.status!=='accepted'&&(v.effects.length||(Array.isArray(v.stages)&&v.stages.length)))throw Error('否決候選不能含世界效果。');
  if(v.check!==null&&(!exact(v.check,['difficulty','ability'])||![8,12,16].includes(v.check.difficulty as number)||!reference(v.check.ability)))throw Error('裁定不可指定骰值或結果。');
  for(const e of v.effects){if(!(exact(e,['kind','supplyId','expectedRemaining'])&&e.kind==='materialize'&&reference(e.supplyId)&&integer(e.expectedRemaining))&&!(exact(e,['kind','objectId','expectedRevision'])&&['consume','destroy'].includes(e.kind as string)&&reference(e.objectId)&&integer(e.expectedRevision))&&!(exact(e,['kind','objectId','expectedRevision','toHolder','toRegion'])&&e.kind==='transfer'&&reference(e.objectId)&&integer(e.expectedRevision)&&(e.toHolder===null||reference(e.toHolder))&&reference(e.toRegion))&&!(exact(e,['kind','objectId','expectedRevision','key','value'])&&e.kind==='state'&&reference(e.objectId)&&integer(e.expectedRevision)&&reference(e.key)&&typeof e.value==='string'&&e.value.length<=100)&&!(exact(e,['kind','targetId','recipient'])&&e.kind==='grant'&&reference(e.targetId)&&reference(e.recipient))&&!(exact(e,['kind','objectId'])&&e.kind==='consent'&&reference(e.objectId)))throw Error('裁定效果格式無效。');}
- return v as unknown as EffectCandidate;
+ if(v.status!=='accepted'&&confirmedDurationMinutes!==undefined)throw Error('未核准活動不能宣稱完成耗時。');
+ const candidate={...v,...(confirmedDurationMinutes===undefined?{}:{confirmedDurationMinutes})} as unknown as EffectCandidate;
+ // Under the completion contract top-level effects are final results. A model
+ // must put meaningful preparation in an explicitly timed stage instead.
+ if(confirmedDurationMinutes!==undefined&&confirmedDurationMinutes>15&&candidate.effects.length){
+  const stages=candidate.stages||[],last=stages.at(-1);
+  if(last&&last.afterMinutes>confirmedDurationMinutes)throw Error('活動階段超出確認完成時間。');
+  if(last?.afterMinutes===confirmedDurationMinutes){
+   if(last.effects.length+candidate.effects.length>4)throw Error('完成階段效果超出範圍。');
+   last.effects=[...candidate.effects,...last.effects];
+  }else{
+   if(stages.length>=4)throw Error('活動階段超出範圍。');
+   stages.push({afterMinutes:confirmedDurationMinutes,preconditions:[],effects:candidate.effects});
+  }
+  candidate.effects=[];candidate.stages=stages;
+ }
+ return candidate;
 }
 export function knownWorldObjects(w:World,c:Character){
  return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:o.state,revision:o.revision,kind:o.kind}));
@@ -148,15 +174,29 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
   c.activity=candidate.blockedReason||(candidate.status==='denied'?'這次方法沒有成功。':'目前的方法無法落實。');
   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);return false;
  }
+ const existingObjects=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
+ const validateResultTime=(snapshot:World,afterMinutes:number)=>{
+  // Only the routine factory can mark its verified raw-material supplies as
+  // preparation. Consuming a generic completed product early is still a result.
+  const completedFood=(object:WorldObject)=>{
+   if(object.kind!=='food')return false;
+   const newProduct=!existingObjects.has(object.id);
+   const terminalChange=object.lifecycle!=='active'&&existingObjects.get(object.id)!==object.lifecycle;
+   const rawPreparation=object.lifecycle==='consumed'&&candidate.preparationSupplies?.includes(object.source);
+   return (newProduct||terminalChange)&&!rawPreparation;
+  };
+  if(candidate.confirmedDurationMinutes!==undefined&&afterMinutes<candidate.confirmedDurationMinutes&&snapshot.objects?.some(completedFood))throw new EffectValidationError('完整食物成果不能早於確認完成時間。',{reason:'completion_result_time'});
+ };
  // Validate complete effects on a copy before randomness or any world mutation.
  const clone=structuredClone(w),actor=clone.characters.find(x=>x.id===c.id)!;
  const results=applyEffects(clone,actor,candidate.effects);
+ validateResultTime(clone,15);
  const predicted=structuredClone(clone),predictedActor=predicted.characters.find(x=>x.id===c.id)!;
  for(const [phaseIndex,phase] of (candidate.stages||[]).entries()){
   try{
    if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
    predicted.minute=Math.max(predicted.minute,w.minute+phase.afterMinutes);
-   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);
+   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);validateResultTime(predicted,phase.afterMinutes);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>predicted.objects?.find(o=>o.id===p.objectId)||null)});
@@ -199,6 +239,17 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
  if(phase.effects.some(e=>e.kind==='grant'||e.kind==='consent'))throw Error('活動需要新的角色選擇。');
  if(c.plan?.phases&&regionOf(c)!==c.plan.phases.origin)throw Error('角色已離開活動場景。');
 }
+// Only unexecuted prepared servings belong to the cancelled future. Concrete
+// objects and earlier committed phases remain facts of the world.
+export function cancelActivity(w:World,c:Character):void {
+ const phases=c.plan?.phases;
+ if(phases&&w.supplies){
+  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).filter((effect):effect is Extract<Effect,{kind:'materialize'}>=>effect.kind==='materialize').map(effect=>effect.supplyId));
+  w.supplies=w.supplies.filter(supply=>!pending.has(supply.id)||!supply.pending||(w.objects||[]).some(object=>object.source===supply.id));
+ }
+ delete c.plan;
+ if(c.control)delete c.control.active;
+}
 export function advanceFreePhases(w:World,c:Character):void{
  const plan=c.plan,phases=plan?.phases;
  if(!plan||!phases)return;
@@ -207,7 +258,7 @@ export function advanceFreePhases(w:World,c:Character):void{
   let results:string[];
   try{checkPhase(clone,actor,phase);results=applyEffects(clone,actor,phase.effects,phases.cursor);}catch{
    c.activity='原活動的條件已改變，尚未完成。';
-   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);delete c.plan;return;
+   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);cancelActivity(w,c);return;
   }
   w.objects=clone.objects;w.supplies=clone.supplies;phases.cursor++;
   c.activity=results.join('，');

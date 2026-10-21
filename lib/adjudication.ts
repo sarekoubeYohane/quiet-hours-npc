@@ -68,7 +68,7 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
-    rules: ['僅回應當前行動，不產生背景事件。若 routineOffer 非空且當前普通活動符合，依提案語義從 routineOffer.templates 選擇一個 operation，回傳 routine={family: routineOffer.family,version:1,operation,subject}，同時 accepted、check=null、effects=[]、stages=[]；由程式綁定當前合法物件與背景。subject 從所選模板的 subjects 選擇；餐點須明示是哪種，飲用須區分茶、咖啡或泛指飲品，其他活動可用 null。這是有界單份普通活動的解讀，不要求 NPC 使用範例原句；supplies/objects 留白不等於已耗盡或不存在，可依場所定位確認普通背景。明確缺貨、損壞、物件權限仍優先；特殊方法、大量規模、授權與交付不屬普通背景核准。不適用時 routine=null，沿既有受限效果。不接受額外規則、背景或 world patch。', '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。'],
+    rules: ['僅回應當前行動，不產生背景事件。若 routineOffer 非空且當前普通活動符合，依提案語義從 routineOffer.templates 選擇一個 operation，回傳 routine={family: routineOffer.family,version:1,operation,subject,timings}；timings 必須一次涵蓋 routineOffer.operations 全部項目，每項 {operation,minutes}，依方法與場所條件確認合理完成分鐘，正數且至多90，不能預設茶或咖啡固定時間。NPC durationMinutes 僅為一般估時，不限制完成時間，程式會向上對齊15分鐘，同時 accepted、check=null、effects=[]、stages=[]；由程式綁定當前合法物件與背景。subject 從所選模板的 subjects 選擇；餐點須明示是哪種，飲用須區分茶、咖啡或泛指飲品，其他活動可用 null。這是有界單份普通活動的解讀，不要求 NPC 使用範例原句；supplies/objects 留白不等於已耗盡或不存在，可依場所定位確認普通背景。明確缺貨、損壞、物件權限仍優先；特殊方法、大量規模、授權與交付不屬普通背景核准。不適用時 routine=null，沿既有受限效果。不接受額外規則、背景或 world patch。', '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。'],
   };
 }
 // Separate task transcript and service configuration; NPC chat history is never reused.

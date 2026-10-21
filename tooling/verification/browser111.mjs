@@ -5,11 +5,11 @@ import {url,server,store,load,modelRequests,setModelResponder} from './browser-f
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
 process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/routine-rules');await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
 const world=load('world').seedWorld();world.characters=world.characters.filter(c=>c.id==='owner');world.adjudication={provider:'openai',model:'fixture-adjudicator'};
-world.routineRules=[{id:'browser-tea',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner']}];
+world.routineRules=[{id:'browser-tea',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner'],templates:[{operation:'tea',verbs:['泡','沖泡'],subjects:['茶','紅茶'],purposes:['泡茶'],result:{kind:'brew',contents:'tea',minutes:30}}]}];
 world.objects=[{id:'cup',source:'finite-cups',label:'咖啡館內唯一一隻茶杯',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:'empty',condition:'broken'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea'],condition:['broken','sound']}}];store.install(world);
 const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
 let npc=0,adjudication=0,newMethod=false;
-setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'unsupported',effects:[],stages:[],check:null});}npc++;assert.doesNotMatch(JSON.stringify(input),/routineAudit|ruleId|owner_consent|反循環|必須放棄/);return completion(newMethod?{type:'propose',target:'cup',content:'用魔法改造這隻茶杯',purpose:'改造器具',mood:'平靜',durationMinutes:30,intents:[]}:{type:'propose',target:'cafe',content:npc===1?'泡一杯茶':'沖泡一壺紅茶',purpose:'泡茶',mood:'平靜',durationMinutes:30,intents:[]});});
+setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'unsupported',completionMinutes:null,effects:[],stages:[],check:null});}npc++;assert.doesNotMatch(JSON.stringify(input),/routineAudit|ruleId|owner_consent|反循環|必須放棄/);return completion(newMethod?{type:'propose',target:'cup',content:'用魔法改造這隻茶杯',purpose:'改造器具',mood:'平靜',durationMinutes:30,intents:[]}:{type:'propose',target:'cafe',content:npc===1?'泡一杯茶':'沖泡一壺紅茶',purpose:'泡茶',mood:'平靜',durationMinutes:30,intents:[]});});
 const navigate=(page,name)=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
 let browser;
 try{

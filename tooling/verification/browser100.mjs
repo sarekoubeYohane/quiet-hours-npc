@@ -7,13 +7,13 @@ process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/heavenly-
 const navigate=(page,name)=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
 const fixture=()=>{const w=load('world').seedWorld();w.characters=[w.characters[0],w.characters.find(c=>c.id==='owner')];Object.assign(w.characters[1],{control:{mode:'taken-over'},location:'kris-home',region:'kris-home-main'});w.adjudication={provider:'openai',model:'fixture-adjudicator'};w.objects=[{id:'cup:1',source:'cup',label:'測試杯子',region:'kris-home-main',holder:null,owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['cass','owner'],allowedTo:['cass','owner'],stateTransitions:{contents:['empty','water','tea']}}];return w;};
 const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
-const proposal={type:process.env.TEA_ACTION==='legacy'?'work':'propose',target:process.env.TEA_ACTION==='legacy'?'tea':'cup:1',content:'逐步加入水再沖泡茶',purpose:'泡茶',mood:'平靜',durationMinutes:60,intents:[]};
-const tea={status:'accepted',effects:[],check:null,stages:[{afterMinutes:30,preconditions:[{objectId:'cup:1',revision:1,region:'kris-home-main',holder:null,state:{contents:'empty'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:1,key:'contents',value:'water'}]},{afterMinutes:60,preconditions:[{objectId:'cup:1',revision:2,region:'kris-home-main',holder:null,state:{contents:'water'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:2,key:'contents',value:'tea'}]}]};
+const proposal={type:process.env.TEA_ACTION==='legacy'?'work':'propose',target:process.env.TEA_ACTION==='legacy'?'tea':'cup:1',content:'逐步加入水再沖泡茶',purpose:'泡茶',mood:'平靜',durationMinutes:60,timeIntent:{kind:'completion',maxMinutes:null},intents:[]};
+const tea={completionMinutes:60,status:'accepted',effects:[],check:null,stages:[{afterMinutes:30,preconditions:[{objectId:'cup:1',revision:1,region:'kris-home-main',holder:null,state:{contents:'empty'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:1,key:'contents',value:'water'}]},{afterMinutes:60,preconditions:[{objectId:'cup:1',revision:2,region:'kris-home-main',holder:null,state:{contents:'water'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:2,key:'contents',value:'tea'}]}]};
 const input=request=>JSON.parse(request.messages[1].content);
 let browser;
 try{
- browser=await launchBrowser();
  const scenario=async(kind)=>{
+  browser=await launchBrowser();
   store.install(fixture());const context=await browser.newContext({reducedMotion:'reduce'});const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(String(error)));await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
   const initial=modelRequests.length;setModelResponder(request=>completion(input(request).contractVersion==='world-adjudication.v1'?tea:proposal));
   const read=async()=> (await (await page.request.get(url+'/api/world')).json()).world;
@@ -28,17 +28,17 @@ try{
     const replay=await page.request.post(url+'/api/world',{data:requests.filter(r=>r.operation==='advance').at(-1)});assert.equal(replay.status(),200);assert.equal((await replay.json()).world.objects[0].revision,2);w=await advance();assert.equal(w.objects[0].state.contents,'tea');assert.equal(w.objects[0].revision,3);assert.equal(w.characters[0].plan,undefined);assert.equal(modelRequests.length-initial,3);
     await navigate(page,'分析');await page.addStyleTag({content:'body,body *{font-family:"Noto Sans TC",sans-serif!important}'});await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:outputPath('browser100-completed.png'),fullPage:true});
    }else if(kind==='interrupt'){
-    await intervene();setModelResponder(()=>completion({...proposal,type:'rest',target:'',content:'',durationMinutes:90}));await advance();w=await advance();assert.equal(w.objects[0].state.contents,'water');assert.equal(w.objects[0].revision,2);assert.equal(w.characters[0].plan.phases,undefined);assert.equal(modelRequests.length-initial,3);
+    await intervene();setModelResponder(()=>completion({...proposal,type:'rest',target:'',content:'',durationMinutes:90,timeIntent:{kind:'open-ended',maxMinutes:null}}));await advance();w=await advance();assert.equal(w.objects[0].state.contents,'water');assert.equal(w.objects[0].revision,2);assert.equal(w.characters[0].plan.phases,undefined);assert.equal(modelRequests.length-initial,3);
    }else if(kind==='save'){
     await advance();store.conflictOnNextSave();w=await advance(502);assert.equal(w.objects[0].state.contents,'water');assert.equal(w.objects[0].revision,2);assert.equal(w.characters[0].plan.phases.cursor,1);await page.getByRole('alert').waitFor();w=await advance();assert.equal(w.objects[0].state.contents,'tea');assert.equal(w.objects[0].revision,3);assert.equal(modelRequests.length-initial,2);
    }else{
     await page.getByRole('region',{name:'角色近況',exact:true}).getByRole('button',{name:'店主',exact:true}).click();await operation(page.getByRole('button',{name:'交還控制權',exact:true}),'return-control');let sawIntermediate=false;
-    setModelResponder(request=>{const v=input(request);if(v.contractVersion==='world-adjudication.v1')return completion({status:'accepted',effects:[{kind:'transfer',objectId:'cup:1',expectedRevision:2,toHolder:'owner',toRegion:'kris-home-main'}],check:null});sawIntermediate=v.objects?.some(o=>o.id==='cup:1'&&o.state.contents==='water');return completion(proposal);});w=await advance();assert.equal(sawIntermediate,true);assert.equal(w.objects[0].holder,'owner');
+    setModelResponder(request=>{const v=input(request);if(v.contractVersion==='world-adjudication.v1')return completion({completionMinutes:15,status:'accepted',effects:[{kind:'transfer',objectId:'cup:1',expectedRevision:2,toHolder:'owner',toRegion:'kris-home-main'}],check:null});sawIntermediate=v.objects?.some(o=>o.id==='cup:1'&&o.state.contents==='water');return completion(proposal);});w=await advance();assert.equal(sawIntermediate,true);assert.equal(w.objects[0].holder,'owner');
     setModelResponder(()=>completion({...proposal,type:'move',target:'cafe',content:'',durationMinutes:15}));w=await advance();assert.equal(w.objects[0].region,'cafe-front');assert.equal(w.objects[0].state.contents,'water');assert.equal(w.characters[0].plan,undefined);
-    let cass;setModelResponder(request=>{const v=input(request);if(v.self?.id==='cass')cass=v;return completion({...proposal,type:'rest',target:'',content:'',durationMinutes:60});});await advance();assert.ok(cass);assert.deepEqual(cass.objects,[]);assert.doesNotMatch(cass.self.activity,/cafe|owner|店主|咖啡/);
+    let cass;setModelResponder(request=>{const v=input(request);if(v.self?.id==='cass')cass=v;return completion({...proposal,type:'rest',target:'',content:'',durationMinutes:60,timeIntent:{kind:'open-ended',maxMinutes:null}});});await advance();assert.ok(cass);assert.deepEqual(cass.objects,[]);assert.doesNotMatch(cass.self.activity,/cafe|owner|店主|咖啡/);
    }
    assert.deepEqual(errors,[]);console.log(`PASS #100 real Chromium ${kind}: committed intermediate state, phase cursor, reload/replay or interruption/staleness, bounded dispatch and persisted world verified`);
-  }finally{await context.close();}
+  }finally{await context.close();await browser.close();browser=undefined;}
  };
  for(const kind of ['complete','interrupt','save','other-npc'])await scenario(kind);
 }finally{await browser?.close();server.close();}

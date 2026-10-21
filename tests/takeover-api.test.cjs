@@ -82,7 +82,7 @@ test('failed takeover round and conflicting control save leave no partial world 
 test('return ends an unfinished designated activity and cancels a pending command without erasing its actual history', async () => {
   const world=worldWithAdjudication(); owner(world).intents=queue; store.install(world);
   assert.equal((await POST(request({operation:'takeover'}))).status,200);
-  assert.equal((await POST(request({operation:'direct',action:{type:'work',target:'tidy'}}))).status,200);
+  assert.equal((await POST(request({operation:'direct',action:{type:'rest'}}))).status,200);
   await withModel(async perceived => {
     assert.equal((await advance()).status,200);
     assert.equal(owner(await read()).control.active,true);
@@ -93,7 +93,7 @@ test('return ends an unfinished designated activity and cancels a pending comman
     assert.equal(owner(await read()).control.pending.content,'取消的想法');
     assert.equal((await POST(request({operation:'return-control'}))).status,200);
     const returned=owner(await read()); assert.equal(returned.control.mode,'autonomous'); assert.equal(returned.plan,undefined);
-    assert.ok(returned.memories.some(m=>m.text.includes('收拾桌面')));
+    assert.ok(returned.memories.some(m=>m.text.includes('休息')));
     assert.equal((await advance()).status,200);
     const data=perceived.filter(p=>p.self.id==='owner'); assert.equal(data.length,1);
     assert.equal(JSON.stringify(data[0]).includes('取消的想法'),false);
