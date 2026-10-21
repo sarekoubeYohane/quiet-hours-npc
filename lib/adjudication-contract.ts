@@ -33,7 +33,7 @@ export const effectRules = [
  '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
  'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
  'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
- 'consume：僅 food 且 holder=actor.id 才可食用，之後 lifecycle=consumed、holder=null，不會補貨。桌上食物必須先 transfer 拿取再 consume，第二步版本加一。不能 consume 杯子或茶具；飲用杯中液體須用支援的 state 轉換，無法表達時 unsupported。',
+ 'consume：明示 consumable=true 的物件且 holder=actor.id 才可食用；consumable=false 不可，只有舊資料缺 consumable 才以 kind=food 相容，不以新kind名稱決定。之後 lifecycle=consumed、holder=null、已保存quantity歸零，不會補貨。桌上可食用物件先 transfer 拿取再 consume，第二步版本加一。容器本身不能因裝有飲品而被食用；杯中獨立飲品按其可消耗能力consume，並在同批更新原杯contents，保留飲品與容器連續性。',
  '舊kind state/transfer/consume/destroy的授權模式及change-state access=authorized：物件必須已知、active、本地且獲准，並由actor持有或無人持有。這是舊核准方法的適用範圍，不代表所有物理方法都不可能；需要未經許可或對他人持有物件的外在後果時明示新physical契約。',
  'transfer：toRegion 必須是 actor 當前 region；toHolder=null 是放下，toHolder=actor.id 是拿取。交給其他角色需要同區域、allowedTo 與該角色先前 consent 形成的 acceptedBy；不能代對方同意。移動另用 NPC move，不得遠端轉移。',
  'grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。',

@@ -1,27 +1,49 @@
-import { matchesRoutineMethod, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
-import { regionOf, canSee } from './perception';
+import { matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
+import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
-import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase } from './world-effects';
+import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject, type SceneSupply } from './world-effects';
 import { rebindRoutineEffects, type RoutinePhaseBindings } from './routine-world-bindings';
 import type { World, Character, Action } from './world';
 import type { RoutineRule } from './routine-rules';
 
 const denied=(message:string):EffectCandidate=>({status:'denied',effects:[],stages:[],check:null,blockedReason:message});
-function audit(w:World,c:Character,rule:RoutineRule,result:'approved'|'reused'|'exception'){
- w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:rule.id,result}].slice(-64);
+function audit(w:World,c:Character,rule:RoutineRule,result:'approved'|'reused'|'exception'|'blocked',reason?:string){
+ w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:rule.id,result,...(reason?{reason}:{})}].slice(-64);
 }
 const stateMatches=(state:Record<string,string>,binding:RoutineBinding)=>binding.state.every(({key,value})=>(Object.hasOwn(state,key)?state[key]:null)===value);
+// A material role keeps its confirmed source semantics for concrete objects and
+// supplies alike. Legacy food needs its subject because that kind covers meals
+// and ingredients; newer kinds can carry the confirmed source category.
+function matchesMaterialSource(source:WorldObject|SceneSupply,binding:RoutineBinding):boolean {
+ if(binding.sourceRole!=='material')return true;
+ const state='initialState' in source?source.initialState:source.state;
+ const subject=!!binding.sourceSubject&&(source.label.includes(binding.sourceSubject)||['material','category'].some(key=>state[key]===binding.sourceSubject));
+ const kind=binding.background?.kind??binding.kind;
+ return source.kind==='food'||kind==='food'||!kind?subject:source.kind===kind||source.kind===binding.kind;
+}
 class RoutineUnavailable extends Error {}
 function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram,rule:RoutineRule):Map<string,string>|undefined {
  const refs=new Map<string,string>([['actor',c.id],['here',regionOf(c)]]);
+ const currentRule=w.routineRules?.find(value=>value.id===rule.id)||rule;
+ const finiteSource=(binding:RoutineBinding)=>{
+  if(!binding.background)return;
+  const entries=currentRule.finiteSourceBindings??=[];
+  let entry=entries.find(value=>value.operation===program.operation);
+  if(!entry){if(entries.length>=routineWorldLimits.maxPrograms)throw Error('有限來源範圍超出程序容量。');entry={operation:program.operation,roles:[]};entries.push(entry);}
+  if(!entry.roles.includes(binding.role)){if(entry.roles.length>=routineWorldLimits.maxBindings)throw Error('有限來源角色超出容量。');entry.roles.push(binding.role);}
+ };
+ const fromRenewableBackground=(object:WorldObject)=>!!w.supplies?.some(source=>source.id===object.source&&source.background);
  const background=(binding:RoutineBinding)=>{
   const bg=binding.background!;
-  const explicit=(w.supplies||[]).filter(supply=>!supply.background&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.sourceRole==='material'?(supply.kind==='food'||bg.kind==='food'?!!binding.sourceSubject&&(supply.label.includes(binding.sourceSubject)||['material','category'].some(key=>supply.initialState[key]===binding.sourceSubject)):supply.kind===bg.kind||supply.kind===binding.kind):supply.kind==='utensil'||supply.kind===bg.kind));
+  const explicit=(w.supplies||[]).filter(supply=>!supply.background&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.sourceRole==='material'?matchesMaterialSource(supply,binding):supply.kind==='utensil'||supply.kind===bg.kind));
   if(explicit.length){
    const actual=explicit.find(supply=>supply.remaining>0&&hasObjectPermission(supply,c.id)&&stateMatches(supply.initialState,binding));
    if(!actual)throw new RoutineUnavailable('目前已知的有限材料或器具不能使用，尚未完成；日常背景不會補回。');
    return actual;
   }
+  const finite=currentRule.finiteSourceBindings?.some(entry=>entry.operation===program.operation&&entry.roles.includes(binding.role));
+  const concrete=(w.objects||[]).some(object=>object.knownTo.includes(c.id)&&regions.some(region=>region.id===object.region&&region.location===c.location)&&!fromRenewableBackground(object)&&(binding.sourceRole==='material'?matchesMaterialSource(object,binding):object.kind===bg.kind||object.kind===binding.kind));
+  if(finite||concrete)throw new RoutineUnavailable('已知具體材料或器具已耗盡、損毀、移走或無法操作；日常背景不會補回。');
   let supply=w.supplies?.find(supply=>supply.background?.ruleId===rule.id&&supply.region===regionOf(c)&&supply.label===bg.label&&supply.kind===bg.kind);
   if(!supply){
    if((w.supplies?.length||0)>=512)throw Error('日常供應已達容量。');
@@ -34,19 +56,19 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   const binding={...rawBinding,state:substitute(rawBinding.state,refs),background:rawBinding.background?{...rawBinding.background,initialState:substitute(rawBinding.background.initialState,refs)}:null};
   if(binding.type==='object'){
    const reachable=(w.objects||[]).filter(object=>canPhysicallyReachObject(w,c,object)&&(binding.access==='physical'||hasObjectPermission(object,c.id)&&(object.holder===null||object.holder===c.id)));
-   const candidates=reachable.filter(object=>(binding.select!=='target'||object.id===action.target)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&stateMatches(object.state,binding)&&(!binding.link||object.state[binding.link.key]===refs.get(binding.link.role))&&(!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount));
+   const candidates=reachable.filter(object=>(binding.select!=='target'||object.id===action.target)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)&&stateMatches(object.state,binding)&&(!binding.link||object.state[binding.link.key]===refs.get(binding.link.role))&&(!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount));
    const object=candidates[0];
-   if(object){refs.set(binding.role,object.id);continue;}
+   if(object){if(!fromRenewableBackground(object))finiteSource(binding);refs.set(binding.role,object.id);continue;}
    if(!binding.background)return;
-   if(binding.select==='target'&&w.objects?.some(object=>object.id===action.target)||reachable.some(object=>(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))))throw new RoutineUnavailable('指定或現有物件條件不成立，不能用日常背景代換。');
-   const supply=background(binding);refs.set(binding.role,`${supply.id}:${supply.background?.sequence??supply.remaining}`);refs.set(binding.role+'-supply',supply.id);
+   if(binding.select==='target'&&w.objects?.some(object=>object.id===action.target)||reachable.some(object=>(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)))throw new RoutineUnavailable('指定或現有物件條件不成立，不能用日常背景代換。');
+   const supply=background(binding);if(!supply.background)finiteSource(binding);refs.set(binding.role,`${supply.id}:${supply.background?.sequence??supply.remaining}`);refs.set(binding.role+'-supply',supply.id);
   }else if(binding.type==='environment'){
    const snapshot=worldTargetSnapshot(w,{type:'environment',id:regionOf(c)});if(!snapshot||!stateMatches(snapshot.state,binding))return;refs.set(binding.role,regionOf(c));
   }else if(binding.type==='body'){
    const actor=w.characters.find(actor=>(binding.select==='actor'?actor.id===c.id:binding.select==='target'?actor.id===action.target:!binding.label||actor.name.includes(binding.label))&&regionOf(actor)===regionOf(c)&&canSee(w,c,regionOf(actor))&&stateMatches(actor.physical?.state||{},binding));if(!actor)return;refs.set(binding.role,actor.id);
   }else{
-   let supply=w.supplies?.find(supply=>!supply.pending&&supply.remaining>0&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.access==='physical'||hasObjectPermission(supply,c.id))&&(binding.select!=='target'||supply.id===action.target)&&(!binding.kind||supply.kind===binding.kind)&&(!binding.label||supply.label.includes(binding.label))&&(binding.sourceRole!=='material'||supply.kind!=='food'||!!binding.sourceSubject&&(supply.label.includes(binding.sourceSubject)||['material','category'].some(key=>supply.initialState[key]===binding.sourceSubject)))&&stateMatches(supply.initialState,binding));if(!supply&&binding.background)supply=background(binding);if(!supply)return;
-   refs.set(binding.role,supply.id);refs.set(binding.role+'-object',`${supply.id}:${supply.background?.sequence??supply.remaining}`);
+   let supply=w.supplies?.find(supply=>!supply.pending&&supply.remaining>0&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.access==='physical'||hasObjectPermission(supply,c.id))&&(binding.select!=='target'||supply.id===action.target)&&(!binding.kind||supply.kind===binding.kind)&&(!binding.label||supply.label.includes(binding.label))&&matchesMaterialSource(supply,binding)&&stateMatches(supply.initialState,binding));if(!supply&&binding.background)supply=background(binding);if(!supply)return;
+   if(!supply.background)finiteSource(binding);refs.set(binding.role,supply.id);refs.set(binding.role+'-object',`${supply.id}:${supply.background?.sequence??supply.remaining}`);
   }
  }
  const explicit=w.objects?.some(object=>object.id===action.target)||w.supplies?.some(supply=>supply.id===action.target)||w.characters.some(actor=>actor.id===action.target);
@@ -101,13 +123,14 @@ function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:Routin
  if(!rule||!program)return;
  const duration=rule.worldTimings!.find(time=>time.operation===program.operation)!.minutes,confirmedDurationMinutes=Math.ceil(duration/15)*15;
  if(maxMinutes!==null&&confirmedDurationMinutes>maxMinutes)return denied(`完成這項活動需要 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`);
- const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule);}catch(error){if(error instanceof RoutineUnavailable)return denied(error.message);throw error;}
+ const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule);}catch(error){if(error instanceof RoutineUnavailable){audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
  if(!refs){audit(w,c,rule,'exception');if(approval)return denied('目前已知物件或外在條件不能承接這次方法，尚未完成。');return;}
  if(!approval)audit(w,c,rule,'reused');
  let branches:{outcomes:string[];effects:Effect[];stages:ActivityPhase[]}[];
  try{branches=(program.branches||[{outcomes:['critical-success','success','mixed','failure','critical-failure'],effects:[],stages:program.stages}]).map(path=>({outcomes:path.outcomes,effects:[] as Effect[],stages:compilePath(prepared,c,program,path,new Map(refs))}));}
  catch(error){if(error instanceof EffectValidationError){if(approval)return denied('目前外在前提與已確認方法不同，活動尚未完成。');audit(w,c,rule,'exception');return;}throw error;}
 
+ const finite=prepared.routineRules?.find(value=>value.id===rule.id)?.finiteSourceBindings;if(finite)rule.finiteSourceBindings=structuredClone(finite);
  const newSupplies=(prepared.supplies||[]).filter(supply=>!w.supplies?.some(existing=>existing.id===supply.id));if(newSupplies.length)(w.supplies??=[]).push(...structuredClone(newSupplies));
  const references=trialReferences(w,program,refs);
  return {status:'accepted',pendingResultSupplies:newSupplies.map(supply=>supply.id),effects:[],stages:[],branches:branches as EffectCandidate['branches'],check:program.check,confirmedDurationMinutes,trialBinding:{operation:program.operation,subject:refs.get(program.bindings[0].role)!,references}};
@@ -119,7 +142,7 @@ export function bindWorldRoutine(w:World,c:Character,action:Action,approval?:Rou
  if(approval)return bindWorldRoutineRule(w,c,action,approval,maxMinutes);
  const candidates=(w.routineRules||[]).filter(rule=>rule.version===3&&rule.origin===c.location&&rule.knownTo.includes(c.id)&&(rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>matchesRoutineMethod(method,action))));
  let blocked:{candidate:EffectCandidate;world:World}|undefined;
- for(const rule of candidates){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;return candidate;}
+ for(const rule of candidates){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;const original=w.routineRules?.find(value=>value.id===rule.id),bound=snapshot.routineRules?.find(value=>value.id===rule.id);if(original&&bound?.finiteSourceBindings)original.finiteSourceBindings=structuredClone(bound.finiteSourceBindings);return candidate;}
  if(blocked){w.routineAudit=blocked.world.routineAudit;return blocked.candidate;}
  if(candidates.length)audit(w,c,candidates[0],'exception');
  return;

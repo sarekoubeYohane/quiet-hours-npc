@@ -21,8 +21,22 @@
 
 獨立公開API＋實際SQLite重現：既有22案通過，新增兩案均失敗，證明實作缺口。修正須把反例納入正式回歸，並驗證真正來源恢復仍能接續。
 
-## 修正及複審狀態
+## 修正及複審結果
 
-依 implement-spec，以上三項交同一修正代理，採獨立工作樹及 TDD；修正、整合回歸與原審查者複審尚待完成。本文件目前不宣稱審查通過，PR維持draft。最終解決情況及提交由root在完成後更新。
+依 implement-spec，三項交同一修正代理，在獨立工作樹以 TDD 完成；修正提交 `75da24a7dfbbfa6a26862d29c8f387de042c57fb`，整合及複審固定點為本機 `44f9a8a9aeddac7d809653e04c1a1cc2d601be9c`／tree `0932b5ca2852a6f7e2c2f6b376f3b37709bbfda8`。後續只更新交付文件。
 
-初審總數：Standards 1（最嚴重P2）；Spec 2（最嚴重P1）。兩軸分開判斷，不以另一軸通過抵銷缺口。
+### Standards 複審
+
+原1項已解決；未解決 **0**、新增 finding **0**、另列 smell **0**。consume 正式提示與 consumable 執行規則一致，實際派送提示及 SQLite 結果有回歸。原 Standards reviewer 獨立重讀修正、ADR及證據，focused public API **36/36** 通過，保持 no-network。
+
+### Spec 複審
+
+原2項已解決；未解決 **0**、新增 **0**。材料主題共用匹配；有限來源的有界 server-only 綁定防止耗盡、毀壞或移走後由背景補回，真正新來源仍可恢復。原 Spec reviewer 獨立重跑原始2項反例及現有30項公開 API／SQLite，**32/32** 通過，保持 no-network。
+
+### 修正擴展與整合驗證
+
+修正回歸另發現並修復無關蛋糕阻擋合法茶葉背景、physical materialize 的編譯佔位未正規化，以及免費受阻被 UI 錯標付費例外。這些不改寫初審的1／2項數目；全域 validator 未放寬。有限來源約束進 observer 的有界證據，不進 NPC，也不追補舊證據。詳見[紅綠證據及 UI](world-changes-review-fixes-2026-10-21.md)。
+
+root 在固定整合點獨立執行 **560/560**（518 API／32 auth／10 Workers/D1），零 fail／skip；typecheck、lint（0 error、4個既有 warning）、production build及產物 `quiet-hours-npc`／`APP_ENV=production` 檢查通過。另重跑有限材料、材料主題、同杯循環、餐點分拆四組真 UI／API／SQLite，合計 **11 NPC／6裁定**，原 ID 重送零新增，reload與保存重讀通過；人工檢查受阻畫面明示「規則受阻，無新增裁定」。模型／骰子仍為 fixture。
+
+初審總數保留：Standards 1（最嚴重P2）、Spec 2（最嚴重P1）；最終兩軸均零未解決，沒有以另一軸通過抵銷缺口。未合併、未部署、未修改正式世界或呼叫正式付費模型。

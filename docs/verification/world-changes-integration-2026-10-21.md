@@ -2,6 +2,14 @@
 
 本報告記錄 #136、#145 及 #137–#139、#146–#151 的本機交付。模型 transport、受控 D20 與故障邊界明示為 fixture；WorldApp、世界 GET／POST、活動、效果、提交、重送及 SQLite 保存重讀走正式程式。沒有呼叫正式付費模型、修改正式世界、合併 PR 或部署。fixture 通過不等於正式站驗收。
 
+## 最終整合結果
+
+獨立 code review 修正後，本機固定點 `44f9a8a9aeddac7d809653e04c1a1cc2d601be9c`／tree `0932b5ca2852a6f7e2c2f6b376f3b37709bbfda8` 經 root 重跑 **560/560**（518 API、32 auth、10 Workers/D1），零 fail／skip；typecheck、lint（零 error、4個既有 warning）、production build及產物環境檢查通過。此後變更只有交付文件；遠端交付 commit/tree 對照見整合 PR。
+
+初審 Standards 1／Spec 2全部修復，原兩位 reviewer 獨立複審均零未解決、零新增；focused API 各36/36與32/32。[雙軸審查](world-changes-code-review-2026-10-21.md)與[修正紅綠證據](world-changes-review-fixes-2026-10-21.md)記錄完整理由。
+
+root 先重跑七組 v3 UI（19 NPC／9裁定）與既有綜合 UI（62 NPC／6裁定），修正後再重跑有限材料、材料主題、同杯循環、餐點分拆四組（11 NPC／6裁定）。所有新 UI 走真 WorldApp／世界 API／SQLite 保存重讀、原 ID 重送及 reload；重送零新增派送。修正實作者另重跑自然及未許可物理等六組，詳見修正證據。這些是 fixture 結果，不能當成正式模型或正式站驗收。
+
 ## 整合基線
 
 - 最新核對 main：`5e172d51f999f28ca17f5a207fb109d3f8c305e2`。
@@ -21,8 +29,8 @@
 | #147 | 物主許可與物理可達分開；保存意外損毀、擅用／拿取及事前許可，不補造 grant／consent | [物理後果](world-physical-147-2026-10-21.md) |
 | #148 | 同一事件承接物件、環境及身體；可知鍵投影、外在線索、中斷、位移攜物及自主界線 | [環境與身體](world-external-148-2026-10-21.md) |
 | #149 | 形成候選、來源證據、隱藏狀態及身份碰撞各先 red；形成／分拆保存來源、份量、權利及重要差異，不複製原物 | [形成與細分](world-formation-149-2026-10-21.md) |
-| #151 | 明示通用v3方法、當前subset／來源／份量綁定、fresh成果、自然重用及實際派送分開計數 | [通用日常程序](world-routine-151-2026-10-21.md) |
 | #150 | 自然安排從真提交起算、到期先行、條件破壞永久失效；保存接續、曝光與本次操作證據接通 | [自然變化](world-natural-150-2026-10-21.md)／[時間取捨](../design/natural-changes-time.md) |
+| #151 | 明示通用v3方法、當前subset／來源／份量綁定、fresh成果、自然重用及實際派送分開計數 | [通用日常程序](world-routine-151-2026-10-21.md) |
 
 ## 階段性完整回歸
 
@@ -40,7 +48,7 @@
 | --- | --- | --- |
 | 餐點取得、消耗、形成與分拆 | `world-formation-api`、`live-acceptance-cup-api` | `browser149`、`browser-live-gaps`；[形成證據](world-formation-149-2026-10-21.md) |
 | 自主授權後借杯、攜帶、洗淨、歸還 | `live-acceptance-cup-api`、既有活動／授權測試 | `browser-live-gaps`；[既有整合基線證據](live-gaps-browser-2026-10-21.md) |
-| 同杯喝洗再泡、不同合理新狀態 | `world-changes-object-api` 保留原杯；v3同杯循環及fresh形成由 `routine-world-changes-api` 覆蓋 | `browser146` 與既有 v2 `browser-live-gaps`；不把既有 v2 成果當 v3 驗收 |
+| 同杯喝洗再泡、不同合理新狀態 | `world-changes-object-api` 保留原杯；v3同杯循環及fresh形成由 `routine-world-changes-api` 覆蓋 | `browser151-world` cafe 的 v3 喝茶→洗杯→同杯再泡、fresh形成及保存；`browser146`、既有v2證據另保留 |
 | 意外損毀、未經許可拿取／擅用／損壞 | `world-physical-api`、`world-formation-api` | `browser147`、`browser149`；所有者與許可事實保持 |
 | 同事件物件／環境／身體影響、自主及資訊隔離 | `world-external-api`、`npc-failure-feedback-api` | `browser148`；public／subject／hidden 由公開 API 核對下一個角色輸入 |
 | 自然變化、永久失效及保存接續 | `natural-changes-api` | `browser-natural-changes`；[時間順序](../design/natural-changes-time.md) |
@@ -57,4 +65,4 @@
 
 新資料寫入後的舊 binary 回退並非安全的雙向門：舊讀取器不理解逐鍵曝光、形成份量或後續的新程序／自然安排。向前讀取舊世界保持相容；回退須保留新讀取與執行語義，不能丟欄位、重置或補造歷史。
 
-#151實作者完整回歸552/552（510 activities/API、32 auth、10 Workers/D1），22項新增正式API／SQLite案例全部通過；typecheck、production build通過，lint無error、沿既有4個warning。七組真UI共19 NPC／9裁定，逐組原ID重送0新增；[完整證據與限制](world-routine-151-2026-10-21.md)。此為實作者交付證據，獨立review後最終整合結果由root另記。
+#151實作者完整回歸552/552（510 activities/API、32 auth、10 Workers/D1），22項新增正式API／SQLite案例全部通過；typecheck、production build通過，lint無error、沿既有4個warning。七組真UI共19 NPC／9裁定，逐組原ID重送0新增；[完整證據與限制](world-routine-151-2026-10-21.md)。此為實作者階段證據；修正及最終整合結果見本報告前段。

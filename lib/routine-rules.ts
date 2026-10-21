@@ -24,7 +24,7 @@ const templates:RoutineTemplate[]=[
  {operation:'wash',verbs:['清洗','洗','洗淨'],subjects:['杯子','茶杯','咖啡杯','餐具'],purposes:['清洗餐具','清潔','清洗'],result:{kind:'clean',contents:'empty',minutes:15}},
  {operation:'return',verbs:['歸還','放回'],subjects:['杯子','茶杯','咖啡杯','餐具'],purposes:['歸還','歸還餐具','歸還杯子'],result:{kind:'release',minutes:15}},
 ];
-export type RoutineRule={id:string;version:1|2|3;programs?:(RoutineProgram|RoutineWorldProgram)[];worldTimings?:{operation:string;minutes:number}[];worldSubject?:string|null;family:'cafe-service';operations:string[];templates?:RoutineTemplate[];origin:string;knownTo:string[]};
+export type RoutineRule={id:string;version:1|2|3;programs?:(RoutineProgram|RoutineWorldProgram)[];worldTimings?:{operation:string;minutes:number}[];worldSubject?:string|null;finiteSourceBindings?:{operation:string;roles:string[]}[];family:'cafe-service';operations:string[];templates?:RoutineTemplate[];origin:string;knownTo:string[]};
 export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string[];confirmedOperations?:RoutineOperation[]};
 
 // World binding is deliberately separate from pure candidate parsing.

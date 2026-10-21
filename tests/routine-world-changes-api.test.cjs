@@ -79,7 +79,7 @@ test('hidden-only changes do not leak authority revisions or add and remove know
  }finally{s.restore();}
 });
 test('v3 wire rejects missing required binding fields, trusted metadata, historical identities and revisions before any world change',async()=>{
- for(const mutate of [reply=>{delete reply.routine.programs[0].bindings[0].sourceSubject;},reply=>{delete reply.routine.programs[0].bindings[0].quantity;},reply=>{delete reply.routine.programs[0].bindings[0].sourceRole;},reply=>{reply.routine.programs[0].stages[0].routineBindings={objects:[],bodies:[]};},reply=>{reply.routine.programs[0].stages[0].effects[0].target.id='cup-a';},reply=>{reply.routine.programs[0].stages[0].effects[0].expectedRevision=1;},reply=>{reply.routine.timings[0].extra=true;}]){
+ for(const mutate of [reply=>{reply.routine.finiteSourceBindings=[{operation:'wash',roles:['vessel']}];},reply=>{delete reply.routine.programs[0].bindings[0].sourceSubject;},reply=>{delete reply.routine.programs[0].bindings[0].quantity;},reply=>{delete reply.routine.programs[0].bindings[0].sourceRole;},reply=>{reply.routine.programs[0].stages[0].routineBindings={objects:[],bodies:[]};},reply=>{reply.routine.programs[0].stages[0].effects[0].target.id='cup-a';},reply=>{reply.routine.programs[0].stages[0].effects[0].expectedRevision=1;},reply=>{reply.routine.timings[0].extra=true;}]){
   const s=await scenario({generic:true,adjustReply:reply=>{mutate(reply);return reply;}});try{const before=await s.read();const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,502);const saved=await s.read();assert.deepEqual(saved.objects,before.objects);assert.equal(saved.routineRules,undefined);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}finally{s.restore();}
  }
 });
@@ -151,4 +151,99 @@ test('new v3 material categories cannot bypass an explicit exhausted legacy food
 test('an exhausted finite cake cannot be replenished by a renamed generic food background while tea and meals remain separate',async()=>{
  const f=require('./routine-world-programs-fixture.cjs');for(const [subject,finiteLabel,shouldForm] of [['蛋糕','最後一個蛋糕',false],['茶葉','最後一個蛋糕',true]]){
  const p=f.program('prepare-food','處理這份材料','製作',[f.binding('raw','supply','local',[],{kind:'food',sourceRole:'material',sourceSubject:subject,background:f.bg('普通'+subject,'food')})],[f.phase(15,[{kind:'materialize',supplyId:'$raw',expectedRemaining:0},f.form('已處理材料','meal')])]);const s=await scenario({adjustWorld:w=>{w.supplies=[{id:'last-cake',label:finiteLabel,kind:'food',region:'cafe-front',owner:'owner',knownTo:['owner'],allowedTo:['owner'],remaining:0,initialState:{}}];},adjustReply:()=>f.approval([p],'prepare-food',subject)});try{s.choose({...proposal('cafe'),content:'處理這份材料',purpose:'製作'});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const w=await s.read();assert.equal(w.objects.some(o=>o.kind==='meal'),shouldForm);assert.equal(w.supplies.find(o=>o.id==='last-cake').remaining,0);assert.equal(w.supplies.length,shouldForm?2:1);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}finally{s.restore();}}
+});
+
+const reviewedStock=(id,label)=>({...cup(id),label,kind:'food',state:{},quantity:{amount:1,unit:'item'},consumable:false});
+test('SPEC REVIEW: reuse must not substitute cake for the confirmed tea-leaf material role',async()=>{
+ const fixture=require('./routine-world-programs-fixture.cjs');
+ const program=fixture.program('dry-leaf-method','把茶葉製成茶飲','飲用',[fixture.binding('raw','object','local',[],{kind:'food',sourceRole:'material',sourceSubject:'茶葉'})],[fixture.phase(15,[fixture.form('茶飲','drink',[],'raw')])]);
+ const reply=fixture.approval([program],'dry-leaf-method','茶飲');
+ const s=await scenario({objects:[reviewedStock('leaf-a','一份茶葉')],adjustReply:()=>reply});
+ try{
+  const action={...proposal('cafe'),content:'把茶葉製成茶飲',purpose:'飲用'};
+  s.choose(action);let r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());
+  let w=await s.read();assert.equal(w.objects.find(o=>o.id==='leaf-a').lifecycle,'consumed');
+  w.objects.push(reviewedStock('cake-a','最後一份蛋糕'));store.replaceCommittedWorld(w);
+  s.choose(action);r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());
+  w=await s.read();
+  assert.equal(w.objects.find(o=>o.id==='cake-a').lifecycle,'active','Confirmed tea method unexpectedly consumed cake');
+ }finally{s.restore();}
+});
+
+test('SPEC REVIEW: exhausted explicit concrete timber cannot be silently replenished by routine background',async()=>{
+ const fixture=require('./routine-world-programs-fixture.cjs');
+ const program=fixture.program('shape-stock','把最後木料製成零件','製作零件',[fixture.binding('raw','object','local',[],{kind:'timber',sourceRole:'material',sourceSubject:'木料',background:{label:'普通木料',kind:'timber',consumable:false,quantity:{amount:1,unit:'item'},initialState:[]}})],[fixture.phase(15,[{kind:'materialize',supplyId:'$raw-supply',expectedRemaining:0},fixture.form('木製零件','component',[],'raw')])]);
+ const reply=fixture.approval([program],'shape-stock','木製零件');
+ const s=await scenario({objects:[{...reviewedStock('last-timber','最後一份木料'),kind:'timber'}],adjustReply:()=>reply});
+ try{
+  const action={...proposal('cafe'),content:'把最後木料製成零件',purpose:'製作零件'};
+  s.choose(action);let r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());
+  let w=await s.read();assert.equal(w.objects.find(o=>o.id==='last-timber').lifecycle,'consumed');
+  s.choose(action);r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());
+  w=await s.read();
+  assert.equal(w.objects.filter(o=>o.kind==='component').length,1,'Background replenished exhausted explicit timber');assert.equal(w.routineAudit.at(-1).result,'blocked');assert.match(w.routineAudit.at(-1).reason,/背景不會補回/);assert.deepEqual(s.counts(),{npc:2,adjudication:1});
+ }finally{s.restore();}
+});
+
+test('a known finite source carried away and left behind cannot be replaced by ordinary background after returning',async()=>{
+ for(const destination of ['cafe-storeroom','kris-home']){
+  const f=require('./routine-world-programs-fixture.cjs'),p=f.program('shape-stock','把木料製成零件','製作零件',[f.binding('raw','object','local',[],{kind:'timber',sourceRole:'material',sourceSubject:'木料',background:f.bg('普通木料','timber')})],[f.phase(15,[{kind:'materialize',supplyId:'$raw-supply',expectedRemaining:0},f.form('木製零件','component',[],'raw')])]);
+  const reply=f.approval([p],'shape-stock','零件'),s=await scenario({objects:[{...reviewedStock('finite-timber','這是現有木料'),kind:'timber',quantity:{amount:2,unit:'item'}}],adjustReply:()=>reply});
+  try{
+   const shape={...proposal('cafe'),content:'把木料製成零件',purpose:'製作零件'};
+   let lastReceipt;const advance=async action=>{s.choose(action);const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());lastReceipt=(await r.clone().json()).operationEvidence;return s.read();};
+   let w=await advance(shape);assert.deepEqual(lastReceipt.result.rules.find(rule=>rule.version===3).finiteSourceBindings,[{operation:'shape-stock',roles:['raw']}]);assert.equal(w.objects.find(o=>o.id==='finite-timber').quantity.amount,1);
+   w=await advance({...proposal(destination),type:'move',content:'',purpose:undefined});
+   const timber=w.objects.find(o=>o.id==='finite-timber');assert.notEqual(timber.region,'cafe-front');
+   s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'physical',version:1,operation:'place',objectId:timber.id,expectedRevision:timber.revision,reason:'把當前持有的木料留在此處。'}],check:null});
+   await advance({...proposal(timber.id),content:'放下手上木料',purpose:'放下'});
+   await advance({...proposal('cafe-front'),type:'move',content:'',purpose:undefined});s.reply(reply);
+   w=await advance(shape);assert.deepEqual(lastReceipt.result.rules.find(rule=>rule.version===3).finiteSourceBindings,[{operation:'shape-stock',roles:['raw']}]);assert.equal(w.objects.filter(o=>o.kind==='component').length,1,'Known finite material was replaced after moving it away');assert.equal(w.supplies?.length||0,0);assert.equal(w.objects.find(o=>o.id===timber.id).holder,null);assert.deepEqual(store.snapshot().objects,w.objects);assert.equal(JSON.stringify(s.inputs.filter(input=>input.contractVersion!=='world-adjudication.v1')).includes('finiteSourceBindings'),false);
+  }finally{s.restore();}
+ }
+});
+
+test('the actual consume adjudication prompt and saved outcome honor explicit consumable for a new pastry kind',async()=>{
+ const s=await scenario({objects:[{...reviewedStock('pastry','一份新糕點'),kind:'pastry',consumable:true}],adjustReply:()=>({status:'accepted',completionMinutes:15,effects:[{kind:'consume',objectId:'pastry',expectedRevision:1}],check:null})});
+ try{s.choose({...proposal('pastry'),content:'品嘗這份糕點',purpose:'食用'});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const w=await s.read();assert.equal(w.objects[0].lifecycle,'consumed');const instruction=s.inputs.find(input=>input.contractVersion==='world-adjudication.v1').effectRules.find(rule=>rule.startsWith('consume：'));assert.match(instruction,/consumable/);assert.match(instruction,/缺.*food/);assert.doesNotMatch(instruction,/僅 food/);assert.deepEqual(store.snapshot().objects,w.objects);}finally{s.restore();}
+});
+
+test('a real new formed source restores a finite material method without background replenishment or another routine approval',async()=>{
+ const f=require('./routine-world-programs-fixture.cjs'),p=f.program('shape-stock','把木料製成零件','製作零件',[f.binding('raw','object','local',[],{kind:'timber',sourceRole:'material',sourceSubject:'木料',background:f.bg('普通木料','timber')})],[f.phase(15,[{kind:'materialize',supplyId:'$raw-supply',expectedRemaining:0},f.form('木製零件','component',[],'raw')])]);
+ const reply=f.approval([p],'shape-stock','零件'),s=await scenario({objects:[{...reviewedStock('last-timber','最後一份木料'),kind:'timber'},{...reviewedStock('new-branch','另一份樹枝'),kind:'branch'}],adjustReply:()=>reply});
+ try{
+  const shape={...proposal('cafe'),content:'把木料製成零件',purpose:'製作零件'},advance=async action=>{s.choose(action);const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return s.read();};
+  await advance(shape);let w=await advance(shape);assert.equal(w.objects.filter(o=>o.kind==='component').length,1);assert.deepEqual(s.counts(),{npc:2,adjudication:1});
+  s.reply({status:'accepted',completionMinutes:15,check:null,effects:[{kind:'form',version:1,operation:'transform',access:'authorized',inputs:[{objectId:'new-branch',expectedRevision:1,quantity:{amount:1,unit:'item'},disposition:'consumed'}],outputs:[{id:'fresh-timber',label:'新取得木料',kind:'timber',consumable:false,quantity:{amount:1,unit:'item'},state:[]}],reason:'把確實存在的另一份樹枝鋸成木料。'}]});
+  w=await advance({...proposal('new-branch'),content:'鋸開這份樹枝作木料',purpose:'準備材料'});assert.equal(w.objects.find(o=>o.id==='new-branch').lifecycle,'consumed');s.reply(reply);
+  w=await advance(shape);assert.equal(w.objects.filter(o=>o.kind==='component').length,2);assert.equal(w.objects.find(o=>o.id==='fresh-timber').lifecycle,'consumed');assert.equal(w.supplies?.length||0,0);assert.deepEqual(s.counts(),{npc:4,adjudication:2});assert.ok(w.objects.find(o=>o.id==='fresh-timber').sources.some(source=>source.id==='new-branch'));assert.deepEqual(store.snapshot().objects,w.objects);
+ }finally{s.restore();}
+});
+
+test('a destroyed finite source stays destroyed while unrelated stock at another place does not forbid confirmed local background',async()=>{
+ const f=require('./routine-world-programs-fixture.cjs'),p=f.program('shape-stock','把木料製成零件','製作零件',[f.binding('raw','object','local',[],{kind:'timber',sourceRole:'material',sourceSubject:'木料',background:f.bg('普通木料','timber')})],[f.phase(15,[{kind:'materialize',supplyId:'$raw-supply',expectedRemaining:0},f.form('木製零件','component',[],'raw')])]);
+ for(const mode of ['destroyed','other-place']){
+  const stock={...reviewedStock('known-timber','一份已知木料'),kind:'timber',...(mode==='other-place'?{region:'kris-home-main',holder:null}:{quantity:{amount:2,unit:'item'}})},reply=f.approval([p],'shape-stock','零件'),s=await scenario({objects:[stock],adjustReply:()=>reply});
+  try{
+   const shape={...proposal('cafe'),content:'把木料製成零件',purpose:'製作零件'},advance=async action=>{s.choose(action);const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return s.read();};
+   let w=await advance(shape);assert.equal(w.objects.filter(o=>o.kind==='component').length,1);
+   if(mode==='destroyed'){
+    const timber=w.objects.find(o=>o.id==='known-timber');s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'physical',version:1,operation:'destroy',objectId:timber.id,expectedRevision:timber.revision,reason:'這次外在活動損毀剩下的木料。'}],check:null});
+    await advance({...proposal(timber.id),content:'損毀剩下木料',purpose:'破壞'});s.reply(reply);w=await advance(shape);assert.equal(w.objects.find(o=>o.id===timber.id).lifecycle,'destroyed');assert.equal(w.objects.filter(o=>o.kind==='component').length,1);assert.equal(w.supplies?.length||0,0);assert.deepEqual(s.counts(),{npc:3,adjudication:2});
+   }else{assert.equal(w.objects.find(o=>o.id==='known-timber').lifecycle,'active');assert.equal(w.supplies.length,1);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}
+   assert.deepEqual(store.snapshot().objects,w.objects);
+  }finally{s.restore();}
+ }
+});
+
+test('an unrelated concrete cake does not block newly confirmed ordinary tea-leaf background',async()=>{
+ const f=require('./routine-world-programs-fixture.cjs'),p=f.program('prepare-tea','用普通茶葉製成茶飲','飲用',[f.binding('raw','object','local',[],{kind:'food',sourceRole:'material',sourceSubject:'茶葉',background:f.bg('普通茶葉','food')})],[f.phase(15,[{kind:'materialize',supplyId:'$raw-supply',expectedRemaining:0},f.form('一份茶飲','drink',[],'raw')])]);
+ const s=await scenario({objects:[reviewedStock('unrelated-cake','最後一份蛋糕')],adjustReply:()=>f.approval([p],'prepare-tea','茶葉')});try{s.choose({...proposal('cafe'),content:'用普通茶葉製成茶飲',purpose:'飲用'});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const w=await s.read();assert.equal(w.objects.filter(o=>o.kind==='drink').length,1);assert.equal(w.objects.find(o=>o.id==='unrelated-cake').lifecycle,'active');assert.deepEqual(s.counts(),{npc:1,adjudication:1});assert.deepEqual(store.snapshot().objects,w.objects);}finally{s.restore();}
+});
+
+test('physical material binding preserves finite supply ownership while normalizing symbolic remaining',async()=>{
+ const f=require('./routine-world-programs-fixture.cjs'),forming=f.form('一份茶飲','drink');forming.access='physical';
+ const p=f.program('physical-tea','擅用眼前茶葉製成茶飲','飲用',[f.binding('raw','supply','local',[],{kind:'food',access:'physical',sourceRole:'material',sourceSubject:'茶葉'})],[f.phase(15,[{kind:'physical',version:1,operation:'materialize',supplyId:'$raw',expectedRemaining:0,reason:'自行取用眼前茶葉，沒有取得物主許可。'},forming])]);
+ const s=await scenario({objects:[],adjustWorld:w=>{w.supplies=[{id:'owned-leaf',label:'最後一份茶葉',kind:'food',region:'cafe-front',owner:'cass',knownTo:['owner'],allowedTo:['cass'],remaining:1,initialState:{},quantity:{amount:1,unit:'item'},consumable:false}];},adjustReply:()=>f.approval([p],'physical-tea','茶葉')});
+ try{s.choose({...proposal('cafe'),content:'擅用眼前茶葉製成茶飲',purpose:'飲用'});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const w=await s.read();assert.equal(w.objects.filter(o=>o.kind==='drink').length,1);assert.equal(w.supplies[0].remaining,0);assert.deepEqual(w.supplies[0].allowedTo,['cass']);assert.equal(w.supplies.length,1);assert.equal(w.objects.find(o=>o.kind==='food').owner,'cass');assert.ok(w.objects.find(o=>o.kind==='food').unpermittedCount>0);assert.deepEqual(store.snapshot().objects,w.objects);}finally{s.restore();}
 });

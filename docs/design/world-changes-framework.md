@@ -62,8 +62,17 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 
 物件／供應／身體身份及環境target是`$role`；移動目的地／guard.region可明示既有地圖固定區域，仍驗相鄰可達；expectedRevision／expectedRemaining只能0佔位。綁定先檢查當前可知本地、active、物理位置／持有、必要state及quantity，再於server-only階段metadata中保存物理連續性，正式執行前重新綁當前revision。模型不能提交此metadata。新form／separate成果每活動fresh ID，杯子只作vessel關聯，物主許可與physical承接各自明示。自然安排沿#150，不另加計時器。
 
-背景須模型明示kind／consumable／quantity／initialState逐鍵exposure與material或equipment用途，material須有非空sourceSubject確認來源主題。已知有限同類及當前指定對象優先；木料等新kind沿同kind來源；food與既有food相容來源依該明示主題在已知label／material／category比對，茶原料與蛋糕等餐點分開，不沿legacy食材regex作永久內容邊界。耗盡不改名補回，背景具體化與形成分開，先取得active原料再form扣量；hidden metadata保存到新物件。
+背景須模型明示kind／consumable／quantity／initialState逐鍵exposure與material或equipment用途，material須有非空sourceSubject確認來源主題。已知有限同類及當前指定對象優先；木料等新kind沿同kind來源；food與既有food相容來源依該明示主題在已知label／material／category比對，茶原料與蛋糕等餐點分開，不沿legacy食材regex作永久內容邊界。object、supply與背景候選阻擋共用同一材料資格，無關蛋糕不會代替或阻擋茶葉。耗盡不改名補回，背景具體化與形成分開，先取得active原料再form扣量；hidden metadata保存到新物件。
 
 方法最多8個核准別名，server另保留首次原長句（最多9），以有界精確content／purpose重用，不另問classifier。各scope保存不覆寫，相同方法多scope逐一驗當前條件。相關subset不符才走既有有界新裁定；已知有限障礙安全回饋而不反覆付費。已學方法投影不是當前可行性清單，hidden-only改變不藉方法有無洩漏；物件NPC投影不含權威revision。v3骰子足跡採相關state subset與物理／份量事實，無關改變不洗骰。
 
 候選32KiB UTF-8、8程序×8角色、4階段／4效果／5分支沿共用上限；字數與位元組分開處理，並非保證所有最大值可同時塞入。舊候選8192字保持。僅routineOffer裁定的server輸出上限12000 tokens，NPC不變；已知累計budget非費用／token預約，單call超過剩餘門檻的幅度可能增加。receipt64KiB及診斷snapshot上限不增，程序完整shape與本次audit引用／變更規則優先保存，舊receipt不追補。工程及真UI證據見[#151驗證](../verification/world-routine-151-2026-10-21.md)。
+
+
+### Review 修復：有限來源與背景邊界（2026-10-21）
+
+背景 fallback 先檢查可知的同場所具體來源，包含 consumed、destroyed 與移至同場所其他區域的當前物件事實，不把來源已不 active 解讀為背景可重生。不同場所的無關既存物件不封鎖本地普通背景。
+
+成功編譯且實際綁定有限來源、又有 background 替代選項時，引擎在該場所規則保存 server-only `finiteSourceBindings`：最多 8 個 operation、每項最多 8 個 role。這個約束防止該來源被帶往其他場所後原規則憑背景補回；可操作的新 active 來源仍優先，可正常恢復。它不複製物件歷史，不由讀取補建，不修改舊 receipt，也不把無關場所資料累積進規則。直接來自既有 renewable background 的物件不建立有限約束，因此同杯清洗後再次泡茶仍能重用。
+
+模型 wire 不接受 `finiteSourceBindings`；NPC 輸入不含該內部欄位。新操作的有界 observer evidence 在 result.rules 投影該欄位，與被確認的 background/role 一起解釋為何不能 fallback，仍受既有 evidence 大小與遮蔽限制。材料主題延用既有 schema：legacy food 按 label/material/category 比對確認主題，新 kind 按確認類別匹配，沒有把通用世界種類重新限制為 food。

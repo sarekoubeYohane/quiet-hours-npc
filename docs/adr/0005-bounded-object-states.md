@@ -38,3 +38,6 @@ status: accepted
 相容與回退：新讀取器承接舊世界，讀取不補狀態、來源、份量或確認歷史。寫入新版曝光、份量、自然安排及日常程序後，舊 binary 不理解完整語義，尤其不能保證 hidden 狀態投影；因此資料寫入後的回退須保留新版讀取／執行能力，不能丟欄位或重置。此為發布前應評估的單向資料語義，不表示本輪已部署或改動正式世界。
 
 #151工程落實：新增明示symbolic日常程序v3，重用共用外在效果、來源／份量及自然安排；不以舊drink／wash後果推導新規則。選定當前角色及必要subset後由server重綁版本，新成果fresh身份；舊v1/v2不升格。8個模型核准方法另保留本次原句，同句多scope保留各自範圍。這避免六動詞成永久能力邊界，代價是未知新措辭仍需要既有一次裁定，且32KiB候選與12000輸出tokens只是有限容量。預算仍檢查已知累計而非預約，單次超越剩餘門檻的幅度可能增加。NPC方法投影表示已學知識，不洩漏hidden可行性；權威revision只供執行及觀察者。具體契約／fixture狀態見[工程契約](../design/world-changes-framework.md)與[#151驗證](../verification/world-routine-151-2026-10-21.md)，不代表部署或正式站通過。
+
+
+Review 工程補充：有限具體來源與普通背景的取捨以當前已保存物件及有界 server-only 規則角色約束保存。成功綁定有限來源後，不因耗盡、損毀或移走便用背景重生；真正新 active 來源仍能接續。每規則最多 8 operation × 8 role，不補舊歷史或舊證據；observer 可看新操作的約束事實，NPC 不接收內部標記。詳見[工程範圍](../design/world-changes-framework.md)與[review 修復證據](../verification/world-changes-review-fixes-2026-10-21.md)。

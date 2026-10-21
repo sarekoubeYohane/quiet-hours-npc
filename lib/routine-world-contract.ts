@@ -35,10 +35,10 @@ export function matchesRoutineMethod(method:RoutineMethod,action:{content?:strin
  return normalizeRoutineMethod(action.content||'')===normalizeRoutineMethod(method.content)&&(action.purpose||'').trim()===method.purpose.trim();
 }
 const symbol=(value:unknown):value is string=>typeof value==='string'&&/^\$[a-z][a-z0-9-]{0,39}$/u.test(value);
-function normalizeRevisions(value:unknown):unknown {
- if(Array.isArray(value))return value.map(normalizeRevisions);
+function normalizeExecutionPlaceholders(value:unknown):unknown {
+ if(Array.isArray(value))return value.map(normalizeExecutionPlaceholders);
  if(!value||typeof value!=='object')return value;
- return Object.fromEntries(Object.entries(value).map(([key,entry])=>[key,key==='expectedRevision'?1:normalizeRevisions(entry)]));
+ return Object.fromEntries(Object.entries(value).map(([key,entry])=>[key,key==='expectedRevision'||key==='expectedRemaining'?1:normalizeExecutionPlaceholders(entry)]));
 }
 export function validateRoutineWorldPrograms(programs:unknown,timings:{operation:string;minutes:number}[]):asserts programs is RoutineWorldProgram[]{
  if(!Array.isArray(programs)||!programs.length||programs.length>routineWorldLimits.maxPrograms||programs.length!==timings.length||new Set(programs.map(program=>program?.operation)).size!==programs.length)throw Error('通用日常程序須完整涵蓋確認範圍。');
@@ -78,7 +78,7 @@ export function validateRoutineWorldPrograms(programs:unknown,timings:{operation
      if(e.kind==='form'){for(const output of e.outputs){if(!symbol(output.id)||declared.has(output.id.slice(1)))throw Error('日常形成須宣告新的成果角色。');declared.add(output.id.slice(1));}}
      if(e.kind==='separate'){if(!symbol(e.outputId)||declared.has(e.outputId.slice(1)))throw Error('日常細分須宣告新的成果角色。');declared.add(e.outputId.slice(1));}
      walk(e);if(refs.some(role=>!declared.has(role)))throw Error('通用日常引用未宣告角色。');
-     parseEffectCandidate(JSON.stringify({status:'accepted',effects:[normalizeRevisions(e)],check:null}));
+     parseEffectCandidate(JSON.stringify({status:'accepted',effects:[normalizeExecutionPlaceholders(e)],check:null}));
     }
     for(const condition of phase.preconditions as StateCondition[])if(!symbol(condition.target.id)||!declared.has(condition.target.id.slice(1))||condition.state.some(entry=>entry.key==='vessel'&&entry.value!==null&&(!symbol(entry.value)||!declared.has(entry.value.slice(1))))||condition.guard?.holder.check&&condition.guard.holder.value!==null&&(!symbol(condition.guard.holder.value)||!declared.has(condition.guard.holder.value.slice(1))))throw Error('日常條件引用未宣告角色。');
    }
