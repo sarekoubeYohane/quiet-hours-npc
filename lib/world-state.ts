@@ -64,6 +64,8 @@ export function stateConditionsHold(w:World,conditions:StateCondition[]):boolean
 // Preserve live character/plan references owned by the activity lifecycle.
 export function commitWorldChanges(w:World,clone:World):void {
  w.objects=clone.objects;w.supplies=clone.supplies;w.scene=clone.scene;
+ if(clone.naturalChangesDropped!==undefined)w.naturalChangesDropped=clone.naturalChangesDropped;else delete w.naturalChangesDropped;
+ if(clone.naturalChanges)w.naturalChanges=clone.naturalChanges;else delete w.naturalChanges;
  for(const actor of w.characters){
   const next=clone.characters.find(c=>c.id===actor.id)!;
   if(next.physical)actor.physical=next.physical;else delete actor.physical;
@@ -76,4 +78,17 @@ export function knownExternalState(bag:PhysicalState|undefined,subject=false):{s
  if(!bag)return;
  const state=Object.fromEntries(Object.entries(bag.state).filter(([key])=>bag.exposure?.[key]==='public'||subject&&bag.exposure?.[key]==='subject'));
  return Object.keys(state).length?{state}:undefined;
+}
+
+// Shared object relations are checked after a whole batch, including nature.
+export function worldObjectContinuityProblem(w:World,touched:ReadonlySet<string>):{message:string;objectId:string}|undefined {
+ for(const drink of w.objects||[]){
+  if(!drink.state.vessel||(!touched.has(drink.id)&&!touched.has(drink.state.vessel)))continue;
+  const vessel=w.objects?.find(o=>o.id===drink.state.vessel);
+  const separated=drink.lifecycle==='active'&&(!vessel||vessel.id===drink.id||vessel.lifecycle!=='active'||vessel.region!==drink.region||vessel.holder!==drink.holder||vessel.state.contents!==drink.state.beverage);
+  const activeServings=(w.objects||[]).filter(object=>object.lifecycle==='active'&&object.state.vessel===drink.state.vessel);
+  const replacement=activeServings.some(object=>object.id!==drink.id&&object.state.beverage===vessel?.state.contents);
+  const terminalStillFull=drink.lifecycle!=='active'&&touched.has(drink.id)&&vessel&&vessel.state.contents===drink.state.beverage&&!replacement;
+  if(separated||terminalStillFull||activeServings.length>1)return {message:'飲品與容器的結果不一致。',objectId:drink.id};
+ }
 }

@@ -51,3 +51,6 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-
 #147：`browser147.mjs` 以真 WorldApp／API／SQLite 驗證已借用杯子的失敗損毀、從另一在場持有人未經許可拿取、同杯新狀態、事前許可歷史、重載及 UI 原 ID 重送。模型回覆／D20 為明示 fixture，3 NPC＋3 裁定＋1 骰，不是正式站驗收；結果輸出 `docs/verification/assets/world-physical-147/`。
 
 `browser149.mjs` 使用真實 WorldApp／世界 API／SQLite 驗證 aggregate 分拆、按需細分／食用、多來源與共同權利，以及未經許可的物理碎片與來源 history；僅初始世界與模型 transport 為 fixture。六個新回合、重載與 UI 原 ID 重送，輸出 `docs/verification/assets/world-formation-149/`；沒有正式付費模型或正式世界操作。
+
+
+`browser-natural-changes.mjs` 以真WorldApp／API／SQLite驗證冷卻、環境乾燥、條件破壞後恢復仍失效、重載及原ID UI重送。8次推進，8 NPC決策＋5裁定，零付費模型；截圖與篩選證據輸出 `docs/verification/assets/natural-changes/`，並非正式站驗收。

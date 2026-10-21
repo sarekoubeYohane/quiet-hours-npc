@@ -50,3 +50,8 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 形成時不得先 consume 原料再拿已終止物作來源；由 form 自己扣除 active 原料。容器是飲品的關聯，不能當泡茶材料消耗；新 kind／新 beverage 仍驗證杯子與活動中飲品的身份、位置、持有及 contents 一致，同杯不能有重複活動中飲品。同批消耗舊飲品並形成有新來源的新飲品可以成立，不因同款新茶而誤判復活。
 
 形成結果的每個新 state entry 必須明示 `exposure=public|hidden`，保存為物件的 `stateExposure`；既有權威條件與觀察者證據可查 hidden 狀態，NPC 投影沿 #148 共同界線移除它。separate 子件繼承原 stateExposure，materialize 繼承供應的 stateExposure，不能因新身份少了 metadata 而把 hidden 當作舊可公開資料。這不追補舊物件未知的曝光歷史；缺欄位的既有狀態維持原先可讀含義。
+
+
+## #150 自然後續
+
+`schedule-natural@1` 經集中契約、自由活動／結果分支／階段、世界時間、SQLite及分析UI接線，沿共用state writer與物件容器連續性檢查。已到期自然先於NPC slots，新安排從實際提交時間計時；相關條件或future from曾於已提交批次破壞就永久失效。具體上限、15／30分鐘取捨及資訊邊界見[時間語義](natural-changes-time.md)，證據見[#150驗證](../verification/world-natural-150-2026-10-21.md)。

@@ -1,3 +1,5 @@
+import { advanceNaturalChanges } from './natural-changes';
+import { emitExternalConsequences } from './world-effects';
 import { requiresWorldEffects, type EffectCandidate } from './world-effects';
 import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, startActivity } from './activity-lifecycle';
 export { activityDurations, canResumeActivity } from './activity-lifecycle';
@@ -78,6 +80,7 @@ export async function advanceActivities(world: World, options: {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
   world.minute += minutes; world.lastMode = mode;
+  advanceNaturalChanges(world,world.minute,emitExternalConsequences);
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {

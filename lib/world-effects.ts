@@ -1,7 +1,8 @@
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
-import { applyWorldStateChange, worldTargetSnapshot, commitWorldChanges, stateConditionsHold, type StateCondition, type ExternalConsequence } from './world-state';
+import { scheduleNaturalChange, invalidateNaturalChanges, type ScheduleNaturalEffect } from './natural-changes';
+import { applyWorldStateChange, worldTargetSnapshot, commitWorldChanges, stateConditionsHold, worldObjectContinuityProblem, type StateCondition, type ExternalConsequence } from './world-state';
 export { applyBoundedStateChanges, commitWorldChanges } from './world-state';
 import { effectCandidateSchema, effectRules, validObjectKind } from './adjudication-contract';
 import { physicalEffectLimits } from './adjudication-limits';
@@ -24,7 +25,7 @@ export type StateChange={key:string;from:string|null;value:string};
 export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
 export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
 export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation:'materialize';supplyId:string;expectedRemaining:number}|{operation:'take'|'place'|'consume'|'destroy';objectId:string;expectedRevision:number});
-export type Effect=PhysicalEffect|FormationEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
+export type Effect=ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
@@ -48,10 +49,10 @@ export function retainPhysicalHistory(object:WorldObject,c:Character,minute:numb
  if(!permitted)object.unpermittedCount=(object.unpermittedCount||0)+1;
 }
 export function effectReferenceId(effect:Effect):string {
- return effect.kind==='form'?effect.inputs[0].objectId:effect.kind==='change-state'?effect.target.id:'objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId;
+ return effect.kind==='schedule-natural'?effect.effects[0].target.id:effect.kind==='form'?effect.inputs[0].objectId:effect.kind==='change-state'?effect.target.id:'objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId;
 }
 export function effectReferenceIds(effect:Effect):string[] {
- return effect.kind==='form'?effect.inputs.map(input=>input.objectId):[effectReferenceId(effect)];
+ return effect.kind==='schedule-natural'?[...new Set([...effect.conditions.map(condition=>condition.target.id),...effect.effects.map(change=>change.target.id)])]:effect.kind==='form'?effect.inputs.map(input=>input.objectId):[effectReferenceId(effect)];
 }
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
@@ -81,7 +82,7 @@ function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,Phy
  if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
  return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
 }
-function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null):string[]{
+function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number):string[]{
  const results:string[]=[];
  const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
  for(const [effectIndex,original] of effects.entries()){
@@ -91,7 +92,10 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    const id=effectReferenceId(e);
    throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
   };
-  if(e.kind==='form'||e.kind==='separate'){
+  if(e.kind==='schedule-natural'){
+   try{scheduleNaturalChange(w,c,e,nominalDueAt);}catch(error){fail('natural_precondition',error instanceof Error?error.message:'自然變化前提無效。');}
+   results.push('已確認自然後續');
+  }else if(e.kind==='form'||e.kind==='separate'){
    results.push(...applyFormation(e,{world:w,actor:c,hasPermission:hasObjectPermission,canReach:canPhysicallyReachObject,retainPhysical:retainPhysicalHistory,fail}));
   }else if(e.kind==='change-state'){
    const current=worldTargetSnapshot(w,e.target);
@@ -167,18 +171,9 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
  // complete batch so explicit, separately authorized transfers can move both;
  // never manufacture an implicit transfer or recipient consent.
  const touched=new Set([...effects.flatMap(effect=>[...effectReferenceIds(effect),...(effect.kind==='form'?effect.outputs.map(output=>output.id):effect.kind==='separate'?[effect.outputId]:[])]),...(w.objects||[]).filter(object=>!previousIdentities.has(object.id)).map(object=>object.id)]);
- for(const drink of w.objects||[]){
-  if(!drink.state.vessel||(!touched.has(drink.id)&&!touched.has(drink.state.vessel)))continue;
-  const vessel=w.objects?.find(o=>o.id===drink.state.vessel);
-  const active=drink.lifecycle==='active';
-  const separated=active&&(!vessel||vessel.id===drink.id||vessel.lifecycle!=='active'||vessel.region!==drink.region||vessel.holder!==drink.holder||vessel.state.contents!==drink.state.beverage);
-  const activeServings=(w.objects||[]).filter(object=>object.lifecycle==='active'&&object.state.vessel===drink.state.vessel);
-  const replacement=activeServings.some(object=>object.id!==drink.id&&object.state.beverage===vessel?.state.contents);
-  const terminalStillFull=drink.lifecycle!=='active'&&touched.has(drink.id)&&vessel&&vessel.state.contents===drink.state.beverage&&!replacement;
-  if(separated||terminalStillFull||activeServings.length>1){
-   throw new EffectValidationError('飲品與容器的結果不一致。',{reason:'vessel_continuity',phaseIndex,objectId:drink.id});
-  }
- }
+ const problem=worldObjectContinuityProblem(w,touched);
+ if(problem)throw new EffectValidationError(problem.message,{reason:'vessel_continuity',phaseIndex,objectId:problem.objectId});
+ invalidateNaturalChanges(w);
  return results;
 }
 function canonical(value:unknown):unknown {return Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,val])=>[key,canonical(val)])):value;}
@@ -231,7 +226,7 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
 export function validateResultBranches(w:World,c:Character,candidate:EffectCandidate):void {
  for(const branch of candidate.branches||[]){const clone=structuredClone(w),actor=clone.characters.find(actor=>actor.id===c.id)!;commitFreeAction(clone,actor,{...candidate,branches:undefined,check:null,effects:branch.effects,stages:branch.stages});}
 }
-export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action):boolean{
+export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt:number}):boolean{
  if(candidate.branches){
   validateResultBranches(w,c,candidate);
   if(!action)throw Error('結果分支缺少活動對象。');
@@ -270,7 +265,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  };
  // Validate complete effects on a copy before randomness or any world mutation.
  const clone=structuredClone(w),actor=clone.characters.find(x=>x.id===c.id)!;
- const results=applyEffects(clone,actor,candidate.effects);
+ const results=applyEffects(clone,actor,candidate.effects,null,context?.nominalDueAt);
  validateResultTime(clone,15);
  const predicted=structuredClone(clone),predictedActor=predicted.characters.find(x=>x.id===c.id)!;
  for(const [phaseIndex,phase] of (candidate.stages||[]).entries()){
@@ -331,7 +326,7 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
 export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
- const results=applyEffects(clone,actor,phase.effects,index);
+ const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined);
  commitWorldChanges(w,clone);
  emitExternalConsequences(w,c.id,phase.effects);
  return results;
@@ -339,8 +334,8 @@ export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,inde
 
 // Only external sensory facts leave the authority batch; reasons stay in receipts.
 export function emitExternalConsequences(w:World,actorId:string,effects:Effect[]):void {
- const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:regions.find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&e.target.type!=='object'?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
+ const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:regions.find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&(e.target.type!=='object'||actorId==='world')?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
  if(!externalChanges.length)return;
  const actor=w.characters.find(c=>c.id===actorId),region=actor?regionOf(actor):externalChanges.find(change=>change.target.type==='environment')?.target.id;
- record(w,actorId,'外在狀況發生變化。','external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges});
+ record(w,actorId,actorId==='world'?'已確認的自然變化發生。':'外在狀況發生變化。',actorId==='world'?'natural':'external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges});
 }

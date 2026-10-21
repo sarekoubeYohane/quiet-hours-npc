@@ -19,7 +19,7 @@ export const adjudicationLimits = {
 } as const;
 export const routineOperations:RoutineOperation[]=['tea','coffee','food','drink','wash','return'];
 
-export const effectKinds={form:'form',separate:'separate',materialize:'materialize',consume:'consume',destroy:'destroy',transfer:'transfer',state:'state',grant:'grant',consent:'consent',changeState:'change-state',physical:'physical',displaceBody:'displace-body'} as const;
+export const effectKinds={form:'form',separate:'separate',materialize:'materialize',consume:'consume',destroy:'destroy',transfer:'transfer',state:'state',grant:'grant',consent:'consent',scheduleNatural:'schedule-natural',changeState:'change-state',displaceBody:'displace-body',physical:'physical'} as const;
 
 export const physicalEffectLimits = {version:1,objectOperations:['take','place','consume','destroy'],maxHistory:16,maxReasonLength:300} as const;
 
@@ -39,3 +39,5 @@ export const stateChangeLimits = {
 } as const;
 
 export const externalStateLimits={targets:['environment','body'],access:'physical',exposures:['public','subject','hidden'],environmentExposures:['public','hidden']} as const;
+
+export const naturalChangeLimits={version:1,minDelay:15,maxDelay:1440,minuteStep:15,maxConditions:4,maxEffects:4,maxPending:32,maxSettled:64} as const;

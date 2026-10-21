@@ -50,7 +50,10 @@ export function eventCandidates(world: World, observer: Character, event: import
   if(event.scene?.externalChanges){
     const clues:SensoryCandidate[]=[];
     for(const consequence of event.scene.externalChanges){
-      if(consequence.target.type==='body'){
+      if(consequence.target.type==='object'){
+        const object=world.objects?.find(item=>item.id===consequence.target.id);
+        if(object&&consequence.exposure==='public'&&(object.holder===observer.id||object.knownTo.includes(observer.id)&&canSee(world,observer,object.region)))clues.push({sense:'sight',kind:'activity',text:`${object.label} 的外在狀況：${consequence.changes.map(change=>`${change.key}：${change.value}`).join('，')}。`,clarity:'clear',region:object.region,direct:true});
+      }else if(consequence.target.type==='body'){
         const target=world.characters.find(c=>c.id===consequence.target.id);if(!target)continue;
         const text=consequence.changes.map(change=>`${change.key}：${change.value}`).join('，');
         if(target.id===observer.id&&consequence.exposure!=='hidden')clues.push({sense:'touch',kind:'activity',text:`自己的身體狀況有變化：${text}。`,clarity:'clear',region:regionOf(target),urgency:'direct',direct:true});
