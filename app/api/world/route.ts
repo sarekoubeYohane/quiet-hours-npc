@@ -1,8 +1,9 @@
+import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
 import { bindRoutine, routineOffer, routineCandidateSchema, parseRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { requiresWorldEffects, cancelActivity, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
+import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
@@ -396,7 +397,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
+              const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:evidence?.observer('adjudication',c.id,config.provider,config.model,key),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});

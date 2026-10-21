@@ -7,7 +7,10 @@ import { createHash } from 'node:crypto';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
-for (const name of ['operation-evidence', 'diagnostic-redaction', 'environment', 'routine-materials', 'routine-obstacles', 'routine-rules', 'acceptance-scene', 'world-effects', 'adjudication', 'model-adapter', 'costs', 'cognition', 'recall', 'recall-services', 'memory', 'world', 'attention', 'perception', 'false-perception', 'd20', 'habits', 'activities', 'models', 'model-keys', 'playbook', 'store', 'auth', 'world-api']) {
+// Load the same top-level runtime library modules as the application. Keeping a
+// second hand-written import graph here lets a real runtime dependency go missing.
+const libraryModules = (await readdir('lib')).filter(name => name.endsWith('.ts')).sort().map(name => name.slice(0, -3));
+for (const name of [...libraryModules, 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
