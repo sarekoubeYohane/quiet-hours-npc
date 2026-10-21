@@ -1,0 +1,164 @@
+{
+  "fixture": true,
+  "npc": 2,
+  "adjudication": 1,
+  "objects": [
+    {
+      "id": "table-a",
+      "label": "第一張桌面",
+      "source": "fixture",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "lifecycle": "active",
+      "kind": "furniture",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "state": {
+        "茶漬": "無",
+        "濕潤": "是"
+      },
+      "stateExposure": {
+        "茶漬": "public",
+        "濕潤": "public"
+      }
+    },
+    {
+      "id": "table-b",
+      "label": "第二張桌面",
+      "source": "fixture",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "lifecycle": "active",
+      "kind": "furniture",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "state": {
+        "茶漬": "無",
+        "濕潤": "是"
+      },
+      "stateExposure": {
+        "茶漬": "public",
+        "濕潤": "public"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "38ea32f2-4deb-4703-a330-437b88322533",
+      "version": 3,
+      "family": "cafe-service",
+      "origin": "cafe",
+      "knownTo": [
+        "owner"
+      ],
+      "operations": [
+        "wipe-table"
+      ],
+      "programs": [
+        {
+          "operation": "wipe-table",
+          "methods": [
+            {
+              "content": "擦桌面",
+              "purpose": "清潔桌面"
+            },
+            {
+              "content": "把桌面擦拭乾淨，保留表面些許水分",
+              "purpose": "清潔桌面"
+            }
+          ],
+          "bindings": [
+            {
+              "role": "surface",
+              "type": "object",
+              "select": "target",
+              "kind": "furniture",
+              "label": null,
+              "state": [
+                {
+                  "key": "茶漬",
+                  "value": "有"
+                }
+              ],
+              "access": "authorized",
+              "link": null,
+              "background": null,
+              "quantity": null,
+              "sourceRole": null,
+              "sourceSubject": null
+            }
+          ],
+          "effects": [],
+          "check": null,
+          "branches": null,
+          "stages": [
+            {
+              "afterMinutes": 15,
+              "preconditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "$surface"
+                  },
+                  "state": [
+                    {
+                      "key": "茶漬",
+                      "value": "有"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "change-state",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "$surface"
+                  },
+                  "expectedRevision": 0,
+                  "access": "authorized",
+                  "exposure": "public",
+                  "changes": [
+                    {
+                      "key": "茶漬",
+                      "from": "有",
+                      "value": "無"
+                    },
+                    {
+                      "key": "濕潤",
+                      "from": null,
+                      "value": "是"
+                    }
+                  ],
+                  "reason": "以清潔用品擦去茶漬，表面留下少量水分。"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "worldSubject": "桌面",
+      "worldTimings": [
+        {
+          "operation": "wipe-table",
+          "minutes": 15
+        }
+      ]
+    }
+  ]
+}

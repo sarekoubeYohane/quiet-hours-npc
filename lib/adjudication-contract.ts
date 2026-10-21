@@ -1,3 +1,4 @@
+import { routineWorldProgramSchema, symbolicEffectSchema, validateRoutineWorldPrograms, routineWorldRules, routineWorldLimits, type RoutineWorldApproval } from './routine-world-contract';
 import type { ScheduleNaturalEffect } from './natural-changes';
 import { formationSchemas, formationRules, validFormationEffect } from './world-formation-contract';
 import type { StateCondition } from './world-state';
@@ -189,21 +190,37 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
  return candidate;
 }
 
-export type RoutineApproval={family:'cafe-service';version:1|2;programs?:RoutineProgram[];operation?:RoutineOperation|null;subject?:string|null;timings:{operation:RoutineOperation;minutes:number}[]};
+export type LegacyRoutineApproval={family:'cafe-service';version:1|2;programs?:RoutineProgram[];operation?:RoutineOperation|null;subject?:string|null;timings:{operation:RoutineOperation;minutes:number}[]};
 // OpenAI strict schemas require an object root and do not support cross-field
 // if/then constraints. Describe the two branches on the supported fields;
 // parseAdjudicationCandidate remains the authority for their joint invariants.
 const legacyRoutineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,completionMinutes:{...effectCandidateSchema.properties.completionMinutes,description:'routine 非 null 時必須為 null，唯一耗時來源是完整 routine.timings；routine=null 的一般完成目標 accepted 時才填正數，denied/unsupported 或開放式時段為 null。'},effects:{...effectCandidateSchema.properties.effects,description:'routine 非 null 的日常核准必須為空陣列；routine=null 的一般 accepted 必須在 effects/stages 提供可執行效果，或用非 null branches 提供受限結果分支，此時頂層 effects/stages 為空。'},stages:{...effectCandidateSchema.properties.stages,description:'routine 非 null 的日常核准必須為空陣列；一般活動階段依完成耗時契約。'},check:{...effectCandidateSchema.properties.check,description:'routine 非 null、denied 或 unsupported 時必須為 null。'},routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:[...routineOperations,null]},subject:{type:['string','null'],maxLength:40},timings:{type:'array',minItems:1,maxItems:routineOperations.length,items:{type:'object',properties:{operation:{type:'string',enum:routineOperations},minutes:{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}},required:['operation','minutes'],additionalProperties:false}}},required:['family','version','operation','subject','timings'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
 const legacyApprovalSchema=legacyRoutineCandidateSchema.properties.routine.anyOf[1];
-export const routineCandidateSchema={...legacyRoutineCandidateSchema,properties:{...legacyRoutineCandidateSchema.properties,routine:{anyOf:[...legacyRoutineCandidateSchema.properties.routine.anyOf,{...legacyApprovalSchema,properties:{...legacyApprovalSchema.properties,version:{type:'integer',enum:[2]},programs:{type:'array',minItems:1,maxItems:routineOperations.length,items:routineProgramSchema}},required:[...(legacyApprovalSchema.required||[]),'programs']}]}}};
+const routineV2CandidateSchema={...legacyRoutineCandidateSchema,properties:{...legacyRoutineCandidateSchema.properties,routine:{anyOf:[...legacyRoutineCandidateSchema.properties.routine.anyOf,{...legacyApprovalSchema,properties:{...legacyApprovalSchema.properties,version:{type:'integer',enum:[2]},programs:{type:'array',minItems:1,maxItems:routineOperations.length,items:routineProgramSchema}},required:[...(legacyApprovalSchema.required||[]),'programs']}]}}};
+const routineWorldApprovalSchema={...legacyApprovalSchema,properties:{...legacyApprovalSchema.properties,version:{type:'integer',enum:[3]},operation:{type:'string',minLength:1,maxLength:60},timings:{type:'array',minItems:1,maxItems:routineWorldLimits.maxPrograms,items:variant({operation:{type:'string',minLength:1,maxLength:60},minutes:{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}})},programs:{type:'array',minItems:1,maxItems:routineWorldLimits.maxPrograms,items:routineWorldProgramSchema}},required:[...(legacyApprovalSchema.required||[]),'programs']};
+export const routineCandidateSchema={...routineV2CandidateSchema,$defs:{...routineV2CandidateSchema.$defs,routineEffect:symbolicEffectSchema(effectSchema),routineCondition:symbolicEffectSchema({anyOf:[stateConditionSchema,guardedStateConditionSchema]})},properties:{...routineV2CandidateSchema.properties,routine:{anyOf:[...routineV2CandidateSchema.properties.routine.anyOf,routineWorldApprovalSchema]}}};
+export type RoutineApproval=LegacyRoutineApproval|RoutineWorldApproval;
 export type AdjudicationCandidate = {kind:'routine';approval:RoutineApproval}|{kind:'effects';candidate:EffectCandidate};
-export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:readonly RoutineOperation[]}={}):AdjudicationCandidate {
- if(raw.length>adjudicationLimits.maxCandidateLength)throw Error('裁定候選超出容量。');
+export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:readonly string[];allowGenericMethods?:boolean}={}):AdjudicationCandidate {
+ if(new TextEncoder().encode(raw).byteLength>routineWorldLimits.maxCandidateBytes)throw Error('裁定候選超出容量。');
  const parsed=JSON.parse(raw),approval=parsed?.routine;
+ if(approval?.version!==3&&raw.length>adjudicationLimits.maxCandidateLength)throw Error('裁定候選超出容量。');
  if(approval!=null&&parsed.branches===null)delete parsed.branches;
  if(approval!=null&&parsed.completionMinutes!==undefined){if(parsed.completionMinutes!==null)throw Error('日常耗時須由整組規則確認。');delete parsed.completionMinutes;}
  if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;return {kind:'effects',candidate:parseEffectCandidate(JSON.stringify(parsed))};}
  const approvalKeys=approval&&typeof approval==='object'?Object.keys(approval).sort().join(','):'';
+ if(approval?.version===3){
+  if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||approvalKeys!=='family,operation,programs,subject,timings,version'||approval.family!=='cafe-service'||typeof approval.operation!=='string'||!approval.operation.trim()||approval.operation.length>60||approval.subject!==null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40)||!Array.isArray(approval.timings)||!approval.timings.length||approval.timings.length>routineWorldLimits.maxPrograms||new Set(approval.timings.map((time:{operation:unknown})=>time?.operation)).size!==approval.timings.length)throw Error('通用日常核准格式無效。');
+  for(const time of approval.timings){if(!exact(time,['operation','minutes'])||typeof time.operation!=='string'||!time.operation.trim()||time.operation.length>60)throw Error('通用日常耗時格式無效。');scheduleCompletionMinutes(time.minutes);}
+  const offered=scope.routineOperations;
+  if(offered){
+   if(offered.includes(approval.operation)){if(approval.timings.length!==offered.length||approval.timings.some((time:{operation:string})=>!offered.includes(time.operation)))throw Error('日常範圍須完整涵蓋本次允許活動。');}
+   else if(!scope.allowGenericMethods||approval.timings.length!==1||approval.timings[0].operation!==approval.operation)throw Error('新日常方法未在本次允許範圍。');
+  }
+  validateRoutineWorldPrograms(approval.programs,approval.timings);
+  return {kind:'routine',approval:approval as RoutineWorldApproval};
+ }
+
  if(approval?.version===2){
   if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||approvalKeys!=='family,operation,programs,subject,timings,version'||approval.family!=='cafe-service'||!Array.isArray(approval.timings))throw Error('日常模型程序核准格式無效。');
   validateRoutinePrograms(approval.programs,approval.timings);
@@ -218,8 +235,8 @@ export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:
 
 export function adjudicationRules(routinePrograms:boolean):string[]{
  return [
-      ...(routinePrograms?routineProgramRules:[]),
-      `只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，依 version=2 程序契約確認一個模板 operation、subject、完整timings與programs。version=1空效果核准僅供舊候選相容，不用於新確認。兩版日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多${adjudicationLimits.maxMinutes}；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊${adjudicationLimits.minuteStep}分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。`,
+      ...(routinePrograms?[...routineProgramRules,...routineWorldRules]:[]),
+      `只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，可依 version=2 舊程序或優先 version=3 通用程序確認本次 operation、subject、完整timings與programs；v3新方法在明示genericMethods受限範圍內一次確認。version=1空效果核准僅供舊候選相容，不用於新確認。日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源；v1/v2與v3使用原operation時必須恰好涵蓋 routineOffer.operations 各一次，v3 generic新方法則只列自己的operation一次，每項 {operation,minutes} 為正數且至多${adjudicationLimits.maxMinutes}；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊${adjudicationLimits.minuteStep}分鐘。v1/v2 subject 選模板 subjects；v3 subject 明示本次有界主題，餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。未確認的特殊方法、大量規模、代他人授權與強制交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。`,
       '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
  ];
 }

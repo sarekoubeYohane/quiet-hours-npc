@@ -69,7 +69,7 @@ export function validateRoutinePrograms(programs:unknown,times:{operation:Routin
 }
 
 export const routineProgramRules = [
- '新日常核准使用 routine.version=2：family、operation、subject、timings 沿日常範圍，另提供 programs，恰好涵蓋 routineOffer.operations 各一次。頂層 accepted、check=null、effects=[]、stages=[]、branches=null、completionMinutes=null；時間唯一來自 timings。version=1 的空效果程序只是舊契約相容，不表示模型確認了效果。',
+ '舊範圍的模型日常候選 routine.version=2：family、operation、subject、timings 沿日常範圍，另提供 programs，恰好涵蓋 routineOffer.operations 各一次。頂層 accepted、check=null、effects=[]、stages=[]、branches=null、completionMinutes=null；時間唯一來自 timings。version=1 的空效果程序只是舊契約相容，不表示模型確認了效果。',
  `不確定日常program={operation,effects:[],stages:[],check:{difficulty:${adjudicationLimits.difficulties.join("|")},ability},branches}，branches為1至${adjudicationLimits.maxBranches}組{outcomes,effects,stages}，outcomes恰好涵蓋${outcomes.join("/")}各一次，多級可共用；分支內effects是準備。成功須含完整合法成果；部分或失敗可僅消耗/留下water等合法中間成果，空分支仍花確認時間。失敗不生成完整茶或食物。程式用原D20選分支，規則不存骰值。確定program可check=null、branches=null沿effects/stages，或一組全部級別。`,
  `每項確定 program={operation,effects,stages,check:null,branches:null}；此program內的effects是最多${adjudicationLimits.maxEffects}項起始準備（不等於routine=null自由分支的頂層最終成果），完整食物或飲品只能列在最後stages，不能提前產生成品；階段={afterMinutes,effects}，${adjudicationLimits.minuteStep}分鐘遞增，最多${adjudicationLimits.maxStages}階段，最後階段等於該項timing向上對齊${adjudicationLimits.minuteStep}分鐘。只確認有意義時點與既有 materialize/consume/transfer/state 效果，不產生程式、ID、revision、任意patch或新能力；程式綁定當前合法角色並檢查每階段前提。`,
  '符號角色：vessel為本次合法杯子，vesselSupply是確有需要時的合法杯子供應；materialSupply/material為明確原料供應/該份原料，沒有明確原料時為核准背景；productSupply為此次合法成品供應，drink為杯內當前飲品。選用當前物件/供應由程式按權限及短缺處理，規則不保存歷史ID。可選供應未綁定時略過其步驟；transfer到actor已持有時略過；state已是所需值時略過，clean未宣告時略過。這些略過不放寬缺貨、特定杯子、工具、知情或使用權。',

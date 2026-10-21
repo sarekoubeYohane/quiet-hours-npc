@@ -4,19 +4,19 @@
 
 ## #146 已接通的物件狀態
 
-`change-state` 的封閉欄位為 `version:1`、`access:authorized`、`target:{type:object,id}`、`expectedRevision`、`changes:[{key,from,value}]` 及 `reason`。`from:null` 表示原本不存在該鍵；字串表示當前必須仍等於該值。執行時仍檢查當前引用、active、知情、可見、本地、持有與使用條件。每項效果只增加一次物件版本，不改身份、來源、歸屬或生命週期；理由留在觀察者操作證據。
+物件 `change-state` 的封閉欄位為 `version:1`、`access:authorized|physical`、`target:{type:object,id}`、`expectedRevision`、`changes:[{key,from,value}]`、`exposure:public|hidden` 及 `reason`。`from:null` 表示原本不存在該鍵；字串表示當前必須仍等於該值。執行時仍檢查當前引用、active、知情、可見及本地；authorized 另驗持有與使用許可，physical 的邊界見 #147。每項效果只增加一次物件版本，不改身份、來源、歸屬或生命週期；理由留在觀察者操作證據。
 
 共同限制位於 `adjudication-limits`：每項至多 4 個變化，單狀態袋至多 16 鍵、4096 UTF-8 bytes，key 至多 60 字、value 至多 100 字、理由至多 300 字。拒絕重複鍵、prototype 鍵及核心身份／位置／來源／數量／許可欄位。每次候選仍受 8192 字、4 效果、4 階段、5 結果分支與原有時間上限約束。類別是至多 60 字的非空簡單字串；`food`／`utensil` 既有意義保持，類別本身不授予食用等能力。
 
 提示、schema、純候選解析使用同一限制。解析不接收可變世界；活動效果在副本驗證所有分支後，才沿既有 D20、階段、原子保存與重送執行。未選分支沒有狀態成果。新狀態可列入既有階段前提；舊前提的版本語義不被靜默改成弱比較。
 
-一般世界的「日常規則與成果」顯示完整物件狀態及來源。新操作證據在原 64 KiB／深度／遮蔽界線內，增加 `stateEntries` 與變更物件 `beforeObjects`；不重寫舊 journal、不把裁定理由加入 NPC 敘述。
+一般世界的「日常規則與成果」顯示完整物件狀態及來源。新操作證據維持 64 KiB 與遮蔽界線，增加 `stateEntries` 與變更物件 `beforeObjects`；v3 巢狀形成／自然效果所需的投影深度由 v2 的 11 增至有界的 14，仍明示截短，不重寫舊 journal、不把裁定理由加入 NPC 敘述。
 
 失敗診斷的 `inputProjection.version=1` 保留動態情境與契約版本，明示省略 repository 內的靜態規則／schema；不承諾在失敗快照重複保存完整 prompt。超界動態資料標為截短並維持合法 JSON，沿用既有 input 9000 字、candidate 8192 字與診斷整體 24000 字上限。
 
-## 後續工作
+## 交付與相容狀態
 
-#147 已接通下節的物理操作與物主許可分離；#148 負責環境／身體與相關條件；#149 負責形成／來源／數量／分拆；#150 負責自然變化；#151 負責新日常程序與整合驗收。本文件目前宣稱 #146、#147 已接通；其餘能力仍由後票交付。
+#146–#151 已接通正式自由活動、通用日常程序、效果、保存及既有畫面；整合獨立review及正式站驗收另記。各票已驗證範圍及最終完整回歸以[整合報告](../verification/world-changes-integration-2026-10-21.md)為準，不能以單票通過宣稱正式站驗收。
 
 相容策略是新增能力、保留舊資料；不自動重置、修改舊杯能力或補造歷史。舊 `state` 仍要求 `stateTransitions`。新裁定才能選擇新通用效果，不能把舊核准或舊證據推定為已確認的新狀態。
 
@@ -43,7 +43,7 @@
 
 quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源扣至零，按模型明示的 `disposition=consumed|destroyed` 保存終止事實，不以動作名稱或食物／器具分類猜測。每批總產量亦至多 1,000,000；全部輸入輸出同單位時，總產量不可大於消耗量。跨單位的合理轉化由天上意志確認，程式不聲稱驗證化學質量守恆。新的 kind 可以是一般材料、糕點或碎片；新成果的 `consumable` 明示布林優先，只有舊資料缺欄時才以原 food 語義相容。
 
-`source` 舊欄保留，新的 `sources` 保存最多 8 筆直接來源及當時版本／用量／單位／所有者；多層形成沿來源身份鏈查回，沒有複製整棵歷史。新產物 id 必須未被任何現有物件或供應使用，不能復活舊物。新物件來源、份量及形成事實從真正操作起保存；舊物件在讀取時不補 quantity、sources 或歷史模型確認，首次新操作把缺量的舊單件按 `1 item` 承接。新日常程序須每次重綁當前來源及 fresh 產物身份，不能重播首次 ID。
+`source` 舊欄保留，新的 `sources` 保存最多 8 筆直接來源及當時版本／用量／單位／所有者；多層形成沿來源身份鏈查回，沒有複製整棵歷史。新產物 id 必須未被任何現有物件、供應、角色、區域或場所使用，不能復活舊物或使目標引用含糊。新物件來源、份量及形成事實從真正操作起保存；舊物件在讀取時不補 quantity、sources 或歷史模型確認，首次新操作把缺量的舊單件按 `1 item` 承接。新日常程序須每次重綁當前來源及 fresh 產物身份，不能重播首次 ID。
 
 共同來源權利以 `coOwners` 保存全部來源權利人；舊 `owner` 欄仍供主展示與相容，不代表其他權利人被抹掉。使用權採各來源既有權利集合交集，共有物件不能僅因 actor 等於主 owner 就繞過；單一角色的 grant 不會代其餘共有人同意。`access=physical` 承接可行情境下的未經許可分拆／轉化及他人持有來源，仍保留知情、可達、active、版本、數量及世界隔離；沿 #147 的共同有界 history 保存每個來源的事前許可及持有，成果／子件不複製來源自行經歷。
 
@@ -55,3 +55,15 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 ## #150 自然後續
 
 `schedule-natural@1` 經集中契約、自由活動／結果分支／階段、世界時間、SQLite及分析UI接線，沿共用state writer與物件容器連續性檢查。已到期自然先於NPC slots，新安排從實際提交時間計時；相關條件或future from曾於已提交批次破壞就永久失效。具體上限、15／30分鐘取捨及資訊邊界見[時間語義](natural-changes-time.md)，證據見[#150驗證](../verification/world-natural-150-2026-10-21.md)。
+
+## #151 明示通用日常程序
+
+`routine.version=3` 在既有首次裁定確認明示methods、bindings、timings及共用效果stages／五段branches。角色種類object／supply／body／environment；選擇target／local／actor／here／linked，使用必要state subset、quantity、sourceRole及來源sourceSubject。新operation是模型確認的資料scope，不增加動作handler；既有角色／場所可提供genericMethods供新方法確認，原六項operation仍須完整涵蓋原offer。v1/v2保留原義，不以讀取自動升格。
+
+物件／供應／身體身份及環境target是`$role`；移動目的地／guard.region可明示既有地圖固定區域，仍驗相鄰可達；expectedRevision／expectedRemaining只能0佔位。綁定先檢查當前可知本地、active、物理位置／持有、必要state及quantity，再於server-only階段metadata中保存物理連續性，正式執行前重新綁當前revision。模型不能提交此metadata。新form／separate成果每活動fresh ID，杯子只作vessel關聯，物主許可與physical承接各自明示。自然安排沿#150，不另加計時器。
+
+背景須模型明示kind／consumable／quantity／initialState逐鍵exposure與material或equipment用途，material須有非空sourceSubject確認來源主題。已知有限同類及當前指定對象優先；木料等新kind沿同kind來源；food與既有food相容來源依該明示主題在已知label／material／category比對，茶原料與蛋糕等餐點分開，不沿legacy食材regex作永久內容邊界。耗盡不改名補回，背景具體化與形成分開，先取得active原料再form扣量；hidden metadata保存到新物件。
+
+方法最多8個核准別名，server另保留首次原長句（最多9），以有界精確content／purpose重用，不另問classifier。各scope保存不覆寫，相同方法多scope逐一驗當前條件。相關subset不符才走既有有界新裁定；已知有限障礙安全回饋而不反覆付費。已學方法投影不是當前可行性清單，hidden-only改變不藉方法有無洩漏；物件NPC投影不含權威revision。v3骰子足跡採相關state subset與物理／份量事實，無關改變不洗骰。
+
+候選32KiB UTF-8、8程序×8角色、4階段／4效果／5分支沿共用上限；字數與位元組分開處理，並非保證所有最大值可同時塞入。舊候選8192字保持。僅routineOffer裁定的server輸出上限12000 tokens，NPC不變；已知累計budget非費用／token預約，單call超過剩餘門檻的幅度可能增加。receipt64KiB及診斷snapshot上限不增，程序完整shape與本次audit引用／變更規則優先保存，舊receipt不追補。工程及真UI證據見[#151驗證](../verification/world-routine-151-2026-10-21.md)。

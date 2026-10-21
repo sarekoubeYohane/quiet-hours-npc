@@ -1,3 +1,4 @@
+import { routineBindingsHold, rebindRoutineEffects, type RoutinePhaseBindings } from './routine-world-bindings';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -28,11 +29,11 @@ export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation
 export type Effect=ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
+export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;requiredTools?:string[]};
 export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
 // Internal only: a trusted routine binder can identify each current vessel/material
 // attempt without storing model-authored IDs or the first historical die in a rule.
-export type TrialBinding={operation:import('./routine-rules').RoutineOperation;subject:string;references:string[]};
+export type TrialBinding={operation:string;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
 export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export function hasObjectPermission(object:{owner:string;allowedTo:string[];coOwners?:string[]},actorId:string):boolean {
@@ -67,7 +68,7 @@ export function discardPendingSupplies(world:World,ids:ReadonlySet<string>):void
 
 const materializedObjectId = (supply: SceneSupply) => `${supply.id}:${supply.background?.sequence??supply.remaining}`;
 export function knownWorldObjects(w:World,c:Character){
- return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:Object.fromEntries(Object.entries(o.state).filter(([key])=>o.stateExposure?.[key]!=='hidden')),revision:o.revision,kind:o.kind,...(o.quantity?{quantity:o.quantity}:{}),...(o.consumable===undefined?{}:{consumable:o.consumable})}));
+ return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:Object.fromEntries(Object.entries(o.state).filter(([key])=>o.stateExposure?.[key]!=='hidden')),kind:o.kind,...(o.quantity?{quantity:o.quantity}:{}),...(o.consumable===undefined?{}:{consumable:o.consumable})}));
 }
 export function knownWorldSupplies(w:World,c:Character){
  return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind}));
@@ -209,7 +210,9 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
  const currentRefs=[...refs].filter(id=>{const ref=externalReference(id);return ref?!!worldTargetSnapshot(w,{type:ref.external,id:ref.id}):w.objects?.some(o=>o.id===id)||w.supplies?.some(s=>s.id===id);}).sort();
  let frozen=candidate.trialBinding?.references||w.branchTrialScopes?.[scope]||currentRefs;
  const facts=(references:string[])=>references.map(id=>{
-  const ref=externalReference(id);if(ref){const current=worldTargetSnapshot(w,{type:ref.external,id:ref.id});return current?{id,region:current.region,state:ref.keys.map(key=>({key,value:Object.hasOwn(current.state,key)?current.state[key]:null}))}:{id,missing:true};}
+  let routine:{routineTarget:{type:'object'|'supply'|'body'|'environment';id:string};keys:string[]}|undefined;try{const value=JSON.parse(id);if(value.routineTarget&&Array.isArray(value.keys))routine=value;}catch{/* Legacy plain identity. */}
+  if(routine){const target=routine.routineTarget,object=w.objects?.find(value=>value.id===target.id),supply=w.supplies?.find(value=>value.id===target.id),snapshot=target.type==='supply'?null:worldTargetSnapshot(w,{type:target.type,id:target.id});const state=target.type==='supply'?supply?.initialState:snapshot?.state;return {id,region:target.type==='supply'?supply?.region:snapshot?.region,...(target.type==='object'?{source:object?.source,holder:object?.holder,lifecycle:object?.lifecycle,quantity:object?.quantity,allowed:object&&hasObjectPermission(object,c.id)}:target.type==='supply'?{remaining:supply?.remaining,sequence:supply?.background?.sequence,quantity:supply?.quantity,allowed:supply?.allowedTo.includes(c.id)}:{}),state:routine.keys.map(key=>({key,value:state&&Object.hasOwn(state,key)?state[key]:null})),missing:!state};}
+ const ref=externalReference(id);if(ref){const current=worldTargetSnapshot(w,{type:ref.external,id:ref.id});return current?{id,region:current.region,state:ref.keys.map(key=>({key,value:Object.hasOwn(current.state,key)?current.state[key]:null}))}:{id,missing:true};}
   const o=w.objects?.find(o=>o.id===id),s=w.supplies?.find(s=>s.id===id);
   return o?{id:o.id,source:o.source,region:o.region,holder:o.holder,owner:o.owner,coOwners:o.coOwners,quantity:o.quantity,consumable:o.consumable,state:o.state,lifecycle:o.lifecycle,allowed:hasObjectPermission(o,c.id)}:s?{id:s.id,region:s.region,owner:s.owner,remaining:s.remaining,sequence:s.background?.sequence,state:s.initialState,allowed:s.allowedTo.includes(c.id)}:{id,missing:true};
  });
@@ -302,6 +305,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
 }
 
 function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
+ if(phase.routineBindings){if(!routineBindingsHold(w,phase.routineBindings))throw Error('日常活動的物理前提已改變。');phase.effects=rebindRoutineEffects(w,phase.effects);}
  // Internal routine plans retain tools separately from their result vessel.
  // They remain local, known and authorized at every scheduled phase.
  for(const id of phase.requiredTools||[]){

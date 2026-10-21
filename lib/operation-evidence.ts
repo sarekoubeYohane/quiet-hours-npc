@@ -43,8 +43,9 @@ const checkShape: Shape = { difficulty:true, ability:true };
 const stageShape: Shape = {afterMinutes:true,preconditions:[{kind:true,version:true,target:{type:true,id:true},guard:{region:true,holder:{check:true,value:true}},objectId:true,revision:true,region:true,holder:true,state:[stateEntry]}],effects:[effectShape]};
 const branchShape: Shape = {outcomes:[true],effects:[effectShape],stages:[stageShape]};
 const routineStepShape: Shape = {kind:true,role:true,toHolder:true,key:true,value:true};
-const routineStageShape: Shape = {afterMinutes:true,effects:[routineStepShape]};
-const routineProgramShape: Shape = {operation:true,effects:[routineStepShape],stages:[routineStageShape],check:checkShape,branches:[{outcomes:[true],effects:[routineStepShape],stages:[routineStageShape]}]};
+const routineEffectShape: Shape = {...effectShape as Record<string,Shape>,...routineStepShape as Record<string,Shape>};
+const routineStageShape: Shape = {...stageShape as Record<string,Shape>,effects:[routineEffectShape]};
+const routineProgramShape: Shape = {operation:true,methods:[{content:true,purpose:true}],bindings:[{role:true,type:true,select:true,kind:true,label:true,state:[{key:true,value:true}],access:true,link:{role:true,key:true},quantity:quantityShape,sourceRole:true,sourceSubject:true,background:{label:true,kind:true,consumable:true,quantity:quantityShape,initialState:[stateEntry]}}],effects:[routineEffectShape],stages:[routineStageShape],check:checkShape,branches:[{outcomes:[true],effects:[routineEffectShape],stages:[routineStageShape]}]};
 const candidateShape: Shape = {status:true,completionMinutes:true,effects:[effectShape],check:checkShape,branches:[branchShape],routine:{family:true,version:true,operation:true,subject:true,timings:[{operation:true,minutes:true}],programs:[routineProgramShape]},stages:[stageShape]};
 
 export function createOperationEvidence(context: {
@@ -138,7 +139,8 @@ export function createOperationEvidence(context: {
       const afterExternal=externalSnapshot(world),beforeExternal=externalSnapshot(before);
       const externalStates=afterExternal.flatMap(after=>{const previous=beforeExternal.find(item=>item.target.type===after.target.type&&item.target.id===after.target.id)||null;return JSON.stringify(previous)===JSON.stringify(after)?[]:[{target:after.target,before:previous,after}];});
       const naturalChanges=(world.naturalChanges||[]).filter(change=>JSON.stringify(change)!==JSON.stringify(before.naturalChanges?.find(previous=>previous.id===change.id)));
-      const rules=(world.routineRules||[]).map(rule=>({id:rule.id,version:rule.version,family:rule.family,timings:rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes})),programs:rule.programs}));
+      const relevantRules=new Set((world.routineAudit||[]).filter(item=>!(before.routineAudit||[]).some(old=>JSON.stringify(old)===JSON.stringify(item))).map(item=>item.ruleId));
+      const rules=(world.routineRules||[]).filter(rule=>relevantRules.has(rule.id)||JSON.stringify(rule)!==JSON.stringify(before.routineRules?.find(old=>old.id===rule.id))).sort((a,b)=>Number(relevantRules.has(b.id))-Number(relevantRules.has(a.id))).map(rule=>({id:rule.id,version:rule.version,family:rule.family,timings:rule.worldTimings||rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes})),programs:rule.programs}));
       const actors=world.characters.map(actor=>({id:actor.id,activity:actor.activity,plan:actor.plan?{
         startedAt:actor.plan.startedAt,until:actor.plan.until,action:actor.plan.action,phaseCursor:actor.plan.phases?.cursor,
         selectedResult:actor.plan.selectedResult,

@@ -1,0 +1,1344 @@
+{
+  "fixture": true,
+  "scenario": "borrow",
+  "npc": 6,
+  "adjudication": 2,
+  "world": {
+    "routinePlaces": [
+      {
+        "location": "cafe",
+        "purpose": "cafe",
+        "operators": [
+          "owner",
+          "vera"
+        ]
+      }
+    ],
+    "minute": 1320,
+    "turn": 4,
+    "lastMode": "openai",
+    "characters": [
+      {
+        "id": "vera",
+        "intents": [],
+        "name": "Vera",
+        "color": "#a2bdf0",
+        "location": "cafe",
+        "mood": "平靜",
+        "personality": "不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。",
+        "abilityTags": [
+          "擅長髮飾設計"
+        ],
+        "goal": "尊重 Cass 的空間，也試著做一件自己喜歡的事。",
+        "activity": "borrow-cup留在現場；這次嘗試已結束。",
+        "relationships": {
+          "cass": "想關心她，但不想再越界。",
+          "kris": "知道她是 Cass 信任的人。"
+        },
+        "memories": [
+          {
+            "id": "legacy:vera:memory:0:1260",
+            "time": 1260,
+            "text": "Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。"
+          },
+          {
+            "id": "8791f77f-c898-4054-874e-95ed38b379cd",
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+            "time": 1275,
+            "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。"
+          },
+          {
+            "id": "48b410be-cf66-4d3e-976f-2353f502594a:vera:0",
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "1d74e4a9-41bf-4747-b1ea-e9224a6b8c2d",
+            "time": 1290,
+            "text": "Vera 開始進行這項活動；活動尚未完成。。"
+          },
+          {
+            "id": "219331e1-0ef1-4a34-922c-cea81f717a79",
+            "time": 1290,
+            "text": "Vera borrow-cup已交付持有人。"
+          },
+          {
+            "id": "6ffdce35-4a95-468d-ab55-ac2023ecc44d",
+            "time": 1305,
+            "text": "Vera 已進行這個步驟。"
+          },
+          {
+            "id": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+            "time": 1305,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+            "time": 1320,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "0920c854-8684-414f-9a1f-60e7e5fcf73f",
+            "time": 1320,
+            "text": "Vera borrow-cup留在現場。"
+          }
+        ],
+        "attentionConditions": [],
+        "observationCursor": 2,
+        "region": "cafe-front",
+        "observations": [
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+            "clarity": "clear",
+            "source": "owner",
+            "region": "cafe-front",
+            "id": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+            "time": 1275
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "owner",
+            "region": "cafe-front",
+            "id": "48b410be-cf66-4d3e-976f-2353f502594a:vera:0",
+            "time": 1290
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "owner",
+            "region": "cafe-front",
+            "id": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+            "time": 1305
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "owner",
+            "region": "cafe-front",
+            "id": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+            "time": 1320
+          }
+        ],
+        "shortTerm": [
+          {
+            "id": "legacy:vera:memory:0:1260",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1260,
+            "text": "Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "8791f77f-c898-4054-874e-95ed38b379cd",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "cafe-front"
+            },
+            "eventId": "54c50c5b-fcfc-4a75-9bd1-9500225f9638"
+          },
+          {
+            "id": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+            "source": {
+              "kind": "observation",
+              "person": "owner",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+              "time": 1275
+            },
+            "consumed": true
+          },
+          {
+            "id": "48b410be-cf66-4d3e-976f-2353f502594a:vera:0",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "owner",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "48b410be-cf66-4d3e-976f-2353f502594a:vera:0",
+              "time": 1290
+            },
+            "consumed": true
+          },
+          {
+            "id": "1d74e4a9-41bf-4747-b1ea-e9224a6b8c2d",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1290,
+            "text": "Vera 開始進行這項活動；活動尚未完成。。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "cafe-front"
+            },
+            "eventId": "3c46a574-e069-4385-9208-7e29ed23fab9"
+          },
+          {
+            "id": "219331e1-0ef1-4a34-922c-cea81f717a79",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1290,
+            "text": "Vera borrow-cup已交付持有人。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "cafe-front"
+            },
+            "eventId": "225c1011-b598-4977-94f4-62545f2209db"
+          },
+          {
+            "id": "6ffdce35-4a95-468d-ab55-ac2023ecc44d",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1305,
+            "text": "Vera 已進行這個步驟。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "cafe-front"
+            },
+            "eventId": "c79ff62d-6d7e-4d77-8713-7a87556f2157"
+          },
+          {
+            "id": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1305,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "owner",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+              "time": 1305
+            }
+          },
+          {
+            "id": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1320,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "owner",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "店主 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "owner",
+              "region": "cafe-front",
+              "id": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+              "time": 1320
+            }
+          },
+          {
+            "id": "0920c854-8684-414f-9a1f-60e7e5fcf73f",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1320,
+            "text": "Vera borrow-cup留在現場。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "cafe-front"
+            },
+            "eventId": "98d4256f-b7db-434e-9055-ce680e6d9a1f"
+          }
+        ],
+        "longTerm": [],
+        "routineCapabilities": [
+          "wash"
+        ],
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1275,
+            "observationId": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+            "reason": "一般線索，等待正常決策"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1305,
+            "observationId": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+            "reason": "一般線索，等待正常決策"
+          },
+          {
+            "time": 1320,
+            "observationId": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+            "reason": "一般線索，等待正常決策"
+          }
+        ],
+        "memoryTrace": [],
+        "habits": [
+          {
+            "key": "3:cafe:propose:",
+            "type": "propose",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1290
+          },
+          {
+            "key": "3:cafe:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1275
+          }
+        ]
+      },
+      {
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "安靜休息了一會兒。",
+        "relationships": {},
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          },
+          {
+            "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638:owner:0",
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "a6df37f5-59c5-4c33-ac39-f7133ff2f4e0",
+            "time": 1275,
+            "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。"
+          },
+          {
+            "id": "55cf0fa6-114b-40cb-9822-51173a73e528",
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+            "time": 1290,
+            "text": "Vera 開始進行這項活動；活動尚未完成。。"
+          },
+          {
+            "id": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+            "time": 1290,
+            "text": "Vera borrow-cup已交付持有人。"
+          },
+          {
+            "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157:owner:0",
+            "time": 1305,
+            "text": "Vera 已進行這個步驟。"
+          },
+          {
+            "id": "0b8cf737-eaf2-4cca-9c17-31f96d7bbc02",
+            "time": 1305,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "5a47ea39-1ae3-41b5-b2ed-f591b64f5005",
+            "time": 1320,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+            "time": 1320,
+            "text": "Vera borrow-cup留在現場。"
+          }
+        ],
+        "intents": [],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observationCursor": 4,
+        "region": "cafe-front",
+        "observations": [
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Vera 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "vera",
+            "region": "cafe-front",
+            "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638:owner:0",
+            "time": 1275
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Vera 開始進行這項活動；活動尚未完成。。",
+            "clarity": "clear",
+            "source": "vera",
+            "region": "cafe-front",
+            "id": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+            "time": 1290
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Vera borrow-cup已交付持有人。",
+            "clarity": "clear",
+            "source": "vera",
+            "region": "cafe-front",
+            "id": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+            "time": 1290
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Vera 已進行這個步驟。",
+            "clarity": "clear",
+            "source": "vera",
+            "region": "cafe-front",
+            "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157:owner:0",
+            "time": 1305
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Vera borrow-cup留在現場。",
+            "clarity": "clear",
+            "source": "vera",
+            "region": "cafe-front",
+            "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+            "time": 1320
+          }
+        ],
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638:owner:0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "vera",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Vera 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "vera",
+              "region": "cafe-front",
+              "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638:owner:0",
+              "time": 1275
+            },
+            "consumed": true
+          },
+          {
+            "id": "a6df37f5-59c5-4c33-ac39-f7133ff2f4e0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "ec9d4d02-4253-4450-a206-34230d116730"
+          },
+          {
+            "id": "55cf0fa6-114b-40cb-9822-51173a73e528",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "48b410be-cf66-4d3e-976f-2353f502594a"
+          },
+          {
+            "id": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1290,
+            "text": "Vera 開始進行這項活動；活動尚未完成。。",
+            "source": {
+              "kind": "observation",
+              "person": "vera",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Vera 開始進行這項活動；活動尚未完成。。",
+              "clarity": "clear",
+              "source": "vera",
+              "region": "cafe-front",
+              "id": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+              "time": 1290
+            },
+            "consumed": true
+          },
+          {
+            "id": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1290,
+            "text": "Vera borrow-cup已交付持有人。",
+            "source": {
+              "kind": "observation",
+              "person": "vera",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Vera borrow-cup已交付持有人。",
+              "clarity": "clear",
+              "source": "vera",
+              "region": "cafe-front",
+              "id": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+              "time": 1290
+            },
+            "consumed": true
+          },
+          {
+            "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157:owner:0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1305,
+            "text": "Vera 已進行這個步驟。",
+            "source": {
+              "kind": "observation",
+              "person": "vera",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Vera 已進行這個步驟。",
+              "clarity": "clear",
+              "source": "vera",
+              "region": "cafe-front",
+              "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157:owner:0",
+              "time": 1305
+            },
+            "consumed": true
+          },
+          {
+            "id": "0b8cf737-eaf2-4cca-9c17-31f96d7bbc02",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1305,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "26450019-c495-4204-aec3-10a77b7fe263"
+          },
+          {
+            "id": "5a47ea39-1ae3-41b5-b2ed-f591b64f5005",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1320,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "815b658d-823a-4240-8fbc-73c40348e1f8"
+          },
+          {
+            "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1320,
+            "text": "Vera borrow-cup留在現場。",
+            "source": {
+              "kind": "observation",
+              "person": "vera",
+              "region": "cafe-front",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Vera borrow-cup留在現場。",
+              "clarity": "clear",
+              "source": "vera",
+              "region": "cafe-front",
+              "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+              "time": 1320
+            }
+          }
+        ],
+        "longTerm": [],
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "observationId": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+            "reason": "一般線索，等待正常決策"
+          },
+          {
+            "time": 1290,
+            "observationId": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+            "reason": "一般線索，等待正常決策"
+          },
+          {
+            "time": 1305,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1320,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1320,
+            "observationId": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+            "reason": "一般線索，等待正常決策"
+          }
+        ],
+        "memoryTrace": [],
+        "habits": [
+          {
+            "key": "3:cafe:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1320
+          },
+          {
+            "key": "3:cafe:propose:",
+            "type": "propose",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1275
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "id": "opening",
+        "time": 1260,
+        "actor": "world",
+        "text": "雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。",
+        "kind": "opening",
+        "audience": [
+          "cass",
+          "kris"
+        ]
+      },
+      {
+        "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638",
+        "time": 1275,
+        "actor": "vera",
+        "text": "Vera 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "owner",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Vera 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "vera",
+                "region": "cafe-front",
+                "id": "54c50c5b-fcfc-4a75-9bd1-9500225f9638:owner:0",
+                "time": 1275
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "ec9d4d02-4253-4450-a206-34230d116730",
+        "time": 1275,
+        "actor": "owner",
+        "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+        "kind": "work",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "店主 borrow-cup留在現場，同意 Vera 使用borrow-cup。",
+                "clarity": "clear",
+                "source": "owner",
+                "region": "cafe-front",
+                "id": "ec9d4d02-4253-4450-a206-34230d116730:vera:0",
+                "time": 1275
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "48b410be-cf66-4d3e-976f-2353f502594a",
+        "time": 1290,
+        "actor": "owner",
+        "text": "店主 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "店主 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "owner",
+                "region": "cafe-front",
+                "id": "48b410be-cf66-4d3e-976f-2353f502594a:vera:0",
+                "time": 1290
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "3c46a574-e069-4385-9208-7e29ed23fab9",
+        "time": 1290,
+        "actor": "vera",
+        "text": "Vera 開始進行這項活動；活動尚未完成。。",
+        "kind": "work",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": [
+          {
+            "characterId": "owner",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Vera 開始進行這項活動；活動尚未完成。。",
+                "clarity": "clear",
+                "source": "vera",
+                "region": "cafe-front",
+                "id": "3c46a574-e069-4385-9208-7e29ed23fab9:owner:0",
+                "time": 1290
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "225c1011-b598-4977-94f4-62545f2209db",
+        "time": 1290,
+        "actor": "vera",
+        "text": "Vera borrow-cup已交付持有人。",
+        "kind": "work",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": [
+          {
+            "characterId": "owner",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Vera borrow-cup已交付持有人。",
+                "clarity": "clear",
+                "source": "vera",
+                "region": "cafe-front",
+                "id": "225c1011-b598-4977-94f4-62545f2209db:owner:0",
+                "time": 1290
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157",
+        "time": 1305,
+        "actor": "vera",
+        "text": "Vera 已進行這個步驟。",
+        "kind": "work",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": [
+          {
+            "characterId": "owner",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Vera 已進行這個步驟。",
+                "clarity": "clear",
+                "source": "vera",
+                "region": "cafe-front",
+                "id": "c79ff62d-6d7e-4d77-8713-7a87556f2157:owner:0",
+                "time": 1305
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "26450019-c495-4204-aec3-10a77b7fe263",
+        "time": 1305,
+        "actor": "owner",
+        "text": "店主 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "店主 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "owner",
+                "region": "cafe-front",
+                "id": "26450019-c495-4204-aec3-10a77b7fe263:vera:0",
+                "time": 1305
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "815b658d-823a-4240-8fbc-73c40348e1f8",
+        "time": 1320,
+        "actor": "owner",
+        "text": "店主 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "店主 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "owner",
+                "region": "cafe-front",
+                "id": "815b658d-823a-4240-8fbc-73c40348e1f8:vera:0",
+                "time": 1320
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      },
+      {
+        "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f",
+        "time": 1320,
+        "actor": "vera",
+        "text": "Vera borrow-cup留在現場。",
+        "kind": "work",
+        "audience": [
+          "vera",
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": [
+          {
+            "characterId": "owner",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Vera borrow-cup留在現場。",
+                "clarity": "clear",
+                "source": "vera",
+                "region": "cafe-front",
+                "id": "98d4256f-b7db-434e-9055-ce680e6d9a1f:owner:0",
+                "time": 1320
+              }
+            ],
+            "reason": "直接察覺"
+          }
+        ]
+      }
+    ],
+    "perceptionTrials": {},
+    "probeResults": {},
+    "currentSensory": {
+      "presence": {
+        "cass": {
+          "region": "kris-home-main",
+          "clue": "initial:cass:kris-home-main"
+        },
+        "vera": {
+          "region": "vera-home-main",
+          "clue": "initial:vera:vera-home-main"
+        },
+        "kris": {
+          "region": "kris-home-main",
+          "clue": "initial:kris:kris-home-main"
+        },
+        "owner": {
+          "region": "cafe-front",
+          "clue": "initial:owner:cafe-front"
+        }
+      },
+      "activities": {
+        "vera": {
+          "clue": "98d4256f-b7db-434e-9055-ce680e6d9a1f",
+          "region": "cafe-front",
+          "action": {
+            "type": "work"
+          }
+        },
+        "owner": {
+          "clue": "815b658d-823a-4240-8fbc-73c40348e1f8",
+          "region": "cafe-front",
+          "action": {
+            "type": "rest",
+            "target": ""
+          }
+        }
+      }
+    },
+    "scene": {
+      "doors": {
+        "cafe-door": "open"
+      },
+      "noise": {},
+      "occluded": []
+    },
+    "contextId": "browser151-borrow",
+    "adjudication": {
+      "provider": "openai",
+      "model": "fixture-world"
+    },
+    "objects": [
+      {
+        "id": "borrow-cup",
+        "label": "borrow-cup",
+        "source": "fixture",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 5,
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "owner",
+          "vera"
+        ],
+        "allowedTo": [
+          "owner",
+          "vera"
+        ],
+        "state": {
+          "contents": "empty",
+          "茶漬": "無"
+        },
+        "stateExposure": {
+          "茶漬": "public"
+        }
+      }
+    ],
+    "aiUsage": {
+      "windowStartedAt": 1792080001000,
+      "calls": 8,
+      "inputTokens": 240,
+      "outputTokens": 80,
+      "unknownCalls": 0,
+      "totalCalls": 8,
+      "totalInputTokens": 240,
+      "totalOutputTokens": 80,
+      "totalUnknownCalls": 0,
+      "savedDecisions": 2,
+      "costs": {
+        "total": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 6,
+            "input": 180,
+            "output": 60,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 6,
+            "lastDispatchAt": 1792080004000
+          },
+          "adjudication:unknown:openai:fixture-world": {
+            "task": "adjudication",
+            "provider": "openai",
+            "model": "fixture-world",
+            "price": null,
+            "calls": 2,
+            "input": 60,
+            "output": 20,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 2,
+            "lastDispatchAt": 1792080002000
+          }
+        },
+        "hour": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 6,
+            "input": 180,
+            "output": 60,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 6,
+            "lastDispatchAt": 1792080004000
+          },
+          "adjudication:unknown:openai:fixture-world": {
+            "task": "adjudication",
+            "provider": "openai",
+            "model": "fixture-world",
+            "price": null,
+            "calls": 2,
+            "input": 60,
+            "output": 20,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 2,
+            "lastDispatchAt": 1792080002000
+          }
+        }
+      }
+    },
+    "routineRules": [
+      {
+        "id": "1d0ac8ba-5737-4c74-a00b-6e635dc0f067",
+        "version": 3,
+        "family": "cafe-service",
+        "origin": "cafe",
+        "knownTo": [
+          "vera"
+        ],
+        "operations": [
+          "borrow-care-return"
+        ],
+        "programs": [
+          {
+            "operation": "borrow-care-return",
+            "methods": [
+              {
+                "content": "借用杯子帶在身上，洗淨後歸還",
+                "purpose": "借用杯子"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "target",
+                "kind": null,
+                "label": null,
+                "state": [
+                  {
+                    "key": "茶漬",
+                    "value": "有"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": null,
+                "quantity": null,
+                "sourceRole": null,
+                "sourceSubject": null
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  }
+                ],
+                "preconditions": []
+              },
+              {
+                "afterMinutes": 30,
+                "effects": [
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "茶漬",
+                        "from": "有",
+                        "value": "無"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "preconditions": []
+              },
+              {
+                "afterMinutes": 45,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": null,
+                    "toRegion": "$here"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          }
+        ],
+        "worldSubject": "杯子",
+        "worldTimings": [
+          {
+            "operation": "borrow-care-return",
+            "minutes": 45
+          }
+        ]
+      }
+    ],
+    "routineAudit": [
+      {
+        "turn": 1,
+        "actorId": "vera",
+        "location": "cafe",
+        "ruleId": "1d0ac8ba-5737-4c74-a00b-6e635dc0f067",
+        "result": "approved"
+      }
+    ]
+  }
+}

@@ -21,6 +21,7 @@
 | #147 | 物主許可與物理可達分開；保存意外損毀、擅用／拿取及事前許可，不補造 grant／consent | [物理後果](world-physical-147-2026-10-21.md) |
 | #148 | 同一事件承接物件、環境及身體；可知鍵投影、外在線索、中斷、位移攜物及自主界線 | [環境與身體](world-external-148-2026-10-21.md) |
 | #149 | 形成候選、來源證據、隱藏狀態及身份碰撞各先 red；形成／分拆保存來源、份量、權利及重要差異，不複製原物 | [形成與細分](world-formation-149-2026-10-21.md) |
+| #151 | 明示通用v3方法、當前subset／來源／份量綁定、fresh成果、自然重用及實際派送分開計數 | [通用日常程序](world-routine-151-2026-10-21.md) |
 | #150 | 自然安排從真提交起算、到期先行、條件破壞永久失效；保存接續、曝光與本次操作證據接通 | [自然變化](world-natural-150-2026-10-21.md)／[時間取捨](../design/natural-changes-time.md) |
 
 ## 階段性完整回歸
@@ -31,8 +32,29 @@
 
 #150 實作者最終完整回歸530/530，相關聯合回歸70/70；root 在整合後獨立重跑自然變化真 UI，8次推進、8 NPC／5裁定、8份保存快照及原ID零新增派送全部通過。root 額外檢查條件失效畫面，確認當前狀態恢復為熱並不把舊安排改回 pending。這些是自然變化的階段證據，最終整合仍須包含 #151。
 
+## 使用者情境對照
+
+下列 API 測試透過真正世界 route 及 SQLite；UI runner 使用真 WorldApp。測試的受控回覆與骰子不代表正式 NPC 一定會選相同行動。
+
+| 情境 | API／保存回歸 | UI／證據 |
+| --- | --- | --- |
+| 餐點取得、消耗、形成與分拆 | `world-formation-api`、`live-acceptance-cup-api` | `browser149`、`browser-live-gaps`；[形成證據](world-formation-149-2026-10-21.md) |
+| 自主授權後借杯、攜帶、洗淨、歸還 | `live-acceptance-cup-api`、既有活動／授權測試 | `browser-live-gaps`；[既有整合基線證據](live-gaps-browser-2026-10-21.md) |
+| 同杯喝洗再泡、不同合理新狀態 | `world-changes-object-api` 保留原杯；v3同杯循環及fresh形成由 `routine-world-changes-api` 覆蓋 | `browser146` 與既有 v2 `browser-live-gaps`；不把既有 v2 成果當 v3 驗收 |
+| 意外損毀、未經許可拿取／擅用／損壞 | `world-physical-api`、`world-formation-api` | `browser147`、`browser149`；所有者與許可事實保持 |
+| 同事件物件／環境／身體影響、自主及資訊隔離 | `world-external-api`、`npc-failure-feedback-api` | `browser148`；public／subject／hidden 由公開 API 核對下一個角色輸入 |
+| 自然變化、永久失效及保存接續 | `natural-changes-api` | `browser-natural-changes`；[時間順序](../design/natural-changes-time.md) |
+| 日常重用與真正例外、裁定／NPC分開計數 | 既有 v1/v2 回歸保持；新 v3 由 `routine-world-changes-api` 的多scope／新方法／中文證據覆蓋 | `browser128`／`browser129` 舊程序證據；`browser151`／`browser151-world` 新v3證據獨立計數 |
+| 跨回合、五段、失敗消耗、部分成果及中斷 | `activity-results-api`、`routine-results-api`、新物件／形成／自然測試 | `browser127` 七組、`browser129` 六組；[前置整合證據](adjudication-contract-139-2026-10-21.md) |
+| 重載、原 ID、保存前失敗、提交不明、版本／租約衝突 | 新效果各票 API 與既有原子提交回歸 | `browser-live-gaps` 保存前後故障及原 ID；各新 UI runner 重載及重送 |
+| 舊世界、舊規則、帳號隔離及敏感資料 | 既有 auth／Workers/D1、新效果舊資料回歸、`operation-evidence-api` | 讀取不補歷史；證據遮蔽、截斷與舊 receipt 不追補由公開 API 核對 |
+
+每個簡稱對應 `tests/<名稱>.test.cjs` 或 `tooling/verification/<runner>.mjs`。完整執行方式見 [verification README](../../tooling/verification/README.md)，單獨 API runner 必須保留 `NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs"`。
+
 ## 正式站界線
 
 [部署後有界驗收流程](world-changes-live-runbook.md) 包含版本、現有預算、24 個新回合／30 分鐘上限及立即停止條件。正式驗收需要後續授權與實際部署；未到達的自主行為記為未到達，不強制成功、不改模型行動，也不在正式站注入故障。
 
 新資料寫入後的舊 binary 回退並非安全的雙向門：舊讀取器不理解逐鍵曝光、形成份量或後續的新程序／自然安排。向前讀取舊世界保持相容；回退須保留新讀取與執行語義，不能丟欄位、重置或補造歷史。
+
+#151實作者完整回歸552/552（510 activities/API、32 auth、10 Workers/D1），22項新增正式API／SQLite案例全部通過；typecheck、production build通過，lint無error、沿既有4個warning。七組真UI共19 NPC／9裁定，逐組原ID重送0新增；[完整證據與限制](world-routine-151-2026-10-21.md)。此為實作者交付證據，獨立review後最終整合結果由root另記。

@@ -85,7 +85,7 @@ const input = budgetMemoryInput({contractVersion:npcContractVersion,...perceived
 const visible: Character = { ...c, longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), cognition: { ...input.self.cognition, trace: [] } };
 const decisionContext: CognitiveDecisionContext = { visible, knownPeople: knownPeopleForDecision(visible, input.contacts.map(person => person.id)), memoryReview: input.self.memoryReview, historyCandidates: input.self.cognition.historyCandidates || [] };
 const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
-messages[0].content+=physicalBoundariesPrompt;
+messages[0].content+=physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 let recalled = false;
 for (;;) {
 const requestId = crypto.randomUUID();

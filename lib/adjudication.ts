@@ -1,3 +1,4 @@
+import { routineWorldLimits } from './routine-world-contract';
 import { adjudicationRules } from './adjudication-contract';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 import { requestModel, type ModelService } from './model-adapter';
@@ -118,7 +119,7 @@ export function requestAdjudication(input: AdjudicationInput, service: ModelServ
   return requestModel(service, [
     { role: 'system', content: '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。' },
     { role: 'user', content: JSON.stringify(input) },
-  ], schema, options);
+  ], schema, {...options,...('routineOffer' in input&&input.routineOffer?{maxOutputTokens:routineWorldLimits.maxOutputTokens}:{})});
 }
 export function validateExistingAdjudication(candidate: unknown): void {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.keys(candidate).length !== 1 || !('status' in candidate) || candidate.status !== 'accepted') {
