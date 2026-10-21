@@ -1,6 +1,7 @@
 import type { Action, Character, World } from './world';
 import { canSee, regionOf, regions } from './perception';
 import { record } from './world';
+import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage } from './d20';
 
 // Legacy tea changes physical objects too; it must use the same verified effects.
@@ -12,7 +13,7 @@ export type SceneSupply={pending?:boolean;availableAt?:number;background?:{ruleI
 export type WorldObject={id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:'food'|'utensil';knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type Effect={kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type PhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[]};
+export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];requiredTools?:string[]};
 export type EffectCandidate={preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
@@ -231,6 +232,12 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate):
 }
 
 function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
+ // Internal routine plans retain tools separately from their result vessel.
+ // They remain local, known and authorized at every scheduled phase.
+ for(const id of phase.requiredTools||[]){
+  const tool=w.objects?.find(o=>o.id===id);
+  if(!tool||!usableRoutineObject(tool,c.id)||tool.region!==regionOf(c)||!tool.knownTo.includes(c.id))throw Error('活動工具已不可使用。');
+ }
  for(const p of phase.preconditions){
   const o=w.objects?.find(o=>o.id===p.objectId);
   if(!o||o.lifecycle!=='active'||o.revision!==p.revision||o.region!==p.region||o.holder!==p.holder||Object.entries(p.state).some(([k,v])=>o.state[k]!==v))throw Error('活動前提已改變。');

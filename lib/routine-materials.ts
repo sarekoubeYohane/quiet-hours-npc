@@ -12,6 +12,9 @@ export function rawRoutineMaterial(supply:SceneSupply,operation:string):boolean 
 export function supportsRoutineDrink(values:string[]|undefined,contents:string):boolean {
  return !!values&&['water',contents].every(value=>values.includes(value));
 }
+export function emptyRoutineVessel(state:Record<string,string>):boolean {
+ return state.contents==='empty'&&state.clean!=='no';
+}
 export function usableRoutineObject(object:WorldObject,actorId:string):boolean {
- return object.lifecycle==='active'&&object.state.condition!=='broken'&&(object.holder===null||object.holder===actorId)&&(object.owner===actorId||object.allowedTo.includes(actorId));
+ return object.lifecycle==='active'&&object.state.condition!=='broken'&&object.state.available!=='no'&&(object.holder===null||object.holder===actorId)&&(object.owner===actorId||object.allowedTo.includes(actorId));
 }
