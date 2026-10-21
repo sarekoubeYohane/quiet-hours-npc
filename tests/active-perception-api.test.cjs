@@ -32,7 +32,8 @@ test('focused looking obtains current people, replaces work and consumes world t
   assert.equal((await POST(req({operation:'direct',action:{type:'observe',target:'invented-person',content:'sight'}}))).status,400);
   const saved=await act({type:'observe',target:'cafe-front',content:'sight'});
   assert.equal(saved.minute,before.minute+15);
-  assert.equal(owner(saved).plan.action.type,'observe');
+  assert.equal(owner(saved).plan,undefined);
+  assert.equal(owner(saved).control.active,undefined);
   assert.ok(owner(saved).observations.some(o=>o.sense==='sight'&&o.source==='vera'));
   const probe=saved.events.findLast(e=>e.actor==='owner'&&e.kind==='observe');
   assert.equal(probe.perception.find(t=>t.characterId==='owner').status,'direct');

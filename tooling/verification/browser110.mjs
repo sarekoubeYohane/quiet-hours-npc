@@ -23,7 +23,7 @@ const decisions=[
  {target:'cafe',content:'準備一份簡餐',purpose:'用餐'},
 ];
 let npc=0,adjudication=0;
-setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1}});}const decision=decisions[npc++];assert.ok(decision,'unexpected extra NPC dispatch');return completion({type:'propose',mood:'平靜',durationMinutes:15,intents:[],...decision});});
+setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'accepted',completionMinutes:null,effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:input.routineOffer.operations.map(operation=>({operation,minutes:operation==='tea'||operation==='coffee'?30:15}))}});}const decision=decisions[npc++];assert.ok(decision,'unexpected extra NPC dispatch');return completion({type:'propose',mood:'平靜',durationMinutes:15,intents:[],...decision});});
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({reducedMotion:'reduce'});page.setDefaultTimeout(15000);await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));const errors=[];page.on('pageerror',e=>errors.push(String(e)));

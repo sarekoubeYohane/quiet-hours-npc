@@ -1,7 +1,7 @@
 import { routineObstacle, blockedRoutine } from './routine-obstacles';
 import type { Action, Character, World } from './world';
 import type { EffectCandidate, SceneSupply, WorldObject, Effect } from './world-effects';
-import { effectCandidateSchema, parseEffectCandidate, EffectValidationError } from './world-effects';
+import { effectCandidateSchema, parseEffectCandidate, scheduleCompletionMinutes, EffectValidationError } from './world-effects';
 import { regionOf } from './perception';
 import { rawRoutineMaterial, supportsRoutineDrink, usableRoutineObject } from './routine-materials';
 
@@ -21,13 +21,14 @@ export type RoutineRule={id:string;version:1;family:'cafe-service';operations:Ro
 export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string[];confirmedOperations?:RoutineOperation[]};
 
 export const routineCandidateSchema={...effectCandidateSchema,properties:{...effectCandidateSchema.properties,routine:{anyOf:[{type:'null'},{type:'object',properties:{family:{type:'string',enum:['cafe-service']},version:{type:'integer',enum:[1]},operation:{type:['string','null'],enum:['tea','coffee','food','drink','wash','return',null]},subject:{type:['string','null'],maxLength:40},timings:{type:'array',minItems:1,maxItems:6,items:{type:'object',properties:{operation:{type:'string',enum:['tea','coffee','food','drink','wash','return']},minutes:{type:'number',exclusiveMinimum:0,maximum:90}},required:['operation','minutes'],additionalProperties:false}}},required:['family','version','operation','subject','timings'],additionalProperties:false}]}},required:[...effectCandidateSchema.required,'routine']};
-export function parseRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15):EffectCandidate {
+export function parseRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15,maxMinutes:number|null=null):EffectCandidate {
  if(raw.length>8192)throw Error('裁定候選超出容量。');
  const parsed=JSON.parse(raw),approval=parsed?.routine;
+ if(approval!=null&&parsed.completionMinutes!==undefined){if(parsed.completionMinutes!==null)throw Error('日常耗時須由整組規則確認。');delete parsed.completionMinutes;}
  if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;const candidate=parseEffectCandidate(JSON.stringify(parsed));const rule=w.routineRules?.find(r=>r.knownTo.includes(c.id));if(rule)audit(w,c,rule,'exception');return candidate;}
  const approvalKeys=approval&&typeof approval==='object'?Object.keys(approval).sort().join(','):'';
  if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||!['family,timings,version','family,operation,timings,version','family,operation,subject,timings,version'].includes(approvalKeys)||approval.family!=='cafe-service'||approval.version!==1||approval.operation!=null&&!templates.some(t=>t.operation===approval.operation)||approval.subject!=null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40))throw Error('日常規則核准格式無效。');
- return bindRoutine(w,c,a,duration,approval,elapsedMinutes)!;
+ return bindRoutine(w,c,a,duration,approval,elapsedMinutes,maxMinutes)!;
 }
 
 export type RoutineApproval={family:'cafe-service';version:1;operation?:RoutineOperation|null;subject?:string|null;timings:{operation:RoutineOperation;minutes:number}[]};
@@ -43,7 +44,7 @@ function validTemplate(t:RoutineTemplate):boolean {
 }
 function requestTemplate(a:Action,scope:RoutineTemplate[]=templates):RoutineTemplate|undefined {
  if(a.type!=='work'&&a.type!=='propose')return;
- const text=(a.content||'').trim().replace(/[。！!\s]+$/,'');
+ const text=(a.content||(a.type==='work'&&a.target==='tea'?'泡一杯茶':'')).trim().replace(/[。！!\s]+$/,'');
  if(!Array.isArray(scope)||scope.length>16)return;
  for(const t of scope.filter(validTemplate)){
   if(a.purpose&&!t.purposes.includes(a.purpose.trim()))continue;
@@ -93,9 +94,9 @@ export function routineOffer(w:World,c:Character,a:Action){
 }
 export function matchingRoutine(w:World,c:Character,a:Action):RoutineRule|undefined {
  const matches=(w.routineRules||[]).filter(r=>r.version===1&&r.family==='cafe-service'&&!!requestTemplate(a,r.templates||templates.filter(t=>Array.isArray(r.operations)&&r.operations.includes(t.operation))));
- return matches.find(r=>r.knownTo.includes(c.id))||matches[0];
+ return matches.find(r=>r.origin===c.location&&r.knownTo.includes(c.id))||matches.find(r=>r.knownTo.includes(c.id))||matches[0];
 }
-export function bindRoutine(w:World,c:Character,a:Action,duration:number,approval?:RoutineApproval,elapsedMinutes=15):EffectCandidate|undefined {
+export function bindRoutine(w:World,c:Character,a:Action,duration:number,approval?:RoutineApproval,elapsedMinutes=15,maxMinutes:number|null=null):EffectCandidate|undefined {
  let rule=matchingRoutine(w,c,a);
  if(!rule&&!approval)return;
  const offer=approval?routineOffer(w,c,a):null;
@@ -113,24 +114,44 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  }
  if(approval){
   const expected=offer!.operations;
-  if(!Array.isArray(approval.timings)||approval.timings.length!==expected.length||new Set(approval.timings.map(t=>t?.operation)).size!==expected.length||approval.timings.some(t=>!t||Object.keys(t).sort().join(',')!=='minutes,operation'||!expected.includes(t.operation)||typeof t.minutes!=='number'||!Number.isFinite(t.minutes)||t.minutes<=0||t.minutes>90))throw new EffectValidationError('日常範圍須確認每項活動的合法耗時。',{reason:'routine_timing'});
+  if(!Array.isArray(approval.timings)||approval.timings.length!==expected.length||new Set(approval.timings.map(t=>t?.operation)).size!==expected.length||approval.timings.some(t=>!t||Object.keys(t).sort().join(',')!=='minutes,operation'||!expected.includes(t.operation)))throw new EffectValidationError('日常範圍須確認每項活動的合法耗時。',{reason:'routine_timing'});
  }
- const confirmedTemplates=approval?templates.filter(t=>(localPlace(w,c)?.purpose==='home'?[template.operation]:offer!.operations).includes(t.operation)).map(t=>({...structuredClone(t),result:{...t.result,minutes:Math.ceil(approval.timings.find(time=>time.operation===t.operation)!.minutes/15)*15}})):undefined;
+ const confirmedTemplates=approval?templates.filter(t=>(localPlace(w,c)?.purpose==='home'?[template.operation]:offer!.operations).includes(t.operation)).map(t=>({...structuredClone(t),result:{...t.result,minutes:scheduleCompletionMinutes(approval.timings.find(time=>time.operation===t.operation)!.minutes)}})):undefined;
  const confirmed=confirmedTemplates?.find(t=>t.operation===template.operation)||template;
  const confirmedDurationMinutes=confirmed.result.minutes;
 
+ if(approval&&rule&&rule.origin!==c.location){
+  // A new local scope is a separate confirmation, not a rewrite of the source
+  // home's narrower procedure or its method/condition-specific completion time.
+  if(w.routineAudit?.at(-1)?.ruleId===rule.id)w.routineAudit.pop();
+  rule=undefined;
+ }
  if(!rule){
   if((w.routineRules?.length||0)>=32)throw new EffectValidationError('日常規則已達容量。',{reason:'routine_capacity'});
   // A home confirms only this interpreted procedure, never the entire café role.
   const selected=confirmedTemplates!;
   rule={id:crypto.randomUUID(),version:1,family:'cafe-service',operations:selected.map(t=>t.operation),templates:structuredClone(selected),origin:c.location,knownTo:[c.id]};(w.routineRules??=[]).push(rule);
   audit(w,c,rule,'approved');
+ }else if(confirmedTemplates){
+  rule.operations=confirmedTemplates.map(t=>t.operation);
+  rule.templates=structuredClone(confirmedTemplates);
  }
  if(approval){
   const place=localPlace(w,c)!;
   const operations=place.purpose==='home'?[template.operation]:rule.operations;
   place.confirmedOperations=[...new Set([...(place.confirmedOperations||[]),...operations])];
   if(rule.origin!==c.location&&w.routineAudit?.at(-1))w.routineAudit.at(-1)!.result='confirmed';
+ }
+ const literalSubject=template.subjects.find(subject=>(a.content||'').includes(subject));
+ const subject=approval?.subject||literalSubject;
+ if(template.result.kind==='serve'&&(!subject||literalSubject&&subject!==literalSubject))throw new EffectValidationError('日常餐點種類未確認或與提案不符。',{reason:'routine_subject'});
+ const literalDrink=template.result.kind==='consume'?requestedDrink(a,template):undefined;
+ const interpretedDrink=approval?.subject==='咖啡'?'coffee':approval?.subject&&/茶/.test(approval.subject)?'tea':undefined;
+ if(template.result.kind==='consume'&&literalDrink&&interpretedDrink&&literalDrink!==interpretedDrink)throw new EffectValidationError('飲品種類與提案不符。',{reason:'routine_subject'});
+ if(maxMinutes!==null && confirmedDurationMinutes>maxMinutes){
+  const reason=`完成這項活動需要安排 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`;
+  const item=w.routineAudit?.at(-1);if(item&&item.actorId===c.id&&item.turn===w.turn)item.reason=reason;
+  return {status:'denied',effects:[],stages:[],check:null,blockedReason:reason};
  }
  const contents=template.result.contents||'tea';
  const obstacle=routineObstacle(w,c,a,template.operation);if(obstacle)return blockedRoutine(w,c,obstacle);
@@ -143,9 +164,6 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  const canUse=(o:WorldObject)=>usableRoutineObject(o,c.id);
  const targetCup=targetObject?.kind==='utensil'?targetObject:undefined;
  if(['consume','clean','release'].includes(template.result.kind)){
-  const literalDrink=template.result.kind==='consume'?requestedDrink(a,template):undefined;
-  const interpretedDrink=approval?.subject==='咖啡'?'coffee':approval?.subject&&/茶/.test(approval.subject)?'tea':undefined;
-  if(literalDrink&&interpretedDrink&&literalDrink!==interpretedDrink)throw new EffectValidationError('飲品種類與提案不符。',{reason:'routine_subject'});
   const requested=template.result.kind==='consume'?literalDrink||interpretedDrink:undefined;
   const availableDrink=(v:WorldObject)=>visible.find(o=>o.kind==='food'&&o.state.vessel===v.id&&canUse(o)&&o.state.beverage===v.state.contents&&(!requested||o.state.beverage===requested));
   const vessel=targetCup||(!target?visible.find(o=>o.kind==='utensil'&&canUse(o)&&(template.result.kind!=='consume'||availableDrink(o))):undefined);
@@ -167,15 +185,12 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   return {status:'accepted',confirmedDurationMinutes,effects:[],check:null,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[{objectId:vessel.id,revision:vessel.revision,region,holder:vessel.holder,state:{contents:vessel.state.contents}}],effects}]};
  }
  if(template.result.kind==='serve'){
-  const literalSubject=template.subjects.find(subject=>(a.content||'').includes(subject));
-  const subject=approval?.subject||literalSubject;
-  if(!subject||literalSubject&&subject!==literalSubject)throw new EffectValidationError('日常餐點種類未確認或與提案不符。',{reason:'routine_subject'});
-  const explicit=(w.supplies||[]).filter(s=>!s.background&&s.region===region&&s.kind==='food'&&(target?s.id===target:s.label.includes(subject)));
+  const explicit=(w.supplies||[]).filter(s=>!s.background&&s.region===region&&s.kind==='food'&&(target?s.id===target:s.label.includes(subject!)));
   let supply=explicit.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id));
   if(targetObject||target&&!targetSupply||explicit.length&&!supply)return denied;
   // A specific limited named dish cannot be invented as ordinary materials.
   if(!supply&&subject==='蛋糕')return denied;
-  supply??=backgroundSupply(w,c,rule,region,subject,'food',{});
+  supply??=backgroundSupply(w,c,rule,region,subject!,'food',{});
   return {status:'accepted',confirmedDurationMinutes,effects:[],check:null,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[],effects:[{kind:'materialize',supplyId:supply.id,expectedRemaining:supply.remaining}]}]};
  }
 
@@ -183,9 +198,9 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  // A concrete utensil is never repaired, replenished or teleported by background.
  let cup:WorldObject|undefined=teaObjects.find(o=>supportsRoutineDrink(o.stateTransitions?.contents,contents)&&o.state.contents==='empty'&&usableRoutineObject(o,c.id));
  const explicit=(w.supplies||[]).filter(s=>s.region===region&&!s.background&&(!target||s.id===target)&&s.kind==='utensil'&&'contents' in s.initialState);
- const effects:Effect[]=[];
+ const effects:Effect[]=[],preparationSupplies:string[]=[];
  const materials=(w.supplies||[]).filter(s=>!s.background&&s.region===region&&rawRoutineMaterial(s,contents));
- if(materials.length){const material=materials.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id));if(!material)return denied;effects.push({kind:'materialize',supplyId:material.id,expectedRemaining:material.remaining},{kind:'consume',objectId:`${material.id}:${material.remaining}`,expectedRevision:1});}
+ if(materials.length){const material=materials.find(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id));if(!material)return denied;preparationSupplies.push(material.id);effects.push({kind:'materialize',supplyId:material.id,expectedRemaining:material.remaining},{kind:'consume',objectId:`${material.id}:${material.remaining}`,expectedRevision:1});}
  if(!cup){
   if(targetObject)return denied;
   if(teaObjects.some(o=>!(w.supplies||[]).find(s=>s.id===o.source)?.background))return denied;
@@ -208,7 +223,7 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
  beverage.pending=true;
  beverage.availableAt=w.minute+Math.max(0,confirmedDurationMinutes-elapsedMinutes);
 
- return {status:'accepted',confirmedDurationMinutes,check:null,effects,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[{objectId:cup.id,revision:revision+1,region,holder:c.id,state:{contents:'water'}}],effects:[{kind:'state',objectId:cup.id,expectedRevision:revision+1,key:'contents',value:contents},{kind:'materialize',supplyId:beverage.id,expectedRemaining:beverage.remaining}]}]};
+ return {status:'accepted',preparationSupplies,confirmedDurationMinutes,check:null,effects,stages:[{afterMinutes:confirmedDurationMinutes,preconditions:[{objectId:cup.id,revision:revision+1,region,holder:c.id,state:{contents:'water'}}],effects:[{kind:'state',objectId:cup.id,expectedRevision:revision+1,key:'contents',value:contents},{kind:'materialize',supplyId:beverage.id,expectedRemaining:beverage.remaining}]}]};
 }
 
 function audit(w:World,c:Character,r:RoutineRule,result:'approved'|'reused'|'exception'|'confirmed'){w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:r.id,result}].slice(-64);}

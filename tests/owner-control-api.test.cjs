@@ -37,14 +37,14 @@ test('single designated action survives reload, replaces autonomous activity, pr
   const queue = [{ id: 'care', content: '照顧咖啡館', intensity: 'high', importance: 'medium', urgency: 'low', context: '晚點再整理' }];
   owner.intents = queue; owner.plan = { action: { type: 'rest' }, startedAt: 1245, until: 1335, attention: '', modelKey: 'openai:gpt-6-luna' };
   store.install(world);
-  assert.equal((await POST(request({ operation: 'direct', action: { type: 'work', target: 'tidy' } }))).status, 200);
-  assert.deepEqual((await read()).characters.find(c => c.id === 'owner').control.pending, { type: 'work', target: 'tidy' });
+  assert.equal((await POST(request({ operation: 'direct', action: { type: 'rest' } }))).status, 200);
+  assert.deepEqual((await read()).characters.find(c => c.id === 'owner').control.pending, { type: 'rest' });
   await withModel(async calls => {
     assert.equal((await advance()).status, 200);
     const saved = await read(); const c = saved.characters.find(c => c.id === 'owner');
-    assert.match(c.activity, /收拾桌面/); assert.deepEqual(c.intents, queue);
+    assert.match(c.activity, /休息|時段/); assert.deepEqual(c.intents, queue);
     assert.equal(c.control.pending, undefined); assert.equal(c.control.active, true);
-    assert.equal(c.plan.action.type, 'work'); assert.equal(c.plan.until, 1320);
+    assert.equal(c.plan.action.type, 'rest'); assert.equal(c.plan.until, 1320);
     assert.deepEqual(c.habits || [], []); assert.deepEqual(calls, ['cass', 'vera', 'kris']);
     assert.equal(saved.turn, 1);
     for (let i = 0; i < 3; i++) assert.equal((await advance()).status, 200);

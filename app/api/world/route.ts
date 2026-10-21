@@ -1,6 +1,6 @@
 import { bindRoutine, routineOffer, routineCandidateSchema, parseRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
+import { requiresWorldEffects, cancelActivity, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
@@ -265,7 +265,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           (action.target !== undefined && typeof action.target !== 'string') ||
           (action.mood !== undefined && (typeof action.mood !== 'string' || action.mood.length > 20))) throw Error('行動格式無效');
         const check = structuredClone(world);
-        resolve(check, check.characters.find(c => c.id === 'owner')!, action, { dryRun: true });
+        if(action.type==='work'&&action.target==='tea'){
+          if(!bindRoutine(check,check.characters.find(c=>c.id==='owner')!,action,15))throw Error('泡茶尚無已確認的日常規則；直接指定不新增模型裁定。');
+        }else resolve(check, check.characters.find(c => c.id === 'owner')!, action, { dryRun: true });
       } catch (e) { return reply({ error: e instanceof Error ? e.message : '指定行動無效。' }, 400); }
     }
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
@@ -297,12 +299,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';
       c.control!.experiences ??= [];
-      if (!c.control!.active) { delete c.plan; c.activity = '待命，等待下一個指定行動。'; }
+      if (!c.control!.active) { cancelActivity(world,c); c.activity = '待命，等待下一個指定行動。'; }
     } else if (b.operation === 'return-control') {
       const c = world.characters.find(c => c.id === 'owner')!;
       const experiences = c.control!.experiences;
       c.control = { mode: 'autonomous', ...(experiences?.length ? { experiences } : {}) };
-      delete c.plan;
+      cancelActivity(world,c);
       c.activity = '已交還控制權，等待下一次自主選擇。';
     } else if (b.operation === 'direct') {
       world.characters.find(c => c.id === 'owner')!.control!.pending = b.action!;
@@ -366,8 +368,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               },
               search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
             });
+            if(requiresWorldEffects(decision.action)&&decision.timeIntent?.kind==='open-ended'&&!decision.continueExisting){
+              decision.freeCandidate={status:'unsupported',effects:[],stages:[],check:null};
+              return decision;
+            }
             if(requiresWorldEffects(decision.action) && !decision.continueExisting){
-              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes,undefined,b.minutes);
+              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes,undefined,b.minutes,decision.timeIntent?.maxMinutes);
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
               await guard('chat',1);
@@ -375,13 +381,13 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,routineOffer:routineOffer(w,c,decision.action)};
+              const input={...buildAdjudicationInput(w,c,decision.action),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication`,onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
-              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes);}
+              try{decision.freeCandidate=parseRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes);}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
               adjudicationAttempt.stage='effects';
               }
