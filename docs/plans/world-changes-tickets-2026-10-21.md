@@ -1,28 +1,28 @@
-# 通用世界變更框架：工作票拆分草案
+# 通用世界變更框架：工作票拆分與發布
 
 父規格：[#145](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/145)。
 
-狀態：2026-10-21 to-tickets 草案，**待使用者確認粒度與阻擋關係，尚未發布子票**。T1–T6 是草案代號，不是 GitHub Issue 編號。本文件已備妥六張可直接發布的完整票面，確認後才依序建立。父規格及既有工作票未修改或關閉。
+狀態：2026-10-21 使用者已確認六票粒度與阻擋關係，工作票 #146–#151 已發布並標記 ready-for-agent。尚未實作或驗收；父規格及既有工作票未修改或關閉。
 
 ## 查證基準與既有工作
 
-- main：5e172d51f999f28ca17f5a207fb109d3f8c305e2；#145 完整票面已讀，留言為 0，沒有新增決策或既有子票。
+- main：5e172d51f999f28ca17f5a207fb109d3f8c305e2；#145 完整票面已讀，留言為 0，發布前沒有新增決策或既有子票。
 - [#136](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/136) 及 [#137](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/137) → [#138](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/138) → [#139](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/139) 仍 open，完整內容與前次查證一致、留言為 0。#139 的另一前置 #129 已 closed。
-- 本拆分沿用這三張既有票作先行契約整理，**不新增一張重複的基礎重構票**。T1 同時需要一般自由候選及結果分支的集中契約／無副作用解析，故以前述鏈末端 #139 作為完成前置；本計畫不另建平行契約。
-- PR #144 仍 open、未合併，head 為 53f42981fb0666bc85bb91fedc963dc666eb4645。其杯子能力、有界 v2 證據與安全回饋修正已有交付，須承接並回歸，不重新發明或冒稱已在 main。可用明示的整合基線承接既有提交；本草案不授權合併 PR。
+- 本拆分沿用這三張既有票作先行契約整理，**不新增一張重複的基礎重構票**。[#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 同時需要一般自由候選及結果分支的集中契約／無副作用解析，故以前述鏈末端 #139 作為完成前置；本計畫不另建平行契約。
+- PR #144 仍 open、未合併，head 為 53f42981fb0666bc85bb91fedc963dc666eb4645。其杯子能力、有界 v2 證據與安全回饋修正已有交付，須承接並回歸，不重新發明或冒稱已在 main。可用明示的整合基線承接既有提交；本計畫不授權合併 PR。
 - 原正式站已通過的餐點、店主首次泡茶、原杯與飲品保存／重讀／重送保持；#104、#106 不由本輪拆票關閉。角色表、新骰制與完整戰鬥持續延後。
-- 沿用已確認的 UI＋API＋SQLite 驗收介面，不新增測試專用 UI。每票包含自身的契約、執行、保存、必要畫面、證據與回歸；T6 有新的日常重用行為，不是單獨 QA 票。
+- 沿用已確認的 UI＋API＋SQLite 驗收介面，不新增測試專用 UI。每票包含自身的契約、執行、保存、必要畫面、證據與回歸；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 有新的日常重用行為，不是單獨 QA 票。
 
 ## 拆分摘要
 
-| 代號 | 工作 | 直接前置 | 完成後可驗證的行為 |
+| 工作票 | 工作 | 直接前置 | 完成後可驗證的行為 |
 | --- | --- | --- | --- |
-| T1 | 自由活動承接新物件狀態與結果分支 | #139 | 從自由提案到保存重讀及畫面，承接未預列的新物件狀態與不同結果，保留同一物件身份。 |
-| T2 | 分開物主許可與物理操作，保存意外及未經許可後果 | T1 | 合法借用可有意外損毀；未經許可拿取、擅用或損壞可依情境落地，持有與所有權分開。 |
-| T3 | 承接環境與身體影響，連接可知線索及活動中斷 | T1 | 一次事件可改變物件、環境和身體；推拉等外在影響可保存，NPC 的意願與後續反應仍自主。 |
-| T4 | 形成與轉化保留來源，分拆物件按需要細分 | T1 | 新產物保留材料來源；蛋糕數份或碎片先整體保存，分開操作時再追蹤個別部分。 |
-| T5 | 已確認的自然變化隨世界時間執行並可失效 | T3 | 熱茶冷卻、濕桌面乾燥按已確認條件發生；相關條件改變時停止過期後續，無逐回合裁定。 |
-| T6 | 日常規則重用通用後果，完成跨情境接續與整合驗收 | T2、T4、T5 | 首次日常核准保存新狀態、來源與自然變化，後續免費重用；完整同杯循環及混合情境可保存接續。 |
+| [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) | 自由活動承接新物件狀態與結果分支 | #139 | 從自由提案到保存重讀及畫面，承接未預列的新物件狀態與不同結果，保留同一物件身份。 |
+| [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) | 分開物主許可與物理操作，保存意外及未經許可後果 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) | 合法借用可有意外損毀；未經許可拿取、擅用或損壞可依情境落地，持有與所有權分開。 |
+| [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) | 承接環境與身體影響，連接可知線索及活動中斷 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) | 一次事件可改變物件、環境和身體；推拉等外在影響可保存，NPC 的意願與後續反應仍自主。 |
+| [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) | 形成與轉化保留來源，分拆物件按需要細分 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) | 新產物保留材料來源；蛋糕數份或碎片先整體保存，分開操作時再追蹤個別部分。 |
+| [#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) | 已確認的自然變化隨世界時間執行並可失效 | [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) | 熱茶冷卻、濕桌面乾燥按已確認條件發生；相關條件改變時停止過期後續，無逐回合裁定。 |
+| [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) | 日常規則重用通用後果，完成跨情境接續與整合驗收 | [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)、[#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149)、[#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) | 首次日常核准保存新狀態、來源與自然變化，後續免費重用；完整同杯循環及混合情境可保存接續。 |
 
 ## 依賴與可開工範圍
 
@@ -30,22 +30,22 @@
 flowchart TD
   P137["既有 #137"] --> P138["既有 #138"]
   P138 --> P139["既有 #139"]
-  P139 --> T1["T1 物件新狀態"]
-  T1 --> T2["T2 物件操作邊界"]
-  T1 --> T3["T3 環境與身體"]
-  T1 --> T4["T4 來源與分拆"]
-  T3 --> T5["T5 自然變化"]
-  T2 --> T6["T6 日常重用"]
+  P139 --> T1["#146 物件新狀態"]
+  T1 --> T2["#147 物件操作邊界"]
+  T1 --> T3["#148 環境與身體"]
+  T1 --> T4["#149 來源與分拆"]
+  T3 --> T5["#150 自然變化"]
+  T2 --> T6["#151 日常重用"]
   T4 --> T6
   T5 --> T6
 ```
 
-- 現在的先行工作是既有 #137，接著 #138、#139；T1 不在它們完成前另造同一契約整理。
-- T1 完成後，T2、T3、T4 沒有彼此的必要行為依賴，可分別推進。T2 處理既有物件許可與持有門檻，T3 用無物件權限爭議的外在互動驗證新環境／身體能力，T4 用有權或無爭議的材料驗證來源／分拆。
-- T5 需要 T3 的環境及身體狀態／條件表示，但不必等待 T2 的物件操作邊界或 T4 的來源分拆。
-- T6 需 T2、T4、T5 完成；T1、T3 及既有契約鏈已由傳遞依賴涵蓋，不重複列成直接阻擋。
+- 現在的先行工作是既有 #137，接著 #138、#139；[#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 不在它們完成前另造同一契約整理。
+- [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 完成後，[#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)、[#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148)、[#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) 沒有彼此的必要行為依賴，可分別推進。[#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) 處理既有物件許可與持有門檻，[#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) 用無物件權限爭議的外在互動驗證新環境／身體能力，[#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) 用有權或無爭議的材料驗證來源／分拆。
+- [#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) 需要 [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) 的環境及身體狀態／條件表示，但不必等待 [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) 的物件操作邊界或 [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) 的來源分拆。
+- [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 需 [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)、[#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149)、[#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) 完成；[#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)、[#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) 及既有契約鏈已由傳遞依賴涵蓋，不重複列成直接阻擋。
 - 分支工作即使沒有行為阻擋，仍需協調共用契約的變更並保持各自驗收；不為避免合併衝突就虛構額外產品依賴。
-- 發布時再次核對狀態，以真實 Issue 編號取代 T1–T6。ready-for-agent 表示票面已可承接，不表示可跳過阻擋關係。
+- 發布前已再次核對狀態，以下引用均已對應實際工作票。ready-for-agent 表示票面已可承接，不表示可跳過阻擋關係。
 
 ## #145 驗收覆蓋
 
@@ -53,30 +53,30 @@ flowchart TD
 
 | 父規格驗收項 | 負責票 |
 | --- | --- |
-| 1 新狀態與不同後果 | T1、T6 |
-| 2 完整外在影響 | T3 |
-| 3 餐點與來源 | T4；T6 回歸 |
-| 4 正常授權借還 | T2；T6 回歸 |
-| 5 喝→洗→同杯再泡 | T6 |
-| 6 意外損毀 | T2 |
-| 7 未經許可物件操作 | T2 |
-| 8 刻意身體影響 | T3 |
-| 9 分拆與細分 | T4 |
-| 10 自然變化與條件失效 | T5 |
-| 11 日常免費重用與例外 | T6 |
-| 12 活動與五段分支 | T1 建立；T2–T5 各自情境；T6 日常整合 |
-| 13 候選／執行分離 | T1 建立；各票對新增候選回歸 |
-| 14 保存及原操作重送 | 各票針對新增變更驗證；T6 混合情境 |
-| 15 舊世界相容 | 各票處理新增表示；T6 完整接續 |
-| 16 有界證據與安全回饋 | 各票新增行為同步驗證；T6 日常完整投影 |
-| 17 真實應用回歸 | 各票端到端驗收；T6 全場景整合 |
-| 18 交付證據與限制 | 各票維護文件與審查；T6 彙整有界驗收流程 |
+| 1 新狀態與不同後果 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)、[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) |
+| 2 完整外在影響 | [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) |
+| 3 餐點與來源 | [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149)；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 回歸 |
+| 4 正常授權借還 | [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 回歸 |
+| 5 喝→洗→同杯再泡 | [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) |
+| 6 意外損毀 | [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) |
+| 7 未經許可物件操作 | [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) |
+| 8 刻意身體影響 | [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) |
+| 9 分拆與細分 | [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) |
+| 10 自然變化與條件失效 | [#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) |
+| 11 日常免費重用與例外 | [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) |
+| 12 活動與五段分支 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 建立；[#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)–[#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150) 各自情境；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 日常整合 |
+| 13 候選／執行分離 | [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 建立；各票對新增候選回歸 |
+| 14 保存及原操作重送 | 各票針對新增變更驗證；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 混合情境 |
+| 15 舊世界相容 | 各票處理新增表示；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 完整接續 |
+| 16 有界證據與安全回饋 | 各票新增行為同步驗證；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 日常完整投影 |
+| 17 真實應用回歸 | 各票端到端驗收；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 全場景整合 |
+| 18 交付證據與限制 | 各票維護文件與審查；[#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 彙整有界驗收流程 |
 
-## 完整工作票草案
+## 完整工作票
 
-以下票面使用 #145 的範圍及已確認詞彙，不固定內部檔案、欄位名稱或程式片段。具體通用表示、上限、時間／數量與相容方案由各票工程設計落實。每票預期在一個新的工作上下文中交付一條可獨立展示的完整路徑。
+以下為已發布票面；後續以各 GitHub Issue 的最新內容與留言為準。工程表示與有界上限由各票落實，驗收範圍沿用 #145。
 
-### T1：[世界變更] 自由活動承接新物件狀態與結果分支
+### [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)：[世界變更] 自由活動承接新物件狀態與結果分支
 
 #### Parent
 
@@ -114,11 +114,15 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T1，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 1/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
+
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
 ---
 
-### T2：[世界變更] 分開物主許可與物理操作，保存意外及未經許可後果
+### [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)：[世界變更] 分開物主許可與物理操作，保存意外及未經許可後果
 
 #### Parent
 
@@ -128,7 +132,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 讓物件操作依物理可行性及裁定結果承接，物主許可保留為世界事實，但不再單獨等同所有操作都做不到。打通合法借用的意外損毀，以及刻意未經許可拿取、擅用和損壞的完整應用路徑。
 
-更新相關物件綁定、材料／工具選擇、已知障礙、目標與效果驗證及可知回饋的共同語義。沿 T1 的新契約與既有自由活動執行；日常規則對新語義的免費重用由 T6 完成。本票不設計財產法律或強制 NPC 作惡。
+更新相關物件綁定、材料／工具選擇、已知障礙、目標與效果驗證及可知回饋的共同語義。沿 [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 的新契約與既有自由活動執行；日常規則對新語義的免費重用由 [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 完成。本票不設計財產法律或強制 NPC 作惡。
 
 #### Acceptance criteria
 
@@ -144,7 +148,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Blocked by
 
-- T1：[世界變更] 自由活動承接新物件狀態與結果分支（發布時換成實際 Issue 編號）。
+- [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)：[世界變更] 自由活動承接新物件狀態與結果分支。
 
 #### 驗證與邊界
 
@@ -156,11 +160,15 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T2，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 2/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
+
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
 ---
 
-### T3：[世界變更] 承接環境與身體影響，連接可知線索及活動中斷
+### [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148)：[世界變更] 承接環境與身體影響，連接可知線索及活動中斷
 
 #### Parent
 
@@ -168,9 +176,9 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### What to build
 
-擴充 T1 的通用狀態與變更路徑，讓一次事件能同時形成物件、環境及身體的外在後果，例如打翻熱茶造成杯中茶減少、桌面濕及手被燙到。另以推開、拉住等刻意互動驗證角色身體可被外在影響，但不能藉此改寫角色自主。
+擴充 [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146) 的通用狀態與變更路徑，讓一次事件能同時形成物件、環境及身體的外在後果，例如打翻熱茶造成杯中茶減少、桌面濕及手被燙到。另以推開、拉住等刻意互動驗證角色身體可被外在影響，但不能藉此改寫角色自主。
 
-將新狀態接入既有可知線索、感知／關注、活動前提及決策時機，並在既有世界／角色畫面與保存重讀中可辨識。T2 的物件所有權門檻改造不是本票必要前置；本票可用無物件權限爭議的情境完成。
+將新狀態接入既有可知線索、感知／關注、活動前提及決策時機，並在既有世界／角色畫面與保存重讀中可辨識。[#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) 的物件所有權門檻改造不是本票必要前置；本票可用無物件權限爭議的情境完成。
 
 #### Acceptance criteria
 
@@ -185,7 +193,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Blocked by
 
-- T1：[世界變更] 自由活動承接新物件狀態與結果分支（發布時換成實際 Issue 編號）。
+- [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)：[世界變更] 自由活動承接新物件狀態與結果分支。
 
 #### 驗證與邊界
 
@@ -197,11 +205,15 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T3，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 3/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
+
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
 ---
 
-### T4：[世界變更] 形成與轉化保留來源，分拆物件按需要細分
+### [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149)：[世界變更] 形成與轉化保留來源，分拆物件按需要細分
 
 #### Parent
 
@@ -211,7 +223,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 讓實際形成與材料轉化保存必要來源、身份和數量，並完成物件分拆後按需細分的互動路徑。蛋糕切成數份或杯子成一堆碎片時，當下就保存分拆事實與重要差異；尚不需分開操作的部分可先作為整體，某部分被拿走、食用或另行使用時再細分。
 
-本票以已獲許可或沒有物件權限爭議的情境驗收，不必等待 T2；涉及物件本身的形成／分拆，也不必等待 T3 的環境／身體。跨情境日常規則重用由 T6 接入。
+本票以已獲許可或沒有物件權限爭議的情境驗收，不必等待 [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)；涉及物件本身的形成／分拆，也不必等待 [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) 的環境／身體。跨情境日常規則重用由 [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151) 接入。
 
 #### Acceptance criteria
 
@@ -227,7 +239,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Blocked by
 
-- T1：[世界變更] 自由活動承接新物件狀態與結果分支（發布時換成實際 Issue 編號）。
+- [#146](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/146)：[世界變更] 自由活動承接新物件狀態與結果分支。
 
 #### 驗證與邊界
 
@@ -239,11 +251,15 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T4，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 4/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
+
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
 ---
 
-### T5：[世界變更] 已確認的自然變化隨世界時間執行並可失效
+### [#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150)：[世界變更] 已確認的自然變化隨世界時間執行並可失效
 
 #### Parent
 
@@ -253,7 +269,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 把天上意志在確認外在後果時一併提出的自然變化、時間與成立條件，接入真實世界時間推進與保存。以熱茶冷卻及濕桌面乾燥示範從首次確認到時間推進、UI 顯示、保存重讀及條件失效的完整路徑。
 
-沿既有活動／世界推進與回合一致性責任執行，不另建付費背景輪詢或只存在於前端的計時器。依賴 T3 提供物件以外的狀態與條件引用；不要求先完成 T2 的物件許可或 T4 的分拆來源功能。
+沿既有活動／世界推進與回合一致性責任執行，不另建付費背景輪詢或只存在於前端的計時器。依賴 [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148) 提供物件以外的狀態與條件引用；不要求先完成 [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147) 的物件許可或 [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149) 的分拆來源功能。
 
 #### Acceptance criteria
 
@@ -269,7 +285,7 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Blocked by
 
-- T3：[世界變更] 承接環境與身體影響，連接可知線索及活動中斷（發布時換成實際 Issue 編號）。
+- [#148](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/148)：[世界變更] 承接環境與身體影響，連接可知線索及活動中斷。
 
 #### 驗證與邊界
 
@@ -281,11 +297,15 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T5，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 5/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
+
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
 ---
 
-### T6：[世界變更] 日常規則重用通用後果，完成跨情境接續與整合驗收
+### [#151](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/151)：[世界變更] 日常規則重用通用後果，完成跨情境接續與整合驗收
 
 #### Parent
 
@@ -314,9 +334,9 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Blocked by
 
-- T2：[世界變更] 分開物主許可與物理操作，保存意外及未經許可後果（發布時換成實際 Issue 編號）。
-- T4：[世界變更] 形成與轉化保留來源，分拆物件按需要細分（發布時換成實際 Issue 編號）。
-- T5：[世界變更] 已確認的自然變化隨世界時間執行並可失效（發布時換成實際 Issue 編號）。
+- [#147](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/147)：[世界變更] 分開物主許可與物理操作，保存意外及未經許可後果。
+- [#149](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/149)：[世界變更] 形成與轉化保留來源，分拆物件按需要細分。
+- [#150](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/150)：[世界變更] 已確認的自然變化隨世界時間執行並可失效。
 
 #### 驗證與邊界
 
@@ -328,13 +348,18 @@ Part of #145 — [通用世界變更框架：模型確認外在後果、物件�
 
 #### Further Notes
 
-本票為 #145 拆分草案 T6，尚未發布、實作或驗收。經使用者確認拆分後，按依賴順序發布並標記 ready-for-agent；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
+2026-10-21 使用者已批准六張拆分及前置關係。本票為第 6/6 張，已發布為 ready-for-agent，尚未實作或驗收；該標籤不表示可忽略未完成前置。父規格保持原狀，不因拆票修改或關閉。
 
+本連接器未提供原生 sub-issue／blocking 寫入工具，父規格及阻擋關係以本文 Parent／Blocked by 連結為準，未建立原生關係。
 
-## 發布方式與本次邊界
+來源：[使用者確認的拆票草案](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/2572a255d6a8bbd4ecce9ac887f0b2e249ae238f/docs/plans/world-changes-tickets-2026-10-21.md)。
 
-to-tickets skill 要求先讓使用者確認拆分粒度與 blocking edges，再發布工作票。本次已完成完整草案及覆蓋檢查，下一步只需確認這六張是否需要合併、拆細或調整前置；不重開已確認的產品 Grill。
+## 發布紀錄與本次邊界
 
-確認後按 T1 至 T6 的順序建立 GitHub Issues，套用 ready-for-agent，引用父規格 #145 與真實阻擋票號。優先使用原生 sub-issue／blocking 關係；目前可用 GitHub 連接器未提供其寫入工具，發布時若仍不可用，就使用每票 Parent／Blocked by 的明確連結並如實說明，不能冒稱已建立原生關係。按 skill 不修改或關閉父規格。
+使用者已於 2026-10-21 回覆「ok」，批准六張拆分、驗收範圍及前置關係；依 to-tickets 流程按依賴順序建立 #146–#151，套用 ready-for-agent，完整票面已回讀確認。
 
-本次沒有發布新子票、執行功能測試、啟動實作、呼叫正式付費模型、修改正式世界、合併或部署。
+目前 GitHub 連接器沒有原生 sub-issue／blocking 寫入工具，各票以 Parent／Blocked by 明確連結父規格及阻擋票；未建立原生關係。父規格 #145 與既有票保持原狀，不因拆票修改或關閉。
+
+先行工作仍為既有 #137 → #138 → #139，再開始 #146。#146 完成後 #147、#148、#149 可分別推進；#148 完成後可進行 #150；#147、#149、#150 完成後進行 #151。ready-for-agent 不表示可跳過未完成前置。
+
+本次僅發布工作票並更新拆分文件，沒有執行功能測試、啟動 runtime 實作、呼叫正式付費模型、修改正式世界、合併或部署；#104、#106 保持未關閉。
