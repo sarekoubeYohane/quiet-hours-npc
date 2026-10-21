@@ -1,6 +1,7 @@
+import { cancelActivity } from '@/lib/activity-lifecycle';
 import { bindRoutine, routineOffer, routineCandidateSchema, parseRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
-import { requiresWorldEffects, cancelActivity, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
+import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
 import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';

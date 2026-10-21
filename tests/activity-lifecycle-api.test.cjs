@@ -78,3 +78,26 @@ test('direct deterministic work finishes in its program-confirmed unit and contr
   await s.post({operation:'direct',action:{type:'rest'}});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan.timeIntent.kind,'open-ended');assert.equal(w.characters[0].plan.until-w.characters[0].plan.startedAt,60);for(let i=0;i<3;i++)await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,/時段.*到期/);assert.equal(w.characters[0].control.mode,'taken-over');assert.deepEqual(s.counts(),{npc:0,judgments:0});
  }finally{s.restore();}
 });
+
+test('cancelling one activity removes only its unmaterialized future supplies and preserves unrelated pending world facts',async()=>{
+ for(const operation of ['takeover','return-control']){
+  const s=await scenario(60);try{
+   await s.post({operation:'advance',minutes:15});let w=await s.read();
+   const cup=structuredClone(w.objects[0]),future=w.supplies.find(x=>x.pending);
+   const unrelated={...structuredClone(future),id:'another-activity-serving',label:'另一項活動待用材料'};
+   w.supplies.push(unrelated);
+   // A previously materialized source is a committed identity even if another
+   // actor later marks its supply pending; cancellation must preserve that fact.
+   const committed=structuredClone(w.supplies.find(x=>x.id===cup.source));
+   committed.pending=true;Object.assign(w.supplies.find(x=>x.id===cup.source),committed);
+   store.replaceCommittedWorld(w);
+   const request={operation,operationId:opid()};assert.equal((await s.post(request)).status,200);w=await s.read();
+   assert.equal(w.characters[0].plan,undefined);assert.deepEqual(w.objects,[cup]);
+   assert.equal(w.supplies.some(x=>x.id===future.id),false);
+   assert.deepEqual(w.supplies.find(x=>x.id===unrelated.id),unrelated);
+   assert.deepEqual(w.supplies.find(x=>x.id===committed.id),committed);
+   assert.equal((await s.post(request)).status,200);assert.deepEqual((await s.read()).supplies,w.supplies);
+   assert.deepEqual(s.counts(),{npc:1,judgments:1});
+  }finally{s.restore();}
+ }
+});

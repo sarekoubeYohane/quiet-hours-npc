@@ -246,30 +246,11 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
  if(phase.effects.some(e=>e.kind==='grant'||e.kind==='consent'))throw Error('活動需要新的角色選擇。');
  if(c.plan?.phases&&regionOf(c)!==c.plan.phases.origin)throw Error('角色已離開活動場景。');
 }
-// Only unexecuted prepared servings belong to the cancelled future. Concrete
-// objects and earlier committed phases remain facts of the world.
-export function cancelActivity(w:World,c:Character):void {
- const phases=c.plan?.phases;
- if(phases&&w.supplies){
-  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).filter((effect):effect is Extract<Effect,{kind:'materialize'}>=>effect.kind==='materialize').map(effect=>effect.supplyId));
-  w.supplies=w.supplies.filter(supply=>!pending.has(supply.id)||!supply.pending||(w.objects||[]).some(object=>object.source===supply.id));
- }
- delete c.plan;
- if(c.control)delete c.control.active;
-}
-export function advanceFreePhases(w:World,c:Character):void{
- const plan=c.plan,phases=plan?.phases;
- if(!plan||!phases)return;
- while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=w.minute-plan.startedAt){
-  const phase=phases.stages[phases.cursor],clone=structuredClone(w),actor=clone.characters.find(x=>x.id===c.id)!;
-  let results:string[];
-  try{checkPhase(clone,actor,phase);results=applyEffects(clone,actor,phase.effects,phases.cursor);}catch{
-   c.activity='原活動的條件已改變，尚未完成。';
-   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);cancelActivity(w,c);return;
-  }
-  w.objects=clone.objects;w.supplies=clone.supplies;phases.cursor++;
-  c.activity=results.join('，');
-  record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
- }
- if(phases.cursor===phases.stages.length&&w.minute>=plan.until){c.activity+='；活動已完成。';delete c.plan;}
+// Validate and commit one phase as a batch; lifecycle owns the phase cursor.
+export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number):string[] {
+ const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
+ checkPhase(clone,actor,phase);
+ const results=applyEffects(clone,actor,phase.effects,index);
+ w.objects=clone.objects;w.supplies=clone.supplies;
+ return results;
 }

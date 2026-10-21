@@ -1,9 +1,11 @@
-import { requiresWorldEffects, cancelActivity, advanceFreePhases, commitFreeAction, EffectValidationError, type EffectCandidate } from './world-effects';
+import { requiresWorldEffects, type EffectCandidate } from './world-effects';
+import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, startActivity } from './activity-lifecycle';
+export { activityDurations, canResumeActivity } from './activity-lifecycle';
 import { bindRoutine } from './routine-rules';
 import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
-import { demoDecision, pendingInterventions, record, resolve, type Action, type AIUsage, type Character, type Intent, type World } from './world';
+import { demoDecision, pendingInterventions, record, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
@@ -20,8 +22,6 @@ export function budgetReached(usage: AIUsage, limits: BudgetLimits): boolean {
   return (limits.calls !== null && usage.calls >= limits.calls) ||
     (limits.tokens !== null && usage.inputTokens + usage.outputTokens >= limits.tokens);
 }
-export const activityDurations = [15, 30, 45, 60, 75, 90];
-const sustained = new Set<Action['type']>(['propose', 'rest', 'work', 'reflect', 'observe']);
 const attentionKinds = new Set(['message', 'intervention']);
 
 export class BudgetExceeded extends Error {
@@ -45,12 +45,6 @@ export function attentionMarker(world: World, character: Character): string {
   return pendingObservations(character).findLast(observation => observationAttention(character, observation))?.id || world.events.findLast(event => event.actor !== character.id && attentionKinds.has(event.kind) && event.audience.includes(character.id))?.id || '';
 }
 
-export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
-  const plan = character.plan;
-  return !!plan && (!requiresWorldEffects(plan.action) || !!plan.phases) && (sustained.has(plan.action.type) || plan.timeIntent?.kind==='open-ended') && plan.modelKey === modelKey &&
-    (world.minute <= plan.until || !!plan.phases);
-}
-
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
   return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
     pendingInterventions(world, character).length === 0;
@@ -63,14 +57,6 @@ function mayChooseAutonomously(character: Character): boolean {
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = { ...world, minute: world.minute + minutes };
   return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
-}
-
-function expireOpenPeriod(world:World,character:Character):boolean {
- if(character.plan?.timeIntent?.kind!=='open-ended'||world.minute<character.plan.until)return false;
- character.activity='自己選定的活動時段已到期，接下來可重新安排。';
- record(world,character.id,`${character.name} ${character.activity}`,'continue',[character.id]);
- cancelActivity(world,character);
- return true;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -96,12 +82,7 @@ export async function advanceActivities(world: World, options: {
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     const control = character.control;
-    // Old tea plans have no validated effects. Replan without replaying their
-    // historical success text or changing earlier committed story/memories.
-    if (character.plan?.action.type === 'work' && character.plan.action.target === 'tea' && !character.plan.phases) {
-      cancelActivity(world,character);
-      character.activity = '泡茶尚未完成，需要重新確認物件條件。';
-    }
+    discardLegacyActivity(world,character);
     let controlledDecision:ActivityDecision|undefined;
     if (control?.pending) {
       const action=control.pending;
@@ -111,11 +92,7 @@ export async function advanceActivities(world: World, options: {
       controlledDecision={action,durationMinutes:openEnded?60:15,timeIntent:{kind:openEnded?'open-ended':'completion',maxMinutes:null}};
     }
     if (!controlledDecision && control?.active && character.plan) {
-      if(character.plan.phases){advanceFreePhases(world,character);if(!character.plan)delete control.active;continue;}
-      if(expireOpenPeriod(world,character))continue;
-      const left = Math.max(0, character.plan.until - world.minute);
-      record(world, character.id, `${character.name} 繼續指定活動${left ? `，還有約 ${left} 分鐘` : '，這段活動已完成'}。`, 'continue', [character.id], { from: character.location, to: character.location });
-      if (!left) cancelActivity(world,character);
+      progressActivity(world,character,'controlled');
       continue;
     }
     if (!controlledDecision && control?.mode === 'taken-over') {
@@ -123,14 +100,7 @@ export async function advanceActivities(world: World, options: {
       continue;
     }
     if (!controlledDecision && canContinue(world, character, modelKey)) {
-      if(character.plan?.phases){advanceFreePhases(world,character);if(ai)usage.savedDecisions++;continue;}
-      const left = Math.max(0, character.plan!.until - world.minute);
-      if (expireOpenPeriod(world,character)) {
-        if(ai)usage.savedDecisions++;
-        continue;
-      }
-      // Do not repeatedly say the same line, produce new thoughts, or add duplicate memories.
-      record(world, character.id, `${character.name} 繼續原本的活動${left ? `，還有約 ${left} 分鐘` : '，這段活動已完成'}。`, 'continue', [character.id], { from: character.location, to: character.location });
+      progressActivity(world,character,'automatic');
       if (ai) usage.savedDecisions++;
       continue;
     }
@@ -154,7 +124,7 @@ export async function advanceActivities(world: World, options: {
       if (control) delete control.experiences;
     } else {
       const action = demoDecision(world, character);
-      decision = { action, durationMinutes: sustained.has(action.type) ? 60 : 15 };
+      decision = { action, durationMinutes: sustainedActions.has(action.type) ? 60 : 15 };
     }
     if((controlledDecision||!ai)&&requiresWorldEffects(decision.action)){
       decision.freeCandidate=bindRoutine(world,character,decision.action,decision.durationMinutes,undefined,minutes,decision.timeIntent?.maxMinutes)??{status:'unsupported',effects:[],stages:[],check:null};
@@ -174,68 +144,13 @@ export async function advanceActivities(world: World, options: {
       if (decision.intents) character.intents = decision.intents;
       if (typeof decision.action.mood === 'string') character.mood = decision.action.mood;
       character.plan!.attention = attentionMarker(world, character);
-      if(character.plan?.phases){record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from,to:character.location});advanceFreePhases(world,character);continue;}
-      if(expireOpenPeriod(world,character))continue;
-      record(world, character.id, `${character.name} 決定繼續原本的活動，還有約 ${Math.max(0, character.plan!.until - world.minute)} 分鐘。`, 'continue', [character.id], { from, to: character.location });
+      progressActivity(world,character,'chosen');
       continue;
     }
     if (decision.intents) character.intents = decision.intents;
-    cancelActivity(world,character);
     try {
-      if(requiresWorldEffects(decision.action)){
-        if(!decision.freeCandidate){
-          if(ai)throw Error('物件行動缺少裁定。');
-          character.activity='泡茶尚未完成：目前規則模式不支援這項物件活動。';
-          record(world,character.id,`${character.name} ${character.activity}`,'unsupported',[character.id]);
-          continue;
-        }
-        let candidate=decision.freeCandidate;
-        if(decision.timeIntent?.kind==='completion'&&candidate.status==='accepted'){
-          const instantaneousRights=candidate.effects.length>0&&candidate.effects.every(effect=>effect.kind==='grant'||effect.kind==='consent')&&!(candidate.stages?.length);
-          if(candidate.confirmedDurationMinutes===undefined&&instantaneousRights)candidate={...candidate,confirmedDurationMinutes:15};
-          if(candidate.confirmedDurationMinutes===undefined)throw new EffectValidationError('完成目標缺少世界確認耗時。',{reason:'completion_time_missing'});
-          const duration=candidate.confirmedDurationMinutes;
-          if(instantaneousRights&&duration!==15)throw new EffectValidationError('授權與同意是一次性選擇。',{reason:'rights_duration'});
-          if(!(candidate.stages?.length)&&duration>minutes)candidate={...candidate,effects:[],stages:[{afterMinutes:duration,preconditions:[],effects:candidate.effects}]};
-          if(candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
-          if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes){
-            const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
-            commitFreeAction(validation,actor,{...candidate,check:null});
-            candidate={status:'denied',effects:[],stages:[],check:null,blockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
-          }
-        }
-        const phases=candidate.stages||[];
-        const duration=candidate.confirmedDurationMinutes??decision.durationMinutes;
-        if(phases.some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
-        const accepted=commitFreeAction(world,character,candidate);
-        if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention:attentionMarker(world,character),modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advanceFreePhases(world,character);}
-      }
-      else {
-        if(decision.timeIntent?.kind==='completion'){
-          if(decision.action.type==='rest'||decision.action.type==='reflect'){
-            character.activity='目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。';
-            record(world,character.id,`${character.name} ${character.activity}`,'unsupported',[character.id]);
-            continue;
-          }
-          if(decision.timeIntent.maxMinutes!==null&&decision.timeIntent.maxMinutes<15){
-            const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
-            resolve(validation,actor,decision.action,{dryRun:true});
-            character.activity=`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`;
-            record(world,character.id,`${character.name} ${character.activity}`,'blocked',[character.id]);
-            continue;
-          }
-        }
-        resolve(world, character, decision.action);
-      }
+      if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai}))continue;
       if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from);
-      const duration = decision.timeIntent?.kind==='completion'?15:activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
-      if (!requiresWorldEffects(decision.action) && (sustained.has(decision.action.type) || decision.timeIntent?.kind==='open-ended') && duration > minutes) {
-        character.plan = { action: decision.action, startedAt: world.minute - minutes,
-          until: world.minute - minutes + duration, attention: attentionMarker(world, character), modelKey, ...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}) };
-        if(decision.timeIntent?.kind==='open-ended')character.activity=`正在進行自己選定的活動時段，約剩 ${duration-minutes} 分鐘。`;
-      }else if(decision.timeIntent?.kind==='open-ended'&&!requiresWorldEffects(decision.action)){
-        character.activity='自己選定的活動時段已到期，接下來可重新安排。';
-      }
       if(controlledDecision&&character.plan)control!.active=true;
     } catch (error) {
       if (error instanceof MemoryValidationError || requiresWorldEffects(decision.action)) throw error;
