@@ -177,9 +177,10 @@ export async function advanceActivities(world: World, options: {
           continue;
         }
         const phases=decision.freeCandidate.stages||[];
-        if(phases.some(p=>p.afterMinutes>decision.durationMinutes))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
+        const duration=decision.freeCandidate.confirmedDurationMinutes??decision.durationMinutes;
+        if(phases.some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
         const accepted=commitFreeAction(world,character,decision.freeCandidate);
-        if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+decision.durationMinutes,attention:attentionMarker(world,character),modelKey,phases:{stages:phases,cursor:0,origin:character.region!}};advanceFreePhases(world,character);}
+        if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention:attentionMarker(world,character),modelKey,phases:{stages:phases,cursor:0,origin:character.region!}};advanceFreePhases(world,character);}
       }
       else resolve(world, character, decision.action);
       if (ai && !respondingToUser) learnHabit(world, character, decision.action, from);
