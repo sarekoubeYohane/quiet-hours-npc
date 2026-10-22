@@ -63,6 +63,39 @@
 - 單筆超過1MiB時，不靜默截斷成完整件；改存帶`single-record-limit`、原始bytes數及有界派送／已知用量的缺口骨架。列表、詳情可見缺口。無按日數到期。
 - 實錄在世界CAS確定成功後才標committed／rolled-back保存。世界及供應商呼叫與實錄不是單一交易；journal先放`pending / world-and-trace-are-separate-transactions`狀態，實錄寫入後補狀態。寫入失敗回`write-failed / trace-write-failed`，不能宣稱完整；世界原提交及精確重送不受影響。持續資料庫故障可使狀態補記本身也失敗，因此pending必須視為缺口而不是完整。
 - reset成功後清除owner舊實錄，再保存reset操作本身；清除失敗以trace-lifecycle-gap呈現。驗收場景進出保留舊context證據，在同一owner總容量下淘汰；當前context列表不把其他context混入。
-- 舊世界、舊操作及舊候選不回填內容。找不到實錄可能是舊版、淘汰、未捕獲或寫入失敗，不代表沒有派送。#92承接持久checkpoint、遲到／租約與故障崩潰窗口。
+- 舊世界、舊操作及舊候選不回填內容。找不到實錄可能是舊版、淘汰、未捕獲或寫入失敗，不代表沒有派送。#92持久checkpoint、遲到／租約與故障崩潰窗口見下節。
 
-新資料表為附加migration；新讀取器兼容無實錄的舊世界。發布前須套用0005 migration；未套用時故事仍可執行，讀寫實錄明示失敗，不能視為追溯驗收成功。回退程式可保留新表，不能刪除已記錄證據當作回退步驟。完整payload不寫入console，一般安全stage logs仍只攜既有關聯欄位。
+新資料表為附加migration；新讀取器兼容無實錄的舊世界。發布前須套用0005 migration；#91初版未套用時故事仍可執行、讀寫實錄明示失敗；#92為防同ID重派新增受理前歷史查詢依賴，未套用時停止受理，詳見下節。回退程式可保留新表，不能刪除已記錄證據當作回退步驟。完整payload不寫入console，一般安全stage logs仍只攜既有關聯欄位。
+
+## 故障與未提交的保存點（#92）
+
+#92沿同一張私有實錄表與同一GET／分析詳情，新增awaited保存點。受理後先保存accepted；共用transport在fetch前保存真正準備的body與當時世界快照，fetch開始後保存dispatched，收到headers／body／候選／已知usage／技術故障後逐步保存。observer與保存失敗不改原模型候選或增加呼叫。首個保存點前註冊目前帳號兩種configured服務的Key，以免NPC輸入意外包含另一供應商Key時在較早保存點洩漏；headers仍不捕獲。
+
+| 最後已知階段 | 能證明 | 不能證明 |
+| --- | --- | --- |
+| accepted | 本操作取得原租約、被受理 | 已呼叫模型 |
+| dispatch-prepared | 當次真正準備的body／當時世界已保存 | fetch確實發生；保存返回到fetch之間仍可中斷 |
+| dispatched | 此worker已開始fetch並保存關聯 | 供應商完成、usage、候選合法 |
+| response-headers | 已收到HTTP狀態 | body收到或可解析；429body失敗仍保留provider-limit分類 |
+| received／candidate-received | 實際回覆／候選原文已可得 | 解析／驗證或世界提交成功 |
+| timeout／transport／response-body／provider-body／candidate-format／candidate-validation | 程式實際失敗的邊界 | 模型內部根因、正常世界否決 |
+| commit-start | 世界結果仍為交易候選 | 已提交 |
+| world-commit-confirmed／journal-confirmed | CAS成功或原journal確認的結果與版本 | 原事件未記錄的模型理由 |
+
+NPC格式錯誤以實際JSON解析與契約驗證catch記錄，不從錯誤文案反推。裁定的純解析、綁定／效果驗證及世界提交保持分工；較早NPC已執行的候選仍可查，後一角色失敗時整回合回復，實錄outcome為rolled-back並展示回復後世界，不能稱局部效果已提交。
+
+provider timeout由同一signal／原25秒上限約束；忽略abort的底層回覆可在worker仍活著時保存為late-discarded、保留原失敗及可機械讀得的lateUsage，但不續做parser、D20、世界效果或改寫原journal／已知費用。租約／版本失效後已收到的候選亦標discarded及lease-invalid。lateUsage是供應商回覆證據，與已定案費用帳分開，不把未知用量補成0；負數／非有限數不列為已知。Worker已終止或body永不返回時，實際回覆仍不可得，不保證可捕獲所有晚到內容。
+
+保存點以序列queue逐個await，final outcome也經同一queue，避免較早保存點在最終定案後覆蓋新結果。第一次成功保存保留原acceptedAt；之後僅UPDATE原owner／operation／request的紀錄。被淘汰或reset清除的in-flight紀錄不因晚到worker重新INSERT；所有內容仍受1MiB／64筆／16MiB同一限制。超限骨架保留有界failure、discarded、已知usage／lateUsage及原資料缺口，不把大回覆省略誤當沒有用量或沒有錯誤。
+
+world CAS衝突明示not-committed；throw-before經原pending確認未提交，throw-after則讀原journal確認已提交，不能只按exception判定。若原receipt被替換、已淘汰或儲存持續不可讀，保留unknown及最後成功保存階段；不把較後新操作成功覆蓋原失敗。讀取或重送仍沿原journal。若原journal receipt已遺失但archive證明同ID曾受理，只回uncertain並說明journal-receipt-unavailable，禁止用archive重建／重做操作。
+
+因此#92新增一項**受理前的私有歷史讀取依賴**：在接受一個journal未見ID前，必須能查archive確認未曾受理。查詢故障回本地化503、operationUncertain與prior-acceptance-unavailable／before-acceptance，不取得租約、不派送模型、不更改世界；可用原ID待讀取恢復後重試。這修訂#91「未套migration故事仍可執行」的初始退化行為：發布#92前必須先套0005，讀取不可用時選擇停在受理前以維持同ID不重派。**trace寫入失敗仍不阻斷已受理操作的世界提交**；journal留write-failed／pending及最後已知階段，不能把這兩種故障混稱故事已回復。
+
+分析頁以本次操作ID聚焦，不依舊成功operationEvidence猜測；無世界／evidence的uncertain或conflict回應也可由停止原因進詳情。原journal的世界結果、archive最後durable副本與本次HTTP回應的非持久狀態分開標示；有舊checkpoint且最終寫入失敗時，仍須顯示該筆journal的gap，不用當前最新操作替它背書。
+
+這些保存點增加序列化及D1讀寫成本；每次NPC或裁定通常多個statement，仍受原110秒工作／120秒租約及25秒provider限制，不能保證任意大型回合完成。包含40角色極端容量情境的48項本機相關回歸合計約144秒，僅證明上限與故障保障，不是正式站效能或永不逾時保證。原模型／世界／實錄不形成單一交易：fetch與dispatched保存點、世界CAS與final trace之間仍有不可消除的崩潰窗口，必須保留未知，不能補造。
+
+configured但無法解密的未使用Key不應阻擋demo、直接控制或另一正常供應商。此時不猜測憑證明文，實錄切換credential-redaction-unavailable骨架：省略所有body、snapshot、steps原文、result、context與自由服務／角色標籤，僅保存安全操作／HTTP UUID、程式階段、outcome與有界已知用量。實際選用服務原有readModelKey驗證仍會照常停止不合法派送，診斷不替其放行。
+
+單筆1MiB限制亦在capture中生效：第一次跨界即按當時JSON bytes量測轉骨架，後續派送仍記機械收據／用量，但不繼續收集本文、世界snapshot或step原文。`omittedOriginalBytes`是首次超界值，不代表未知的最後原件總大小。metadata-only因憑證未知而不保存context，列表會在同owner當前查閱路徑併列此類骨架並明示場景未知；不因此替它補造context或放寬跨帳號權限。

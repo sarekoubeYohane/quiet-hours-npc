@@ -1,6 +1,6 @@
 import type { World, Character } from './world';
 import type { ModelObserver, ModelObservation } from './model-adapter';
-import type { DecisionTrace } from './decision-traces';
+import { decisionTraceLimits, omitDecisionTraceContent, type DecisionTrace } from './decision-traces';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 
 // Observer-only snapshots never become World fields or prompt inputs. Each is
@@ -10,9 +10,10 @@ export function traceWorldSnapshot(world: World) {
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
     actors:world.characters.map(actor=>({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan}))});
 }
-export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown}) {
-  const secrets=new Set<string>();
-  const trace:DecisionTrace={...context,schemaVersion:1,lastKnownStage:'accepted',dispatches:[],steps:[],gaps:[],redacted:false};
+export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
+  const secrets=new Set<string>();let unknownCredentials=false,contentLimitExceeded=false,omittedOriginalBytes=0;
+  const omitContent=()=>unknownCredentials||contentLimitExceeded;
+  const trace:DecisionTrace={...context,schemaVersion:1,acceptedAt:Date.now(),lastKnownStage:'accepted',dispatches:[],steps:[],gaps:[],redacted:false};
   const steps=trace.steps as {kind:string;actorId?:string;source:string;data:unknown;at:number}[];
   const scrub=(value:unknown,depth=0):unknown=>{
     if(depth>48){(trace.gaps as string[]).push('redaction-depth-limit');return '<OMITTED>';}
@@ -38,25 +39,52 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
     return value;
   };
   const step=(kind:string,actorId:string|undefined,data:unknown,source='program')=>{
-    steps.push({kind,actorId,source,data:structuredClone(data),at:Date.now()});trace.lastKnownStage=kind;
+    steps.push({kind,actorId,source,data:omitContent()?{gap:'trace-content-omitted'}:structuredClone(data),at:Date.now()});trace.lastKnownStage=kind;
   };
   const observer=(task:'npc'|'adjudication',actor:Character,world:World,provider:string,model:string,key:string,legacy?:ModelObserver):ModelObserver=>{
     secrets.add(key);let active:Record<string,unknown>|undefined;
-    return (event:ModelObservation)=>{
-      legacy?.(event);
-      if(event.kind==='dispatch'){
+    return async(event:ModelObservation)=>{
+      await legacy?.(event);
+      if(event.kind==='prepared'){
         active={sequence:trace.dispatches.length+1,task,actorId:actor.id,requestId:event.requestId,provider,model,startedAt:Date.now(),
-          requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world),stage:'dispatched'};
-        trace.dispatches.push(active);trace.lastKnownStage='dispatched';
-      }else if(active&&event.kind==='response'){active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=Date.now();active.stage='received';trace.lastKnownStage='received';}
+          ...(omitContent()?{}:{requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world)}),stage:'dispatch-prepared'};
+        trace.dispatches.push(active);trace.lastKnownStage='dispatch-prepared';
+      }else if(active&&event.kind==='dispatch'){if(active.stage==='dispatch-prepared')active.stage='dispatched';trace.lastKnownStage=String(active.stage);}
+      else if(active&&event.kind==='headers'){active.httpStatus=event.httpStatus;active.headersReceivedAt=Date.now();active.stage='response-headers';trace.lastKnownStage='response-headers';}
+      else if(active&&(event.kind==='response'||event.kind==='late-response')){if(!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=Date.now();active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
+        active.discarded=true;
+        try{const usage=JSON.parse(event.responseBody)?.usage;if(typeof usage?.prompt_tokens==='number'&&typeof usage?.completion_tokens==='number'&&Number.isFinite(usage.prompt_tokens)&&Number.isFinite(usage.completion_tokens)&&usage.prompt_tokens>=0&&usage.completion_tokens>=0)active.lateUsage={inputTokens:usage.prompt_tokens,outputTokens:usage.completion_tokens};}catch{/* Malformed late bodies remain raw evidence. */}
+      }}
       else if(active&&event.kind==='usage')active.usage=event.usage;
-      else if(active&&event.kind==='candidate'){active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
+      else if(active&&event.kind==='candidate'){if(!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
+      else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage};active.stage=event.failure;trace.lastKnownStage=event.failure;}
+      await persist();
     };
   };
+  let writes=Promise.resolve();
+  const snapshot=()=>{
+    if(!omitContent()){
+      const measured=new TextEncoder().encode(JSON.stringify(trace)).byteLength;
+      if(measured>decisionTraceLimits.recordBytes){
+        contentLimitExceeded=true;omittedOriginalBytes=measured;
+        // Once this operation is over its content budget, retain receipts only.
+        // Avoid repeatedly serializing all earlier transcripts at every later
+        // actor's checkpoint while preserving actual dispatch/usage metadata.
+        for(const item of trace.dispatches){const dispatch=item as Record<string,unknown>;for(const key of ['requestBody','responseBody','rawCandidate','worldSnapshot','parsedCandidate','validation'])delete dispatch[key];}
+        for(const item of steps)item.data={gap:'single-record-limit'};
+        delete trace.result;
+      }
+    }
+    const value=unknownCredentials?omitDecisionTraceContent(trace,'credential-redaction-unavailable',true):contentLimitExceeded?omitDecisionTraceContent(trace,'single-record-limit',false,omittedOriginalBytes):trace;
+    const cleaned=scrub(value) as DecisionTrace;cleaned.redacted=trace.redacted||unknownCredentials;return cleaned;
+  };
+  const persist=async()=>{if(checkpoint){const copy=snapshot();writes=writes.then(()=>checkpoint(copy));await writes;}};
   const finish=(outcome:DecisionTrace['outcome'],world?:World,resultVersion?:number)=>{
     trace.outcome=outcome;trace.resultVersion=resultVersion;
-    if(world)trace.result=traceWorldSnapshot(world);
-    const cleaned=scrub(trace) as DecisionTrace;cleaned.redacted=trace.redacted;return cleaned;
+    if(world&&!omitContent())trace.result=traceWorldSnapshot(world);
+    return snapshot();
   };
-  return {observer,step,finish};
+  const discard=(kind:string)=>{const active=trace.dispatches.at(-1) as Record<string,unknown>|undefined;if(active){active.discarded=true;active.failure={kind,stage:active.stage};active.stage='discarded';}};
+  const gap=(reason:string)=>{const gaps=trace.gaps as string[];if(!gaps.includes(reason))gaps.push(reason);};
+  return {observer,step,finish,persist,gap,discard,omitUnsafeContent:()=>{unknownCredentials=true;gap('credential-redaction-unavailable');},registerSecret:(key:string)=>{secrets.add(key);}};
 }

@@ -9,13 +9,15 @@ type Trace = {
   baseVersion:number; resultVersion?:number; redacted:boolean; gaps:string[];
   dispatches:Array<{sequence:number;task:string;actorId:string;requestId:string;provider:string;model:string;
     startedAt:number;requestBody?:string;responseBody?:string;httpStatus?:number;stage:string;
-    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown}>;
+    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown;failure?:{kind:string;stage?:string};discarded?:boolean;lateUsage?:unknown}>;
   steps:Array<{kind:string;actorId?:string;source:string;data:unknown}>;
   result?:unknown;
 };
 type TraceIndex = { records:Array<{operationId:string;requestId:string;outcome:string;lastKnownStage:string;createdAt:number;bytes:number;gap?:string}>;
   retention:{count:number;bytes:number;evicted:number;firstAvailableAt?:number;lastAvailableAt?:number;limits:unknown};gap?:string };
-type TraceResponse = {error?:string;decisionTrace?:Trace|null;decisionTraces?:TraceIndex};
+type TraceStatus = {status?:string;gap?:string;lastKnownStage?:string};
+type TraceOperation = {state:string;decisionTraceStatus?:TraceStatus;evidence?:{outcome:string;resultVersion?:number}|null};
+type TraceResponse = {error?:string;decisionTrace?:Trace|null;decisionTraces?:TraceIndex;operation?:TraceOperation};
 const contentStyle = {whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:'28rem',overflow:'auto',fontSize:'.85rem',fontFamily:'ui-monospace, SFMono-Regular, Consolas, "Noto Sans TC", monospace'} as const;
 const outcomes:Record<string,string> = {committed:'世界已提交','rolled-back':'回合已回復', 'not-committed':'世界未提交',unknown:'世界提交狀態未知'};
 const sources:Record<string,string> = {program:'程式檢查／紀錄','model-self-report':'模型自述（不代表真實因果）','maintainer-hypothesis':'維護者假設（尚待驗證）'};
@@ -28,10 +30,11 @@ async function readTrace(operationId?:string,signal?:AbortSignal) {
   if(!response.ok)throw Error(body.error||'暫時無法讀取決策追溯。');
   return body;
 }
-export default function DecisionTraces({operationId}:{operationId?:string}) {
+export default function DecisionTraces({operationId,lastResponse}:{operationId?:string;lastResponse?:TraceStatus&{operationId:string}}) {
   const [index,setIndex]=useState<TraceIndex>();
   const [shown,setShown]=useState<Trace|null>();
   const [selected,setSelected]=useState('');
+  const [operationStatus,setOperationStatus]=useState<TraceOperation>();
   const [message,setMessage]=useState(''),[loading,setLoading]=useState(true);
   useEffect(()=>{
     const controller=new AbortController();
@@ -41,7 +44,7 @@ export default function DecisionTraces({operationId}:{operationId?:string}) {
         if(controller.signal.aborted)return;
         setIndex(body.decisionTraces);
         const id=operationId||body.decisionTraces?.records[0]?.operationId;
-        if(id){const detail=await readTrace(id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);}}
+        if(id){const detail=await readTrace(id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);setOperationStatus(detail.operation);}}
         else setShown(null);
       } catch(error) { if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。'); }
       finally {if(!controller.signal.aborted)setLoading(false);}
@@ -49,8 +52,8 @@ export default function DecisionTraces({operationId}:{operationId?:string}) {
     void load();return ()=>controller.abort();
   },[operationId]);
   async function select(id:string) {
-    setLoading(true);setMessage('');setSelected(id);setShown(undefined);
-    try { const body=await readTrace(id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null); }
+    setLoading(true);setMessage('');setSelected(id);setShown(undefined);setOperationStatus(undefined);
+    try { const body=await readTrace(id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null);setOperationStatus(body.operation); }
     catch(error) {setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。');}
     finally {setLoading(false);}
   }
@@ -62,12 +65,15 @@ export default function DecisionTraces({operationId}:{operationId?:string}) {
       {index.gap&&<p role="status">資料缺口：{index.gap}</p>}
       {index.records.length>0&&<label style={{display:'grid',gap:8}}>選擇追溯操作<select aria-label="追溯操作" style={{width:'100%',minWidth:0,padding:10,background:'#18232f',color:'inherit'}} value={selected} disabled={loading} onChange={event=>void select(event.target.value)}>
         {!index.records.some(item=>item.operationId===selected)&&<option value={selected}>{selected||'選擇操作'}</option>}
-        {index.records.map(item=><option key={item.operationId} value={item.operationId}>{outcomes[item.outcome]||item.outcome} · {item.operationId}</option>)}
+        {index.records.map(item=><option key={item.operationId} value={item.operationId}>{outcomes[item.outcome]||item.outcome} · {item.operationId}{item.gap==='credential-redaction-unavailable'?' · 場景未知，內容已省略':''}</option>)}
       </select></label>}</>}
     {loading&&<p role="status">正在讀取實錄…</p>}
     {message&&<p role="alert">{message}<Button variant="link" disabled={loading||!selected} onClick={()=>void select(selected)}>重新讀取實錄</Button></p>}
+    {selected&&!loading&&lastResponse?.operationId===selected&&lastResponse.gap&&<p aria-label="本次HTTP追溯回應">本次 HTTP 回應（非已保存回條）：{lastResponse.status}<br/>最後已知階段：{lastResponse.lastKnownStage||'未知'}<br/>資料缺口：{lastResponse.gap}</p>}
+    {selected&&!loading&&<p aria-label="本筆追溯保存狀態">操作：{selected}<br/>操作狀態：{operationStatus?.state||'未記錄'} · 追溯保存：{operationStatus?.decisionTraceStatus?.status||'未記錄'}<br/>操作回條最後已知階段：{operationStatus?.decisionTraceStatus?.lastKnownStage||'未保存／未知'}{operationStatus?.evidence&&<><br/>操作回條的世界結果：{outcomes[operationStatus.evidence.outcome]||operationStatus.evidence.outcome}{operationStatus.evidence.resultVersion!==undefined?`（版本 ${operationStatus.evidence.resultVersion}）`:''}</>}{operationStatus?.decisionTraceStatus?.gap&&<><br/>本筆資料缺口：{operationStatus.decisionTraceStatus.gap}</>}</p>}
     {shown===null&&!loading&&!message&&<p>沒有保存這筆實錄：可能是舊操作、已淘汰、未捕獲或寫入失敗。找不到紀錄不代表沒有派送；舊版未保存的輸入及理由無法重建。</p>}
     {shown&&<>
+      {operationStatus?.decisionTraceStatus?.gap&&<p>以下是最後成功保存的實錄；操作回條可能記錄更後階段，不能把這份較早副本視為完整實錄。</p>}
       <p>操作：{shown.operationId}<br/>原請求：{shown.requestId}<br/>{outcomes[shown.outcome]||shown.outcome} · 最後已知階段：{shown.lastKnownStage}<br/>世界版本：{shown.baseVersion} → {shown.resultVersion??'未確認'}</p>
       <p>下列解析、效果及分支可能只是候選；世界是否提交以本操作提交狀態為準。</p>
       {shown.redacted&&<p>包含憑證遮蔽；顯示內容不是逐位元原件。</p>}
@@ -77,13 +83,16 @@ export default function DecisionTraces({operationId}:{operationId?:string}) {
       {shown.dispatches.map(dispatch=><article key={dispatch.sequence} style={{display:'grid',gap:10,minWidth:0,borderTop:'1px solid #445365',paddingTop:12}}>
         <h4>#{dispatch.sequence} · {dispatch.task==='npc'?'NPC 決策':'世界裁定'} · {dispatch.actorId}</h4>
         <p>{dispatch.provider} / {dispatch.model}<br/>請求：{dispatch.requestId}<br/>階段：{dispatch.stage} · HTTP {dispatch.httpStatus??'未記錄'}</p>
-        {dispatch.requestBody===undefined?<p>當次請求本文未保存。</p>:<JsonDetails label="實際送出的請求本文" value={dispatch.requestBody}/>}
+        {dispatch.stage==='dispatch-prepared'&&<p>派送前保存點：是否真正發送未知；這筆準備紀錄不能證明供應商已收到請求。</p>}
+        {dispatch.failure&&<p>技術故障：{dispatch.failure.kind}{dispatch.failure.stage?` · ${dispatch.failure.stage}`:''}。這不是模型對世界行動的正常否決。</p>}
+        {dispatch.discarded&&<p>此回覆遲到或已失效，未交給世界執行；不代表候選或效果已提交。</p>}
+        {dispatch.requestBody===undefined?<p>當次請求本文未保存。</p>:<JsonDetails label={dispatch.stage==='dispatch-prepared'?'已準備的請求本文（派送狀態未知）':'實際送出的請求本文'} value={dispatch.requestBody}/>}
         {dispatch.responseBody===undefined?<p>當次回覆本文缺失；不推定模型沒有回覆。</p>:<JsonDetails label="實際收到的回覆本文" value={dispatch.responseBody}/>}
         {dispatch.worldSnapshot!==undefined&&<JsonDetails label="當次權威世界快照（包含相關未變狀態；不代表 NPC 可知）" value={dispatch.worldSnapshot}/>}
         {dispatch.rawCandidate!==undefined&&<JsonDetails label="模型候選原文" value={dispatch.rawCandidate}/>}
         {dispatch.parsedCandidate!==undefined&&<JsonDetails label="解析候選（尚非提交證據）" value={dispatch.parsedCandidate}/>}
         {dispatch.validation!==undefined&&<JsonDetails label="程式驗證" value={dispatch.validation}/>}
-        {dispatch.usage!==undefined&&<JsonDetails label="供應商已知用量" value={dispatch.usage}/>}
+        {dispatch.usage!==undefined&&<JsonDetails label="供應商已知用量" value={dispatch.usage}/>}{dispatch.lateUsage!==undefined&&<JsonDetails label="遲到回覆中的供應商用量（未改寫原定案）" value={dispatch.lateUsage}/>}
       </article>)}
       <h3>規則、驗證、執行與回饋</h3>
       {(shown.steps??[]).map((step,i)=><div key={i}><p>{sources[step.source]||step.source} · {step.kind}{step.actorId?` · ${step.actorId}`:''}</p><JsonDetails label={`查看 ${step.kind}`} value={step.data}/></div>)}

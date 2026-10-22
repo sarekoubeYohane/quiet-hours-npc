@@ -13,3 +13,13 @@ PR #132 的成功成果無法還原原提案及裁定，而把完整模型對話
 選擇現有D1/SQLite附加表與原子statement內容量trigger；單筆1MiB／owner世界64筆及16MiB源自代表實際序列化body量測。跨context共享上限，不按日數到期，最舊優先；單筆超限、遮蔽、寫入及reset清除失敗均需明示。此成本換取可查當次原輸入與原回覆，仍接受有限容量、憑證遮蔽及供應商／世界／實錄多交易崩潰窗口。世界提交和實錄完成不能相互冒充。
 
 裁定有界explanation與引用事實是模型自述，程式規則／驗證是機械紀錄，維護者猜測是待反證假設。舊事件缺失不補造；固定回覆fixture只證明程式，不證明10/22原事件模型根因，亦不自動關閉#85／#104／#106。工程上限、舊資料及回退契約見[工程契約](../design/operation-evidence.md)。
+
+## #92：持久保存點與不明結果
+
+只有請求結束時寫實錄會丟掉硬中斷與未提交回合，因此改在共用派送的準備、開始、headers／回覆、已知usage及故障邊界逐次await有界保存點；世界候選到CAS／journal確認仍由原交易負責。接受保存點增加D1延遲及寫入量，保留原工作期限／租約與預算；不宣稱provider、世界與實錄可原子提交。prepared只證明準備本文已保存，不能證明fetch已發生；資料缺口與原失敗不得由晚到回覆覆蓋。
+
+私有保存點含跨供應商服務Key的意外echo風險，因此任何本文持久化前先註冊所有當前configured Key並遮蔽；憑證仍不進實錄。逾時後的晚到回覆只作discarded證據，已知lateUsage不回寫原費用或恢復世界執行；最後定案與晚到保存按同一queue排列。超限保留有界機械failure／用量／缺口；淘汰或reset後只UPDATE不重新INSERT舊in-flight操作。
+
+journal仍是精確HTTP重放權威。archive證明ID曾受理而journal遺失時，選擇uncertain且不重派，不從實錄重建原結果。為防這類窗口，在journal未見ID的受理前先查私有archive；archive讀取不可用就明示before-acceptance停止、零模型／零世界效果。這是#92新增可用性取捨，發布前必須套0005 migration；不沿用#91未套migration仍執行新操作的初始退化描述。寫入實錄失敗仍不回滾或改寫已提交世界，保持原journal／用量／提交責任。
+
+歷史理由、模型因果與原10/22根因仍不能從新fixture還原；#85／#104／#106保持獨立診斷及受限正式驗收責任。工程細節與故障矩陣見[工程契約](../design/operation-evidence.md)與[#92本地驗收](../verification/decision-traces-92-2026-10-22.md)。
