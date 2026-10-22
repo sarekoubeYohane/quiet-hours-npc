@@ -71,7 +71,7 @@ try {
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
-  allTests.push('tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs');
+  allTests.push('tests/action-feedback-api.test.cjs', 'tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
