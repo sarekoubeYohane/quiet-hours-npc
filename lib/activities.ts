@@ -70,6 +70,7 @@ export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
 export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
   beforeDecision?: () => Promise<void>;
+  onActor?: (world:World,character:Character)=>void;
   decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
 }): Promise<void> {
   const { minutes, mode, modelKey, limits } = options;
@@ -84,6 +85,7 @@ export async function advanceActivities(world: World, options: {
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
+    try {
     const control = character.control;
     discardLegacyActivity(world,character);
     let controlledDecision:ActivityDecision|undefined;
@@ -159,6 +161,7 @@ export async function advanceActivities(world: World, options: {
       if (error instanceof MemoryValidationError || requiresWorldEffects(decision.action)) throw error;
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
+    } finally {try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}}
   }
   for (const character of world.characters) for (const observation of pendingObservations(character)) {
     const reason = observationAttention(character, observation);

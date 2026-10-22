@@ -73,3 +73,19 @@ test('pure routine parsing verifies an offered scope without receiving mutable w
  const one=structuredClone(candidate);one.routine.timings=one.routine.timings.slice(0,1);one.routine.programs=one.routine.programs.slice(0,1);
  assert.equal(parseAdjudicationCandidate(JSON.stringify(one),{routineOperations:['tea']}).kind,'routine');
 });
+
+test('bounded model explanations remain self-reported evidence for allowed, denied, and unsupported candidates without inventing legacy reasons',()=>{
+ const explanation={summary:'杯中原已有茶，因此不再填入。',facts:[{reference:'objects.ordinary-mug.state.contents',value:'tea'}]};
+ for(const status of ['denied','unsupported','accepted']){
+  const input=status==='accepted'?accepted:{status,effects:[],check:null};
+  assert.deepEqual(parseEffectCandidate(JSON.stringify({...input,explanation})).explanation,explanation);
+ }
+ assert.equal(parseEffectCandidate(JSON.stringify(accepted)).explanation,undefined);
+ assert.equal(parseEffectCandidate(JSON.stringify({...accepted,explanation:null})).explanation,undefined);
+ for(const invalid of [{...explanation,summary:'x'.repeat(513)},{...explanation,facts:Array(9).fill(explanation.facts[0])},{summary:'',facts:[]},{...explanation,facts:[{reference:'x',value:'x'.repeat(257)}]},{...explanation,thoughts:'private chain'}])assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,explanation:invalid})));
+ const contract=load('adjudication-contract'),{approval}=require('./routine-program-fixture.cjs');
+ assert.deepEqual(contract.parseAdjudicationCandidate(JSON.stringify({...approval(),explanation})).explanation,explanation);
+ assert.equal(contract.parseAdjudicationCandidate(JSON.stringify(approval())).explanation,undefined);
+ assert.equal(effectCandidateSchema.properties.explanation.anyOf[1].properties.summary.maxLength,512);
+ assert.ok(effectRules.some(rule=>rule.includes('模型自述')&&rule.includes('內部思考')));
+});

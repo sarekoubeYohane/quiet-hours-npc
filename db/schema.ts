@@ -7,3 +7,14 @@ export const accountModelKeys = sqliteTable('account_model_keys', {
   ciphertext: text('ciphertext').notNull(), nonce: text('nonce').notNull(), tag: text('tag').notNull(), expiresAt: integer('expires_at').notNull(),
 }, table => [primaryKey({ columns: [table.scope, table.owner, table.provider] })]);
 
+// SQL migration 0005 also installs byte checks and atomic retention triggers.
+// These are observer records, intentionally separate from World JSON.
+export const decisionTraces = sqliteTable('decision_traces', {
+  owner: text('owner').notNull(), contextId: text('context_id').notNull(),
+  operationId: text('operation_id').notNull(), requestId: text('request_id').notNull(),
+  createdAt: integer('created_at').notNull(), body: text('body').notNull(), bytes: integer('bytes').notNull(),
+}, table => [primaryKey({ columns: [table.owner, table.operationId] })]);
+export const decisionTraceRetention = sqliteTable('decision_trace_retention', {
+  owner: text('owner').primaryKey(), evicted: integer('evicted').notNull().default(0),
+});
+

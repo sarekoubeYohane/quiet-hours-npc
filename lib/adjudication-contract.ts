@@ -12,6 +12,17 @@ import type { Outcome } from './d20';
 import { adjudicationLimits, routineOperations, effectKinds, naturalChangeLimits, stateChangeLimits, externalStateLimits, physicalEffectLimits } from './adjudication-limits';
 export { adjudicationLimits, routineOperations, effectKinds, naturalChangeLimits, stateChangeLimits, externalStateLimits, physicalEffectLimits } from './adjudication-limits';
 
+// An explanation is bounded, self-reported output, never an execution premise.
+// Missing/null is deliberately distinct from a reconstructed or inferred reason.
+export const adjudicationExplanationLimits = {maxSummaryLength:512,maxFacts:8,maxReferenceLength:160,maxFactValueLength:256} as const;
+export type AdjudicationExplanation = {summary:string;facts:{reference:string;value:string}[]};
+function parseExplanation(value:unknown):AdjudicationExplanation|undefined {
+ if(value===undefined||value===null)return undefined;
+ const text=(item:unknown,max:number):item is string=>typeof item==='string'&&!!item.trim()&&item.length<=max;
+ if(!exact(value,['summary','facts'])||!text(value.summary,adjudicationExplanationLimits.maxSummaryLength)||!Array.isArray(value.facts)||value.facts.length>adjudicationExplanationLimits.maxFacts||value.facts.some(fact=>!exact(fact,['reference','value'])||!text(fact.reference,adjudicationExplanationLimits.maxReferenceLength)||!text(fact.value,adjudicationExplanationLimits.maxFactValueLength)))throw Error('裁定結果說明超出有界契約。');
+ return structuredClone(value) as AdjudicationExplanation;
+}
+
 // Keys remain data in a state bag; identity, rights and lifecycle have their
 // own restricted effects and may never be shadowed by a state descriptor.
 const reservedStateKeys = new Set(['__proto__','constructor','prototype','id','source','sources','owner','holder','region','location','revision','kind','lifecycle','quantity','coowners','consumable','formation','endedbyformation','physicalhistory','physicalhistorydropped','unpermittedcount','knownto','allowedto','acceptedby','statetransitions','stateexposure','exposure','physical','external','state','authorization','api_key','apikey','cookie','access_token','refresh_token']);
@@ -27,6 +38,7 @@ export function assertBoundedState(value:unknown):asserts value is Record<string
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 export const effectRules = [
+ `explanation是有界的模型自述結果說明，不是程式已驗證的根因或角色已知事實；請用summary（1至${adjudicationExplanationLimits.maxSummaryLength}字）簡述允許、否決或無進展的可核對結果，facts最多${adjudicationExplanationLimits.maxFacts}筆{reference,value}引用當次輸入中既有事實（reference至多${adjudicationExplanationLimits.maxReferenceLength}字，value至多${adjudicationExplanationLimits.maxFactValueLength}字）。不要求或輸出內部思考過程，不創造不存在的事實；無可用說明時explanation=null。此說明只供觀察者，不可自動作為NPC回饋。`,
  `schedule-natural version=${naturalChangeLimits.version}：在同次裁定確認已形成外在狀態的自然後續。delayMinutes是從該狀態正式提交起算的${naturalChangeLimits.minuteStep}分鐘倍數，${naturalChangeLimits.minDelay}至${naturalChangeLimits.maxDelay}；不是從回溯phase進展時間起算，不同回合追溯觸發。conditions為1至${naturalChangeLimits.maxConditions}個state-condition，僅綁必要state及可選region/holder guard，沒有guard的條件須有state。effects為1至${naturalChangeLimits.maxEffects}個{target,changes,exposure}，同target可分不同鍵的曝光，同鍵不能重複寫入，只允許同change-state受限狀態後果，不含revision或遞迴安排；每筆changes.from亦為持續前提。exposure明示object/environment public或hidden，body public/subject/hidden。每次正式批次後必要條件或from破壞即永久失效，即使後來恢復也不復活；無關state/revision不影響。reason只供證據，不是角色已知理由。pending最多${naturalChangeLimits.maxPending}、已結算紀錄最多${naturalChangeLimits.maxSettled}；安排與世界同批保存，執行不追加模型或骰子。`,
  ...formationRules,
  `共同界線：effects kinds=${Object.values(effectKinds).join("/")}；status=${adjudicationLimits.statuses.join('/')}；effects 至多${adjudicationLimits.maxEffects}；stages 至多${adjudicationLimits.maxStages}；completionMinutes 必須是正數且至多${adjudicationLimits.maxMinutes}，向上對齊${adjudicationLimits.minuteStep}分鐘；階段時點=${adjudicationLimits.phaseMinutes.join('/')}；不確定難度=${adjudicationLimits.difficulties.join('/')}。`,
@@ -115,13 +127,16 @@ const phaseReference={$ref:'#/$defs/phase'};
 const phaseSchema=variant({afterMinutes:{type:'integer',enum:[...adjudicationLimits.phaseMinutes]},preconditions:{type:'array',maxItems:adjudicationLimits.maxConditions,items:phaseConditionSchema},effects:{type:'array',minItems:1,maxItems:adjudicationLimits.maxEffects,items:effectReference}});
 const outcomes:readonly Outcome[]=adjudicationLimits.outcomes;
 const branchSchema=variant({outcomes:{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:{type:'string',enum:outcomes}},effects:{type:'array',maxItems:adjudicationLimits.maxEffects,items:effectReference},stages:{type:'array',maxItems:adjudicationLimits.maxStages,items:phaseReference}});
-export const effectCandidateSchema={...variant({branches:{anyOf:[{type:'null'},{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:branchSchema}]},completionMinutes:{anyOf:[{type:'null'},{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}]},stages:{type:'array',maxItems:adjudicationLimits.maxStages,items:phaseReference},status:{type:'string',enum:[...adjudicationLimits.statuses]},effects:{type:'array',maxItems:adjudicationLimits.maxEffects,items:effectReference},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:{type:'string',maxLength:adjudicationLimits.maxValueLength}})]}}),$defs:{effect:effectSchema,phase:phaseSchema}};
+export const explanationSchema={anyOf:[{type:'null'},variant({summary:{type:'string',minLength:1,maxLength:adjudicationExplanationLimits.maxSummaryLength},facts:{type:'array',maxItems:adjudicationExplanationLimits.maxFacts,items:variant({reference:{type:'string',minLength:1,maxLength:adjudicationExplanationLimits.maxReferenceLength},value:{type:'string',minLength:1,maxLength:adjudicationExplanationLimits.maxFactValueLength}})}})]};
+export const effectCandidateSchema={...variant({explanation:explanationSchema,branches:{anyOf:[{type:'null'},{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:branchSchema}]},completionMinutes:{anyOf:[{type:'null'},{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}]},stages:{type:'array',maxItems:adjudicationLimits.maxStages,items:phaseReference},status:{type:'string',enum:[...adjudicationLimits.statuses]},effects:{type:'array',maxItems:adjudicationLimits.maxEffects,items:effectReference},check:{anyOf:[{type:'null'},variant({difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:{type:'string',maxLength:adjudicationLimits.maxValueLength}})]}}),$defs:{effect:effectSchema,phase:phaseSchema}};
 export function scheduleCompletionMinutes(value:unknown):number {
  if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>adjudicationLimits.maxMinutes)throw Error('完成耗時必須是至多九十分鐘的有限正數。');
  return Math.ceil(value/adjudicationLimits.minuteStep)*adjudicationLimits.minuteStep;
 }
-export function parseEffectCandidate(raw:string):EffectCandidate{
+export function parseEffectCandidate(raw:string):EffectCandidate & {explanation?:AdjudicationExplanation}{
  let v:unknown;try{v=JSON.parse(raw);}catch{throw Error('裁定未回傳有效候選。');}
+ const explanation=parseExplanation(v&&typeof v==='object'&&!Array.isArray(v)?(v as Record<string,unknown>).explanation:undefined);
+ if(v&&typeof v==='object'&&!Array.isArray(v))delete (v as Record<string,unknown>).explanation;
  if(v&&typeof v==='object'&&!Array.isArray(v)&&'branches' in v){
   const envelope=v as Record<string,unknown>,branches=envelope.branches;
   delete envelope.branches;
@@ -140,7 +155,7 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
    });
    if(seen.length!==outcomes.length||new Set(seen).size!==outcomes.length||envelope.check===null&&branches.length!==1)throw Error('結果分支須唯一涵蓋五段判定；確定活動只用一組後果。');
    if(envelope.check!==null&&(!exact(envelope.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(envelope.check.difficulty as number)||(!reference(envelope.check.ability)||envelope.check.ability.length>adjudicationLimits.maxValueLength)))throw Error('裁定不可指定骰值或結果。');
-   return {status:'accepted',effects:[],stages:[],check:envelope.check as EffectCandidate['check'],confirmedDurationMinutes:duration,branches:parsed};
+   return {status:'accepted',effects:[],stages:[],check:envelope.check as EffectCandidate['check'],confirmedDurationMinutes:duration,branches:parsed,...(explanation?{explanation}:{})};
   }
  }
  let confirmedDurationMinutes:number|undefined;
@@ -187,7 +202,7 @@ export function parseEffectCandidate(raw:string):EffectCandidate{
   candidate.effects=[];candidate.stages=stages;
  }
  if(confirmedDurationMinutes!==undefined&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==confirmedDurationMinutes)throw Error('最後階段須與確認完成時間一致。');
- return candidate;
+ return {...candidate,...(explanation?{explanation}:{})};
 }
 
 export type LegacyRoutineApproval={family:'cafe-service';version:1|2;programs?:RoutineProgram[];operation?:RoutineOperation|null;subject?:string|null;timings:{operation:RoutineOperation;minutes:number}[]};
@@ -200,14 +215,16 @@ const routineV2CandidateSchema={...legacyRoutineCandidateSchema,properties:{...l
 const routineWorldApprovalSchema={...legacyApprovalSchema,properties:{...legacyApprovalSchema.properties,version:{type:'integer',enum:[3]},operation:{type:'string',minLength:1,maxLength:60},timings:{type:'array',minItems:1,maxItems:routineWorldLimits.maxPrograms,items:variant({operation:{type:'string',minLength:1,maxLength:60},minutes:{type:'number',exclusiveMinimum:0,maximum:adjudicationLimits.maxMinutes}})},programs:{type:'array',minItems:1,maxItems:routineWorldLimits.maxPrograms,items:routineWorldProgramSchema}},required:[...(legacyApprovalSchema.required||[]),'programs']};
 export const routineCandidateSchema={...routineV2CandidateSchema,$defs:{...routineV2CandidateSchema.$defs,routineEffect:symbolicEffectSchema(effectSchema),routineCondition:symbolicEffectSchema({anyOf:[stateConditionSchema,guardedStateConditionSchema]})},properties:{...routineV2CandidateSchema.properties,routine:{anyOf:[...routineV2CandidateSchema.properties.routine.anyOf,routineWorldApprovalSchema]}}};
 export type RoutineApproval=LegacyRoutineApproval|RoutineWorldApproval;
-export type AdjudicationCandidate = {kind:'routine';approval:RoutineApproval}|{kind:'effects';candidate:EffectCandidate};
+export type AdjudicationCandidate = ({kind:'routine';approval:RoutineApproval}|{kind:'effects';candidate:EffectCandidate}) & {explanation?:AdjudicationExplanation};
 export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:readonly string[];allowGenericMethods?:boolean}={}):AdjudicationCandidate {
  if(new TextEncoder().encode(raw).byteLength>routineWorldLimits.maxCandidateBytes)throw Error('裁定候選超出容量。');
  const parsed=JSON.parse(raw),approval=parsed?.routine;
+ const explanation=parseExplanation(parsed?.explanation);
+ if(parsed&&typeof parsed==='object')delete parsed.explanation;
  if(approval?.version!==3&&raw.length>adjudicationLimits.maxCandidateLength)throw Error('裁定候選超出容量。');
  if(approval!=null&&parsed.branches===null)delete parsed.branches;
  if(approval!=null&&parsed.completionMinutes!==undefined){if(parsed.completionMinutes!==null)throw Error('日常耗時須由整組規則確認。');delete parsed.completionMinutes;}
- if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;return {kind:'effects',candidate:parseEffectCandidate(JSON.stringify(parsed))};}
+ if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;return {kind:'effects',candidate:parseEffectCandidate(JSON.stringify({...parsed,...(explanation?{explanation}:{})})),...(explanation?{explanation}:{})};}
  const approvalKeys=approval&&typeof approval==='object'?Object.keys(approval).sort().join(','):'';
  if(approval?.version===3){
   if(Object.keys(parsed).sort().join(',')!=='check,effects,routine,stages,status'||parsed.status!=='accepted'||parsed.check!==null||!Array.isArray(parsed.effects)||parsed.effects.length||!Array.isArray(parsed.stages)||parsed.stages.length||approvalKeys!=='family,operation,programs,subject,timings,version'||approval.family!=='cafe-service'||typeof approval.operation!=='string'||!approval.operation.trim()||approval.operation.length>60||approval.subject!==null&&(typeof approval.subject!=='string'||!approval.subject.length||approval.subject.length>40)||!Array.isArray(approval.timings)||!approval.timings.length||approval.timings.length>routineWorldLimits.maxPrograms||new Set(approval.timings.map((time:{operation:unknown})=>time?.operation)).size!==approval.timings.length)throw Error('通用日常核准格式無效。');
@@ -218,7 +235,7 @@ export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:
    else if(!scope.allowGenericMethods||approval.timings.length!==1||approval.timings[0].operation!==approval.operation)throw Error('新日常方法未在本次允許範圍。');
   }
   validateRoutineWorldPrograms(approval.programs,approval.timings);
-  return {kind:'routine',approval:approval as RoutineWorldApproval};
+  return {kind:'routine',approval:approval as RoutineWorldApproval,...(explanation?{explanation}:{})};
  }
 
  if(approval?.version===2){
@@ -229,7 +246,7 @@ export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:
  if(!Array.isArray(approval.timings)||!approval.timings.length||approval.timings.length>routineOperations.length||new Set(approval.timings.map((t:{operation:unknown})=>t?.operation)).size!==approval.timings.length||approval.timings.some((t:unknown)=>!exact(t,['operation','minutes'])||!routineOperations.includes(t.operation as RoutineOperation)))throw Error('日常耗時格式無效。');
  for(const timing of approval.timings)scheduleCompletionMinutes(timing.minutes);
  if(scope.routineOperations&&(approval.timings.length!==scope.routineOperations.length||approval.timings.some((timing:{operation:RoutineOperation})=>!scope.routineOperations!.includes(timing.operation))))throw Error('日常範圍須完整涵蓋本次允許活動。');
- return {kind:'routine',approval:approval as RoutineApproval};
+ return {kind:'routine',approval:approval as RoutineApproval,...(explanation?{explanation}:{})};
 }
 
 

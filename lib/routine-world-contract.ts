@@ -31,8 +31,15 @@ export function symbolicEffectSchema(schema:unknown):unknown {
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const bounded=(value:unknown,max:number):value is string=>typeof value==='string'&&!!value.trim()&&value.length<=max;
 export const normalizeRoutineMethod=(value:string)=>value.trim().replace(/[。！!\s]+$/u,'');
+export function checkRoutineMethod(method:RoutineMethod,action:{content?:string;purpose?:string}):{wording:boolean;purpose:boolean} {
+ const wording=normalizeRoutineMethod(action.content||'')===normalizeRoutineMethod(method.content);
+ // Preserve the matching predicate's short circuit. A false wording means the
+ // purpose comparison did not run; diagnostic callers must label it accordingly.
+ const purpose=wording&&(action.purpose||'').trim()===method.purpose.trim();
+ return {wording,purpose};
+}
 export function matchesRoutineMethod(method:RoutineMethod,action:{content?:string;purpose?:string}):boolean {
- return normalizeRoutineMethod(action.content||'')===normalizeRoutineMethod(method.content)&&(action.purpose||'').trim()===method.purpose.trim();
+ const {wording,purpose}=checkRoutineMethod(method,action);return wording&&purpose;
 }
 const symbol=(value:unknown):value is string=>typeof value==='string'&&/^\$[a-z][a-z0-9-]{0,39}$/u.test(value);
 function normalizeExecutionPlaceholders(value:unknown):unknown {

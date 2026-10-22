@@ -48,7 +48,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     const db = await mf.getD1Database('DB');
     for (const file of (await readdir('drizzle')).filter(name => name.endsWith('.sql')).sort()) {
       const sql = await readFile('drizzle/' + file, 'utf8');
-      for (const statement of sql.split(';').map(value => value.replace(/--> statement-breakpoint/g, '').trim()).filter(Boolean)) await db.prepare(statement).run();
+      for (const statement of sql.split('--> statement-breakpoint').map(value => value.trim()).filter(Boolean)) await db.prepare(statement).run();
     }
     const origin = 'http://localhost:5173';
     const signIn = async () => {
