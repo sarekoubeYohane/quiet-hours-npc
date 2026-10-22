@@ -1,0 +1,33 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "testedSource": "a18ccc1",
+  "worldAndPersistence": "real WorldApp GET/POST with Node SQLite; auth/bindings/model transport and dice are fixture boundaries",
+  "runs": [
+    {
+      "runner": "tooling/verification/browser127.mjs",
+      "passCount": 7,
+      "results": [
+        "PASS #127 Chromium critical-success: progress=complete, material=active; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium success: progress=complete, material=active; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium mixed: progress=partial, material=active; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium failure: progress=raw, material=consumed; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium critical-failure: progress=raw, material=consumed; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium continue: progress=complete, material=active; 2 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay.",
+        "PASS #127 Chromium interrupt: progress=partial, material=active; 1 NPC + 1 adjudication + 1 D20; SQLite/UI reload and replay."
+      ]
+    },
+    {
+      "runner": "tooling/verification/browser129.mjs",
+      "passCount": 6,
+      "results": [
+        "PASS #129 Chromium critical-success: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 1 NPC + 1 adjudication + 1 dice.",
+        "PASS #129 Chromium success: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 1 NPC + 1 adjudication + 1 dice.",
+        "PASS #129 Chromium mixed: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 1 NPC + 1 adjudication + 1 dice.",
+        "PASS #129 Chromium failure: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 1 NPC + 1 adjudication + 1 dice.",
+        "PASS #129 Chromium critical-failure: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 1 NPC + 1 adjudication + 1 dice.",
+        "PASS #129 Chromium flow: saved rule/outcome, actual materials and cups, API/SQLite/UI reload/replay; 4 NPC + 1 adjudication + 3 dice."
+      ]
+    }
+  ]
+}

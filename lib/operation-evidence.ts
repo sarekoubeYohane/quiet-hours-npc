@@ -13,7 +13,7 @@ export type CandidateEvidence = { status: 'captured' | 'invalid-json' | 'omitted
 export type DispatchEvidence = { sequence: number; task: 'npc' | 'adjudication'; actorId: string; requestId: string; provider: string; model: string; usage: TokenUsage | null; candidate?: CandidateEvidence };
 export type ReplayAdvance = { operation: 'advance'; operationId: string; worldContext?: string; mode: string; model?: string; minutes: number };
 export type OperationEvidence = {
-  schemaVersion: 1; operationId: string; requestId: string; contextId?: string;
+  schemaVersion: 1 | 2; operationId: string; requestId: string; contextId?: string;
   deployment: Pick<EnvironmentView, 'name' | 'commit' | 'builtAt'>;
   operation: string; baseVersion: number; resultVersion?: number;
   outcome: 'committed' | 'rolled-back' | 'not-committed';
@@ -27,7 +27,18 @@ type Shape = true | { [key: string]: Shape } | Shape[];
 const proposalShape: Shape = { contractVersion: true, type: true, target: true, content: true, purpose: true, durationMinutes: true, timeIntent: { kind: true, maxMinutes: true } };
 const effectShape: Shape = {kind:true,supplyId:true,expectedRemaining:true,objectId:true,expectedRevision:true,toHolder:true,toRegion:true,key:true,value:true,targetId:true,recipient:true};
 const stateEntry: Shape = { key:true,value:true };
-const candidateShape: Shape = {status:true,completionMinutes:true,effects:[effectShape],check:{difficulty:true,ability:true},routine:{family:true,version:true,operation:true,subject:true,timings:[{operation:true,minutes:true}]},stages:[{afterMinutes:true,preconditions:[{objectId:true,revision:true,region:true,holder:true,state:[stateEntry]}],effects:[effectShape]}]};
+// The deepest allowed projection is result.rules[].programs[].branches[].stages[].effects[].value.
+// Keep a finite structural bound as well as the independent 64 KiB receipt limit.
+const projectionDepth = 11;
+const resolutionShape: Shape = {roll:true,modifier:true,dc:true,total:true,outcome:true};
+const selectedResultShape: Shape = {outcome:true,branch:true,resolution:resolutionShape};
+const checkShape: Shape = { difficulty:true, ability:true };
+const stageShape: Shape = {afterMinutes:true,preconditions:[{objectId:true,revision:true,region:true,holder:true,state:[stateEntry]}],effects:[effectShape]};
+const branchShape: Shape = {outcomes:[true],effects:[effectShape],stages:[stageShape]};
+const routineStepShape: Shape = {kind:true,role:true,toHolder:true,key:true,value:true};
+const routineStageShape: Shape = {afterMinutes:true,effects:[routineStepShape]};
+const routineProgramShape: Shape = {operation:true,effects:[routineStepShape],stages:[routineStageShape],check:checkShape,branches:[{outcomes:[true],effects:[routineStepShape],stages:[routineStageShape]}]};
+const candidateShape: Shape = {status:true,completionMinutes:true,effects:[effectShape],check:checkShape,branches:[branchShape],routine:{family:true,version:true,operation:true,subject:true,timings:[{operation:true,minutes:true}],programs:[routineProgramShape]},stages:[stageShape]};
 
 export function createOperationEvidence(context: {
   operationId: string; requestId: string; operation: string; baseVersion: number;
@@ -36,7 +47,7 @@ export function createOperationEvidence(context: {
   const secrets = new Set<string>();
   const before = context.world;
   const evidence: OperationEvidence = {
-    schemaVersion:1, operationId:context.operationId, requestId:context.requestId,
+    schemaVersion:2, operationId:context.operationId, requestId:context.requestId,
     contextId:before.contextId, deployment:{name:context.deployment.name,commit:context.deployment.commit,builtAt:context.deployment.builtAt},
     operation:context.operation, baseVersion:context.baseVersion, outcome:'not-committed',
     ...(context.replay ? {replay:context.replay} : {}), counts:{npc:0,adjudication:0},dispatches:[],truncated:false,redacted:false,
@@ -59,7 +70,7 @@ export function createOperationEvidence(context: {
   };
   const project = (value:unknown,shape:Shape,depth=0,strict=true):unknown => {
     if(value===null)return null;
-    if(depth>8){evidence.truncated=true;return undefined;}
+    if(depth>projectionDepth){evidence.truncated=true;return undefined;}
     if(shape===true)return scalar(value);
     if(Array.isArray(shape)) {
       if(!Array.isArray(value))return scalar(value);
@@ -111,9 +122,19 @@ export function createOperationEvidence(context: {
     evidence.outcome=outcome;evidence.resultVersion=resultVersion;
     if(world) {
       const objects=(world.objects||[]).filter(object=>JSON.stringify(object)!==JSON.stringify(before.objects?.find(old=>old.id===object.id)));
-      const rules=(world.routineRules||[]).map(rule=>({id:rule.id,version:rule.version,family:rule.family,timings:rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes}))}));
-      evidence.result=project({turn:world.turn,minute:world.minute,actors:world.characters.map(actor=>({id:actor.id,activity:actor.activity,plan:actor.plan?{startedAt:actor.plan.startedAt,until:actor.plan.until,action:actor.plan.action,phaseCursor:actor.plan.phases?.cursor}:null})),rules,objects},
-        {turn:true,minute:true,actors:[{id:true,activity:true,plan:{startedAt:true,until:true,action:{type:true,target:true,content:true},phaseCursor:true}}],rules:[{id:true,version:true,family:true,timings:[{operation:true,minutes:true}]}],objects:[{id:true,revision:true,region:true,holder:true,owner:true,lifecycle:true,kind:true,state:{contents:true,clean:true,vessel:true,beverage:true,available:true,condition:true}}]},0,false) as Record<string,unknown>;
+      const rules=(world.routineRules||[]).map(rule=>({id:rule.id,version:rule.version,family:rule.family,timings:rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes})),programs:rule.programs}));
+      const actors=world.characters.map(actor=>({id:actor.id,activity:actor.activity,plan:actor.plan?{
+        startedAt:actor.plan.startedAt,until:actor.plan.until,action:actor.plan.action,phaseCursor:actor.plan.phases?.cursor,
+        selectedResult:actor.plan.selectedResult,
+        stages:actor.plan.phases?.stages.map(stage=>({...stage,preconditions:stage.preconditions.map(condition=>({...condition,state:Object.entries(condition.state).map(([key,value])=>({key,value}))}))})),
+      }:null}));
+      // Only new mechanical results, never event text, audiences, attempt keys or private context.
+      // Completed plans are removed by the lifecycle; their committed resolution remains evidence.
+      const previousEvents=new Set(before.events.map(event=>event.id));
+      const resolutions=world.events.filter(event=>!previousEvents.has(event.id)&&['attempt','work'].includes(event.kind)&&event.resolution)
+        .map(event=>({eventId:event.id,actorId:event.actor,resolution:event.resolution}));
+      evidence.result=project({turn:world.turn,minute:world.minute,actors,rules,objects,resolutions},
+        {turn:true,minute:true,actors:[{id:true,activity:true,plan:{startedAt:true,until:true,action:{type:true,target:true,content:true},phaseCursor:true,selectedResult:selectedResultShape,stages:[stageShape]}}],rules:[{id:true,version:true,family:true,timings:[{operation:true,minutes:true}],programs:[routineProgramShape]}],objects:[{id:true,revision:true,region:true,holder:true,owner:true,lifecycle:true,kind:true,state:{contents:true,clean:true,vessel:true,beverage:true,available:true,condition:true}}],resolutions:[{eventId:true,actorId:true,resolution:resolutionShape}]},0,false) as Record<string,unknown>;
     }else delete evidence.result;
     // Redact metadata too, after all dispatched service credentials are known.
     const sanitize=(value:unknown):unknown=>{

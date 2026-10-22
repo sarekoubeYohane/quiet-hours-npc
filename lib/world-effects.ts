@@ -260,7 +260,12 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  }
 
  if(candidate.status!=='accepted'){
-  c.activity=candidate.blockedReason||(candidate.status==='denied'?'這次方法沒有成功。':'目前的方法無法落實。');
+  // A general candidate carries only a status, not a verified explanation.
+  // Do not turn hidden authority data into a reason or invent the model's intent.
+  // Routine binders already provide a more specific, knowable blockedReason.
+  c.activity=candidate.blockedReason||(candidate.status==='denied'
+   ?'這次方法沒有成功。若尚未取得必要使用許可，須由有權角色自行同意授權；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
+   :'目前的方法無法落實：這種效果目前無法承接，尚未完成。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);return false;
  }
  const existingObjects=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
