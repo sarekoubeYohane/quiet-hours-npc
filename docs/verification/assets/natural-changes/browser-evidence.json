@@ -1,0 +1,2782 @@
+{
+  "fixture": true,
+  "paidModelCalls": 0,
+  "counts": {
+    "npc": 8,
+    "adjudication": 5
+  },
+  "snapshots": [
+    {
+      "name": "hot-state-and-pending-cooling",
+      "world": {
+        "minute": 15,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 2,
+            "state": {
+              "temperature": "hot"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ]
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "pending"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080001000:4f17d8b0-7b52-4683-bd86-998993918af7",
+        "requestId": "07659f37-37f4-41db-83f7-bc4b463d2d81",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 0,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080001000:4f17d8b0-7b52-4683-bd86-998993918af7",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 1
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "ee512cc4-48ed-4afc-a58a-1fb5fad263f7",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "propose",
+                "target": "natural-cup",
+                "content": "觀察這只杯子並確認外在溫度的變化",
+                "purpose": "處理眼前物件",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "completion",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          },
+          {
+            "sequence": 2,
+            "task": "adjudication",
+            "actorId": "owner",
+            "requestId": "1792080001000:4f17d8b0-7b52-4683-bd86-998993918af7:owner:adjudication:cfe0f952-d76e-43ef-add7-463c3b6ed109",
+            "provider": "openai",
+            "model": "fixture-natural",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "status": "accepted",
+                "completionMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "state",
+                    "objectId": "natural-cup",
+                    "expectedRevision": 1,
+                    "key": "temperature",
+                    "value": "hot"
+                  },
+                  {
+                    "delayMinutes": 15,
+                    "conditions": [
+                      {
+                        "kind": "state-condition",
+                        "version": 1,
+                        "target": {
+                          "type": "object",
+                          "id": "natural-cup"
+                        },
+                        "state": [
+                          {
+                            "key": "temperature",
+                            "value": "hot"
+                          }
+                        ]
+                      }
+                    ],
+                    "effects": [
+                      {
+                        "target": {
+                          "type": "object",
+                          "id": "natural-cup"
+                        },
+                        "changes": [
+                          {
+                            "key": "temperature",
+                            "from": "hot",
+                            "value": "cool"
+                          }
+                        ],
+                        "exposure": "public"
+                      }
+                    ],
+                    "version": 1,
+                    "reason": "熱杯在室內靜置後逐漸冷卻",
+                    "kind": "schedule-natural"
+                  }
+                ],
+                "check": null,
+                "branches": null,
+                "routine": null,
+                "stages": []
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 1,
+        "result": {
+          "turn": 1,
+          "minute": 15,
+          "naturalChanges": [
+            {
+              "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 0
+              },
+              "scheduledAt": 15,
+              "committedAt": 15,
+              "nominalDueAt": 15,
+              "dueAt": 30,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "state": [
+                    {
+                      "key": "temperature",
+                      "value": "hot"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "changes": [
+                    {
+                      "key": "temperature",
+                      "from": "hot",
+                      "value": "cool"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "熱杯在室內靜置後逐漸冷卻",
+              "status": "pending"
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "自然變化測試杯：temperature=hot，已確認自然後續",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 2,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "state": {},
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "hot"
+                }
+              ]
+            }
+          ],
+          "beforeObjects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 1,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "warm"
+                }
+              ]
+            }
+          ],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "cooling-executed-without-adjudication",
+      "world": {
+        "minute": 30,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 3,
+            "state": {
+              "temperature": "cool"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080002000:2a3f00c3-6395-4c73-9e7d-b814489429b6",
+        "requestId": "078e642a-e2f7-489f-a3fe-c611223b60fd",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 1,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080002000:2a3f00c3-6395-4c73-9e7d-b814489429b6",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 0
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "667c2e2a-4651-4838-b136-1294f40817aa",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "rest",
+                "target": "",
+                "content": "安靜休息一會",
+                "purpose": "休息",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "open-ended",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 2,
+        "result": {
+          "turn": 2,
+          "minute": 30,
+          "naturalChanges": [
+            {
+              "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 0
+              },
+              "scheduledAt": 15,
+              "committedAt": 15,
+              "nominalDueAt": 15,
+              "dueAt": 30,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "state": [
+                    {
+                      "key": "temperature",
+                      "value": "hot"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "changes": [
+                    {
+                      "key": "temperature",
+                      "from": "hot",
+                      "value": "cool"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "熱杯在室內靜置後逐漸冷卻",
+              "status": "executed",
+              "settledAt": 30
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 3,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "state": {},
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "cool",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "beforeObjects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 2,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "hot"
+                }
+              ]
+            }
+          ],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "environment-wet-and-pending-drying",
+      "world": {
+        "minute": 45,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 3,
+            "state": {
+              "temperature": "cool"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "pending"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080003000:8bfab18c-cbc7-4f05-b81f-21770f4a0d9d",
+        "requestId": "c3ce0d2e-a8a9-4edc-93ae-66a8cb846047",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 2,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080003000:8bfab18c-cbc7-4f05-b81f-21770f4a0d9d",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 1
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "b6c16f9c-e1fe-4b54-94cc-8fc73369ab76",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "propose",
+                "target": "cafe-front",
+                "content": "處理桌面上的水滴並等待乾燥",
+                "purpose": "處理眼前狀況",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "completion",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          },
+          {
+            "sequence": 2,
+            "task": "adjudication",
+            "actorId": "owner",
+            "requestId": "1792080003000:8bfab18c-cbc7-4f05-b81f-21770f4a0d9d:owner:adjudication:45b58483-378b-493e-acb7-f32ed92f80ba",
+            "provider": "openai",
+            "model": "fixture-natural",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "status": "accepted",
+                "completionMinutes": 15,
+                "effects": [
+                  {
+                    "version": 1,
+                    "access": "physical",
+                    "exposure": "public",
+                    "target": {
+                      "type": "environment",
+                      "id": "cafe-front"
+                    },
+                    "changes": [
+                      {
+                        "key": "table.surface",
+                        "from": null,
+                        "value": "濕潤"
+                      }
+                    ],
+                    "reason": "形成可見水滴",
+                    "kind": "change-state",
+                    "expectedRevision": 0
+                  },
+                  {
+                    "delayMinutes": 15,
+                    "conditions": [
+                      {
+                        "kind": "state-condition",
+                        "version": 1,
+                        "target": {
+                          "type": "environment",
+                          "id": "cafe-front"
+                        },
+                        "state": [
+                          {
+                            "key": "table.surface",
+                            "value": "濕潤"
+                          }
+                        ]
+                      }
+                    ],
+                    "effects": [
+                      {
+                        "target": {
+                          "type": "environment",
+                          "id": "cafe-front"
+                        },
+                        "changes": [
+                          {
+                            "key": "table.surface",
+                            "from": "濕潤",
+                            "value": "已乾燥"
+                          }
+                        ],
+                        "exposure": "public"
+                      }
+                    ],
+                    "version": 1,
+                    "reason": "已確認的水滴自然乾燥",
+                    "kind": "schedule-natural"
+                  }
+                ],
+                "check": null,
+                "branches": null,
+                "routine": null,
+                "stages": []
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 3,
+        "result": {
+          "turn": 3,
+          "minute": 45,
+          "naturalChanges": [
+            {
+              "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 2
+              },
+              "scheduledAt": 45,
+              "committedAt": 45,
+              "nominalDueAt": 45,
+              "dueAt": 60,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "environment",
+                    "id": "cafe-front"
+                  },
+                  "state": [
+                    {
+                      "key": "table.surface",
+                      "value": "濕潤"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "environment",
+                    "id": "cafe-front"
+                  },
+                  "changes": [
+                    {
+                      "key": "table.surface",
+                      "from": "濕潤",
+                      "value": "已乾燥"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "已確認的水滴自然乾燥",
+              "status": "pending"
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "已進行這個步驟，已確認自然後續",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [],
+          "beforeObjects": [],
+          "externalStates": [
+            {
+              "target": {
+                "type": "environment",
+                "id": "cafe-front"
+              },
+              "before": null,
+              "after": {
+                "revision": 1,
+                "region": "cafe-front",
+                "stateEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ],
+                "exposureEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "public"
+                  }
+                ]
+              }
+            }
+          ],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "environment-dried-on-world-time",
+      "world": {
+        "minute": 60,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 3,
+            "state": {
+              "temperature": "cool"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "executed",
+            "settledAt": 60
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080004000:05ddf298-c8af-42e4-a919-b693aaa17c8d",
+        "requestId": "f0262754-ec3b-4a60-8aa0-63194e21a689",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 3,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080004000:05ddf298-c8af-42e4-a919-b693aaa17c8d",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 0
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "0e0de894-0fcf-4817-b6d9-b438ed4e8a3a",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "rest",
+                "target": "",
+                "content": "安靜休息一會",
+                "purpose": "休息",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "open-ended",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 4,
+        "result": {
+          "turn": 4,
+          "minute": 60,
+          "naturalChanges": [
+            {
+              "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 2
+              },
+              "scheduledAt": 45,
+              "committedAt": 45,
+              "nominalDueAt": 45,
+              "dueAt": 60,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "environment",
+                    "id": "cafe-front"
+                  },
+                  "state": [
+                    {
+                      "key": "table.surface",
+                      "value": "濕潤"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "environment",
+                    "id": "cafe-front"
+                  },
+                  "changes": [
+                    {
+                      "key": "table.surface",
+                      "from": "濕潤",
+                      "value": "已乾燥"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "已確認的水滴自然乾燥",
+              "status": "executed",
+              "settledAt": 60
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [],
+          "beforeObjects": [],
+          "externalStates": [
+            {
+              "target": {
+                "type": "environment",
+                "id": "cafe-front"
+              },
+              "before": {
+                "revision": 1,
+                "region": "cafe-front",
+                "stateEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ],
+                "exposureEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "public"
+                  }
+                ]
+              },
+              "after": {
+                "revision": 2,
+                "region": "cafe-front",
+                "stateEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposureEntries": [
+                  {
+                    "key": "table.surface",
+                    "value": "public"
+                  }
+                ]
+              }
+            }
+          ],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "confirmed-cooling-before-condition-break",
+      "world": {
+        "minute": 75,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 4,
+            "state": {
+              "temperature": "hot"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "executed",
+            "settledAt": 60
+          },
+          {
+            "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 4
+            },
+            "scheduledAt": 75,
+            "committedAt": 75,
+            "nominalDueAt": 75,
+            "dueAt": 120,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "應在必要條件中斷時失效",
+            "status": "pending"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080005000:746b8724-c4a6-4179-82db-2a16b0617e64",
+        "requestId": "a2c1dc26-5d69-48e9-b43c-e9d7fda95803",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 4,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080005000:746b8724-c4a6-4179-82db-2a16b0617e64",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 1
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "ec8f347a-a03f-4384-bfd0-d8cc257a71f7",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "propose",
+                "target": "natural-cup",
+                "content": "處理杯溫並確認後續冷卻",
+                "purpose": "處理眼前物件",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "completion",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          },
+          {
+            "sequence": 2,
+            "task": "adjudication",
+            "actorId": "owner",
+            "requestId": "1792080005000:746b8724-c4a6-4179-82db-2a16b0617e64:owner:adjudication:3e82b6da-72f1-46a2-9f31-40eb35467b0e",
+            "provider": "openai",
+            "model": "fixture-natural",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "status": "accepted",
+                "completionMinutes": 15,
+                "effects": [
+                  {
+                    "version": 1,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "target": {
+                      "type": "object",
+                      "id": "natural-cup"
+                    },
+                    "changes": [
+                      {
+                        "key": "temperature",
+                        "from": "cool",
+                        "value": "hot"
+                      }
+                    ],
+                    "reason": "調整杯子溫度",
+                    "kind": "change-state",
+                    "expectedRevision": 3
+                  },
+                  {
+                    "delayMinutes": 45,
+                    "conditions": [
+                      {
+                        "kind": "state-condition",
+                        "version": 1,
+                        "target": {
+                          "type": "object",
+                          "id": "natural-cup"
+                        },
+                        "state": [
+                          {
+                            "key": "temperature",
+                            "value": "hot"
+                          }
+                        ]
+                      }
+                    ],
+                    "effects": [
+                      {
+                        "target": {
+                          "type": "object",
+                          "id": "natural-cup"
+                        },
+                        "changes": [
+                          {
+                            "key": "temperature",
+                            "from": "hot",
+                            "value": "cool"
+                          }
+                        ],
+                        "exposure": "public"
+                      }
+                    ],
+                    "version": 1,
+                    "reason": "應在必要條件中斷時失效",
+                    "kind": "schedule-natural"
+                  }
+                ],
+                "check": null,
+                "branches": null,
+                "routine": null,
+                "stages": []
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 5,
+        "result": {
+          "turn": 5,
+          "minute": 75,
+          "naturalChanges": [
+            {
+              "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 4
+              },
+              "scheduledAt": 75,
+              "committedAt": 75,
+              "nominalDueAt": 75,
+              "dueAt": 120,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "state": [
+                    {
+                      "key": "temperature",
+                      "value": "hot"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "changes": [
+                    {
+                      "key": "temperature",
+                      "from": "hot",
+                      "value": "cool"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "應在必要條件中斷時失效",
+              "status": "pending"
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "已進行這個步驟，已確認自然後續",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 4,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "state": {},
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "hot",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "beforeObjects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 3,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "cool",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "condition-broken-permanently",
+      "world": {
+        "minute": 90,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 5,
+            "state": {
+              "temperature": "cool"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "executed",
+            "settledAt": 60
+          },
+          {
+            "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 4
+            },
+            "scheduledAt": 75,
+            "committedAt": 75,
+            "nominalDueAt": 75,
+            "dueAt": 120,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "應在必要條件中斷時失效",
+            "status": "invalidated",
+            "invalidatedAt": 90,
+            "settledAt": 90,
+            "invalidation": "conditions"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080006000:f213d712-e7a6-4f37-95a7-d2b647cfd174",
+        "requestId": "e7cc82e0-9628-430d-9dce-d79cd163b5b3",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 5,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080006000:f213d712-e7a6-4f37-95a7-d2b647cfd174",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 1
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "49a9f8a2-de2b-4b20-8709-8007eb1562e1",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "propose",
+                "target": "natural-cup",
+                "content": "處理杯溫並確認後續冷卻",
+                "purpose": "處理眼前物件",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "completion",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          },
+          {
+            "sequence": 2,
+            "task": "adjudication",
+            "actorId": "owner",
+            "requestId": "1792080006000:f213d712-e7a6-4f37-95a7-d2b647cfd174:owner:adjudication:2de2c885-ec24-40db-8e55-3524ece5eb23",
+            "provider": "openai",
+            "model": "fixture-natural",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "status": "accepted",
+                "completionMinutes": 15,
+                "effects": [
+                  {
+                    "version": 1,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "target": {
+                      "type": "object",
+                      "id": "natural-cup"
+                    },
+                    "changes": [
+                      {
+                        "key": "temperature",
+                        "from": "hot",
+                        "value": "cool"
+                      }
+                    ],
+                    "reason": "調整杯子溫度",
+                    "kind": "change-state",
+                    "expectedRevision": 4
+                  }
+                ],
+                "check": null,
+                "branches": null,
+                "routine": null,
+                "stages": []
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 6,
+        "result": {
+          "turn": 6,
+          "minute": 90,
+          "naturalChanges": [
+            {
+              "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+              "version": 1,
+              "source": {
+                "actorId": "owner",
+                "turn": 4
+              },
+              "scheduledAt": 75,
+              "committedAt": 75,
+              "nominalDueAt": 75,
+              "dueAt": 120,
+              "conditions": [
+                {
+                  "kind": "state-condition",
+                  "version": 1,
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "state": [
+                    {
+                      "key": "temperature",
+                      "value": "hot"
+                    }
+                  ]
+                }
+              ],
+              "effects": [
+                {
+                  "target": {
+                    "type": "object",
+                    "id": "natural-cup"
+                  },
+                  "changes": [
+                    {
+                      "key": "temperature",
+                      "from": "hot",
+                      "value": "cool"
+                    }
+                  ],
+                  "exposure": "public"
+                }
+              ],
+              "reason": "應在必要條件中斷時失效",
+              "status": "invalidated",
+              "settledAt": 90,
+              "invalidatedAt": 90,
+              "invalidation": "conditions"
+            }
+          ],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "已進行這個步驟",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 5,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "state": {},
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "cool",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "beforeObjects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 4,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "hot",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "condition-restored-without-revival",
+      "world": {
+        "minute": 105,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 6,
+            "state": {
+              "temperature": "hot"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "executed",
+            "settledAt": 60
+          },
+          {
+            "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 4
+            },
+            "scheduledAt": 75,
+            "committedAt": 75,
+            "nominalDueAt": 75,
+            "dueAt": 120,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "應在必要條件中斷時失效",
+            "status": "invalidated",
+            "invalidatedAt": 90,
+            "settledAt": 90,
+            "invalidation": "conditions"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080007000:ae9e18e5-ecc7-4a9b-8518-b63768c111f4",
+        "requestId": "bdad0b40-2bf8-4b23-9f40-b0fc5b6c4410",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 6,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080007000:ae9e18e5-ecc7-4a9b-8518-b63768c111f4",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 1
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "fe746b2a-4dcf-42c9-b9c9-c4694d38ca77",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "propose",
+                "target": "natural-cup",
+                "content": "處理杯溫並確認後續冷卻",
+                "purpose": "處理眼前物件",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "completion",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          },
+          {
+            "sequence": 2,
+            "task": "adjudication",
+            "actorId": "owner",
+            "requestId": "1792080007000:ae9e18e5-ecc7-4a9b-8518-b63768c111f4:owner:adjudication:5c2ce746-e055-451e-b85d-62d4078532fb",
+            "provider": "openai",
+            "model": "fixture-natural",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "status": "accepted",
+                "completionMinutes": 15,
+                "effects": [
+                  {
+                    "version": 1,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "target": {
+                      "type": "object",
+                      "id": "natural-cup"
+                    },
+                    "changes": [
+                      {
+                        "key": "temperature",
+                        "from": "cool",
+                        "value": "hot"
+                      }
+                    ],
+                    "reason": "調整杯子溫度",
+                    "kind": "change-state",
+                    "expectedRevision": 5
+                  }
+                ],
+                "check": null,
+                "branches": null,
+                "routine": null,
+                "stages": []
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 7,
+        "result": {
+          "turn": 7,
+          "minute": 105,
+          "naturalChanges": [],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "已進行這個步驟",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 6,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "state": {},
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "hot",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "beforeObjects": [
+            {
+              "allowedTo": [
+                "owner"
+              ],
+              "id": "natural-cup",
+              "source": "known-cup",
+              "revision": 5,
+              "region": "cafe-front",
+              "holder": "owner",
+              "owner": "owner",
+              "lifecycle": "active",
+              "kind": "utensil",
+              "stateEntries": [
+                {
+                  "key": "temperature",
+                  "value": "cool",
+                  "exposure": "public"
+                }
+              ]
+            }
+          ],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    },
+    {
+      "name": "original-due-time-does-not-revive-cooling",
+      "world": {
+        "minute": 120,
+        "objects": [
+          {
+            "id": "natural-cup",
+            "source": "known-cup",
+            "label": "自然變化測試杯",
+            "region": "cafe-front",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 6,
+            "state": {
+              "temperature": "hot"
+            },
+            "stateTransitions": {
+              "temperature": [
+                "warm",
+                "hot",
+                "cool"
+              ]
+            },
+            "lifecycle": "active",
+            "kind": "utensil",
+            "knownTo": [
+              "owner"
+            ],
+            "allowedTo": [
+              "owner"
+            ],
+            "stateExposure": {
+              "temperature": "public"
+            }
+          }
+        ],
+        "naturalChanges": [
+          {
+            "id": "a955b45e-0de9-4f02-ab16-fa19cbfcaf6c",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 0
+            },
+            "scheduledAt": 15,
+            "committedAt": 15,
+            "nominalDueAt": 15,
+            "dueAt": 30,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "exposure": "public",
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ]
+              }
+            ],
+            "reason": "熱杯在室內靜置後逐漸冷卻",
+            "status": "executed",
+            "settledAt": 30
+          },
+          {
+            "id": "85fc3382-15c0-431c-88e9-a8bf9d1eee2d",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 2
+            },
+            "scheduledAt": 45,
+            "committedAt": 45,
+            "nominalDueAt": 45,
+            "dueAt": 60,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "state": [
+                  {
+                    "key": "table.surface",
+                    "value": "濕潤"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "environment",
+                  "id": "cafe-front"
+                },
+                "changes": [
+                  {
+                    "key": "table.surface",
+                    "from": "濕潤",
+                    "value": "已乾燥"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "已確認的水滴自然乾燥",
+            "status": "executed",
+            "settledAt": 60
+          },
+          {
+            "id": "9c27d754-484f-495e-8a17-37358b62b3c4",
+            "version": 1,
+            "source": {
+              "actorId": "owner",
+              "turn": 4
+            },
+            "scheduledAt": 75,
+            "committedAt": 75,
+            "nominalDueAt": 75,
+            "dueAt": 120,
+            "conditions": [
+              {
+                "kind": "state-condition",
+                "version": 1,
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "state": [
+                  {
+                    "key": "temperature",
+                    "value": "hot"
+                  }
+                ]
+              }
+            ],
+            "effects": [
+              {
+                "target": {
+                  "type": "object",
+                  "id": "natural-cup"
+                },
+                "changes": [
+                  {
+                    "key": "temperature",
+                    "from": "hot",
+                    "value": "cool"
+                  }
+                ],
+                "exposure": "public"
+              }
+            ],
+            "reason": "應在必要條件中斷時失效",
+            "status": "invalidated",
+            "invalidatedAt": 90,
+            "settledAt": 90,
+            "invalidation": "conditions"
+          }
+        ]
+      },
+      "evidence": {
+        "schemaVersion": 2,
+        "operationId": "1792080008000:4a25279a-9b32-45e0-b2ce-8c1fa3582e37",
+        "requestId": "52e3f980-fd1f-4ad8-a1e3-2c9fb3d91e3c",
+        "deployment": {
+          "name": "local",
+          "commit": "unknown",
+          "builtAt": "unknown"
+        },
+        "operation": "advance",
+        "baseVersion": 7,
+        "outcome": "committed",
+        "replay": {
+          "operation": "advance",
+          "operationId": "1792080008000:4a25279a-9b32-45e0-b2ce-8c1fa3582e37",
+          "mode": "openai",
+          "model": "gpt-6-luna",
+          "minutes": 15
+        },
+        "counts": {
+          "npc": 1,
+          "adjudication": 0
+        },
+        "dispatches": [
+          {
+            "sequence": 1,
+            "task": "npc",
+            "actorId": "owner",
+            "requestId": "40173f34-ec16-4562-a19f-219b89a221b5",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "usage": {
+              "inputTokens": 30,
+              "outputTokens": 10
+            },
+            "candidate": {
+              "status": "captured",
+              "value": {
+                "type": "rest",
+                "target": "",
+                "content": "安靜休息一會",
+                "purpose": "休息",
+                "durationMinutes": 15,
+                "timeIntent": {
+                  "kind": "open-ended",
+                  "maxMinutes": null
+                }
+              },
+              "truncated": false,
+              "redacted": false
+            }
+          }
+        ],
+        "truncated": false,
+        "redacted": false,
+        "resultVersion": 8,
+        "result": {
+          "turn": 8,
+          "minute": 120,
+          "naturalChanges": [],
+          "actors": [
+            {
+              "id": "cass",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "vera",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "kris",
+              "activity": "待命，等待下一個指定行動。",
+              "plan": null
+            },
+            {
+              "id": "owner",
+              "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+              "plan": null
+            }
+          ],
+          "rules": [],
+          "objects": [],
+          "beforeObjects": [],
+          "externalStates": [],
+          "resolutions": []
+        }
+      }
+    }
+  ]
+}

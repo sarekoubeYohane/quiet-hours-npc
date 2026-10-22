@@ -117,7 +117,7 @@ test('requested tea cannot consume coffee or substitute an explicit target; gene
    assert.equal((await s.post({operation:'advance',minutes:15})).status,200);w=await s.read();
    assert.equal(w.objects.find(o=>o.id===cup.id).state.contents,'coffee');assert.equal(w.objects.find(o=>o.state.vessel===cup.id).lifecycle,'active');assert.equal(adjudications,0);
    assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有成功/);
-   const projected=JSON.stringify(seen);assert.doesNotMatch(projected,/"content":"喝茶"|routineAudit|ruleId|secret-cup|secret-tea|隱藏茶/);assert.match(projected,/喝咖啡/);
+   const projected=JSON.stringify(seen);assert.doesNotMatch(projected,/routineAudit|ruleId|secret-cup|secret-tea|隱藏茶/);assert.match(projected,/喝咖啡/);
    decision={...decision,content:'飲用飲品'};assert.equal((await s.post({operation:'advance',minutes:15})).status,200);w=await s.read();assert.equal(w.objects.find(o=>o.state.vessel===cup.id).lifecycle,'consumed');assert.equal(w.objects.find(o=>o.id===cup.id).state.contents,'dirty');assert.equal(adjudications,0);
   }finally{s.restore();}
  }

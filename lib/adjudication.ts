@@ -1,4 +1,5 @@
-import { routineProgramRules } from './routine-program-contract';
+import { routineWorldLimits } from './routine-world-contract';
+import { adjudicationRules } from './adjudication-contract';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 import { requestModel, type ModelService } from './model-adapter';
 import type { Action, Character, World } from './world';
@@ -46,7 +47,7 @@ export function captureAdjudicationFailure(
       if(value&&typeof value==='object'){
         const item=value as Record<string,unknown>;
         if(Object.keys(item).length>64)truncated=true;
-        return Object.fromEntries(Object.entries(item).slice(0,64).map(([key,content])=>[redactDiagnosticText(key,secrets),sensitiveDiagnosticKey.test(key)||(key==='value'&&typeof item.key==='string'&&sensitiveDiagnosticKey.test(item.key))?'<REDACTED>':scrub(content,depth+1)]));
+        return Object.fromEntries(Object.entries(item).slice(0,64).map(([key,content])=>[redactDiagnosticText(key,secrets),sensitiveDiagnosticKey.test(key)||((key==='value'||key==='from')&&typeof item.key==='string'&&sensitiveDiagnosticKey.test(item.key))?'<REDACTED>':scrub(content,depth+1)]));
       }
       return value;
     };
@@ -54,11 +55,37 @@ export function captureAdjudicationFailure(
     catch{return redactDiagnosticText(text,secrets);}
   };
   let truncated = false;
+  // The model receives the contract itself, but a failure receipt needs the
+  // dynamic decision context plus its version, not another copy of the static
+  // prompt and schema. Declare that projection rather than treating it as lost
+  // runtime evidence whenever the shared contract grows.
+  const diagnosticInput = () => {
+    let value:unknown=input;
+    if(typeof value==='string'){try{value=JSON.parse(value);}catch{return value;}}
+    if(!value||typeof value!=='object'||Array.isArray(value))return value;
+    const staticFields=['rules','effectRules','effectContract'];
+    const entries=Object.entries(value);
+    return {...Object.fromEntries(entries.filter(([key])=>!staticFields.includes(key))),inputProjection:{version:1,omittedStaticFields:entries.filter(([key])=>staticFields.includes(key)).map(([key])=>key)}};
+  };
   const snapshot = (value: unknown, limit: number) => {
     const text = redact(typeof value === 'string' ? value : JSON.stringify(value));
     if (text.length <= limit) return text;
     truncated = true;
-    return text.slice(0, limit);
+    // Keep structured snapshots valid JSON when truncating. The old raw slice
+    // could cut in the middle of a property and destroy all retained evidence.
+    let parsed:unknown;
+    try{parsed=JSON.parse(text);}catch{return text.slice(0,limit);}
+    for(let strings=1024,items=32;strings>=1;strings=Math.floor(strings/2),items=Math.floor(items/2)){
+      const clip=(item:unknown):unknown=>{
+        if(typeof item==='string')return item.length>strings?item.slice(0,strings)+'…':item;
+        if(Array.isArray(item))return item.slice(0,items).map(clip);
+        if(item&&typeof item==='object')return Object.fromEntries(Object.entries(item).map(([key,content])=>[key,clip(content)]));
+        return item;
+      };
+      const clipped=JSON.stringify(clip(parsed));
+      if(clipped.length<=limit)return clipped;
+    }
+    return limit>=24?'{"snapshotOmitted":true}':'null';
   };
   const validationText = snapshot(details, 4000);
   let validation: Record<string, unknown>;
@@ -66,12 +93,12 @@ export function captureAdjudicationFailure(
   catch { validation = { reason: details.reason, snapshot: validationText }; }
   const result: AdjudicationFailure = {
     ...context, actorId: snapshot(context.actorId, 120), contextId: context.contextId === undefined ? undefined : snapshot(context.contextId, 120),
-    input: snapshot(input, 9000), candidate: snapshot(raw, 8192), validation, truncated,
+    input: snapshot(diagnosticInput(), 9000), candidate: snapshot(raw, 8192), validation, truncated,
   };
   // Account for JSON escaping as well as the individual field bounds.
   while (JSON.stringify(result).length > 24000) {
-    result.input = result.input.slice(0, Math.floor(result.input.length / 2));
-    result.candidate = result.candidate.slice(0, Math.floor(result.candidate.length / 2));
+    result.input = snapshot(result.input, Math.floor(result.input.length / 2));
+    result.candidate = snapshot(result.candidate, Math.floor(result.candidate.length / 2));
     result.truncated = true;
   }
   return result;
@@ -83,11 +110,7 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
-    rules: [
-      ...(routinePrograms?routineProgramRules:[]),
-      '只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，依 version=2 程序契約確認一個模板 operation、subject、完整timings與programs。version=1空效果核准僅供舊候選相容，不用於新確認。兩版日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源，必須恰好涵蓋 routineOffer.operations 各一次，每項 {operation,minutes} 為正數且至多90；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊15分鐘。subject 選模板 subjects；餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。特殊方法、大量規模、授權、交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。',
-      '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
-    ],
+    rules: adjudicationRules(routinePrograms),
   };
 }
 // Separate task transcript and service configuration; NPC chat history is never reused.
@@ -96,7 +119,7 @@ export function requestAdjudication(input: AdjudicationInput, service: ModelServ
   return requestModel(service, [
     { role: 'system', content: '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。' },
     { role: 'user', content: JSON.stringify(input) },
-  ], schema, options);
+  ], schema, {...options,...('routineOffer' in input&&input.routineOffer?{maxOutputTokens:routineWorldLimits.maxOutputTokens}:{})});
 }
 export function validateExistingAdjudication(candidate: unknown): void {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.keys(candidate).length !== 1 || !('status' in candidate) || candidate.status !== 'accepted') {

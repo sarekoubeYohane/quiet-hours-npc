@@ -1,4 +1,4 @@
-import type { WorldObject, SceneSupply } from './world-effects';
+import {hasObjectPermission,type WorldObject,type SceneSupply} from './world-effects';
 
 // Pure material and utensil qualifications. Callers retain their own visibility,
 // locality, rights, finite availability and pending-output checks.
@@ -15,6 +15,6 @@ export function supportsRoutineDrink(values:string[]|undefined,contents:string):
 export function emptyRoutineVessel(state:Record<string,string>):boolean {
  return state.contents==='empty'&&state.clean!=='no';
 }
-export function usableRoutineObject(object:WorldObject,actorId:string):boolean {
- return object.lifecycle==='active'&&object.state.condition!=='broken'&&object.state.available!=='no'&&(object.holder===null||object.holder===actorId)&&(object.owner===actorId||object.allowedTo.includes(actorId));
+export function usableRoutineObject(object:WorldObject,actorId:string,access:'authorized'|'physical'='authorized'):boolean {
+ return object.lifecycle==='active'&&object.state.condition!=='broken'&&object.state.available!=='no'&&(access==='physical'||(object.holder===null||object.holder===actorId)&&hasObjectPermission(object,actorId));
 }

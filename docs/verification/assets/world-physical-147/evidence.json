@@ -1,0 +1,675 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "counts": {
+    "npc": 3,
+    "adjudication": 3,
+    "dice": 1
+  },
+  "checks": {
+    "borrowedAccidentalDamage": true,
+    "otherHolderPhysicalTake": true,
+    "noForgedConsent": true,
+    "sameIdentity": true,
+    "physicalState": true,
+    "sqliteReload": true,
+    "sameIdReplay": true
+  },
+  "snapshots": [
+    {
+      "schemaVersion": 2,
+      "operationId": "1792080001000:4cca85d0-f4af-441a-95b9-8daeaf0b9913",
+      "requestId": "161328d0-f03f-4854-bf80-cf90fe42f0df",
+      "contextId": "browser-physical-147",
+      "deployment": {
+        "name": "local",
+        "commit": "unknown",
+        "builtAt": "unknown"
+      },
+      "operation": "advance",
+      "baseVersion": 0,
+      "outcome": "committed",
+      "replay": {
+        "operation": "advance",
+        "operationId": "1792080001000:4cca85d0-f4af-441a-95b9-8daeaf0b9913",
+        "worldContext": "browser-physical-147",
+        "mode": "openai",
+        "model": "gpt-6-luna",
+        "minutes": 15
+      },
+      "counts": {
+        "npc": 1,
+        "adjudication": 1
+      },
+      "dispatches": [
+        {
+          "sequence": 1,
+          "task": "npc",
+          "actorId": "cass",
+          "requestId": "3d04ed0d-8f2d-4ec8-b5a4-7ed2b6acb60c",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "type": "propose",
+              "target": "borrowed-cup",
+              "content": "拿穩借來的杯子時手滑",
+              "purpose": "操作物件",
+              "durationMinutes": 15,
+              "timeIntent": {
+                "kind": "completion",
+                "maxMinutes": null
+              }
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        },
+        {
+          "sequence": 2,
+          "task": "adjudication",
+          "actorId": "cass",
+          "requestId": "1792080001000:4cca85d0-f4af-441a-95b9-8daeaf0b9913:cass:adjudication:e3eae858-4f46-45da-89a8-49917c722d1d",
+          "provider": "openai",
+          "model": "fixture-world",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "status": "accepted",
+              "completionMinutes": 15,
+              "effects": [],
+              "check": {
+                "difficulty": 12,
+                "ability": "拿穩杯子"
+              },
+              "branches": [
+                {
+                  "outcomes": [
+                    "critical-success",
+                    "success",
+                    "mixed"
+                  ],
+                  "effects": [],
+                  "stages": []
+                },
+                {
+                  "outcomes": [
+                    "failure",
+                    "critical-failure"
+                  ],
+                  "effects": [
+                    {
+                      "operation": "destroy",
+                      "version": 1,
+                      "reason": "觀察者的隱藏裁定原因，不代表物主同意。",
+                      "kind": "physical",
+                      "objectId": "borrowed-cup",
+                      "expectedRevision": 1
+                    }
+                  ],
+                  "stages": []
+                }
+              ],
+              "routine": null,
+              "stages": []
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      ],
+      "truncated": false,
+      "redacted": false,
+      "resultVersion": 1,
+      "result": {
+        "turn": 1,
+        "minute": 1275,
+        "actors": [
+          {
+            "id": "cass",
+            "activity": "借來的杯子已損毀",
+            "plan": null
+          },
+          {
+            "id": "owner",
+            "activity": "待命，等待下一個指定行動。",
+            "plan": null
+          }
+        ],
+        "rules": [],
+        "objects": [
+          {
+            "allowedTo": [
+              "cass",
+              "owner"
+            ],
+            "physicalHistory": [
+              {
+                "actorId": "cass",
+                "minute": 1275,
+                "operation": "destroy",
+                "permitted": true,
+                "priorHolder": "cass"
+              }
+            ],
+            "physicalHistoryDropped": 0,
+            "id": "borrowed-cup",
+            "source": "old-supply",
+            "revision": 2,
+            "region": "kris-home-main",
+            "holder": null,
+            "owner": "owner",
+            "lifecycle": "destroyed",
+            "kind": "utensil",
+            "state": {
+              "contents": "empty"
+            },
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              }
+            ]
+          }
+        ],
+        "beforeObjects": [
+          {
+            "allowedTo": [
+              "cass",
+              "owner"
+            ],
+            "id": "borrowed-cup",
+            "source": "old-supply",
+            "revision": 1,
+            "region": "kris-home-main",
+            "holder": "cass",
+            "owner": "owner",
+            "lifecycle": "active",
+            "kind": "utensil",
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              }
+            ]
+          }
+        ],
+        "resolutions": [
+          {
+            "eventId": "49448c6e-f12f-40b9-bfa9-0c356dd1899e",
+            "actorId": "cass",
+            "resolution": {
+              "roll": 1,
+              "modifier": 0,
+              "dc": 12,
+              "total": -11,
+              "outcome": "critical-failure"
+            }
+          },
+          {
+            "eventId": "3eff4b5b-692d-46bc-8e7e-cf854259bb21",
+            "actorId": "cass",
+            "resolution": {
+              "roll": 1,
+              "modifier": 0,
+              "dc": 12,
+              "total": -11,
+              "outcome": "critical-failure"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "operationId": "1792080002000:29be0b2f-9817-477a-8bdb-21a38a873639",
+      "requestId": "fff0c7bd-51e5-4f75-94c0-6a8f719e7a08",
+      "contextId": "browser-physical-147",
+      "deployment": {
+        "name": "local",
+        "commit": "unknown",
+        "builtAt": "unknown"
+      },
+      "operation": "advance",
+      "baseVersion": 1,
+      "outcome": "committed",
+      "replay": {
+        "operation": "advance",
+        "operationId": "1792080002000:29be0b2f-9817-477a-8bdb-21a38a873639",
+        "worldContext": "browser-physical-147",
+        "mode": "openai",
+        "model": "gpt-6-luna",
+        "minutes": 15
+      },
+      "counts": {
+        "npc": 1,
+        "adjudication": 1
+      },
+      "dispatches": [
+        {
+          "sequence": 1,
+          "task": "npc",
+          "actorId": "cass",
+          "requestId": "20da2506-9ffb-4b07-bd26-5f018674f8a1",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "type": "propose",
+              "target": "held-cup",
+              "content": "不等待物主許可，直接操作面前的杯子",
+              "purpose": "操作物件",
+              "durationMinutes": 15,
+              "timeIntent": {
+                "kind": "completion",
+                "maxMinutes": null
+              }
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        },
+        {
+          "sequence": 2,
+          "task": "adjudication",
+          "actorId": "cass",
+          "requestId": "1792080002000:29be0b2f-9817-477a-8bdb-21a38a873639:cass:adjudication:cfabaef4-c002-4559-9cd5-142626e39e1b",
+          "provider": "openai",
+          "model": "fixture-world",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "status": "accepted",
+              "completionMinutes": 15,
+              "effects": [
+                {
+                  "operation": "take",
+                  "version": 1,
+                  "reason": "觀察者的隱藏裁定原因，不代表物主同意。",
+                  "kind": "physical",
+                  "objectId": "held-cup",
+                  "expectedRevision": 1
+                }
+              ],
+              "check": null,
+              "branches": null,
+              "routine": null,
+              "stages": []
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      ],
+      "truncated": false,
+      "redacted": false,
+      "resultVersion": 2,
+      "result": {
+        "turn": 2,
+        "minute": 1290,
+        "actors": [
+          {
+            "id": "cass",
+            "activity": "物主持有的杯子的實際持有位置已改變",
+            "plan": null
+          },
+          {
+            "id": "owner",
+            "activity": "待命，等待下一個指定行動。",
+            "plan": null
+          }
+        ],
+        "rules": [],
+        "objects": [
+          {
+            "allowedTo": [
+              "owner"
+            ],
+            "physicalHistory": [
+              {
+                "actorId": "cass",
+                "minute": 1290,
+                "operation": "take",
+                "permitted": false,
+                "priorHolder": "owner"
+              }
+            ],
+            "physicalHistoryDropped": 0,
+            "unpermittedCount": 1,
+            "id": "held-cup",
+            "source": "old-supply",
+            "revision": 2,
+            "region": "kris-home-main",
+            "holder": "cass",
+            "owner": "owner",
+            "lifecycle": "active",
+            "kind": "utensil",
+            "state": {
+              "contents": "empty"
+            },
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              }
+            ]
+          }
+        ],
+        "beforeObjects": [
+          {
+            "allowedTo": [
+              "owner"
+            ],
+            "id": "held-cup",
+            "source": "old-supply",
+            "revision": 1,
+            "region": "kris-home-main",
+            "holder": "owner",
+            "owner": "owner",
+            "lifecycle": "active",
+            "kind": "utensil",
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              }
+            ]
+          }
+        ],
+        "resolutions": []
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "operationId": "1792080003000:df6e468b-1e4a-4fb7-a83e-7afffb6436e1",
+      "requestId": "f9983ca9-0782-40c3-80fa-22b0594f2597",
+      "contextId": "browser-physical-147",
+      "deployment": {
+        "name": "local",
+        "commit": "unknown",
+        "builtAt": "unknown"
+      },
+      "operation": "advance",
+      "baseVersion": 2,
+      "outcome": "committed",
+      "replay": {
+        "operation": "advance",
+        "operationId": "1792080003000:df6e468b-1e4a-4fb7-a83e-7afffb6436e1",
+        "worldContext": "browser-physical-147",
+        "mode": "openai",
+        "model": "gpt-6-luna",
+        "minutes": 15
+      },
+      "counts": {
+        "npc": 1,
+        "adjudication": 1
+      },
+      "dispatches": [
+        {
+          "sequence": 1,
+          "task": "npc",
+          "actorId": "cass",
+          "requestId": "1b4dd390-290d-40c4-b37c-304e8701d2b5",
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "type": "propose",
+              "target": "held-cup",
+              "content": "不等待物主許可，直接操作面前的杯子",
+              "purpose": "操作物件",
+              "durationMinutes": 15,
+              "timeIntent": {
+                "kind": "completion",
+                "maxMinutes": null
+              }
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        },
+        {
+          "sequence": 2,
+          "task": "adjudication",
+          "actorId": "cass",
+          "requestId": "1792080003000:df6e468b-1e4a-4fb7-a83e-7afffb6436e1:cass:adjudication:35ba4f2b-a9c7-442d-8b07-15cfc4f1dc83",
+          "provider": "openai",
+          "model": "fixture-world",
+          "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10
+          },
+          "candidate": {
+            "status": "captured",
+            "value": {
+              "status": "accepted",
+              "completionMinutes": 15,
+              "effects": [
+                {
+                  "version": 1,
+                  "access": "physical",
+                  "target": {
+                    "type": "object",
+                    "id": "held-cup"
+                  },
+                  "changes": [
+                    {
+                      "key": "surface",
+                      "from": null,
+                      "value": "濕潤"
+                    }
+                  ],
+                  "reason": "觀察者的隱藏裁定原因，不代表物主同意。",
+                  "kind": "change-state",
+                  "expectedRevision": 2
+                }
+              ],
+              "check": null,
+              "branches": null,
+              "routine": null,
+              "stages": []
+            },
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      ],
+      "truncated": false,
+      "redacted": false,
+      "resultVersion": 3,
+      "result": {
+        "turn": 3,
+        "minute": 1305,
+        "actors": [
+          {
+            "id": "cass",
+            "activity": "物主持有的杯子的外在狀態已改變",
+            "plan": null
+          },
+          {
+            "id": "owner",
+            "activity": "待命，等待下一個指定行動。",
+            "plan": null
+          }
+        ],
+        "rules": [],
+        "objects": [
+          {
+            "allowedTo": [
+              "owner"
+            ],
+            "physicalHistory": [
+              {
+                "actorId": "cass",
+                "minute": 1290,
+                "operation": "take",
+                "permitted": false,
+                "priorHolder": "owner"
+              },
+              {
+                "actorId": "cass",
+                "minute": 1305,
+                "operation": "state",
+                "permitted": false,
+                "priorHolder": "cass"
+              }
+            ],
+            "physicalHistoryDropped": 0,
+            "unpermittedCount": 2,
+            "id": "held-cup",
+            "source": "old-supply",
+            "revision": 3,
+            "region": "kris-home-main",
+            "holder": "cass",
+            "owner": "owner",
+            "lifecycle": "active",
+            "kind": "utensil",
+            "state": {
+              "contents": "empty"
+            },
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              },
+              {
+                "key": "surface",
+                "value": "濕潤"
+              }
+            ]
+          }
+        ],
+        "beforeObjects": [
+          {
+            "allowedTo": [
+              "owner"
+            ],
+            "physicalHistory": [
+              {
+                "actorId": "cass",
+                "minute": 1290,
+                "operation": "take",
+                "permitted": false,
+                "priorHolder": "owner"
+              }
+            ],
+            "physicalHistoryDropped": 0,
+            "unpermittedCount": 1,
+            "id": "held-cup",
+            "source": "old-supply",
+            "revision": 2,
+            "region": "kris-home-main",
+            "holder": "cass",
+            "owner": "owner",
+            "lifecycle": "active",
+            "kind": "utensil",
+            "stateEntries": [
+              {
+                "key": "contents",
+                "value": "empty"
+              }
+            ]
+          }
+        ],
+        "resolutions": []
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "borrowed-cup",
+      "source": "old-supply",
+      "label": "借來的杯子",
+      "region": "kris-home-main",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "state": {
+        "contents": "empty"
+      },
+      "lifecycle": "destroyed",
+      "kind": "utensil",
+      "knownTo": [
+        "cass",
+        "owner"
+      ],
+      "allowedTo": [
+        "cass",
+        "owner"
+      ],
+      "physicalHistoryDropped": 0,
+      "physicalHistory": [
+        {
+          "actorId": "cass",
+          "minute": 1275,
+          "operation": "destroy",
+          "permitted": true,
+          "priorHolder": "cass"
+        }
+      ]
+    },
+    {
+      "id": "held-cup",
+      "source": "old-supply",
+      "label": "物主持有的杯子",
+      "region": "kris-home-main",
+      "holder": "cass",
+      "owner": "owner",
+      "revision": 3,
+      "state": {
+        "contents": "empty",
+        "surface": "濕潤"
+      },
+      "lifecycle": "active",
+      "kind": "utensil",
+      "knownTo": [
+        "cass",
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "physicalHistoryDropped": 0,
+      "physicalHistory": [
+        {
+          "actorId": "cass",
+          "minute": 1290,
+          "operation": "take",
+          "permitted": false,
+          "priorHolder": "owner"
+        },
+        {
+          "actorId": "cass",
+          "minute": 1305,
+          "operation": "state",
+          "permitted": false,
+          "priorHolder": "cass"
+        }
+      ],
+      "unpermittedCount": 2
+    }
+  ]
+}

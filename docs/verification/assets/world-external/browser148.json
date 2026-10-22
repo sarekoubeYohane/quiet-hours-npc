@@ -1,0 +1,81 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "counts": {
+    "npc": 3,
+    "judgments": 1
+  },
+  "checks": {
+    "combinedConsequences": true,
+    "informationIsolation": true,
+    "sameIdReplay": true,
+    "profile": true,
+    "uiReload": true
+  },
+  "world": {
+    "objects": [
+      {
+        "id": "cup",
+        "source": "fixture-cup",
+        "label": "熱茶杯",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 2,
+        "state": {
+          "volume": "less"
+        },
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "owner",
+          "vera"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "stateExposure": {
+          "volume": "public"
+        }
+      }
+    ],
+    "scene": {
+      "doors": {
+        "cafe-door": "open"
+      },
+      "noise": {},
+      "occluded": [],
+      "external": {
+        "cafe-front": {
+          "revision": 1,
+          "state": {
+            "桌面": "濕潤"
+          },
+          "exposure": {
+            "桌面": "public"
+          }
+        }
+      }
+    },
+    "physical": [
+      {
+        "id": "owner"
+      },
+      {
+        "id": "vera",
+        "physical": {
+          "revision": 1,
+          "state": {
+            "手背": "燙紅"
+          },
+          "exposure": {
+            "手背": "public"
+          }
+        }
+      },
+      {
+        "id": "kris"
+      }
+    ]
+  }
+}

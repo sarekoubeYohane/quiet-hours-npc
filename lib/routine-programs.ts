@@ -25,7 +25,7 @@ export function bindRoutineProgram(w:World,c:Character,legacy:EffectCandidate,pr
  }
 
  const all=[...legacy.effects,...(legacy.stages||[]).flatMap(s=>s.effects)],roles=new Map<string,string>();
- for(const phase of legacy.stages||[])for(const condition of phase.preconditions){const o=w.objects?.find(o=>o.id===condition.objectId);if(o?.kind==='utensil'&&'contents' in o.state)roles.set('vessel',o.id);}
+ for(const phase of legacy.stages||[])for(const condition of phase.preconditions){const o='objectId' in condition?w.objects?.find(o=>o.id===condition.objectId):undefined;if(o?.kind==='utensil'&&'contents' in o.state)roles.set('vessel',o.id);}
  for(const e of all){
   if(e.kind==='materialize'){
    const s=w.supplies!.find(s=>s.id===e.supplyId)!;

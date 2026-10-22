@@ -1,3 +1,4 @@
+import { knownExternalState, type PhysicalState } from './world-state';
 import { addExperience } from './memory';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 import type { Character, World } from './world';
@@ -14,8 +15,8 @@ export const regions: Region[] = [
 ];
 export const doors: Door[] = [{ id: 'cafe-door', name: '儲藏室門', regions: ['cafe-front', 'cafe-storeroom'] }];
 export type CurrentSensoryState = { presence: Record<string, { region: string; clue: string }>; activities: Record<string, { clue: string; region: string; action: import('./world').Action }> };
-export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[] };
-export type Observation = { id: string; time: number; sense: 'sight' | 'hearing'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
+export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[]; external?:Record<string,PhysicalState> };
+export type Observation = { id: string; time: number; sense: 'sight' | 'hearing' | 'touch'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
 export function defaultRegion(location: string) { return regions.find(region => region.location === location)!.id; }
 export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
 export function normalizePerception(world: World) {
@@ -46,6 +47,23 @@ export function canHear(world: World, observer: Character, region: string) {
   return regionOf(observer) === region || !!connectingDoor(regionOf(observer), region);
 }
 export function eventCandidates(world: World, observer: Character, event: import('./world').WorldEvent): SensoryCandidate[] {
+  if(event.scene?.externalChanges){
+    const clues:SensoryCandidate[]=[];
+    for(const consequence of event.scene.externalChanges){
+      if(consequence.target.type==='object'){
+        const object=world.objects?.find(item=>item.id===consequence.target.id);
+        if(object&&consequence.exposure==='public'&&(object.holder===observer.id||object.knownTo.includes(observer.id)&&canSee(world,observer,object.region)))clues.push({sense:'sight',kind:'activity',text:`${object.label} 的外在狀況：${consequence.changes.map(change=>`${change.key}：${change.value}`).join('，')}。`,clarity:'clear',region:object.region,direct:true});
+      }else if(consequence.target.type==='body'){
+        const target=world.characters.find(c=>c.id===consequence.target.id);if(!target)continue;
+        const text=consequence.changes.map(change=>`${change.key}：${change.value}`).join('，');
+        if(target.id===observer.id&&consequence.exposure!=='hidden')clues.push({sense:'touch',kind:'activity',text:`自己的身體狀況有變化：${text}。`,clarity:'clear',region:regionOf(target),urgency:'direct',direct:true});
+        else if(consequence.exposure==='public'&&canSee(world,observer,regionOf(target)))clues.push({sense:'sight',kind:'activity',text:`${target.name} 的外在狀況：${text}。`,clarity:'clear',source:target.id,region:regionOf(target),direct:true});
+      }else if(consequence.target.type==='environment'&&consequence.exposure==='public'&&canSee(world,observer,consequence.target.id)){
+        clues.push({sense:'sight',kind:'activity',text:`${regions.find(r=>r.id===consequence.target.id)?.name||consequence.target.id}：${consequence.changes.map(change=>`${change.key}：${change.value}`).join('，')}。`,clarity:'clear',region:consequence.target.id,direct:true});
+      }
+    }
+    return clues;
+  }
   const actor = world.characters.find(c => c.id === event.actor);
   if (!actor || !event.scene) return [];
   const here = regionOf(observer), destination = event.scene.toRegion || regionOf(actor);
@@ -92,6 +110,7 @@ export const perceptionRules = {
   warningPrefixes: ['小心！', '小心!', '救命！', '救命!', '失火了！', '失火了!', '快躲開！', '快躲開!'],
   abilities: {
     sight: { '視覺敏銳': 2, '視覺極敏銳': 4, '視力較弱': -2, '視力很弱': -4 },
+    touch: {},
     hearing: { '聽覺敏銳': 2, '聽覺極敏銳': 4, '聽力較弱': -2, '聽力很弱': -4 },
   } as Record<Observation['sense'], Record<string, number>>,
   difficulty: { weak: 8, medium: 12, strong: 16 } as const,
@@ -150,10 +169,11 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
     for (const character of world.characters) if (event.audience.includes(character.id)) remember(world, character, event.text, event);
     return;
   }
+  for(const change of event.scene.externalChanges||[])if(change.target.type==='body'&&change.movement)world.currentSensory!.presence[change.target.id]={region:change.movement.toRegion,clue:event.id};
   event.perception = [];
   const audience: string[] = [];
   for (const character of world.characters) {
-    if (character.id === event.actor) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
+    if (character.id === event.actor && !event.scene.externalChanges) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
     const candidates = eventCandidates(world, character, event);
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;
@@ -179,7 +199,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
 }
 export function knownScene(world: World, character: Character) {
   const here = regionOf(character);
-  return { region: regions.find(r => r.id === here),
+  return { region: regions.find(r => r.id === here), external:canSee(world,character,here)?knownExternalState(world.scene?.external?.[here]):undefined,
     exits: doors.filter(d => d.regions.includes(here)).map(d => ({ id: d.id, name: d.name, state: world.scene?.doors[d.id] || 'open', destination: regions.find(r => r.id === d.regions.find(id => id !== here)) })),
   };
 }

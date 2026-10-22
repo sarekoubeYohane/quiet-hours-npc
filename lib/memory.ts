@@ -248,7 +248,7 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
 export function validateMemoryState(c: Character) {
   validateCognition(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
-  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
+  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   const shortIds = new Set<string>();
   for (const item of c.shortTerm || []) {
     if (shortIds.has(item.id)) throw new MemoryValidationError('短期記憶身份重複');

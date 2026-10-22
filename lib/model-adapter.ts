@@ -12,7 +12,7 @@ function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 // Transport sees only the already filtered transcript and task schema, never World.
-export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: { signal: AbortSignal; observer?: ModelObserver; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void; fetcher?: typeof fetch; requestId?: string }): Promise<string> {
+export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void; fetcher?: typeof fetch; requestId?: string }): Promise<string> {
 const {key, model, provider} = service;
 const direct = provider === 'openai', fetcher = options.fetcher || fetch;
 let r:Response;
@@ -21,8 +21,8 @@ const observe=(event:ModelObservation)=>{try{options.observer?.(event);}catch{/*
 const dispatch: typeof fetch = (...args) => { requestSignal.throwIfAborted(); observe({kind:'dispatch',requestId:options.requestId}); return withDeadline(fetcher(...args), requestSignal); };
 try { r=await dispatch(direct?'https://api.openai.com/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions',{
 method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json',...(options.requestId ? {'X-Decision-Request-Id':options.requestId} : {})},signal:requestSignal,body:JSON.stringify({model,messages,...(direct?{
-store:false,max_completion_tokens:model==='gpt-6-luna'?2048:4096,reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
-}:{temperature:.8,max_tokens:2048})})}); }
+store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
+}:{temperature:.8,max_tokens:options.maxOutputTokens??2048})})}); }
 catch(e) { if(e instanceof Error&&e.name==='TimeoutError')throw new DOMException('模型回應逾時。','TimeoutError');throw Error('無法連線至模型服務，本回合沒有推進。'); }
 const providerError=!r.ok?Object.assign(Error(r.status===401?'API Key 無效，請確認它屬於所選服務。':r.status===402?'模型服務額度不足，請先儲值。':r.status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':r.status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${r.status}，本回合沒有儲存。`), { code: r.status === 429 || r.status === 402 ? 'provider_limit' : 'technical_failure' }):undefined;
 let d:{usage?:{prompt_tokens?:number;completion_tokens?:number;prompt_tokens_details?:{cached_tokens?:number}};choices?:{message?:{content?:string;refusal?:string};finish_reason?:string}[]};

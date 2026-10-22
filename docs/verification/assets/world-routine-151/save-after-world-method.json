@@ -1,0 +1,1278 @@
+{
+  "fixture": true,
+  "scenario": "save-after",
+  "npc": 1,
+  "adjudication": 1,
+  "world": {
+    "routinePlaces": [
+      {
+        "location": "cafe",
+        "purpose": "cafe",
+        "operators": [
+          "owner"
+        ]
+      }
+    ],
+    "minute": 1275,
+    "turn": 1,
+    "lastMode": "openai",
+    "characters": [
+      {
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "取得普通茶葉，已進行這個步驟",
+        "relationships": {},
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          },
+          {
+            "id": "6e4fa589-fa4f-43b3-bdb7-9931d20b4cb1",
+            "time": 1275,
+            "text": "店主 開始進行這項活動；活動尚未完成。。"
+          },
+          {
+            "id": "5cb276b6-e207-48de-aa77-63d786e5589d",
+            "time": 1275,
+            "text": "店主 取得普通茶葉，已進行這個步驟。"
+          }
+        ],
+        "intents": [],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observationCursor": 0,
+        "region": "cafe-front",
+        "observations": [],
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "6e4fa589-fa4f-43b3-bdb7-9931d20b4cb1",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 開始進行這項活動；活動尚未完成。。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "22384727-a19f-49d8-92f8-6a192a6fab70"
+          },
+          {
+            "id": "5cb276b6-e207-48de-aa77-63d786e5589d",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 取得普通茶葉，已進行這個步驟。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "72ba0c5d-9729-4cea-a4d4-19f162364548"
+          }
+        ],
+        "longTerm": [],
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          }
+        ],
+        "memoryTrace": [],
+        "plan": {
+          "action": {
+            "type": "propose",
+            "target": "same-cup",
+            "content": "用這個杯子替自己泡一杯茶",
+            "mood": "平靜",
+            "purpose": "飲用"
+          },
+          "startedAt": 1260,
+          "until": 1290,
+          "attention": "",
+          "modelKey": "openai:gpt-6-luna",
+          "selectedResult": {
+            "outcome": null,
+            "branch": 0
+          },
+          "timeIntent": {
+            "kind": "completion",
+            "maxMinutes": null
+          },
+          "phases": {
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "preconditions": [],
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2",
+                    "expectedRemaining": 1
+                  },
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "same-cup"
+                    },
+                    "expectedRevision": 1,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "empty",
+                        "value": "water"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "routineBindings": {
+                  "objects": [
+                    {
+                      "id": "same-cup",
+                      "region": "cafe-front",
+                      "holder": "owner",
+                      "quantity": {
+                        "amount": 1,
+                        "unit": "item"
+                      }
+                    }
+                  ],
+                  "bodies": []
+                }
+              },
+              {
+                "afterMinutes": 30,
+                "preconditions": [],
+                "effects": [
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "same-cup"
+                    },
+                    "expectedRevision": 2,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "water",
+                        "value": "tea"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2:0",
+                        "expectedRevision": 1,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "formed:f8d5fd49-4635-425d-b88e-bd62674e47ac",
+                        "label": "一份茶",
+                        "kind": "drink",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": [
+                          {
+                            "key": "vessel",
+                            "value": "same-cup",
+                            "exposure": "public"
+                          },
+                          {
+                            "key": "beverage",
+                            "value": "tea",
+                            "exposure": "public"
+                          }
+                        ]
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "routineBindings": {
+                  "objects": [
+                    {
+                      "id": "same-cup",
+                      "region": "cafe-front",
+                      "holder": "owner",
+                      "quantity": {
+                        "amount": 1,
+                        "unit": "item"
+                      }
+                    },
+                    {
+                      "id": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2:0",
+                      "region": "cafe-front",
+                      "holder": "owner",
+                      "quantity": {
+                        "amount": 1,
+                        "unit": "item"
+                      }
+                    }
+                  ],
+                  "bodies": []
+                }
+              }
+            ],
+            "cursor": 1,
+            "origin": "cafe-front"
+          }
+        },
+        "habits": [
+          {
+            "key": "3:cafe:propose:",
+            "type": "propose",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1275
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "id": "opening",
+        "time": 1260,
+        "actor": "world",
+        "text": "雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。",
+        "kind": "opening",
+        "audience": [
+          "cass",
+          "kris"
+        ]
+      },
+      {
+        "id": "22384727-a19f-49d8-92f8-6a192a6fab70",
+        "time": 1275,
+        "actor": "owner",
+        "text": "店主 開始進行這項活動；活動尚未完成。。",
+        "kind": "work",
+        "audience": [
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": []
+      },
+      {
+        "id": "72ba0c5d-9729-4cea-a4d4-19f162364548",
+        "time": 1275,
+        "actor": "owner",
+        "text": "店主 取得普通茶葉，已進行這個步驟。",
+        "kind": "work",
+        "audience": [
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front"
+        },
+        "perception": []
+      }
+    ],
+    "perceptionTrials": {},
+    "probeResults": {},
+    "currentSensory": {
+      "presence": {
+        "cass": {
+          "region": "kris-home-main",
+          "clue": "initial:cass:kris-home-main"
+        },
+        "vera": {
+          "region": "vera-home-main",
+          "clue": "initial:vera:vera-home-main"
+        },
+        "kris": {
+          "region": "kris-home-main",
+          "clue": "initial:kris:kris-home-main"
+        },
+        "owner": {
+          "region": "cafe-front",
+          "clue": "initial:owner:cafe-front"
+        }
+      },
+      "activities": {
+        "owner": {
+          "clue": "72ba0c5d-9729-4cea-a4d4-19f162364548",
+          "region": "cafe-front",
+          "action": {
+            "type": "work"
+          }
+        }
+      }
+    },
+    "scene": {
+      "doors": {
+        "cafe-door": "open"
+      },
+      "noise": {},
+      "occluded": []
+    },
+    "contextId": "browser151-save-after",
+    "adjudication": {
+      "provider": "openai",
+      "model": "fixture-world"
+    },
+    "objects": [
+      {
+        "id": "same-cup",
+        "label": "same-cup",
+        "source": "fixture",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 2,
+        "lifecycle": "active",
+        "kind": "utensil",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "state": {
+          "contents": "water",
+          "clean": "yes"
+        },
+        "stateExposure": {
+          "contents": "public"
+        }
+      },
+      {
+        "id": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2:0",
+        "source": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2",
+        "sources": [
+          {
+            "type": "supply",
+            "id": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2",
+            "revision": null,
+            "amount": 1,
+            "unit": "item",
+            "owner": "owner"
+          }
+        ],
+        "quantity": {
+          "amount": 1,
+          "unit": "item"
+        },
+        "consumable": false,
+        "formation": {
+          "operation": "materialize",
+          "at": 1275,
+          "inputs": [
+            "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2"
+          ]
+        },
+        "label": "普通茶葉",
+        "region": "cafe-front",
+        "holder": "owner",
+        "owner": "owner",
+        "revision": 1,
+        "state": {},
+        "stateExposure": {},
+        "lifecycle": "active",
+        "kind": "tea-leaves",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ]
+      }
+    ],
+    "aiUsage": {
+      "windowStartedAt": 1792080001000,
+      "calls": 2,
+      "inputTokens": 60,
+      "outputTokens": 20,
+      "unknownCalls": 0,
+      "totalCalls": 2,
+      "totalInputTokens": 60,
+      "totalOutputTokens": 20,
+      "totalUnknownCalls": 0,
+      "savedDecisions": 0,
+      "costs": {
+        "total": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 1,
+            "input": 30,
+            "output": 10,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 1,
+            "lastDispatchAt": 1792080001000
+          },
+          "adjudication:unknown:openai:fixture-world": {
+            "task": "adjudication",
+            "provider": "openai",
+            "model": "fixture-world",
+            "price": null,
+            "calls": 1,
+            "input": 30,
+            "output": 10,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 1,
+            "lastDispatchAt": 1792080001000
+          }
+        },
+        "hour": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 1,
+            "input": 30,
+            "output": 10,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 1,
+            "lastDispatchAt": 1792080001000
+          },
+          "adjudication:unknown:openai:fixture-world": {
+            "task": "adjudication",
+            "provider": "openai",
+            "model": "fixture-world",
+            "price": null,
+            "calls": 1,
+            "input": 30,
+            "output": 10,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 1,
+            "lastDispatchAt": 1792080001000
+          }
+        }
+      }
+    },
+    "routineRules": [
+      {
+        "id": "e5a5abc0-46b0-4217-b851-1709bf885d57",
+        "version": 3,
+        "family": "cafe-service",
+        "origin": "cafe",
+        "knownTo": [
+          "owner"
+        ],
+        "operations": [
+          "tea",
+          "coffee",
+          "food",
+          "drink",
+          "wash",
+          "return"
+        ],
+        "programs": [
+          {
+            "operation": "tea",
+            "methods": [
+              {
+                "content": "泡一杯茶",
+                "purpose": "飲用"
+              },
+              {
+                "content": "用這個杯子替自己泡一杯茶",
+                "purpose": "飲用"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "local",
+                "kind": "utensil",
+                "label": null,
+                "state": [
+                  {
+                    "key": "contents",
+                    "value": "empty"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通杯子",
+                  "kind": "utensil",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": [
+                    {
+                      "key": "contents",
+                      "value": "empty",
+                      "exposure": "public"
+                    },
+                    {
+                      "key": "clean",
+                      "value": "yes",
+                      "exposure": "public"
+                    }
+                  ]
+                },
+                "quantity": null,
+                "sourceRole": "equipment",
+                "sourceSubject": null
+              },
+              {
+                "role": "raw",
+                "type": "supply",
+                "select": "local",
+                "kind": "tea-leaves",
+                "label": null,
+                "state": [],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通茶葉",
+                  "kind": "tea-leaves",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": []
+                },
+                "quantity": null,
+                "sourceRole": "material",
+                "sourceSubject": "茶葉"
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$raw",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$vessel-supply",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  },
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "empty",
+                        "value": "water"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "preconditions": []
+              },
+              {
+                "afterMinutes": 30,
+                "effects": [
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "water",
+                        "value": "tea"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "$raw-object",
+                        "expectedRevision": 0,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "$product",
+                        "label": "一份茶",
+                        "kind": "drink",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": [
+                          {
+                            "key": "vessel",
+                            "value": "$vessel",
+                            "exposure": "public"
+                          },
+                          {
+                            "key": "beverage",
+                            "value": "tea",
+                            "exposure": "public"
+                          }
+                        ]
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "coffee",
+            "methods": [
+              {
+                "content": "泡一杯咖啡",
+                "purpose": "飲用"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "local",
+                "kind": "utensil",
+                "label": null,
+                "state": [
+                  {
+                    "key": "contents",
+                    "value": "empty"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通杯子",
+                  "kind": "utensil",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": [
+                    {
+                      "key": "contents",
+                      "value": "empty",
+                      "exposure": "public"
+                    },
+                    {
+                      "key": "clean",
+                      "value": "yes",
+                      "exposure": "public"
+                    }
+                  ]
+                },
+                "quantity": null,
+                "sourceRole": "equipment",
+                "sourceSubject": null
+              },
+              {
+                "role": "raw",
+                "type": "supply",
+                "select": "local",
+                "kind": "coffee-beans",
+                "label": null,
+                "state": [],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通咖啡豆",
+                  "kind": "coffee-beans",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": []
+                },
+                "quantity": null,
+                "sourceRole": "material",
+                "sourceSubject": "咖啡豆"
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$raw",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$vessel-supply",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  },
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "empty",
+                        "value": "water"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "preconditions": []
+              },
+              {
+                "afterMinutes": 30,
+                "effects": [
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "water",
+                        "value": "coffee"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "$raw-object",
+                        "expectedRevision": 0,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "$product",
+                        "label": "一份咖啡",
+                        "kind": "drink",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": [
+                          {
+                            "key": "vessel",
+                            "value": "$vessel",
+                            "exposure": "public"
+                          },
+                          {
+                            "key": "beverage",
+                            "value": "coffee",
+                            "exposure": "public"
+                          }
+                        ]
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "food",
+            "methods": [
+              {
+                "content": "準備一份簡餐",
+                "purpose": "用餐"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "raw",
+                "type": "supply",
+                "select": "local",
+                "kind": "cooking-ingredient",
+                "label": null,
+                "state": [],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通食材",
+                  "kind": "cooking-ingredient",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": []
+                },
+                "quantity": null,
+                "sourceRole": "material",
+                "sourceSubject": "食材"
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$raw",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "$raw-object",
+                        "expectedRevision": 0,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "$product",
+                        "label": "一份簡餐",
+                        "kind": "meal",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": []
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "drink",
+            "methods": [
+              {
+                "content": "喝茶",
+                "purpose": "飲用"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "target",
+                "kind": "utensil",
+                "label": null,
+                "state": [
+                  {
+                    "key": "contents",
+                    "value": "tea"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": null,
+                "quantity": null,
+                "sourceRole": null,
+                "sourceSubject": null
+              },
+              {
+                "role": "drink",
+                "type": "object",
+                "select": "linked",
+                "kind": "drink",
+                "label": null,
+                "state": [
+                  {
+                    "key": "beverage",
+                    "value": "tea"
+                  }
+                ],
+                "access": "authorized",
+                "link": {
+                  "role": "vessel",
+                  "key": "vessel"
+                },
+                "background": null,
+                "quantity": null,
+                "sourceRole": null,
+                "sourceSubject": null
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  },
+                  {
+                    "kind": "transfer",
+                    "objectId": "$drink",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  },
+                  {
+                    "kind": "consume",
+                    "objectId": "$drink",
+                    "expectedRevision": 0
+                  },
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "contents",
+                        "from": "tea",
+                        "value": "empty"
+                      },
+                      {
+                        "key": "茶漬",
+                        "from": null,
+                        "value": "有"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "wash",
+            "methods": [
+              {
+                "content": "清洗杯子",
+                "purpose": "清洗"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "target",
+                "kind": "utensil",
+                "label": null,
+                "state": [
+                  {
+                    "key": "contents",
+                    "value": "empty"
+                  },
+                  {
+                    "key": "茶漬",
+                    "value": "有"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": null,
+                "quantity": null,
+                "sourceRole": null,
+                "sourceSubject": null
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": "$actor",
+                    "toRegion": "$here"
+                  },
+                  {
+                    "kind": "change-state",
+                    "version": 1,
+                    "target": {
+                      "type": "object",
+                      "id": "$vessel"
+                    },
+                    "expectedRevision": 0,
+                    "access": "authorized",
+                    "exposure": "public",
+                    "changes": [
+                      {
+                        "key": "茶漬",
+                        "from": "有",
+                        "value": "無"
+                      },
+                      {
+                        "key": "濕潤",
+                        "from": null,
+                        "value": "是"
+                      }
+                    ],
+                    "reason": "fixture模型一次確認外在後果。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "return",
+            "methods": [
+              {
+                "content": "歸還杯子",
+                "purpose": "歸還"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "vessel",
+                "type": "object",
+                "select": "target",
+                "kind": "utensil",
+                "label": null,
+                "state": [
+                  {
+                    "key": "contents",
+                    "value": "empty"
+                  }
+                ],
+                "access": "authorized",
+                "link": null,
+                "background": null,
+                "quantity": null,
+                "sourceRole": null,
+                "sourceSubject": null
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "transfer",
+                    "objectId": "$vessel",
+                    "expectedRevision": 0,
+                    "toHolder": null,
+                    "toRegion": "$here"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          }
+        ],
+        "worldSubject": "茶",
+        "worldTimings": [
+          {
+            "operation": "tea",
+            "minutes": 30
+          },
+          {
+            "operation": "coffee",
+            "minutes": 30
+          },
+          {
+            "operation": "food",
+            "minutes": 15
+          },
+          {
+            "operation": "drink",
+            "minutes": 15
+          },
+          {
+            "operation": "wash",
+            "minutes": 15
+          },
+          {
+            "operation": "return",
+            "minutes": 15
+          }
+        ]
+      }
+    ],
+    "routineAudit": [
+      {
+        "turn": 0,
+        "actorId": "owner",
+        "location": "cafe",
+        "ruleId": "e5a5abc0-46b0-4217-b851-1709bf885d57",
+        "result": "approved"
+      }
+    ],
+    "supplies": [
+      {
+        "id": "supply:07cd7842-c109-45b6-8038-a6c48c0bc8a2",
+        "label": "普通茶葉",
+        "kind": "tea-leaves",
+        "consumable": false,
+        "quantity": {
+          "amount": 1,
+          "unit": "item"
+        },
+        "initialState": {},
+        "stateExposure": {},
+        "region": "cafe-front",
+        "remaining": 1,
+        "owner": "owner",
+        "knownTo": [
+          "owner"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "background": {
+          "ruleId": "e5a5abc0-46b0-4217-b851-1709bf885d57",
+          "sequence": 1
+        }
+      }
+    ]
+  }
+}

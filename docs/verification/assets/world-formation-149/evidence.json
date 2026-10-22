@@ -1,0 +1,626 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "counts": {
+    "npc": 7,
+    "adjudication": 6
+  },
+  "checks": {
+    "uiAdvance": true,
+    "sqliteReload": true,
+    "partitionRecorded": true,
+    "quantityPreserved": true,
+    "sameOperationReplay": true,
+    "independentPortionConsumed": true,
+    "multipleSources": true,
+    "jointOwners": true,
+    "physicalPartition": true,
+    "physicalHistory": true,
+    "childHistoryNotInvented": true
+  },
+  "receipt": {
+    "schemaVersion": 2,
+    "operationId": "1792080006000:b29c0a9c-c12b-4c09-9988-57e162a6a875",
+    "requestId": "ddafb970-bf6a-4939-b6ba-ccff4dd37bfb",
+    "contextId": "browser-formation-149",
+    "deployment": {
+      "name": "local",
+      "commit": "unknown",
+      "builtAt": "unknown"
+    },
+    "operation": "advance",
+    "baseVersion": 5,
+    "outcome": "committed",
+    "replay": {
+      "operation": "advance",
+      "operationId": "1792080006000:b29c0a9c-c12b-4c09-9988-57e162a6a875",
+      "worldContext": "browser-formation-149",
+      "mode": "openai",
+      "model": "gpt-6-luna",
+      "minutes": 15
+    },
+    "counts": {
+      "npc": 1,
+      "adjudication": 1
+    },
+    "dispatches": [
+      {
+        "sequence": 1,
+        "task": "npc",
+        "actorId": "owner",
+        "requestId": "18fa5f30-9821-417f-8037-0bf5da107cf4",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "type": "propose",
+            "target": "cup-shards",
+            "content": "把一片碎片細分出來單獨處置",
+            "purpose": "材料處理",
+            "durationMinutes": 15,
+            "timeIntent": {
+              "kind": "completion",
+              "maxMinutes": null
+            }
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      },
+      {
+        "sequence": 2,
+        "task": "adjudication",
+        "actorId": "owner",
+        "requestId": "1792080006000:b29c0a9c-c12b-4c09-9988-57e162a6a875:owner:adjudication:d66a204a-be7d-4937-8d35-5a647558edd8",
+        "provider": "openai",
+        "model": "fixture-world",
+        "usage": {
+          "inputTokens": 30,
+          "outputTokens": 10
+        },
+        "candidate": {
+          "status": "captured",
+          "value": {
+            "status": "accepted",
+            "completionMinutes": 15,
+            "effects": [
+              {
+                "kind": "separate",
+                "version": 1,
+                "access": "physical",
+                "reason": "細分承接已存在的一片，不複製歷史。",
+                "objectId": "cup-shards",
+                "expectedRevision": 1,
+                "quantity": {
+                  "amount": 1,
+                  "unit": "piece"
+                },
+                "outputId": "single-shard"
+              }
+            ],
+            "check": null,
+            "branches": null,
+            "routine": null,
+            "stages": []
+          },
+          "truncated": false,
+          "redacted": false
+        }
+      }
+    ],
+    "truncated": false,
+    "redacted": false,
+    "resultVersion": 6,
+    "result": {
+      "turn": 6,
+      "minute": 1350,
+      "actors": [
+        {
+          "id": "cass",
+          "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+          "plan": null
+        },
+        {
+          "id": "owner",
+          "activity": "杯子碎片已分出 1 piece，其餘份量保留",
+          "plan": null
+        }
+      ],
+      "rules": [],
+      "objects": [
+        {
+          "allowedTo": [
+            "cass"
+          ],
+          "physicalHistory": [
+            {
+              "actorId": "owner",
+              "minute": 1350,
+              "operation": "separate",
+              "permitted": false,
+              "priorHolder": "owner"
+            }
+          ],
+          "physicalHistoryDropped": 0,
+          "unpermittedCount": 1,
+          "id": "cup-shards",
+          "source": "shared-cup",
+          "sources": [
+            {
+              "type": "object",
+              "id": "shared-cup",
+              "revision": 1,
+              "amount": 1,
+              "unit": "item",
+              "owner": "cass",
+              "disposition": "destroyed"
+            }
+          ],
+          "quantity": {
+            "amount": 4,
+            "unit": "piece"
+          },
+          "consumable": false,
+          "formation": {
+            "operation": "partition",
+            "at": 1335,
+            "inputs": [
+              "shared-cup"
+            ]
+          },
+          "revision": 2,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "cass",
+          "lifecycle": "active",
+          "kind": "ceramic-fragments",
+          "state": {},
+          "stateEntries": []
+        },
+        {
+          "allowedTo": [
+            "cass"
+          ],
+          "id": "single-shard",
+          "source": "cup-shards",
+          "sources": [
+            {
+              "type": "object",
+              "id": "cup-shards",
+              "revision": 1,
+              "amount": 1,
+              "unit": "piece",
+              "owner": "cass"
+            }
+          ],
+          "quantity": {
+            "amount": 1,
+            "unit": "piece"
+          },
+          "consumable": false,
+          "formation": {
+            "operation": "separate",
+            "at": 1350,
+            "inputs": [
+              "cup-shards"
+            ]
+          },
+          "revision": 1,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "cass",
+          "lifecycle": "active",
+          "kind": "ceramic-fragments",
+          "state": {},
+          "stateEntries": []
+        }
+      ],
+      "beforeObjects": [
+        {
+          "allowedTo": [
+            "cass"
+          ],
+          "id": "cup-shards",
+          "source": "shared-cup",
+          "sources": [
+            {
+              "type": "object",
+              "id": "shared-cup",
+              "revision": 1,
+              "amount": 1,
+              "unit": "item",
+              "owner": "cass",
+              "disposition": "destroyed"
+            }
+          ],
+          "quantity": {
+            "amount": 5,
+            "unit": "piece"
+          },
+          "consumable": false,
+          "formation": {
+            "operation": "partition",
+            "at": 1335,
+            "inputs": [
+              "shared-cup"
+            ]
+          },
+          "revision": 1,
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "cass",
+          "lifecycle": "active",
+          "kind": "ceramic-fragments",
+          "stateEntries": []
+        }
+      ],
+      "externalStates": [],
+      "resolutions": []
+    }
+  },
+  "objects": [
+    {
+      "id": "cake",
+      "source": "last-cake",
+      "label": "最後一個蛋糕",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "state": {},
+      "lifecycle": "consumed",
+      "kind": "food",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "quantity": {
+        "amount": 0,
+        "unit": "item"
+      },
+      "endedByFormation": {
+        "operation": "partition",
+        "at": 1275,
+        "actorId": "owner",
+        "disposition": "consumed"
+      }
+    },
+    {
+      "id": "flour",
+      "source": "flour-stock",
+      "label": "麵粉",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "state": {},
+      "lifecycle": "consumed",
+      "kind": "raw-material",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "consumable": false,
+      "quantity": {
+        "amount": 0,
+        "unit": "item"
+      },
+      "endedByFormation": {
+        "operation": "transform",
+        "at": 1320,
+        "actorId": "owner",
+        "disposition": "consumed"
+      }
+    },
+    {
+      "id": "sugar",
+      "source": "sugar-stock",
+      "label": "糖",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "cass",
+      "revision": 2,
+      "state": {},
+      "lifecycle": "consumed",
+      "kind": "raw-material",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "consumable": false,
+      "quantity": {
+        "amount": 0,
+        "unit": "item"
+      },
+      "endedByFormation": {
+        "operation": "transform",
+        "at": 1320,
+        "actorId": "owner",
+        "disposition": "consumed"
+      }
+    },
+    {
+      "id": "shared-cup",
+      "source": "cup-stock",
+      "label": "Cass的杯子",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "cass",
+      "revision": 2,
+      "state": {},
+      "lifecycle": "destroyed",
+      "kind": "utensil",
+      "knownTo": [
+        "owner",
+        "cass"
+      ],
+      "allowedTo": [],
+      "consumable": false,
+      "physicalHistoryDropped": 0,
+      "physicalHistory": [
+        {
+          "actorId": "owner",
+          "minute": 1335,
+          "operation": "partition",
+          "permitted": false,
+          "priorHolder": "cass"
+        }
+      ],
+      "unpermittedCount": 1,
+      "quantity": {
+        "amount": 0,
+        "unit": "item"
+      },
+      "endedByFormation": {
+        "operation": "partition",
+        "at": 1335,
+        "actorId": "owner",
+        "disposition": "destroyed"
+      }
+    },
+    {
+      "id": "cake-pieces",
+      "source": "cake",
+      "sources": [
+        {
+          "type": "object",
+          "id": "cake",
+          "revision": 1,
+          "amount": 1,
+          "unit": "item",
+          "owner": "owner",
+          "disposition": "consumed"
+        }
+      ],
+      "quantity": {
+        "amount": 3,
+        "unit": "piece"
+      },
+      "formation": {
+        "operation": "partition",
+        "at": 1275,
+        "inputs": [
+          "cake"
+        ]
+      },
+      "label": "切成四份的蛋糕",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "revision": 2,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "active",
+      "kind": "food",
+      "consumable": true,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    },
+    {
+      "id": "cake-piece-one",
+      "source": "cake-pieces",
+      "sources": [
+        {
+          "type": "object",
+          "id": "cake-pieces",
+          "revision": 1,
+          "amount": 1,
+          "unit": "piece",
+          "owner": "owner"
+        }
+      ],
+      "quantity": {
+        "amount": 0,
+        "unit": "piece"
+      },
+      "formation": {
+        "operation": "separate",
+        "at": 1290,
+        "inputs": [
+          "cake-pieces"
+        ]
+      },
+      "label": "切成四份的蛋糕",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "consumed",
+      "kind": "food",
+      "consumable": true,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    },
+    {
+      "id": "shared-pastry",
+      "source": "flour",
+      "sources": [
+        {
+          "type": "object",
+          "id": "flour",
+          "revision": 1,
+          "amount": 1,
+          "unit": "item",
+          "owner": "owner",
+          "disposition": "consumed"
+        },
+        {
+          "type": "object",
+          "id": "sugar",
+          "revision": 1,
+          "amount": 1,
+          "unit": "item",
+          "owner": "cass",
+          "disposition": "consumed"
+        }
+      ],
+      "quantity": {
+        "amount": 2,
+        "unit": "item"
+      },
+      "formation": {
+        "operation": "transform",
+        "at": 1320,
+        "inputs": [
+          "flour",
+          "sugar"
+        ]
+      },
+      "label": "共同來源的糕點",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "coOwners": [
+        "owner",
+        "cass"
+      ],
+      "revision": 1,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "active",
+      "kind": "pastry",
+      "consumable": true,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    },
+    {
+      "id": "cup-shards",
+      "source": "shared-cup",
+      "sources": [
+        {
+          "type": "object",
+          "id": "shared-cup",
+          "revision": 1,
+          "amount": 1,
+          "unit": "item",
+          "owner": "cass",
+          "disposition": "destroyed"
+        }
+      ],
+      "quantity": {
+        "amount": 4,
+        "unit": "piece"
+      },
+      "formation": {
+        "operation": "partition",
+        "at": 1335,
+        "inputs": [
+          "shared-cup"
+        ]
+      },
+      "label": "杯子碎片",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "cass",
+      "revision": 2,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "active",
+      "kind": "ceramic-fragments",
+      "consumable": false,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "cass"
+      ],
+      "physicalHistoryDropped": 0,
+      "physicalHistory": [
+        {
+          "actorId": "owner",
+          "minute": 1350,
+          "operation": "separate",
+          "permitted": false,
+          "priorHolder": "owner"
+        }
+      ],
+      "unpermittedCount": 1
+    },
+    {
+      "id": "single-shard",
+      "source": "cup-shards",
+      "sources": [
+        {
+          "type": "object",
+          "id": "cup-shards",
+          "revision": 1,
+          "amount": 1,
+          "unit": "piece",
+          "owner": "cass"
+        }
+      ],
+      "quantity": {
+        "amount": 1,
+        "unit": "piece"
+      },
+      "formation": {
+        "operation": "separate",
+        "at": 1350,
+        "inputs": [
+          "cup-shards"
+        ]
+      },
+      "label": "杯子碎片",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "cass",
+      "revision": 1,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "active",
+      "kind": "ceramic-fragments",
+      "consumable": false,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "cass"
+      ]
+    }
+  ]
+}

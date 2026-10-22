@@ -25,19 +25,27 @@ export type OperationSummary = { operationId: string; operation?: string; status
 
 type Shape = true | { [key: string]: Shape } | Shape[];
 const proposalShape: Shape = { contractVersion: true, type: true, target: true, content: true, purpose: true, durationMinutes: true, timeIntent: { kind: true, maxMinutes: true } };
-const effectShape: Shape = {kind:true,supplyId:true,expectedRemaining:true,objectId:true,expectedRevision:true,toHolder:true,toRegion:true,key:true,value:true,targetId:true,recipient:true};
-const stateEntry: Shape = { key:true,value:true };
+const naturalStateShape:Shape={target:{type:true,id:true},changes:[{key:true,from:true,value:true}],exposure:true};
+const stateConditionShape:Shape={kind:true,version:true,target:{type:true,id:true},state:[{key:true,value:true}],guard:{region:true,holder:{check:true,value:true}}};
+const naturalChangeShape:Shape={id:true,version:true,source:{actorId:true,turn:true},scheduledAt:true,committedAt:true,nominalDueAt:true,dueAt:true,conditions:[stateConditionShape],effects:[naturalStateShape],reason:true,status:true,settledAt:true,invalidatedAt:true,invalidation:true};
+const quantityShape: Shape = {amount:true,unit:true};
+const sourceShape: Shape = {type:true,id:true,revision:true,amount:true,unit:true,owner:true,disposition:true};
+const formationShape: Shape = {operation:true,at:true,inputs:[true]};
+const effectShape: Shape = {quantity:quantityShape,outputId:true,inputs:[{objectId:true,expectedRevision:true,quantity:quantityShape,disposition:true}],outputs:[{id:true,label:true,kind:true,consumable:true,quantity:quantityShape,state:[{key:true,value:true,exposure:true}]}],delayMinutes:true,conditions:[stateConditionShape],effects:[naturalStateShape],operation:true,version:true,access:true,exposure:true,target:{type:true,id:true},changes:[{key:true,from:true,value:true}],reason:true,kind:true,supplyId:true,expectedRemaining:true,objectId:true,expectedRevision:true,toHolder:true,toRegion:true,key:true,value:true,targetId:true,expectedRegion:true,recipient:true};
+const stateEntry: Shape = { key:true,value:true,exposure:true };
+const physicalObjectShape = {allowedTo:[true],coOwners:[true],physicalHistory:[{actorId:true,minute:true,operation:true,permitted:true,priorHolder:true}],physicalHistoryDropped:true,unpermittedCount:true} satisfies Record<string,Shape>;
 // The deepest allowed projection is result.rules[].programs[].branches[].stages[].effects[].value.
 // Keep a finite structural bound as well as the independent 64 KiB receipt limit.
-const projectionDepth = 11;
+const projectionDepth = 14;
 const resolutionShape: Shape = {roll:true,modifier:true,dc:true,total:true,outcome:true};
 const selectedResultShape: Shape = {outcome:true,branch:true,resolution:resolutionShape};
 const checkShape: Shape = { difficulty:true, ability:true };
-const stageShape: Shape = {afterMinutes:true,preconditions:[{objectId:true,revision:true,region:true,holder:true,state:[stateEntry]}],effects:[effectShape]};
+const stageShape: Shape = {afterMinutes:true,preconditions:[{kind:true,version:true,target:{type:true,id:true},guard:{region:true,holder:{check:true,value:true}},objectId:true,revision:true,region:true,holder:true,state:[stateEntry]}],effects:[effectShape]};
 const branchShape: Shape = {outcomes:[true],effects:[effectShape],stages:[stageShape]};
 const routineStepShape: Shape = {kind:true,role:true,toHolder:true,key:true,value:true};
-const routineStageShape: Shape = {afterMinutes:true,effects:[routineStepShape]};
-const routineProgramShape: Shape = {operation:true,effects:[routineStepShape],stages:[routineStageShape],check:checkShape,branches:[{outcomes:[true],effects:[routineStepShape],stages:[routineStageShape]}]};
+const routineEffectShape: Shape = {...effectShape as Record<string,Shape>,...routineStepShape as Record<string,Shape>};
+const routineStageShape: Shape = {...stageShape as Record<string,Shape>,effects:[routineEffectShape]};
+const routineProgramShape: Shape = {operation:true,methods:[{content:true,purpose:true}],bindings:[{role:true,type:true,select:true,kind:true,label:true,state:[{key:true,value:true}],access:true,link:{role:true,key:true},quantity:quantityShape,sourceRole:true,sourceSubject:true,background:{label:true,kind:true,consumable:true,quantity:quantityShape,initialState:[stateEntry]}}],effects:[routineEffectShape],stages:[routineStageShape],check:checkShape,branches:[{outcomes:[true],effects:[routineEffectShape],stages:[routineStageShape]}]};
 const candidateShape: Shape = {status:true,completionMinutes:true,effects:[effectShape],check:checkShape,branches:[branchShape],routine:{family:true,version:true,operation:true,subject:true,timings:[{operation:true,minutes:true}],programs:[routineProgramShape]},stages:[stageShape]};
 
 export function createOperationEvidence(context: {
@@ -81,7 +89,7 @@ export function createOperationEvidence(context: {
     const selected:Record<string,unknown>={};
     for(const key of Object.keys(shape))if(Object.hasOwn(value,key))selected[key]=project(value[key],shape[key],depth+1,strict);
     if(strict&&Object.keys(value).some(key=>!Object.hasOwn(shape,key)))evidence.truncated=true;
-    if(typeof value.key==='string' && sensitiveDiagnosticKey.test(value.key) && Object.hasOwn(selected,'value')){selected.value='<REDACTED>';evidence.redacted=true;}
+    if(typeof value.key==='string' && sensitiveDiagnosticKey.test(value.key)){for(const field of ['value','from'])if(Object.hasOwn(selected,field)){selected[field]='<REDACTED>';evidence.redacted=true;}}
     return selected;
   };
   const capture = (raw:string,task:'npc'|'adjudication'): CandidateEvidence => {
@@ -122,19 +130,29 @@ export function createOperationEvidence(context: {
     evidence.outcome=outcome;evidence.resultVersion=resultVersion;
     if(world) {
       const objects=(world.objects||[]).filter(object=>JSON.stringify(object)!==JSON.stringify(before.objects?.find(old=>old.id===object.id)));
-      const rules=(world.routineRules||[]).map(rule=>({id:rule.id,version:rule.version,family:rule.family,timings:rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes})),programs:rule.programs}));
+      const beforeObjects=objects.flatMap(object=>{const old=before.objects?.find(previous=>previous.id===object.id);return old?[old]:[];});
+      const objectEvidence=(object:NonNullable<World['objects']>[number])=>({...object,stateEntries:Object.entries(object.state).map(([key,value])=>({key,value,...(object.stateExposure&&Object.hasOwn(object.stateExposure,key)?{exposure:object.stateExposure[key]}:{})}))});
+      const externalSnapshot=(source:World)=>[
+        ...source.characters.filter(actor=>actor.physical).map(actor=>({target:{type:'body',id:actor.id},revision:actor.physical!.revision,region:actor.region,stateEntries:Object.entries(actor.physical!.state).map(([key,value])=>({key,value})),exposureEntries:Object.entries(actor.physical!.exposure||{}).map(([key,value])=>({key,value}))})),
+        ...Object.entries(source.scene?.external||{}).map(([id,bag])=>({target:{type:'environment',id},revision:bag.revision,region:id,stateEntries:Object.entries(bag.state).map(([key,value])=>({key,value})),exposureEntries:Object.entries(bag.exposure||{}).map(([key,value])=>({key,value}))})),
+      ];
+      const afterExternal=externalSnapshot(world),beforeExternal=externalSnapshot(before);
+      const externalStates=afterExternal.flatMap(after=>{const previous=beforeExternal.find(item=>item.target.type===after.target.type&&item.target.id===after.target.id)||null;return JSON.stringify(previous)===JSON.stringify(after)?[]:[{target:after.target,before:previous,after}];});
+      const naturalChanges=(world.naturalChanges||[]).filter(change=>JSON.stringify(change)!==JSON.stringify(before.naturalChanges?.find(previous=>previous.id===change.id)));
+      const relevantRules=new Set((world.routineAudit||[]).filter(item=>!(before.routineAudit||[]).some(old=>JSON.stringify(old)===JSON.stringify(item))).map(item=>item.ruleId));
+      const rules=(world.routineRules||[]).filter(rule=>relevantRules.has(rule.id)||JSON.stringify(rule)!==JSON.stringify(before.routineRules?.find(old=>old.id===rule.id))).sort((a,b)=>Number(relevantRules.has(b.id))-Number(relevantRules.has(a.id))).map(rule=>({id:rule.id,version:rule.version,family:rule.family,finiteSourceBindings:rule.finiteSourceBindings,timings:rule.worldTimings||rule.templates?.map(template=>({operation:template.operation,minutes:template.result.minutes})),programs:rule.programs}));
       const actors=world.characters.map(actor=>({id:actor.id,activity:actor.activity,plan:actor.plan?{
         startedAt:actor.plan.startedAt,until:actor.plan.until,action:actor.plan.action,phaseCursor:actor.plan.phases?.cursor,
         selectedResult:actor.plan.selectedResult,
-        stages:actor.plan.phases?.stages.map(stage=>({...stage,preconditions:stage.preconditions.map(condition=>({...condition,state:Object.entries(condition.state).map(([key,value])=>({key,value}))}))})),
+        stages:actor.plan.phases?.stages.map(stage=>({...stage,preconditions:stage.preconditions.map(condition=>({...condition,state:'target' in condition?condition.state:Object.entries(condition.state).map(([key,value])=>({key,value}))}))})),
       }:null}));
       // Only new mechanical results, never event text, audiences, attempt keys or private context.
       // Completed plans are removed by the lifecycle; their committed resolution remains evidence.
       const previousEvents=new Set(before.events.map(event=>event.id));
       const resolutions=world.events.filter(event=>!previousEvents.has(event.id)&&['attempt','work'].includes(event.kind)&&event.resolution)
         .map(event=>({eventId:event.id,actorId:event.actor,resolution:event.resolution}));
-      evidence.result=project({turn:world.turn,minute:world.minute,actors,rules,objects,resolutions},
-        {turn:true,minute:true,actors:[{id:true,activity:true,plan:{startedAt:true,until:true,action:{type:true,target:true,content:true},phaseCursor:true,selectedResult:selectedResultShape,stages:[stageShape]}}],rules:[{id:true,version:true,family:true,timings:[{operation:true,minutes:true}],programs:[routineProgramShape]}],objects:[{id:true,revision:true,region:true,holder:true,owner:true,lifecycle:true,kind:true,state:{contents:true,clean:true,vessel:true,beverage:true,available:true,condition:true}}],resolutions:[{eventId:true,actorId:true,resolution:resolutionShape}]},0,false) as Record<string,unknown>;
+      evidence.result=project({turn:world.turn,minute:world.minute,actors,rules,objects:objects.map(objectEvidence),beforeObjects:beforeObjects.map(objectEvidence),externalStates,naturalChanges,naturalChangesDropped:world.naturalChangesDropped,resolutions},
+        {turn:true,minute:true,naturalChanges:[naturalChangeShape],naturalChangesDropped:true,actors:[{id:true,activity:true,plan:{startedAt:true,until:true,action:{type:true,target:true,content:true},phaseCursor:true,selectedResult:selectedResultShape,stages:[stageShape]}}],rules:[{id:true,version:true,family:true,finiteSourceBindings:[{operation:true,roles:[true]}],timings:[{operation:true,minutes:true}],programs:[routineProgramShape]}],objects:[{...physicalObjectShape,id:true,source:true,sources:[sourceShape],quantity:quantityShape,consumable:true,coOwners:[true],formation:formationShape,endedByFormation:{operation:true,at:true,actorId:true,disposition:true},revision:true,region:true,holder:true,owner:true,lifecycle:true,kind:true,state:{contents:true,clean:true,vessel:true,beverage:true,available:true,condition:true},stateEntries:[stateEntry]}],beforeObjects:[{...physicalObjectShape,id:true,source:true,sources:[sourceShape],quantity:quantityShape,consumable:true,coOwners:[true],formation:formationShape,endedByFormation:{operation:true,at:true,actorId:true,disposition:true},revision:true,region:true,holder:true,owner:true,lifecycle:true,kind:true,stateEntries:[stateEntry]}],externalStates:[{target:{type:true,id:true},before:{revision:true,region:true,stateEntries:[stateEntry],exposureEntries:[stateEntry]},after:{revision:true,region:true,stateEntries:[stateEntry],exposureEntries:[stateEntry]}}],resolutions:[{eventId:true,actorId:true,resolution:resolutionShape}]},0,false) as Record<string,unknown>;
     }else delete evidence.result;
     // Redact metadata too, after all dispatched service credentials are known.
     const sanitize=(value:unknown):unknown=>{

@@ -44,3 +44,13 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-
 `browser128.mjs` 驗證 v2 日常模型程序：首次核准、階段完成、不同杯子免費重綁、接管／交還、喝茶／清洗／歸還、重載與重送。沿相同 Chromium 環境執行，只有模型 transport 使用 fixture，沒有付費或正式世界操作。
 
 `browser-live-gaps.mjs` 從實際 UI 新建最小驗收場景，驗證 v2 首次核准／原始程序證據、跨回合泡茶、喝洗同杯重用、店主自主 grant fixture 與借用攜帶洗還、餐點消耗、UI 原 ID 重送及保存前後故障。篩選 JSON／截圖預設輸出 `docs/verification/assets/live-gaps/`；全部為本機 fixture，不還原 #143 缺失的原始候選，也不呼叫正式模型。
+
+`browser146.mjs` 驗證同一原杯的新茶漬／濕潤狀態、一般分析呈現、SQLite 重載與 UI 原 ID 重送；候選理由留在有界證據。結果在 `docs/verification/assets/world-object-146/`，全部為 fixture，零正式付費呼叫。
+
+`browser148.mjs` 以真實 WorldApp／API／SQLite 驗證同一活動的杯子、環境及身體外在影響，NPC可知線索、人物檔案、重載及原ID UI 重送；模型 transport 是 fixture，沒有正式付費模型。外在權威狀態與NPC public／subject／hidden隔離由同票API回歸補足。
+#147：`browser147.mjs` 以真 WorldApp／API／SQLite 驗證已借用杯子的失敗損毀、從另一在場持有人未經許可拿取、同杯新狀態、事前許可歷史、重載及 UI 原 ID 重送。模型回覆／D20 為明示 fixture，3 NPC＋3 裁定＋1 骰，不是正式站驗收；結果輸出 `docs/verification/assets/world-physical-147/`。
+
+`browser149.mjs` 使用真實 WorldApp／世界 API／SQLite 驗證 aggregate 分拆、按需細分／食用、多來源與共同權利，以及未經許可的物理碎片與來源 history；僅初始世界與模型 transport 為 fixture。六個新回合、重載與 UI 原 ID 重送，輸出 `docs/verification/assets/world-formation-149/`；沒有正式付費模型或正式世界操作。
+
+
+`browser-natural-changes.mjs` 以真WorldApp／API／SQLite驗證冷卻、環境乾燥、條件破壞後恢復仍失效、重載及原ID UI重送。8次推進，8 NPC決策＋5裁定，零付費模型；截圖與篩選證據輸出 `docs/verification/assets/natural-changes/`，並非正式站驗收。

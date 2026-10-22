@@ -1,3 +1,4 @@
+import { invalidateNaturalChanges } from './natural-changes';
 import { requiresWorldEffects, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
 import { regionOf } from './perception';
@@ -107,7 +108,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     }
     const duration=candidate.confirmedDurationMinutes??decision.durationMinutes;
     if((candidate.stages||[]).some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
-    const accepted=commitFreeAction(world,character,candidate,decision.action);
+    const accepted=commitFreeAction(world,character,candidate,decision.action,{nominalDueAt:world.minute-minutes+(candidate.stages?.length?0:candidate.confirmedDurationMinutes??minutes)});
     const phases=candidate.stages||[];
     if(accepted&&phases.length){character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
   }
@@ -127,6 +128,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       }
     }
     resolve(world, character, decision.action);
+    invalidateNaturalChanges(world);
   }
   const duration = decision.timeIntent?.kind==='completion'?15:activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
   if (!requiresWorldEffects(decision.action) && (sustainedActions.has(decision.action.type) || decision.timeIntent?.kind==='open-ended') && duration > minutes) {
