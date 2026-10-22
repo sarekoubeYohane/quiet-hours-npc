@@ -156,3 +156,17 @@ test('a legal batch with long multibyte labels keeps the additional feedback ins
  const s=await scenario({objects,decision:{...proposal,target:'batch-0',content:'說'.repeat(500)},reply:{status:'accepted',completionMinutes:15,effects:objects.map(o=>({kind:'state',objectId:o.id,expectedRevision:1,key:'contents',value:'water'})),stages:[],check:null}});
  try{await advance(s);s.choose(rest);await advance(s);const input=s.inputs.filter(e=>e.input.self).at(-1).input;assert.ok(feedback(input).length);assert.ok(feedback(input).every(m=>Buffer.byteLength(m.text)<=4096));assert.equal((await s.read()).objects.filter(o=>o.id.startsWith('batch-')&&o.state.contents==='water').length,4);}finally{s.restore();}
 });
+
+test('saved phased periods and selected attempts ending after their last effect persist a terminal result without repeating effects',async()=>{
+ for(const mode of ['open-ended','selected','legacy']){
+  // Explicit old saved-plan fixture. The current API does not accept new
+  // open-ended world proposals; compatibility must still finish stored plans.
+  const s=await scenario({modify:w=>{w.characters[0].plan={action:{type:'propose',target:'cup-a',content:'整理器具半小時'},startedAt:w.minute,until:w.minute+30,attention:'',modelKey:'openai:gpt-6-luna',...(mode==='open-ended'?{timeIntent:{kind:'open-ended',maxMinutes:null}}:{}),...(mode==='selected'?{selectedResult:{outcome:'mixed',branch:0}}:{}),phases:{origin:'cafe-front',cursor:0,stages:[{afterMinutes:15,preconditions:[],effects:[{kind:'state',objectId:'cup-a',expectedRevision:1,key:'contents',value:'water'}]}]}};}});
+  try{
+   let w=await advance(s),cup=w.objects.find(o=>o.id==='cup-a');assert.equal(cup.revision,2);assert.equal(cup.state.contents,'water');assert.ok(w.characters[0].plan);const firstCount=w.characters[0].shortTerm.filter(m=>m.text.includes('行動回饋')).length;
+   const operation={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(operation)).status,200);w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,mode==='open-ended'?/時段.*到期/:/已結束/);assert.doesNotMatch(w.characters[0].activity,/活動已完成|尚未完成|部分成功/);assert.equal(w.objects.find(o=>o.id==='cup-a').revision,2);assert.equal(w.characters[0].shortTerm.filter(m=>m.text.includes('行動回饋')).length,firstCount+1);
+   const counts=s.counts();await s.post(operation);assert.deepEqual(s.counts(),counts);assert.deepEqual((await s.read()).characters[0].shortTerm,w.characters[0].shortTerm);
+   s.choose(rest);await advance(s);const input=s.inputs.filter(e=>e.input.self).at(-1).input;assert.equal(input.self.plan,undefined);assert.equal(input.currentActivity,null);assert.match(input.self.activity,mode==='open-ended'?/時段.*到期/:/已結束/);assert.match(feedback(input).at(-1).text,/到期|已結束/);assert.match(feedback(input).at(-1).text,/活動始於/);assert.equal((await s.read()).objects.find(o=>o.id==='cup-a').revision,2);assert.equal(s.counts().judgments,0);assert.equal(s.counts().npc,1);
+  }finally{s.restore();}
+ }
+});

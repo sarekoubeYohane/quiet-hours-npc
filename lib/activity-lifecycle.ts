@@ -38,6 +38,8 @@ export function cancelActivity(w:World,c:Character):void {
 function advancePhases(w:World,c:Character):void{
  const plan=c.plan,phases=plan?.phases;
  if(!plan||!phases)return;
+ const previousCursor=phases.cursor;
+ const periodEnded='自己選定的活動時段已到期，接下來可重新安排。';
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=w.minute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
   let results:string[];
@@ -46,10 +48,15 @@ function advancePhases(w:World,c:Character):void{
   }
   phases.cursor++;
   const finished=phases.cursor===phases.stages.length&&w.minute>=plan.until;
-  const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
+  const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
   recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
  }
- if(phases.cursor===phases.stages.length&&w.minute>=plan.until)cancelActivity(w,c);
+ if(phases.cursor===phases.stages.length&&w.minute>=plan.until){
+  // A stored plan may finish its final effect before its chosen period ends.
+  // Expiry is still a new knowable result, even when no phase runs this time.
+  if(phases.cursor===previousCursor)recordActionResult(w,c,plan.action,plan.timeIntent?.kind==='open-ended'?periodEnded:'這次嘗試已結束，沒有新增可知成果。','work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
+  cancelActivity(w,c);
+ }
 }
 
 // A control transition, an autonomous continuation and an explicit NPC continue
