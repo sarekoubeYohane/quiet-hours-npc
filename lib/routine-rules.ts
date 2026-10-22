@@ -177,7 +177,7 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   const reason=`完成這項活動需要安排 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`;
   const item=w.routineAudit?.at(-1);if(item&&item.actorId===c.id&&item.turn===w.turn)item.reason=reason;
   observeSelection(observe,{source:'program-check',ruleId:rule?.id,version:rule?.version,check:'time-limit',confirmedDurationMinutes,maxMinutes,passed:false});
-  return {status:'denied',effects:[],stages:[],check:null,blockedReason:reason};
+  return {status:'denied',effects:[],stages:[],check:null,knownBlockedReason:reason};
  }
  const finish=(candidate:EffectCandidate)=>{observeSelection(observe,{source:'program-check',ruleId:rule?.id,version:rule?.version,branch:approval?'approved':'reused',status:candidate.status,operation:template.operation});return rule?.version===2?bindRoutineProgram(w,c,candidate,rule.programs!.find(p=>p.operation===template.operation)! as RoutineProgram):candidate;};
  const contents=template.result.contents||'tea';

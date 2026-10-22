@@ -1,5 +1,5 @@
 import { invalidateNaturalChanges } from './natural-changes';
-import { requiresWorldEffects, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
+import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
 import { regionOf } from './perception';
 import type { ActivityDecision } from './activities';
@@ -38,23 +38,24 @@ export function cancelActivity(w:World,c:Character):void {
 function advancePhases(w:World,c:Character):void{
  const plan=c.plan,phases=plan?.phases;
  if(!plan||!phases)return;
+ const previousCursor=phases.cursor;
+ const periodEnded='自己選定的活動時段已到期，接下來可重新安排。';
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=w.minute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
   let results:string[];
   try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch{
-   c.activity='原活動的條件已改變，尚未完成。';
-   record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);cancelActivity(w,c);return;
+   recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
   }
   phases.cursor++;
-  const outcome=plan.selectedResult?.outcome;
-  const label=outcome==='critical-failure'?'大失敗':outcome==='failure'?'失敗':outcome==='mixed'?'部分成功':'完成';
-  c.activity=results.join('，')||`這次嘗試的結果為${label}`;
-  record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
+  const finished=phases.cursor===phases.stages.length&&w.minute>=plan.until;
+  const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
+  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
  }
  if(phases.cursor===phases.stages.length&&w.minute>=plan.until){
-  const outcome=plan.selectedResult?.outcome;
-  const label=outcome==='critical-failure'?'大失敗':outcome==='failure'?'失敗':outcome==='mixed'?'部分成功':outcome==='critical-success'?'大成功':'成功';
-  c.activity+=plan.selectedResult?`；這次嘗試已結束${outcome?`（${label}）`:''}。`:'；活動已完成。';cancelActivity(w,c);
+  // A stored plan may finish its final effect before its chosen period ends.
+  // Expiry is still a new knowable result, even when no phase runs this time.
+  if(phases.cursor===previousCursor)recordActionResult(w,c,plan.action,plan.timeIntent?.kind==='open-ended'?periodEnded:'這次嘗試已結束，沒有新增可知成果。','work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
+  cancelActivity(w,c);
  }
 }
 
@@ -87,8 +88,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   if(requiresWorldEffects(decision.action)){
     if(!decision.freeCandidate){
       if(ai)throw Error('物件行動缺少裁定。');
-      character.activity='泡茶尚未完成：目前規則模式不支援這項物件活動。';
-      record(world,character.id,`${character.name} ${character.activity}`,'unsupported',[character.id]);
+      recordActionResult(world,character,decision.action,'泡茶尚未完成：目前規則模式不支援這項物件活動。','unsupported');
       return false;
     }
     let candidate=decision.freeCandidate;
@@ -103,7 +103,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
         if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null});
-        candidate={status:'denied',effects:[],stages:[],check:null,blockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
+        candidate={status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
       }
     }
     const duration=candidate.confirmedDurationMinutes??decision.durationMinutes;
@@ -115,15 +115,13 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   else {
     if(decision.timeIntent?.kind==='completion'){
       if(decision.action.type==='rest'||decision.action.type==='reflect'){
-        character.activity='目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。';
-        record(world,character.id,`${character.name} ${character.activity}`,'unsupported',[character.id]);
+        recordActionResult(world,character,decision.action,'目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。','unsupported');
         return false;
       }
       if(decision.timeIntent.maxMinutes!==null&&decision.timeIntent.maxMinutes<15){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
         resolve(validation,actor,decision.action,{dryRun:true});
-        character.activity=`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`;
-        record(world,character.id,`${character.name} ${character.activity}`,'blocked',[character.id]);
+        recordActionResult(world,character,decision.action,`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`,'blocked');
         return false;
       }
     }

@@ -35,7 +35,7 @@ export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPha
 // attempt without storing model-authored IDs or the first historical die in a rule.
 export type TrialBinding={operation:string;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
-export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;knownBlockedReason?:string;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export function hasObjectPermission(object:{owner:string;allowedTo:string[];coOwners?:string[]},actorId:string):boolean {
  return object.allowedTo.includes(actorId)||(!object.coOwners||object.coOwners.length<=1)&&object.owner===actorId;
 }
@@ -152,7 +152,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
     o.lifecycle='destroyed';o.holder=null;if(o.quantity)o.quantity.amount=0;results.push(physical?`${o.label}已損毀`:`處理了已損毀的${o.label}`);
    }else if(e.kind==='state'){
     if(!o.stateTransitions?.[e.key]?.includes(e.value)||o.state[e.key]===e.value)fail('state_transition','物件不支援這個狀態轉換。');
-    o.state[e.key]=e.value;results.push(`${o.label}：${e.key}=${e.value}`);
+    o.state[e.key]=e.value;results.push(o.stateExposure?.[e.key]==='hidden'?'已進行這個步驟':`${o.label}：${e.key}=${e.value}`);
    }else{
     if(physical&&o.holder===e.toHolder)fail('unchanged_holder','物件已由該持有人持有。');
     if(e.toRegion!==regionOf(c)||!regions.some(r=>r.id===e.toRegion))fail('remote_transfer','不能跨地點遠端轉移物件。');
@@ -229,6 +229,33 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
 export function validateResultBranches(w:World,c:Character,candidate:EffectCandidate):void {
  for(const branch of candidate.branches||[]){const clone=structuredClone(w),actor=clone.characters.find(actor=>actor.id===c.id)!;commitFreeAction(clone,actor,{...candidate,branches:undefined,check:null,effects:branch.effects,stages:branch.stages});}
 }
+// Generated feedback is an explicit excerpt, never truncation of an existing
+// memory. Preserve the original event's public summary and mechanical evidence.
+function feedbackExcerpt(text:string):string {
+ const encoder=new TextEncoder(),limit=4096;
+ if(encoder.encode(text).length<=limit)return text;
+ const omitted='［行動回饋超出容量，後續內容省略］';
+ let excerpt='',bytes=encoder.encode(omitted).length;
+ for(const character of text){const size=encoder.encode(character).length;if(bytes+size>limit)break;excerpt+=character;bytes+=size;}
+ return excerpt+omitted;
+}
+// A result is an actor experience, not a second knowledge store. Keep the
+// proposal association in the existing bounded short-term memory/event channel.
+// Only the existing NPC projection is consulted; authority reasons, inventory
+// counters, permission lists and private decision traces are never sources.
+export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution):void {
+ const label=action?`${action.type} ${action.target||''} ${action.content||''}`.trim().slice(0,240):'先前活動';
+ const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||action?.type==='work'&&action.target==='tea'&&object.kind==='utensil').slice(0,4);
+ let state='';
+ for(const object of relevant){
+  const entry=`${object.label.slice(0,80)} [${object.id}]：${JSON.stringify(object.state)}`;
+  if(new TextEncoder().encode(state+entry).length<=1024)state+=(state?'；':'')+entry;
+ }
+ const context=relevant.some(object=>object.kind==='utensil'&&object.state.condition==='broken')?' 已知的器具已損壞。':'';
+ c.activity=summary+context;
+ const text=feedbackExcerpt(`${c.name} 行動回饋（原提案，非已發生成果：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
+ record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text);
+}
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt:number}):boolean{
  if(candidate.branches){
   validateResultBranches(w,c,candidate);
@@ -245,13 +272,12 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  }
 
  if(candidate.status!=='accepted'){
-  // A general candidate carries only a status, not a verified explanation.
-  // Do not turn hidden authority data into a reason or invent the model's intent.
-  // Routine binders already provide a more specific, knowable blockedReason.
-  c.activity=candidate.blockedReason||(candidate.status==='denied'
-   ?'這次方法沒有成功。若尚未取得必要使用許可，須由有權角色自行同意授權；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
-   :'目前的方法無法落實：這種效果目前無法承接，尚未完成。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
-  record(w,c.id,`${c.name} ${c.activity}`,'blocked',[c.id]);return false;
+  // blockedReason remains an observer diagnostic: even program-derived reasons
+  // can depend on hidden stock or grants. Only actor-known grounds may leave it.
+  const summary=candidate.knownBlockedReason||(candidate.status==='denied'
+   ?'這次方法沒有成功，尚未執行，沒有新增成果。若尚未取得必要使用許可，須由有權角色自行同意授權；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
+   :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
+  recordActionResult(w,c,action,summary,'blocked');return false;
  }
  const existingObjects=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
  const validateResultTime=(snapshot:World,afterMinutes:number)=>{
@@ -293,14 +319,13 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
   resolution=prior||judgeD20(rollD20(),abilityAdvantage(c,candidate.check.ability),candidate.check.difficulty);
   if(!prior){(w.freeTrials??={})[key]=resolution;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);w.events.at(-1)!.attemptKey=key;}
-  if(!['success','critical-success'].includes(resolution.outcome)){c.activity='嘗試尚未完成。';return false;}
+  if(!['success','critical-success'].includes(resolution.outcome)){recordActionResult(w,c,action,'嘗試尚未完成，這次沒有新增成果。','blocked');return false;}
  }
  commitWorldChanges(w,clone);
  emitExternalConsequences(w,c.id,candidate.effects);
- const outcomeLabel=resolution?.outcome==='critical-failure'?'大失敗':resolution?.outcome==='failure'?'失敗':resolution?.outcome==='mixed'?'部分成功':'完成';
- c.activity=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':candidate.selectedResult?`這次嘗試的結果為${outcomeLabel}`:'完成這次行動'))+(candidate.stages?.length?'；活動尚未完成。':'');
+ const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
- record(w,c.id,`${c.name} ${c.activity}。`,'work',[c.id],{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
+ recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
  return true;
 }
 

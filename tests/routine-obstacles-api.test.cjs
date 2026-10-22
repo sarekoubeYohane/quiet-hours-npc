@@ -45,7 +45,7 @@ for(const obstacle of ['depleted','permission'])test(`known ${obstacle} remains 
   if(obstacle==='depleted')w.supplies=[{id:'tea-leaves',label:'最後的茶葉',region:'cafe-front',remaining:0,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];
   else {w.objects[0].owner='someone-else';w.objects[0].allowedTo=[];}
  });try{
-  await s.post({operation:'advance',minutes:15});let w=await s.read();assert.match(w.characters.find(c=>c.id==='owner').activity,obstacle==='depleted'?/材料已用完/:/可使用的空器具/);assert.equal(w.routineAudit.at(-1).result,'blocked');
+  await s.post({operation:'advance',minutes:15});let w=await s.read();assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有新增成果/);assert.doesNotMatch(w.characters.find(c=>c.id==='owner').activity,/材料已用完|物主已拒絕/);assert.equal(w.routineAudit.at(-1).result,'blocked');
   w.characters.find(c=>c.id!=='owner').mood='好奇';store.replaceCommittedWorld(w);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.aiUsage.totalCalls,2);assert.equal(w.objects[0].state.contents,'empty');
   if(obstacle==='depleted')w.supplies[0].remaining=1;else w.objects[0].allowedTo=['owner'];store.replaceCommittedWorld(w);
   await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects[0].state.contents,'water');assert.equal(s.inputs.filter(i=>i.contractVersion==='world-adjudication.v1').length,0);assert.equal(w.aiUsage.totalCalls,3);

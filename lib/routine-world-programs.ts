@@ -132,7 +132,7 @@ function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:Routin
  }
  if(!rule||!program){observeSelection(observe,{source:'program-check',ruleId,branch:'adjudication-required',reason:'no-matching-program'});return;}
  const duration=rule.worldTimings!.find(time=>time.operation===program.operation)!.minutes,confirmedDurationMinutes=Math.ceil(duration/15)*15;
- if(maxMinutes!==null&&confirmedDurationMinutes>maxMinutes){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,check:'time-limit',confirmedDurationMinutes,maxMinutes,passed:false});return denied(`完成這項活動需要 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`);}
+ if(maxMinutes!==null&&confirmedDurationMinutes>maxMinutes){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,check:'time-limit',confirmedDurationMinutes,maxMinutes,passed:false});return {status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`完成這項活動需要 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`};}
  const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule,observe);}catch(error){if(error instanceof RoutineUnavailable){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'blocked',reason:error.message});audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
  if(!refs){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'adjudication-required',reason:'role-binding-failed'});audit(w,c,rule,'exception');if(approval)return denied('目前已知物件或外在條件不能承接這次方法，尚未完成。');return;}
  if(!approval)audit(w,c,rule,'reused');
