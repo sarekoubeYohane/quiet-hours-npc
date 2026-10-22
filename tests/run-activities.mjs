@@ -25,15 +25,17 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0004_recall_usage.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0005_decision_traces.sql', 'utf8'))});
-    let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure;
+    let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure, traceWriteHook, traceReadFailure;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false;
+      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
     exports.failNextOperationRead = () => { failRead = true; };
     exports.failTraceWrites = value => { traceWriteFailure = value; };
+    exports.onNextTraceWrite = hook => { traceWriteHook = hook; };
+    exports.failNextTraceRead = () => { traceReadFailure=true; };
     exports.throwBeforeNextSave = () => { failBefore = true; };
     exports.throwAfterNextSave = () => { uncertain = true; };
     exports.installForOwner = (owner,value) => db.prepare('INSERT OR REPLACE INTO worlds (owner,state,version,locked_until,operations) VALUES (?, ?, 0, 0, ?)').run(owner, JSON.stringify(value), '{"floor":0,"results":{}}');
@@ -43,9 +45,10 @@ try {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { return { results: db.prepare(sql).all(...values) }; }, async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { return { results: db.prepare(sql).all(...values) }; }, async first() { if(traceReadFailure&&sql.startsWith('SELECT body FROM decision_traces')){traceReadFailure=false;throw Error('fixture archive read unavailable');} if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
       if(sql.startsWith('INSERT OR IGNORE INTO recall_dispatch_usage') && budgetHook){const hook=budgetHook;budgetHook=undefined;await hook();}
-      if(traceWriteFailure && sql.startsWith('INSERT INTO decision_traces'))throw Error('fixture trace storage unavailable');
+      if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&traceWriteHook){const hook=traceWriteHook;traceWriteHook=undefined;await hook();}
+      if(traceWriteFailure && (sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces')))throw Error('fixture trace storage unavailable');
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
       if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }
       if (finalSave && conflict) {
@@ -68,7 +71,7 @@ try {
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
-  allTests.push('tests/decision-traces-api.test.cjs');
+  allTests.push('tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

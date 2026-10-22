@@ -1,0 +1,58 @@
+{
+  "fixture": true,
+  "realPaidModelCalls": 0,
+  "baseline": "c8e9bb3",
+  "backend": "30a2b5f",
+  "red": [
+    {
+      "seam": "Chromium UI + world API + model stub + SQLite",
+      "scenario": "failed operation without world/evidence response",
+      "observation": "analysis selected the prior success operation, waitForFunction failed after 3000ms"
+    },
+    {
+      "seam": "Chromium UI + world API + model stub + SQLite",
+      "scenario": "malformed provider body",
+      "observation": "raw body retained, but dispatch.failure.kind missing on #91 baseline"
+    },
+    {
+      "seam": "Chromium UI + world API + model stub + SQLite",
+      "scenario": "archive read fails before acceptance",
+      "observation": "GET recovered with no accepted record, so the original HTTP gap was invisible in analysis before the local non-durable status was added"
+    },
+    {
+      "seam": "Chromium UI + world API + model stub + SQLite",
+      "scenario": "archive read fails before acceptance",
+      "observation": "GET recovered with no accepted record, so the original HTTP gap was invisible in analysis before the local non-durable status was added"
+    }
+  ],
+  "checks": [
+    "13 fault scenarios passed on backend 30a2b5f; metadata-only discovery case separately passed on e1e1808",
+    "failure analysis focuses original operationId",
+    "reload retains focus",
+    "same operationId adds zero model calls or world effects",
+    "world commit or rollback checked against durable world API",
+    "prepared checkpoint is marked dispatch unknown",
+    "checkpoint write failure does not obscure original operation status",
+    "no real paid model requests",
+    "archive read failure stops before acceptance without dispatch",
+    "local HTTP gap is labeled non-durable and is absent after reload",
+    "same ID first acceptance after read recovery is followed by zero-work replay",
+    "archive read failure stops before acceptance without dispatch",
+    "local HTTP gap is labeled non-durable and is absent after reload",
+    "same ID first acceptance after read recovery is followed by zero-work replay"
+  ],
+  "scope": "Synthetic replies verify deterministic application behavior; they cannot recover or prove the 2026-10-22 original model cause.",
+  "additionalVerification": {
+    "scenario": "credential-redaction-unavailable",
+    "backend": "e1e1808",
+    "result": "passed",
+    "checks": [
+      "damaged unused provider key does not block normal openai advance",
+      "credential-safe metadata-only receipt omits dynamic content and context",
+      "after nine later operations and journal eviction, same-context analysis lists and opens context-unknown receipt",
+      "reload and read do not dispatch models",
+      "expired original ID returns 410 without new model calls"
+    ],
+    "earlierArtifacts": "The first 13 cases remain evidence from backend 30a2b5f and were not rerun or relabeled."
+  }
+}

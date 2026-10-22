@@ -24,16 +24,18 @@ for (const [source,output] of sources) {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(':memory:');
     db.exec(${JSON.stringify((await Promise.all((await readdir('drizzle')).filter(file=>file.endsWith('.sql')).sort().map(file=>readFile(join('drizzle',file),'utf8')))).join('\n'))});
-    let conflict, uncertain, failBefore, failRead, budgetHook;
+    let conflict, uncertain, failBefore, failRead, budgetHook, traceFailure = false, failTraceRead = false;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
+      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceFailure = false; failTraceRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
     exports.failNextOperationRead = () => { failRead = true; };
     exports.throwBeforeNextSave = () => { failBefore = true; };
     exports.throwAfterNextSave = () => { uncertain = true; };
+    exports.failTraceWrites = value => { traceFailure = value; };
+    exports.failNextTraceRead = () => { failTraceRead = true; };
     exports.installForOwner = (owner,value) => db.prepare('INSERT OR REPLACE INTO worlds (owner,state,version,locked_until,operations) VALUES (?, ?, 0, 0, ?)').run(owner, JSON.stringify(value), '{"floor":0,"results":{}}');
     exports.replaceCommittedWorld = value => db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0 WHERE owner = ?').run(JSON.stringify(value), 'test-owner');
     exports.snapshot = () => JSON.parse(db.prepare('SELECT state FROM worlds WHERE owner = ?').get('test-owner').state);
@@ -41,7 +43,8 @@ for (const [source,output] of sources) {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { return { results: db.prepare(sql).all(...values) }; }, async first() { if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { return { results: db.prepare(sql).all(...values) }; }, async first() { if(failTraceRead && sql.startsWith('SELECT body FROM decision_traces')) { failTraceRead=false;throw Error('Private trace read unavailable'); } if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+      if(traceFailure && (sql.startsWith('INSERT INTO decision_traces') || sql.startsWith('UPDATE decision_traces')))throw Error('Private trace unavailable');
       if(sql.startsWith('INSERT OR IGNORE INTO recall_dispatch_usage') && budgetHook){const hook=budgetHook;budgetHook=undefined;await hook();}
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
       if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }

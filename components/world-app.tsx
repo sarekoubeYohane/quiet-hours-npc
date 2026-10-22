@@ -50,20 +50,28 @@ const [ownerUsage,setOwnerUsage]=useState<OwnerUsage>({enabled:false});
 const [directType,setDirectType]=useState<Action['type']>('rest'),[directTarget,setDirectTarget]=useState(''),[directContent,setDirectContent]=useState('');
 const [modelKeys,setModelKeys]=useState<ModelKeyStatus>({openai:{configured:false,expiresAt:null},openrouter:{configured:false,expiresAt:null}}),[keyStorageAvailable,setKeyStorageAvailable]=useState(false);
 const busyRef=useRef(false),autoRef=useRef(false),playingRef=useRef(false);
-const versionRef=useRef(-1),scopeRef=useRef('');
+const versionRef=useRef(-1),scopeRef=useRef(''),worldContextRef=useRef<string|undefined>(undefined);
+const [traceFocusOperationId,setTraceFocusOperationId]=useState<string>();
+const [traceResponseStatus,setTraceResponseStatus]=useState<{operationId:string;status:string;gap?:string;lastKnownStage?:string}>();
+const focusTrace=useCallback((operationId:string)=>{setTraceFocusOperationId(operationId);setTraceResponseStatus(previous=>previous?.operationId===operationId?previous:undefined);if(scopeRef.current)sessionStorage.setItem(scopeRef.current+':trace-focus',JSON.stringify({operationId,contextId:worldContextRef.current}));},[]);
 const [pendingOperation,setPendingOperation]=useState(false),[resetOpen,setResetOpen]=useState(false);
-const acceptWorld=useCallback((d:{world?:World;version?:number;adjudicationFailure?:AdjudicationFailure;operationEvidence?:OperationEvidence;recentOperations?:OperationSummary[]})=>{if(d.world&&typeof d.version==='number'&&d.version>=versionRef.current){versionRef.current=d.version;setWorld(d.world);setAdjudicationFailure(d.adjudicationFailure);setOperationEvidence(d.operationEvidence);if(d.recentOperations)setRecentOperations(d.recentOperations);const config=JSON.stringify(d.world.adjudication||null);if(config!==adjudicationDraftRef.current){adjudicationDraftRef.current=config;setAdjudicationProvider(d.world.adjudication?.provider||'openai');setAdjudicationModel(d.world.adjudication?.model||'');}setLimits(validBudgetLimits(d.world.playerBudget)?d.world.playerBudget:defaultLimits);}},[]);
+const acceptWorld=useCallback((d:{world?:World;version?:number;adjudicationFailure?:AdjudicationFailure;operationEvidence?:OperationEvidence;recentOperations?:OperationSummary[]})=>{if(d.world&&typeof d.version==='number'&&d.version>=versionRef.current){if(worldContextRef.current!==d.world.contextId){setTraceFocusOperationId(undefined);setTraceResponseStatus(undefined);if(scopeRef.current)sessionStorage.removeItem(scopeRef.current+':trace-focus');}worldContextRef.current=d.world.contextId;versionRef.current=d.version;setWorld(d.world);setAdjudicationFailure(d.adjudicationFailure);setOperationEvidence(d.operationEvidence);if(d.recentOperations)setRecentOperations(d.recentOperations);const config=JSON.stringify(d.world.adjudication||null);if(config!==adjudicationDraftRef.current){adjudicationDraftRef.current=config;setAdjudicationProvider(d.world.adjudication?.provider||'openai');setAdjudicationModel(d.world.adjudication?.model||'');}setLimits(validBudgetLimits(d.world.playerBudget)?d.world.playerBudget:defaultLimits);}},[]);
 const readLatest=useCallback(async()=>{
 type Latest={operationEvidence?:OperationEvidence;recentOperations?:OperationSummary[];adjudicationFailure?:AdjudicationFailure;recallUsage?:OwnerUsage;stopReason?:StopReason;world:World;version:number;operationScope:string;modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string;operation?:{state:string;status?:number;error?:string;stopReason?:StopReason}};
 const read=async(path:string)=>{const r=await fetch(path,{credentials:'same-origin',signal:AbortSignal.timeout(15000)});if(r.status===401)setSignInRequired(true);const d=await readWorldResponse<Latest>(r);if(!r.ok)throw Error(reasonLabel(d.stopReason)+(d.error||`讀取世界失敗（HTTP ${r.status}）。`));if(!d.world||typeof d.version!=='number'||typeof d.operationScope!=='string'||!d.modelKeys?.openai||!d.modelKeys?.openrouter)throw new WorldResponseError(r.status,'application/json');return d;};
 let d=await read('/api/world');
 const scope=`quiet-hours:pending:${d.operationScope}`;
-if(scopeRef.current!==scope){scopeRef.current=scope;versionRef.current=-1;setEvidenceScope(scope);}
-acceptWorld(d);setOwnerUsage(d.recallUsage||{enabled:false});setSignInRequired(false);setModelKeys(d.modelKeys);setKeyStorageAvailable(d.modelKeyStorageAvailable);
+const initialScope=!scopeRef.current;
+if(scopeRef.current!==scope){if(scopeRef.current)sessionStorage.removeItem(scopeRef.current+':trace-focus');scopeRef.current=scope;versionRef.current=-1;worldContextRef.current=undefined;setTraceFocusOperationId(undefined);setTraceResponseStatus(undefined);setEvidenceScope(scope);}
+const storedFocus=initialScope?sessionStorage.getItem(scope+':trace-focus'):null;
+acceptWorld(d);
+if(storedFocus){try{const focus=JSON.parse(storedFocus);if(focus.contextId===d.world.contextId&&typeof focus.operationId==='string')focusTrace(focus.operationId);}catch{sessionStorage.removeItem(scope+':trace-focus');}}
+setOwnerUsage(d.recallUsage||{enabled:false});setSignInRequired(false);setModelKeys(d.modelKeys);setKeyStorageAvailable(d.modelKeyStorageAvailable);
 const saved=sessionStorage.getItem(scope);
 setPendingOperation(!!saved);
 if(saved){
-const payload=JSON.parse(saved) as {operationId:string};
+const payload=JSON.parse(saved) as {operationId:string;worldContext?:string};
+if(payload.worldContext===d.world.contextId)focusTrace(payload.operationId);
 d=await read(`/api/world?operationId=${encodeURIComponent(payload.operationId)}`);
 if(`quiet-hours:pending:${d.operationScope}`!==scope)throw Error('登入帳號已變更，請重新讀取世界。');
 acceptWorld(d);
@@ -73,7 +81,7 @@ sessionStorage.removeItem(scope);setPendingOperation(false);
 if(d.operation.status!==200)throw Error(reasonLabel(d.operation.stopReason)+(d.operation.error||'上次操作已確認失敗，世界未重做；可以決定是否建立新操作。'));
 }else if(d.operation?.state==='uncertain'||d.operation?.state==='expired')throw Error('上次操作的結果仍無法確認；未完成操作已保留，不會自動重做模型決策。請保留操作識別碼供診斷。');
 }
-},[acceptWorld]);
+},[acceptWorld,focusTrace]);
 const handlePlayingChange=useCallback((next:boolean)=>{playingRef.current=next;setPlaying(next);},[]);
 const stopAuto=useCallback((message?:string)=>{autoRef.current=false;setAutomatic(false);if(message)setNotice(message);},[]);
 const refresh=useCallback(async()=>{if(busyRef.current)return;stopAuto();busyRef.current=true;setBusy(true);setError('');try{await readLatest();}catch(e){setError((e as Error).message);}finally{busyRef.current=false;setBusy(false);}},[stopAuto,readLatest]);
@@ -93,9 +101,10 @@ const saved=sessionStorage.getItem(storageKey);
 const payload=saved||JSON.stringify(replay?{...replay,operationScope:storageKey.slice('quiet-hours:pending:'.length)}:{operationScope:storageKey.slice('quiet-hours:pending:'.length),operationId:`${Date.now()}:${crypto.randomUUID()}`,worldContext:world?.contextId,operation,minutes:Number(minutes),mode,model:mode!=='demo'?model:undefined,target:['direct','takeover','return-control'].includes(operation)?'owner':target,text,...(budget?{limits:budget}:{}),...(price?{price}:{}),...(adjudication?{adjudication}:{}),action:operation==='direct'?{type:directType,...(directTarget?{target:directTarget}:{}),...(directContent?{content:directContent}:{})}:undefined});
 // Persist before sending; reloading or a lost response must not create a new ID.
 sessionStorage.setItem(storageKey,payload);setPendingOperation(true);
-operation=JSON.parse(payload).operation;
+const sent=JSON.parse(payload) as {operation:string;operationId:string};
+operation=sent.operation;focusTrace(sent.operationId);
 const deadline=Date.now()+15000;
-let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;contextMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean;operationUncertain?:boolean;stopReason?:StopReason}|undefined;
+let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;contextMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean;operationUncertain?:boolean;stopReason?:StopReason;decisionTraceStatus?:{status:string;gap?:string;lastKnownStage?:string}}|undefined;
 let transportError:Error|undefined;
 while(Date.now()<deadline){
 try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:payload,signal:AbortSignal.timeout(125000)});if(r.status===401)setSignInRequired(true);d=await readWorldResponse<NonNullable<typeof d>>(r);if(!r.ok&&typeof d.error!=='string')throw new WorldResponseError(r.status,'application/json');}
@@ -104,6 +113,7 @@ if(r&&d&&!d.retryable)break;
 setNotice('世界正處理另一個回合或連線中斷，正在等待後重試…');
 await new Promise(resolve=>setTimeout(resolve,1000));
 }
+if(d?.decisionTraceStatus)setTraceResponseStatus({operationId:sent.operationId,...d.decisionTraceStatus});
 if(!r||!d||d.retryable)throw Error(transportError?.message||'等待逾時：另一個回合可能仍在處理。未完成操作已保留，請按「重試未完成操作」。');
 if(d.contextMismatch){sessionStorage.removeItem(storageKey);setPendingOperation(false);await readLatest();throw Error(d.error);}
 if(d.scopeMismatch){await readLatest();throw Error(d.error);}
@@ -139,7 +149,7 @@ return <main>{pendingOperation&&<section className="panel" role="status"><p>有�
 <nav className="world-navigation" aria-label="觀察室分頁">{([{id:'observation',label:'觀察'},{id:'settings',label:'設定'},{id:'analysis',label:'分析'}] as const).map(item=><Button key={item.id} variant={page===item.id?'default':'ghost'} aria-current={page===item.id?'page':undefined} onClick={()=>setPage(item.id)}>{item.label}</Button>)}</nav>
 {adjudicationFailure&&<AdjudicationFailureDetails failure={adjudicationFailure}/>}
 {page==='analysis'&&<OperationEvidenceDetails key={`${evidenceScope}:${world?.contextId}`} evidence={operationEvidence} recent={recentOperations} disabled={busy||pendingOperation||playing||automatic||signInRequired} onReplay={payload=>act('advance',undefined,undefined,undefined,payload)}/>}
-{page==='analysis'&&world&&<DecisionTraces key={`trace:${evidenceScope}:${world.contextId}:${operationEvidence?.operationId}`} operationId={operationEvidence?.operationId}/>}
+{page==='analysis'&&world&&<DecisionTraces key={`trace:${evidenceScope}:${world.contextId}:${traceFocusOperationId||operationEvidence?.operationId}`} operationId={traceFocusOperationId||operationEvidence?.operationId} lastResponse={traceResponseStatus}/>}
 {world&&<AcceptanceSceneStatus world={world}/>}
 {world&&page==='settings'&&<AcceptanceSceneControls world={world} disabled={busy||pendingOperation||playing||automatic||signInRequired} onSwitch={operation=>act(operation)}/>}
 <div hidden={page!=='settings'}><section className="settings panel"><div><h2>決策方式</h2><p>規則模式可以直接試玩。AI 先規劃活動，活動延續期間不再呼叫；新訊息或活動完成後重新規劃。OpenAI 直連使用你的 API 額度，與 ChatGPT 訂閱分開計費。</p></div><div className="settings-fields"><label>模式<Picker label="決策方式" value={mode} onChange={v=>{stopAuto();setMode(v);setKey('');setModel(v==='openai'?'gpt-6-luna':'');}} disabled={busy} items={[{value:'demo',label:'規則試玩'},{value:'openai',label:'OpenAI 直連'},{value:'ai',label:'OpenRouter AI'}]}/></label>{mode!=='demo'&&<><label>模型{mode==='openai'?<Picker label="OpenAI 模型" value={model} onChange={v=>{stopAuto();setModel(v);}} disabled={busy} items={[{value:'gpt-6-luna',label:'GPT-6 Luna · 推薦'},{value:'gpt-6.1-sol',label:'GPT-6.1 Sol'}]}/>:<input value={model} onChange={e=>{stopAuto();setModel(e.target.value);}} placeholder="供應商／模型名稱" autoComplete="off" disabled={busy}/>}</label><label>{mode==='openai'?'OpenAI':'OpenRouter'} API Key<input type="password" value={key} onChange={e=>{stopAuto();setKey(e.target.value);}} placeholder={keyReady?'已保存；貼上新 Key 可替換':'貼上你的 API Key，然後按保存'} autoComplete="off" maxLength={4096} disabled={busy||!keyStorageAvailable}/></label></>}</div>{mode!=='demo'&&<><div className="key-management"><span role="status">{!keyStorageAvailable?'Key 保存服務尚未設定完成':keyReady?`已設定 · 到期 ${new Date(keyStatus.expiresAt!).toLocaleString('zh-TW')}`:'尚未設定，或 Key 已到期／清除'}</span><div className="key-actions"><Button onClick={()=>void manageKey('set-model-key')} disabled={busy||signInRequired||!key.trim()||!keyStorageAvailable}>{keyReady?'替換 Key（24 小時）':'保存 Key（24 小時）'}</Button><Button variant="outline" onClick={()=>void manageKey('clear-model-key')} disabled={busy||signInRequired||!keyStatus.expiresAt}>清除已存 Key</Button><Button variant="ghost" onClick={()=>void refresh()} disabled={busy}>重新檢查 Key</Button></div></div><p className="settings-note">Key 會加密保存，供同一 GitHub 帳號在本站的瀏覽器共用，最長 24 小時。保存後輸入欄會清空；重新整理可讀取設定狀態。登出只結束目前登入；清除會停止所有瀏覽器後續的模型呼叫，已送出的請求仍可能完成。<a href={mode==='openai'?'https://platform.openai.com/api-keys':'https://openrouter.ai/settings/keys'} target="_blank" rel="noreferrer">取得 API Key</a></p></>}</section></div>
