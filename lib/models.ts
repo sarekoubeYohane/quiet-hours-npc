@@ -93,11 +93,14 @@ const requestId = crypto.randomUUID();
 // context. The route rechecks operation version/lease after completion.
 const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
 await recall?.verifyCurrent?.();
+let candidateStage='npc-candidate-parse';
 try {
   const value = JSON.parse(raw.replace(/^\s*`{3}(?:json)?\s*/, '').replace(/\s*`{3}\s*$/, ''));
+  candidateStage='npc-candidate-validation';
   if(value?.type === 'recall') {
     if(!recall?.enabled || recalled || Object.keys(value).some(key=>!['type','questions'].includes(key)) || !Array.isArray(value.questions) || value.questions.length<1 || value.questions.length>2 || value.questions.some((q:unknown)=>typeof q!=='string'||!q.trim()||new TextEncoder().encode(q).length>256)) throw Error('只能提出一輪、最多兩題回想。');
     recalled=true;
+    candidateStage='recall-service';
     const memories=await recall.search(value.questions);
 
     if (!Array.isArray(memories)) throw Error('回想結果格式無效。');
@@ -121,11 +124,11 @@ try {
     messages.push({role:'assistant',content:raw},{role:'user',content:JSON.stringify({recalledMemories:handles,recallComplete:true,instruction:'回想完整主觀內容已放在 self.longTerm；回想已結束；先重新排列意圖，再完成唯一最終行動。禁止第二輪回想。'})});
     continue;
   }
-  const decision=parseDecision(JSON.parse(raw.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, '')),allowedTypes,w,c,decisionContext);
+  const decision=parseDecision(value,allowedTypes,w,c,decisionContext);
   if(JSON.stringify(decision).includes(key))throw Error();
   return decision;
 }
-catch(e) { if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
+catch(e) { if(candidateStage.startsWith('npc-')){try{await recall?.observer?.({kind:'failure',failure:candidateStage==='npc-candidate-parse'?'candidate-format':'candidate-validation',stage:candidateStage});}catch{/* Evidence cannot change the original validation failure. */}}if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
 }
 }
 

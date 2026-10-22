@@ -1,0 +1,20 @@
+{
+  "fixture": true,
+  "scenario": "trace-write-failure",
+  "realPaidModelCalls": 0,
+  "operationId": "1792080141000:3650c646-de3c-48d2-a62e-9d7e00593674",
+  "trace": null,
+  "status": {
+    "status": "write-failed",
+    "gap": "trace-write-failed",
+    "lastKnownStage": "world-commit-confirmed"
+  },
+  "checks": {
+    "failureFocus": true,
+    "reload": true,
+    "noNewDispatch": true,
+    "noDuplicateEffect": true,
+    "worldOutcomeConfirmed": true,
+    "noPageErrors": true
+  }
+}
