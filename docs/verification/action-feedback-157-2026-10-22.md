@@ -49,7 +49,15 @@ pnpm typecheck
 pnpm lint
 ```
 
-新增的 13 個 API 測試涵蓋上述情境與多位元組容量邊界；完整回歸與靜態檢查結果由整合交付更新。既有效果、消耗身份、許可、失敗回復、用量與重送測試仍為本票回歸的一部分。
+新增的 13 個 API 測試涵蓋上述情境與多位元組容量邊界。最終整合版本（含 review 修正）重新執行 `pnpm test`：**613/613 通過**（571 項活動／API、32 項登入、10 項 Workers／migration），零失敗、零跳過。`pnpm typecheck` 通過；完整 `pnpm lint` 為零錯誤、4 個既有 warning（未修改的 components 中 img／effect dependency）。`git diff --check` 通過。既有效果、消耗身份、許可、失敗回復、用量與重送測試仍為本票回歸的一部分。
+
+## Standards
+
+兩軸 code review 的 Standards 審查與修正後複查均無需處理的規範違反或實質異味。
+
+## Spec
+
+Spec 審查發現 1 項已保存活動到期回饋的相容性問題，已以 RED→GREEN 修正，詳見下方補測；複查無未解決項目。沒有把固定回覆測試結果當作真實模型行為改善證據。
 
 ## 尚未驗證
 
