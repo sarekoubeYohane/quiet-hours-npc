@@ -27,7 +27,7 @@ for (const [source,output] of sources) {
     let conflict, uncertain, failBefore, failRead, budgetHook;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
+      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
@@ -63,7 +63,7 @@ const load=name=>require(join(directory,`${name}.cjs`));
 const store=load('store'); store.install(load('world').seedWorld());
 const {GET,POST}=load('route');
 let now=Date.parse('2026-10-15T16:00:00Z'); Date.now=()=>now;
-let modelCalls=0, modelFault=null, modelResponder; const requests=[], modelRequests=[];
+let modelCalls=0, modelFault=null, modelResponder; const requests=[], modelRequests=[], transportFrames=[];
 // Local-only transport boundary: acceptance runners select replies and inspect
 // task inputs while the real application, API handlers and SQLite still execute.
 const setModelResponder = responder => { modelResponder = responder; };
@@ -72,9 +72,8 @@ globalThis.fetch=async(url,init)=>{
  modelCalls++;
  const request=JSON.parse(init.body);
  modelRequests.push(request);
- if(modelFault)return new Response('{}',{status:modelFault});
- if(modelResponder)return modelResponder(request, modelCalls, init.signal);
- return Response.json({model:request.model,usage:{prompt_tokens:1000,completion_tokens:200},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]})},finish_reason:'stop'}]});
+ const response=modelFault?new Response('{}',{status:modelFault}):modelResponder?await modelResponder(request, modelCalls, init.signal):Response.json({model:request.model,usage:{prompt_tokens:1000,completion_tokens:200},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]})},finish_reason:'stop'}]});
+ transportFrames.push({requestBody:init.body,responseBody:await response.clone().text()});return response;
 };
 const entry=join(directory,'entry.jsx');
 await writeFile(entry,`import React from ${JSON.stringify(require.resolve('react'))};import {createRoot} from ${JSON.stringify(require.resolve('react-dom/client'))};import WorldApp from ${JSON.stringify(join(repo,'components/world-app.tsx'))};createRoot(document.getElementById('root')).render(<WorldApp signInPath="/login" displayName="browser fixture" environment={{caption:'local fixture',builtAtLabel:'fixed clock'}}/>);`);
@@ -112,5 +111,5 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(Number(process.env.FIXTURE_PORT||0),'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}`; console.log(`BROWSER_FIXTURE_URL=${url}`);
-export {url,server,store,load,requests,modelRequests,setModelResponder};
+export {url,server,store,load,requests,modelRequests,transportFrames,setModelResponder};
 process.on('SIGTERM',()=>server.close());

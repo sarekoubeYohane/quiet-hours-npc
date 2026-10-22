@@ -44,3 +44,25 @@
 本輪不修改驗收場景或杯子能力。正式站先唯讀核對能力，不足時記錄「場景準備不足」並停止該分支；不能直接補欄位，也不能把未測當失敗。獨立具備完整能力的本機 fixture 僅證明該 fixture 的行為。
 
 本機通過不代表已部署；正式執行見 [合併部署後流程](../verification/operation-evidence-live-runbook.md)。
+
+## 完整私有實錄（#91／#153）
+
+原有64KiB必要欄位投影與8筆 journal繼續負責精確HTTP重送及近期操作證據，不能冒充完整實錄。新增 `decision_traces` 私有 SQLite/D1 資料表，與 `worlds.state`、記憶、回想、Embedding及記憶恢復分離；世界API驗證原登入owner後才讀取。一般 GET 的 `decisionTraces` 提供目前context清單和整個owner世界保存範圍；`?operationId=` 另回 `decisionTrace`。即使journal已淘汰，仍可查保存界限內的私有實錄；重送仍使用原journal，不因有實錄而重跑模型或骰子。
+
+共用 `requestModel` 在真正fetch邊界擷取當次序列化request body，以及收到的response text。實錄逐次保存NPC／裁定的角色、原requestId、供應商／模型、usage、輸入當時的權威物件／供應／環境／身體／活動／規則快照。每次snapshot在當次派送時凍結，不用回合起末或world diff替代；後一角色因此可看到先前實際改變。授權headers不捕獲；已知服務Key及可辨認credential字段／文字在保存前遞迴遮蔽（包含JSON內再編碼的messages和候選），有變化時明示redacted。無須遮蔽的request/response保留原字串。
+
+同一實錄按順序保存解析候選、實際程式規則檢查、活動執行後角色自己的shortTerm／memories／observations及活動、骰值／分支和已提交結果。權威snapshot可含hidden事實，因此只供觀察者；回饋snapshot是原角色實際資料，不用權威診斷替角色補知識。下一次上下文只有實際發生派送時才能在其request body看到，讀取實錄不推進世界。
+
+集中裁定契約新增nullable `explanation`，含summary（最多512字）及facts（最多8筆，每reference160字、value256字）。供應商schema要求這個欄位，但舊候選未含欄位仍可解析，顯示未記錄、不補造；整體候選原有上限仍適用。這是有界可核對的模型自述，不是內部思考，也不是程式已驗證的真實因果。`source=program`的規則檢查與`source=model-self-report`分開；維護者假設不寫成原模型理由。
+
+### 量測與有界政策
+
+以既有API／模型替身／SQLite的實際serialized bytes量測：routine-v2 NPC請求26,088／回覆342、裁定請求89,636／回覆2,728 bytes；world-v3 NPC請求26,088／回覆306、裁定請求89,600／回覆10,180 bytes。這些是合成fixture，含真實生成的schema/prompt，不是10/22原事件。單一2dispatch的body已約120KB，64KiB必要投影不足以保存。因此本輪選定單筆1MiB、每owner世界64筆及16MiB雙上限。這容納一般2dispatch及較多角色操作的保守倍數，但不是一小時保證。
+
+- 上限以完整JSON的UTF-8 bytes計數；SQLite CHECK驗證單筆bytes值，INSERT／UPDATE trigger在同一statement transaction依created_at／rowid最舊優先淘汰，達任一上限即淘汰。所有context共享owner總上限，不能透過反覆進出驗收繞過；淘汰累計metadata每owner一行。
+- 單筆超過1MiB時，不靜默截斷成完整件；改存帶`single-record-limit`、原始bytes數及有界派送／已知用量的缺口骨架。列表、詳情可見缺口。無按日數到期。
+- 實錄在世界CAS確定成功後才標committed／rolled-back保存。世界及供應商呼叫與實錄不是單一交易；journal先放`pending / world-and-trace-are-separate-transactions`狀態，實錄寫入後補狀態。寫入失敗回`write-failed / trace-write-failed`，不能宣稱完整；世界原提交及精確重送不受影響。持續資料庫故障可使狀態補記本身也失敗，因此pending必須視為缺口而不是完整。
+- reset成功後清除owner舊實錄，再保存reset操作本身；清除失敗以trace-lifecycle-gap呈現。驗收場景進出保留舊context證據，在同一owner總容量下淘汰；當前context列表不把其他context混入。
+- 舊世界、舊操作及舊候選不回填內容。找不到實錄可能是舊版、淘汰、未捕獲或寫入失敗，不代表沒有派送。#92承接持久checkpoint、遲到／租約與故障崩潰窗口。
+
+新資料表為附加migration；新讀取器兼容無實錄的舊世界。發布前須套用0005 migration；未套用時故事仍可執行，讀寫實錄明示失敗，不能視為追溯驗收成功。回退程式可保留新表，不能刪除已記錄證據當作回退步驟。完整payload不寫入console，一般安全stage logs仍只攜既有關聯欄位。
