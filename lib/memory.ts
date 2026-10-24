@@ -10,6 +10,8 @@ export type MemoryTraceOperation = 'merge' | 'rewrite' | 'forget' | 'forget-sour
 export type MemoryTrace = { id: string; version: number; type: MemoryTraceOperation; from: MemoryRef[]; to?: MemoryRef; reason: string };
 export type LongMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; origin: MemoryRef; reason: string; kind?: 'episode' | 'summary'; state?: 'active' | 'superseded' | 'forgotten'; rememberedSources?: RememberedSource[]; origins?: MemoryRef[]; unresolved?: MemoryRef[] };
 export class MemoryValidationError extends Error {}
+export class MemorySelectionReferenceError extends MemoryValidationError {}
+export class MemorySelectionFormatError extends MemoryValidationError {}
 export const memoryBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
 const textBytes = (value: string) => new TextEncoder().encode(value).length;
 function validRef(value: unknown): value is MemoryRef {
@@ -79,6 +81,20 @@ export function addExperience(c: Character, time: number, text: string, observat
   c.shortTerm!.push(item); boundShort(c);
 }
 export const memorySelectionSchema = { type: 'array', maxItems: 4, items: { type: 'object', properties: { id: { type: 'string', maxLength: 128 }, version: { type: 'integer', minimum: 1 }, reason: { type: 'string', maxLength: 256 } }, required: ['id', 'version', 'reason'], additionalProperties: false } };
+// Every branch binds one identity and version; separate enums would admit
+// pairings that were never sent. Empty input retains a valid object item schema
+// for strict providers, but maxItems=0 admits only an empty selection.
+export function memorySelectionSchemaFor(refs: MemoryRef[]) {
+  return refs.length ? {
+    ...memorySelectionSchema,
+    items: { anyOf: refs.map(({ id, version }) => ({
+      ...memorySelectionSchema.items,
+      properties: { ...memorySelectionSchema.items.properties,
+        id: { type: 'string', enum: [id] }, version: { type: 'integer', enum: [version] },
+      },
+    })) },
+  } : { ...memorySelectionSchema, maxItems: 0 };
+}
 const memoryRefSchema = { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 128 }, version: { type: 'integer', minimum: 1 } }, required: ['id', 'version'], additionalProperties: false };
 export const memoryOperationSchema = { type: 'array', maxItems: 4, items: {
   type: 'object', properties: {
@@ -89,15 +105,15 @@ export const memoryOperationSchema = { type: 'array', maxItems: 4, items: {
     reason: { type: 'string', minLength: 1, maxLength: 256 },
   }, required: ['type', 'targets', 'text', 'unresolved', 'reason'], additionalProperties: false,
 } };
-function selectedMemories(c: Character, value: unknown): LongMemory[] {
+function selectedMemories(c: Character, value: unknown, visibleShort: MemoryRef[] = c.shortTerm || []): LongMemory[] {
   if (value === undefined) return c.longTerm || [];
-  if (!Array.isArray(value) || value.length > 4 || memoryBytes(value) > 8192) throw new MemoryValidationError('記憶選留超限');
+  if (!Array.isArray(value) || value.length > 4 || memoryBytes(value) > 8192) throw new MemorySelectionFormatError('記憶選留超限');
   const result = [...(c.longTerm || [])], seen = new Set<string>();
   for (const item of value) {
-    if (!item || typeof item !== 'object' || Object.keys(item).some(key => !['id', 'version', 'reason'].includes(key)) || typeof item.id !== 'string' || textBytes(item.id) > 128 || !Number.isSafeInteger(item.version) || typeof item.reason !== 'string' || !item.reason.trim() || textBytes(item.reason) > 256 || seen.has(item.id)) throw new MemoryValidationError('記憶選留格式無效');
+    if (!item || typeof item !== 'object' || Object.keys(item).some(key => !['id', 'version', 'reason'].includes(key)) || typeof item.id !== 'string' || textBytes(item.id) > 128 || !Number.isSafeInteger(item.version) || typeof item.reason !== 'string' || !item.reason.trim() || textBytes(item.reason) > 256 || seen.has(item.id)) throw new MemorySelectionFormatError('記憶選留格式無效');
     seen.add(item.id);
     const source = c.shortTerm?.find(m => m.id === item.id && m.version === item.version && m.characterId === c.id);
-    if (!source) throw new MemoryValidationError('只能選留本次自己的短期經歷版本');
+    if (!source || !visibleShort.some(ref => ref.id === item.id && ref.version === item.version)) throw new MemorySelectionReferenceError('只能選留本次自己的短期經歷版本');
     if (!result.some(m => m.origin.id === source.id && m.origin.version === source.version)) result.push({ id: crypto.randomUUID(), characterId: c.id, version: 1, time: source.time, text: source.text, source: { ...source.source }, origin: { id: source.id, version: source.version }, reason: item.reason });
   }
   return result;
@@ -137,11 +153,11 @@ function traceRequired(trace: MemoryTrace, c: Character): boolean {
     return [...trace.from, ...(trace.to ? [trace.to] : [])].some(anchor => anchor.id === ref.id && anchor.version === ref.version);
   });
 }
-export function evaluateMemories(c: Character, selections: unknown, operations: unknown, visible: MemoryProjection, review: MemoryReview[] = []): MemoryCandidate {
+export function evaluateMemories(c: Character, selections: unknown, operations: unknown, visible: MemoryProjection, review: MemoryReview[] = [], visibleShort: MemoryRef[] = c.shortTerm || []): MemoryCandidate {
   if (operations === undefined) operations = [];
   if (!Array.isArray(operations) || operations.length + (Array.isArray(selections) ? selections.length : 0) > 4 || memoryBytes({ selections: selections ?? [], operations }) > 8192) throw new MemoryValidationError('記憶整理超過單次工作量');
   const candidate: Character = structuredClone(c);
-  candidate.longTerm = selectedMemories(c, selections);
+  candidate.longTerm = selectedMemories(c, selections, visibleShort);
   candidate.memoryTrace ??= [];
   const removedTraces: MemoryTrace[] = [];
   const removedOrigins: MemoryRef[] = [], changed = new Set<string>();

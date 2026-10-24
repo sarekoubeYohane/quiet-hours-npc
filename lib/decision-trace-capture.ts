@@ -1,5 +1,5 @@
 import type { World, Character } from './world';
-import type { ModelObserver, ModelObservation } from './model-adapter';
+import { isCandidateFailureReason, type ModelObserver, type ModelObservation } from './model-adapter';
 import { decisionTraceLimits, omitDecisionTraceContent, type DecisionTrace } from './decision-traces';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 
@@ -57,7 +57,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       }}
       else if(active&&event.kind==='usage')active.usage=event.usage;
       else if(active&&event.kind==='candidate'){if(!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
-      else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage};active.stage=event.failure;trace.lastKnownStage=event.failure;}
+      else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage,...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
       await persist();
     };
   };

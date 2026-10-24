@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import type { CandidateFailureReason } from '@/lib/model-adapter';
 import { Button } from '@/components/ui/button';
 import { readWorldResponse } from '@/lib/world-response';
 
@@ -9,7 +10,7 @@ type Trace = {
   baseVersion:number; resultVersion?:number; redacted:boolean; gaps:string[];
   dispatches:Array<{sequence:number;task:string;actorId:string;requestId:string;provider:string;model:string;
     startedAt:number;requestBody?:string;responseBody?:string;httpStatus?:number;stage:string;
-    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown;failure?:{kind:string;stage?:string};discarded?:boolean;lateUsage?:unknown}>;
+    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown;failure?:{kind:string;stage?:string;reason?:CandidateFailureReason};discarded?:boolean;lateUsage?:unknown}>;
   steps:Array<{kind:string;actorId?:string;source:string;data:unknown}>;
   result?:unknown;
 };
@@ -21,6 +22,12 @@ type TraceResponse = {error?:string;decisionTrace?:Trace|null;decisionTraces?:Tr
 const contentStyle = {whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:'28rem',overflow:'auto',fontSize:'.85rem',fontFamily:'ui-monospace, SFMono-Regular, Consolas, "Noto Sans TC", monospace'} as const;
 const outcomes:Record<string,string> = {committed:'世界已提交','rolled-back':'回合已回復', 'not-committed':'世界未提交',unknown:'世界提交狀態未知'};
 const sources:Record<string,string> = {program:'程式檢查／紀錄','model-self-report':'模型自述（不代表真實因果）','maintainer-hypothesis':'維護者假設（尚待驗證）'};
+const candidateReasons:Record<CandidateFailureReason,string> = {
+  'json-parse':'JSON 解析失敗',
+  'memory-selection-reference':'記憶選留引用不合法（當次本人短期 ID／版本範圍）',
+  'field-format':'候選欄位格式錯誤',
+  'memory-constraint':'其他記憶契約驗證失敗',
+};
 function JsonDetails({label,value}:{label:string;value:unknown}) {
   return <details><summary>{label}</summary><pre style={contentStyle}>{typeof value==='string'?value:JSON.stringify(value,null,2)}</pre></details>;
 }
@@ -85,6 +92,7 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
         <p>{dispatch.provider} / {dispatch.model}<br/>請求：{dispatch.requestId}<br/>階段：{dispatch.stage} · HTTP {dispatch.httpStatus??'未記錄'}</p>
         {dispatch.stage==='dispatch-prepared'&&<p>派送前保存點：是否真正發送未知；這筆準備紀錄不能證明供應商已收到請求。</p>}
         {dispatch.failure&&<p>技術故障：{dispatch.failure.kind}{dispatch.failure.stage?` · ${dispatch.failure.stage}`:''}。這不是模型對世界行動的正常否決。</p>}
+        {dispatch.task==='npc'&&dispatch.failure&&['candidate-format','candidate-validation'].includes(dispatch.failure.kind)&&<p>安全驗證原因：{dispatch.failure.reason&&Object.hasOwn(candidateReasons,dispatch.failure.reason)?candidateReasons[dispatch.failure.reason]:'未記錄／未知；不推測舊候選原因'}。</p>}
         {dispatch.discarded&&<p>此回覆遲到或已失效，未交給世界執行；不代表候選或效果已提交。</p>}
         {dispatch.requestBody===undefined?<p>當次請求本文未保存。</p>:<JsonDetails label={dispatch.stage==='dispatch-prepared'?'已準備的請求本文（派送狀態未知）':'實際送出的請求本文'} value={dispatch.requestBody}/>}
         {dispatch.responseBody===undefined?<p>當次回覆本文缺失；不推定模型沒有回覆。</p>:<JsonDetails label="實際收到的回覆本文" value={dispatch.responseBody}/>}

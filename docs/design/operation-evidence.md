@@ -99,3 +99,11 @@ world CAS衝突明示not-committed；throw-before經原pending確認未提交，
 configured但無法解密的未使用Key不應阻擋demo、直接控制或另一正常供應商。此時不猜測憑證明文，實錄切換credential-redaction-unavailable骨架：省略所有body、snapshot、steps原文、result、context與自由服務／角色標籤，僅保存安全操作／HTTP UUID、程式階段、outcome與有界已知用量。實際選用服務原有readModelKey驗證仍會照常停止不合法派送，診斷不替其放行。
 
 單筆1MiB限制亦在capture中生效：第一次跨界即按當時JSON bytes量測轉骨架，後續派送仍記機械收據／用量，但不繼續收集本文、世界snapshot或step原文。`omittedOriginalBytes`是首次超界值，不代表未知的最後原件總大小。metadata-only因憑證未知而不保存context，列表會在同owner當前查閱路徑併列此類骨架並明示場景未知；不因此替它補造context或放寬跨帳號權限。
+
+### NPC 候選的安全驗證原因（#92，2026-10-24 窄切片）
+
+NPC 的解析／驗證邊界另傳遞可選的封閉 `failure.reason`：`json-parse`（JSON 解析）、`memory-selection-reference`（當次本人短期 ID／版本引用範圍）、`field-format`（候選欄位格式）、`memory-constraint`（其他記憶契約）。引用原因由實際來源驗證的型別錯誤產生；不是對候選本文或 exception.message 做字串分類。保留原有 kind／stage、角色及派送關聯，不改候選拒絕、整回合回復、已知用量或同 ID 重放。
+
+同一私有實錄保存點、SQLite 重讀及分析詳情承接此 code；capture 與單筆超限骨架都只接收白名單 code，不附任意 message／stack／引用文字。舊實錄缺少原因時畫面標示「未記錄／未知」，未知 code 也不顯示為已確認分類。實錄寫入失敗仍只顯示最後持久保存點及原 gap，不推測未保存的理由；內容超限可保留機械原因，但不聲稱保留完整候選。此欄位不進 World、NPC 記憶、回想或一般 console。
+
+本切片沿用 #91 的既有 0005 migration、owner 權限、GET／分析入口、1MiB／64筆／16MiB及寫入缺口政策，不需新 migration。只核對並沿用本切片所需基礎，不代表 #91 或 #92 的全部歷史驗收已完成。原未保存的私有 transcript 及故障原因無法事後復原。

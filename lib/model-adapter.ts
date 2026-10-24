@@ -1,6 +1,11 @@
 import type { TokenUsage } from './activities';
+export const candidateFailureReasons = ['json-parse', 'memory-selection-reference', 'field-format', 'memory-constraint'] as const;
+export type CandidateFailureReason = typeof candidateFailureReasons[number];
+export function isCandidateFailureReason(value: unknown): value is CandidateFailureReason {
+  return candidateFailureReasons.includes(value as CandidateFailureReason);
+}
 export type ModelFailureKind = 'candidate-format' | 'candidate-validation' | 'transport' | 'timeout' | 'response-body' | 'provider-body' | 'http' | 'request-mismatch' | 'refusal' | 'output-limit' | 'sensitive-response';
-export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number}|{kind:'failure';failure:ModelFailureKind;stage:string}|{kind:'usage';usage:TokenUsage}|{kind:'candidate';raw:string};
+export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number}|{kind:'failure';failure:ModelFailureKind;stage:string;reason?:CandidateFailureReason}|{kind:'usage';usage:TokenUsage}|{kind:'candidate';raw:string};
 export type ModelObserver = (event:ModelObservation)=>void|Promise<void>;
 export type ModelService = { key: string; model: string; provider: 'openai' | 'openrouter' };
 export type ModelMessage = { role: string; content: string };

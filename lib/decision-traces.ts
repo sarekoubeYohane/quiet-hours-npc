@@ -1,3 +1,4 @@
+import { isCandidateFailureReason } from './model-adapter';
 // Private observer archive. This module is deliberately not reachable from
 // World, recall, memory recovery or model-context construction.
 export const decisionTraceLimits = Object.freeze({ recordBytes: 1024 * 1024, records: 64, worldBytes: 16 * 1024 * 1024 });
@@ -43,7 +44,7 @@ export function omitDecisionTraceContent(trace: DecisionTrace, reason: string, u
         ['inputTokens', 'outputTokens', 'cachedInputTokens'].includes(key) && typeof value === 'number' && Number.isFinite(value) && value >= 0));
     }
     if(dispatch.discarded===true)receipt.discarded=true;
-    if(dispatch.failure&&typeof dispatch.failure==='object')receipt.failure=Object.fromEntries(Object.entries(dispatch.failure).filter(([key,value])=>['kind','stage'].includes(key)&&typeof value==='string'&&value.length<=256));
+    if(dispatch.failure&&typeof dispatch.failure==='object')receipt.failure=Object.fromEntries(Object.entries(dispatch.failure).filter(([key,value])=>(['kind','stage'].includes(key)&&typeof value==='string'&&value.length<=256)||(key==='reason'&&isCandidateFailureReason(value))));
     return receipt;
   });
   return {
