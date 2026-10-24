@@ -157,3 +157,13 @@
 更新／撤回／堅持的 `trace` 只保存 `traceId`、原項目 ID／版本、當時確信、操作與短理由／引用等精簡資訊，不存舊信念全文，也不進入模型或 Embedding。可辨「當時曾相信、後來取代／撤回、目前堅持」；不宣稱所有舊全文仍能查閱。`trace` 與後續 #54 的 `memoryTrace` 共用合計 24 筆／12 KiB 限制。到 75% 壓力時，提供有限現行或歷史整理候選，兩者合計最多 8 筆；歷史身份候選不含理由／來源／原文。模型以 `kind=history, operation=forget` 明示釋放不再被現行認知引用的中介資料。候選可包含目前被引用的 metadata handle 並標示 `required`，但只在同份候選明示改變最後引用者後才能釋放；依整份最終 state 驗證，不受輸出操作順序影響。重複 keep 不產生新版本，現行身份或真實 changed／withdrawn anchor 已保留時可明示釋放冗餘痕跡。現行信念、矛盾雙方及必要的版本來源鏈保留；沒有有效取捨就拒絕超限決策，不 FIFO 現行理解。
 
 記憶／認知相關輸入合計 88 KiB，優先完整短期內容，再加入現行理解與相關長期。`memorySelections` 與 `cognitiveUpdates` 共用最多 4 項操作／8 KiB 輸出。候選越權、版本過期、格式或容量無效時，沿世界 API 回復整回合及已知付費用量／operationId 重放；不另開修復模型、遷移或認知更新 API。世界 API 自動測試已執行；兩軸審查修復後各剩餘 0，但真實模型的改觀與語意忠實性、正式站操作均尚未驗收。多標籤兼容文字可能超過 #52 舊版的單句 256 bytes 限制，回退舊 runtime 前須備份並準備相容處理，不宣稱新存檔可直接回退至舊 validator。
+
+## #161：當次短期引用配對（2026-10-24）
+
+每次派送完成 `budgetMemoryInput` 後，以真正序列化到 `self.shortTerm` 的 ID／版本建立該次候選範圍。OpenAI strict schema 的 `memorySelections.items.anyOf` 每個分支綁定一對 ID／version，沿用 reason、4項和8 KiB限制；空集合使用相同 object item schema 加 `maxItems:0`，只允許空陣列。有選項仍可不選留。不能分別列舉 ID 和版本而允許錯配。
+
+回想開啟的首輪維持 `json_object`，可直接回決策；其來源界線由收到後的實際記憶驗證保證，沒有生成階段 strict 保證。回想續答重新裁剪後同步重建短期範圍及 strict schema；回想補入的長期片段不成為選留來源。OpenRouter 現行派送沒有 strict schema，同樣依收到後驗證，不能宣稱其生成已受約束。
+
+現行輸入預算會省略相容文字副本、可選長期及認知投影，**不裁剪 canonical shortTerm**；必要短期加完整回想仍超限時依既有政策停止，不另引入裁短期政策。驗證仍顯式以最後派送的短期快照限界，完整角色才是選留原經歷、長期整理和保存的評估來源；不以投影覆寫完整記憶。非法候選仍整回合回復、保留已知用量，operationId 重送不再派送。
+
+nested `anyOf`、object 必填欄位／`additionalProperties:false`、array `maxItems` 依 [OpenAI Structured Outputs 支援子集](https://developers.openai.com/api/docs/guides/structured-outputs)。離線 Ajv 驗證實際 outbound schema，而非只檢查字串；最大80筆 fixture 採128 byte IDs和最大安全整數版本，完整 action schema **34,560 bytes**、序列化 request **145,883 bytes**；空集合 schema **5,970 bytes**、request **25,919 bytes**。此量測包含固定測試故事／提示，不是所有合法故事的 request 上界。無真實供應商呼叫或相容性實測；不相容時不得靜默降級、換模型或新增付費重試。替身只證明程式約束／驗證／原子保存，不證明模型已不犯錯或泡茶 loop 已解決。

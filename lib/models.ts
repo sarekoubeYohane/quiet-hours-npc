@@ -2,7 +2,7 @@ import { knownRoutineMethods } from './routine-rules';
 import { requestModel, type ModelObserver } from './model-adapter';
 export const npcContractVersion = 'npc-decision.v1';
 import { cognitionForDecision, cognitiveUpdatesSchema, knownPeopleForDecision, relationshipsProjection, updateCognition, type CognitiveDecisionContext } from './cognition';
-import { budgetMemoryInput, memoryBytes, memorySelectionSchema, evaluateMemories, memoryOperationSchema } from './memory';
+import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, budgetMemoryInput, memoryBytes, memorySelectionSchema, memorySelectionSchemaFor, evaluateMemories, memoryOperationSchema } from './memory';
 import { parseAttention, clueKinds } from './attention';
 import { npcPlaybook } from './playbook';
 import { perception,type World,type Character,type Action,type Intent } from './world';
@@ -70,19 +70,18 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const cognition = updateCognition(character, data.cognitiveUpdates, world.minute, context);
   if(data.type==='propose'&&(!text(data.purpose,300,true)||!text(data.content,500,true)))throw Error();
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood, ...(data.type==='propose'?{purpose:data.purpose}:{}) } as Action;
-  return { timeIntent, cognition, interpretation: data.interpretation as string | undefined, ...evaluateMemories({ ...character, ...(cognition ? { cognition } : {}) }, data.memorySelections, data.memoryOperations, context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
+  return { timeIntent, cognition, interpretation: data.interpretation as string | undefined, ...evaluateMemories({ ...character, ...(cognition ? { cognition } : {}) }, data.memorySelections, data.memoryOperations, context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview, context.visible.shortTerm || []), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { observer?: ModelObserver; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
-const schema={...actionSchema,properties:{...actionSchema.properties,type:{...actionSchema.properties.type,enum:allowedTypes}}};
 const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。${resumable?'原活動可延續；仍由你判斷續做或切換。':'沒有可延續的原活動（可能已完成或決策模式／模型已改變），必須選擇新行動，不能回傳 continue。'}`;
 const perceived = perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined});
 perceived.self.cognition = cognitionForDecision(c, perceived.contacts, perceived.visiblePeople);
 perceived.self.relationships = relationshipsProjection(perceived.self.cognition.relationshipTags);
 const input = budgetMemoryInput({contractVersion:npcContractVersion,...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable}:null,learnedHabits:habitsForDecision(w,c)},c);
-const visible: Character = { ...c, longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), cognition: { ...input.self.cognition, trace: [] } };
+const visible: Character = { ...c, shortTerm: (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version)), longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), cognition: { ...input.self.cognition, trace: [] } };
 const decisionContext: CognitiveDecisionContext = { visible, knownPeople: knownPeopleForDecision(visible, input.contacts.map(person => person.id)), memoryReview: input.self.memoryReview, historyCandidates: input.self.cognition.historyCandidates || [] };
 const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
 messages[0].content+=physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
@@ -91,6 +90,7 @@ for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
 // context. The route rechecks operation version/lease after completion.
+const schema={...actionSchema,properties:{...actionSchema.properties,type:{...actionSchema.properties.type,enum:allowedTypes},memorySelections:memorySelectionSchemaFor(visible.shortTerm || [])}};
 const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
@@ -115,6 +115,7 @@ try {
     input.self.longTerm = [...memories, ...input.self.longTerm];
     if(memoryBytes({input, recalledMemories:handles}) > 88*1024) throw Error('回想後記憶輸入超過 88 KiB，本回合已回復。');
     messages[1].content = JSON.stringify(input);
+    visible.shortTerm = (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version));
     visible.longTerm = (c.longTerm || []).filter(item => input.self.longTerm.some(shown => shown.id === item.id && shown.version === item.version));
     visible.cognition = { ...input.self.cognition, trace: [] };
     decisionContext.memoryReview = input.self.memoryReview;
@@ -128,7 +129,7 @@ try {
   if(JSON.stringify(decision).includes(key))throw Error();
   return decision;
 }
-catch(e) { if(candidateStage.startsWith('npc-')){try{await recall?.observer?.({kind:'failure',failure:candidateStage==='npc-candidate-parse'?'candidate-format':'candidate-validation',stage:candidateStage});}catch{/* Evidence cannot change the original validation failure. */}}if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
+catch(e) { if(candidateStage.startsWith('npc-')){try{await recall?.observer?.({kind:'failure',failure:candidateStage==='npc-candidate-parse'?'candidate-format':'candidate-validation',stage:candidateStage,reason:candidateStage==='npc-candidate-parse'?'json-parse':e instanceof MemorySelectionReferenceError?'memory-selection-reference':e instanceof MemoryValidationError&&!(e instanceof MemorySelectionFormatError)?'memory-constraint':'field-format'});}catch{/* Evidence cannot change the original validation failure. */}}if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
 }
 }
 
