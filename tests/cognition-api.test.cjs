@@ -2,7 +2,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }) });
 const read = async () => (await (await GET()).json()).world;
 const evidence = input => [{ kind: 'short', id: input.self.shortTerm[0].id, version: input.self.shortTerm[0].version }];
 const belief = (input, extra = {}) => ({ kind: 'belief', operation: 'upsert', id: 'personal-space', version: 0, topic: '相處距離', text: '我可以在乎別人，同時保有自己的空間。', conviction: 'leaning', references: evidence(input), contradictions: [], reason: '這件事會影響我之後怎麼相處。', ...extra });

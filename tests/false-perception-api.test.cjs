@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await(await GET()).json()).world;
 const owner=w=>w.characters.find(c=>c.id==='owner');
 function setup(){const w=worldWithAdjudication();owner(w).region='cafe-storeroom';owner(w).control={mode:'taken-over'};w.scene.doors['cafe-door']='closed';for(const id of ['vera','cass']){const c=w.characters.find(c=>c.id===id);c.location='cafe';c.region='cafe-front';}return w;}

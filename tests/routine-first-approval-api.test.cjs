@@ -8,7 +8,7 @@ const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10}
 async function setup(modify=()=>{}){
  const world=seedWorld();world.contextId='first-approval';world.adjudication={provider:'openai',model:'gpt-6.1-sol'};
  world.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});modify(world);store.install(world);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});
  return {post};
 }

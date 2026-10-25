@@ -23,7 +23,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
  const {POST,GET}=build('route'),store=build('store');
  store.install(require('./fixtures/ai-world.cjs')(build('world').seedWorld)());
  const historyTurns=Number(process.env.RECOVERY_HISTORY_TURNS || 0);
- const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})}));
+ const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})}));
  for(let turn=0;turn<historyTurns;turn++){
   if(turn===17)assert.equal((await send({operation:'intervene',target:'all',text:'所有人收到咖啡館通知：下午兩點有自由參加的手作交流，沒有任何人必須出席。'})).status,200);
   assert.equal((await send({operation:'advance',minutes:15})).status,200);
@@ -40,7 +40,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   if(!options?.method)return GET(new Request(new URL(_url,'https://test.invalid')));
   payloads.push(options.body);
   if(waiting){instant+=1000;return Response.json({retryable:true,error:'世界正處理另一個回合，正在等待後重試。'},{status:409});}
-  const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:options.body}));
+  const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:options.body}));
   if(!committed){committed=true;waiting=true;throw Error('response lost');}
   return response;
  };

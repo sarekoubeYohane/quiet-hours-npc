@@ -33,3 +33,6 @@ NPC 雲端／本機轉接共用行為指導與輸出語義；目前正式轉接�
 - [記憶契約](docs/design/npc-memory-contract.md)、[操作保存契約](docs/design/world-operations.md)：沿用保障。
 
 實際完成程度以對應提交及執行驗證紀錄為準；導覽不代表已合併、部署或通過真實模型品質驗收。
+
+
+完整回合 #168 的時間政策由[同一工程契約](docs/design/round-time-budget.md)維護：400秒工作／430秒固定租約／445秒前端，包含最多12次聊天及4次回想的有限成本包絡。必要保存維持原queue，停止後不再派送或恢復候選；舊client、原ID恢復及私有時間證據與世界route一起驗收。這是目前分支實作，未代表正式站已更新；本地證據見[#168報告](docs/verification/round-time-budget-168-2026-10-25.md)。

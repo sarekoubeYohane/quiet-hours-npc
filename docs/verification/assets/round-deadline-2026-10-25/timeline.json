@@ -1,0 +1,678 @@
+{
+  "schemaVersion": 1,
+  "unit": "milliseconds since trace acceptedAt",
+  "sameBaselineStory": true,
+  "priorTraceMatchesFirstFinal": true,
+  "observations": [
+    {
+      "case": "A / PR164",
+      "privatePackageContentSHA256": "b3bbb88f855a3bf5033df9893ec02bdfee2a3ac9fa690fab245917ce46b344e9",
+      "acceptedAt": 1792842390930,
+      "baseVersion": 329,
+      "endVersion": 330,
+      "storyEqualExcludingUsage": true,
+      "npcReferenceChecks": [
+        {
+          "sequence": 1,
+          "visibleCount": 8,
+          "selectedCount": 3,
+          "valid": true
+        },
+        {
+          "sequence": 3,
+          "visibleCount": 7,
+          "selectedCount": 2,
+          "valid": true
+        },
+        {
+          "sequence": 5,
+          "visibleCount": 9,
+          "selectedCount": 0,
+          "valid": true
+        },
+        {
+          "sequence": 7,
+          "visibleCount": 8,
+          "selectedCount": 3,
+          "valid": true
+        }
+      ],
+      "candidateNewCupAndTea": true,
+      "knownInputTokens": 88365,
+      "knownOutputTokens": 2859,
+      "unknownUsageCalls": 1,
+      "preparedToBodyWindowsMs": 63428,
+      "outsideThoseWindowsBeforeLastPreparedMs": 37382,
+      "dispatches": [
+        {
+          "sequence": 1,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 1850,
+          "headersMs": 7383,
+          "bodyObservedMs": 7952,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9839,
+          "outputTokens": 401
+        },
+        {
+          "sequence": 2,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 10755,
+          "headersMs": 18270,
+          "bodyObservedMs": 19713,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 16297,
+          "outputTokens": 212
+        },
+        {
+          "sequence": 3,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 24547,
+          "headersMs": 29184,
+          "bodyObservedMs": 30553,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9193,
+          "outputTokens": 321
+        },
+        {
+          "sequence": 4,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 35141,
+          "headersMs": 53747,
+          "bodyObservedMs": 55231,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 18097,
+          "outputTokens": 1140
+        },
+        {
+          "sequence": 5,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 60401,
+          "headersMs": 65194,
+          "bodyObservedMs": 66485,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9434,
+          "outputTokens": 224
+        },
+        {
+          "sequence": 6,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 72931,
+          "headersMs": 80043,
+          "bodyObservedMs": 81825,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 16303,
+          "outputTokens": 150
+        },
+        {
+          "sequence": 7,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 87805,
+          "headersMs": 93425,
+          "bodyObservedMs": 95099,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9202,
+          "outputTokens": 411
+        },
+        {
+          "sequence": 8,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 100810,
+          "headersMs": null,
+          "bodyObservedMs": null,
+          "httpStatus": null,
+          "failure": {
+            "kind": "timeout",
+            "stage": "dispatch"
+          },
+          "inputTokens": null,
+          "outputTokens": null
+        }
+      ],
+      "steps": [
+        {
+          "kind": "npc-parsed",
+          "ms": 9923
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 9923
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 9923
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 23882
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 23882
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 23882
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 23882
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 34308
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 34308
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 34308
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 59712
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 59712
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 59712
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 59712
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 72086
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 87128
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 87128
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 87128
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 87128
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 99943
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 110414
+        },
+        {
+          "kind": "round-failure",
+          "ms": 110414
+        },
+        {
+          "kind": "world-candidate",
+          "ms": 110414
+        },
+        {
+          "kind": "commit-start",
+          "ms": 110414
+        },
+        {
+          "kind": "world-commit-confirmed",
+          "ms": 112935
+        }
+      ]
+    },
+    {
+      "case": "B / PR165",
+      "privatePackageContentSHA256": "e5c41f4d71b931aed8f4d64dbb61f4de451c9ce7e1b24a0e8234297ee39da129",
+      "acceptedAt": 1792903195248,
+      "baseVersion": 330,
+      "endVersion": 331,
+      "storyEqualExcludingUsage": true,
+      "npcReferenceChecks": [
+        {
+          "sequence": 1,
+          "visibleCount": 8,
+          "selectedCount": 2,
+          "valid": true
+        },
+        {
+          "sequence": 3,
+          "visibleCount": 7,
+          "selectedCount": 3,
+          "valid": true
+        },
+        {
+          "sequence": 5,
+          "visibleCount": 9,
+          "selectedCount": 2,
+          "valid": true
+        },
+        {
+          "sequence": 7,
+          "visibleCount": 8,
+          "selectedCount": 2,
+          "valid": true
+        }
+      ],
+      "candidateNewCupAndTea": true,
+      "knownInputTokens": 88377,
+      "knownOutputTokens": 3175,
+      "unknownUsageCalls": 1,
+      "preparedToBodyWindowsMs": 59989,
+      "outsideThoseWindowsBeforeLastPreparedMs": 39838,
+      "dispatches": [
+        {
+          "sequence": 1,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 2340,
+          "headersMs": 8066,
+          "bodyObservedMs": 8651,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9839,
+          "outputTokens": 389
+        },
+        {
+          "sequence": 2,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 12376,
+          "headersMs": 18569,
+          "bodyObservedMs": 19824,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 16310,
+          "outputTokens": 259
+        },
+        {
+          "sequence": 3,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 25045,
+          "headersMs": 30769,
+          "bodyObservedMs": 32278,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9193,
+          "outputTokens": 406
+        },
+        {
+          "sequence": 4,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 37613,
+          "headersMs": 51702,
+          "bodyObservedMs": 53271,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 18120,
+          "outputTokens": 1198
+        },
+        {
+          "sequence": 5,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 58961,
+          "headersMs": 64640,
+          "bodyObservedMs": 66321,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9422,
+          "outputTokens": 358
+        },
+        {
+          "sequence": 6,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 71302,
+          "headersMs": 77944,
+          "bodyObservedMs": 79660,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 16303,
+          "outputTokens": 219
+        },
+        {
+          "sequence": 7,
+          "task": "npc",
+          "model": "gpt-6-luna",
+          "preparedMs": 85955,
+          "headersMs": 91781,
+          "bodyObservedMs": 93576,
+          "httpStatus": 200,
+          "failure": null,
+          "inputTokens": 9190,
+          "outputTokens": 346
+        },
+        {
+          "sequence": 8,
+          "task": "adjudication",
+          "model": "gpt-6.1-sol",
+          "preparedMs": 99827,
+          "headersMs": 107202,
+          "bodyObservedMs": null,
+          "httpStatus": 200,
+          "failure": {
+            "kind": "timeout",
+            "stage": "response-body"
+          },
+          "inputTokens": null,
+          "outputTokens": null
+        }
+      ],
+      "steps": [
+        {
+          "kind": "npc-parsed",
+          "ms": 11323
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 11323
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 11323
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 24208
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 24208
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 24208
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 24208
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 36560
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 36560
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 36560
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 58101
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 58101
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 58101
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 58101
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 70252
+        },
+        {
+          "kind": "parsed-candidate",
+          "ms": 85107
+        },
+        {
+          "kind": "adjudication-explanation",
+          "ms": 85107
+        },
+        {
+          "kind": "bound-candidate",
+          "ms": 85107
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 85107
+        },
+        {
+          "kind": "npc-parsed",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "rule-selection",
+          "ms": 98769
+        },
+        {
+          "kind": "npc-feedback",
+          "ms": 110617
+        },
+        {
+          "kind": "round-failure",
+          "ms": 110617
+        },
+        {
+          "kind": "world-candidate",
+          "ms": 110617
+        },
+        {
+          "kind": "commit-start",
+          "ms": 110617
+        },
+        {
+          "kind": "world-commit-confirmed",
+          "ms": 114123
+        }
+      ]
+    }
+  ]
+}

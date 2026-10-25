@@ -9,7 +9,7 @@ const store = fromBuild('store');
 
 function request(operation, extra = {}) {
   return new Request('https://test.invalid/api/world', {
-    method: 'POST', headers: { origin: 'https://test.invalid' },
+    method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' },
     body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation, mode: 'demo', minutes: 15, ...extra }),
   });
 }

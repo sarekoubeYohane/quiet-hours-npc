@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=build('route'),store=build('store'),{seedWorld}=build('world');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await(await GET()).json()).world;
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
@@ -11,7 +11,7 @@ test('player applies explicit unlimited budget, reloads and resets without losin
  const request=req({operation:'set-budget',limits:{calls:null,tokens:null}});
  const body=await request.clone().text();assert.equal((await POST(request)).status,200);
  assert.deepEqual((await read()).playerBudget,{calls:null,tokens:null});
- assert.equal((await POST(new Request(request.url,{method:'POST',headers:{origin:'https://test.invalid'},body}))).status,200);
+ assert.equal((await POST(new Request(request.url,{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body}))).status,200);
  assert.equal((await POST(req({operation:'reset'}))).status,200);
  const saved=await read();assert.deepEqual(saved.playerBudget,{calls:null,tokens:null});assert.equal(saved.aiUsage.totalCalls,151);
 });

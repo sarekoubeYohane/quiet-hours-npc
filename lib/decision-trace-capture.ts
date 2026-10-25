@@ -47,15 +47,16 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       await legacy?.(event);
       if(event.kind==='prepared'){
         active={sequence:trace.dispatches.length+1,task,actorId:actor.id,requestId:event.requestId,provider,model,startedAt:Date.now(),
-          ...(omitContent()?{}:{requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world)}),stage:'dispatch-prepared'};
+          ...(omitContent()?{}:{requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world)}),stage:'dispatch-prepared',signal:event.timing??null};
         trace.dispatches.push(active);trace.lastKnownStage='dispatch-prepared';
-      }else if(active&&event.kind==='dispatch'){if(active.stage==='dispatch-prepared')active.stage='dispatched';trace.lastKnownStage=String(active.stage);}
+      }else if(active&&event.kind==='fetch-start'){active.fetchStartedAt=event.at;return;}
+      else if(active&&event.kind==='dispatch'){if(active.stage==='dispatch-prepared')active.stage='dispatched';trace.lastKnownStage=String(active.stage);}
       else if(active&&event.kind==='headers'){active.httpStatus=event.httpStatus;active.headersReceivedAt=Date.now();active.stage='response-headers';trace.lastKnownStage='response-headers';}
       else if(active&&(event.kind==='response'||event.kind==='late-response')){if(!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=Date.now();active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
         active.discarded=true;
         try{const usage=JSON.parse(event.responseBody)?.usage;if(typeof usage?.prompt_tokens==='number'&&typeof usage?.completion_tokens==='number'&&Number.isFinite(usage.prompt_tokens)&&Number.isFinite(usage.completion_tokens)&&usage.prompt_tokens>=0&&usage.completion_tokens>=0)active.lateUsage={inputTokens:usage.prompt_tokens,outputTokens:usage.completion_tokens};}catch{/* Malformed late bodies remain raw evidence. */}
       }}
-      else if(active&&event.kind==='usage')active.usage=event.usage;
+      else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=Date.now();}
       else if(active&&event.kind==='candidate'){if(!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
       else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage,...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
       await persist();
@@ -78,7 +79,12 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
     const value=unknownCredentials?omitDecisionTraceContent(trace,'credential-redaction-unavailable',true):contentLimitExceeded?omitDecisionTraceContent(trace,'single-record-limit',false,omittedOriginalBytes):trace;
     const cleaned=scrub(value) as DecisionTrace;cleaned.redacted=trace.redacted||unknownCredentials;return cleaned;
   };
-  const persist=async()=>{if(checkpoint){const copy=snapshot();writes=writes.then(()=>checkpoint(copy));await writes;}};
+  const checkpoints:{sequence:number;startedAt:number;completedAt?:number}[]=[];trace.checkpoints=checkpoints;
+  const persist=async()=>{if(checkpoint){
+    const point={sequence:checkpoints.length+1,startedAt:Date.now()} as {sequence:number;startedAt:number;completedAt?:number};
+    if(checkpoints.length<256)checkpoints.push(point);
+    const copy=snapshot();writes=writes.then(async()=>{await checkpoint(copy);point.completedAt=Date.now();});await writes;
+  }};
   const finish=(outcome:DecisionTrace['outcome'],world?:World,resultVersion?:number)=>{
     trace.outcome=outcome;trace.resultVersion=resultVersion;
     if(world&&!omitContent())trace.result=traceWorldSnapshot(world);

@@ -1,4 +1,5 @@
 'use client';
+import { roundTimePolicy, roundClientMs, timePolicyHeader } from '@/lib/round-time-policy';
 import OperationEvidenceDetails from '@/components/operation-evidence';
 import DecisionTraces from '@/components/decision-traces';
 import type { OperationEvidence, OperationSummary, ReplayAdvance } from '@/lib/operation-evidence';
@@ -104,10 +105,10 @@ sessionStorage.setItem(storageKey,payload);setPendingOperation(true);
 const sent=JSON.parse(payload) as {operation:string;operationId:string};
 operation=sent.operation;focusTrace(sent.operationId);
 const deadline=Date.now()+15000;
-let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;contextMismatch?:boolean;operationSettled?:boolean;retryable?:boolean;limitReached?:boolean;operationUncertain?:boolean;stopReason?:StopReason;decisionTraceStatus?:{status:string;gap?:string;lastKnownStage?:string}}|undefined;
+let r:Response|undefined,d:{world?:World;version?:number;error?:string;scopeMismatch?:boolean;contextMismatch?:boolean;operationSettled?:boolean;clientUpdateRequired?:boolean;retryable?:boolean;limitReached?:boolean;operationUncertain?:boolean;stopReason?:StopReason;decisionTraceStatus?:{status:string;gap?:string;lastKnownStage?:string}}|undefined;
 let transportError:Error|undefined;
 while(Date.now()<deadline){
-try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:payload,signal:AbortSignal.timeout(125000)});if(r.status===401)setSignInRequired(true);d=await readWorldResponse<NonNullable<typeof d>>(r);if(!r.ok&&typeof d.error!=='string')throw new WorldResponseError(r.status,'application/json');}
+try{r=await fetch('/api/world',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',[timePolicyHeader]:roundTimePolicy.version},body:payload,signal:AbortSignal.timeout(roundClientMs)});if(r.status===401)setSignInRequired(true);d=await readWorldResponse<NonNullable<typeof d>>(r);if(!r.ok&&typeof d.error!=='string')throw new WorldResponseError(r.status,'application/json');}
 catch(e){transportError=e instanceof WorldResponseError?e:undefined;if(e instanceof WorldResponseError&&e.status===401)throw e;r=undefined;d=undefined;}
 if(r&&d&&!d.retryable)break;
 setNotice('世界正處理另一個回合或連線中斷，正在等待後重試…');
@@ -115,6 +116,7 @@ await new Promise(resolve=>setTimeout(resolve,1000));
 }
 if(d?.decisionTraceStatus)setTraceResponseStatus({operationId:sent.operationId,...d.decisionTraceStatus});
 if(!r||!d||d.retryable)throw Error(transportError?.message||'等待逾時：另一個回合可能仍在處理。未完成操作已保留，請按「重試未完成操作」。');
+if(d.clientUpdateRequired)throw Error(d.error);
 if(d.contextMismatch){sessionStorage.removeItem(storageKey);setPendingOperation(false);await readLatest();throw Error(d.error);}
 if(d.scopeMismatch){await readLatest();throw Error(d.error);}
 acceptWorld(d);

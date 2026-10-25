@@ -7,7 +7,7 @@ const { GET, POST } = load('route'), store = load('store');
 const { seedWorld } = load('world');
 const { enterAcceptanceScene } = load('acceptance-scene');
 const read = async operationId => (await (await GET(operationId ? new Request('https://test.invalid/api/world?operationId=' + encodeURIComponent(operationId)) : undefined)).json());
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify(body) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(body) });
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
 const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: typeof value === 'string' ? value : JSON.stringify(value) } }] });
 async function setup(actor = 'cass', modify = () => {}) {

@@ -6,7 +6,7 @@ const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10}
 const operationId=()=>Date.now()+':'+crypto.randomUUID();
 async function setup(decide,adjudicate=()=>{throw Error('no adjudication expected');},prepare=()=>{}){
  const w=seedWorld();w.contextId='time-semantics';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:operationId(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:operationId(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const old=global.fetch;let npc=0,judgments=0;const inputs=[];
  global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(adjudicate(input,request));}inputs.push(input);npc++;return completion(decide(input,npc,request));};
  return {post,read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=old;},counts:()=>({npc,judgments}),inputs};

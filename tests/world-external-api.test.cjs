@@ -15,7 +15,7 @@ async function scenario({reply=accepted([change('object','cup','volume','full','
  w.objects=[{id:'cup',source:'fixture-cup',label:'熱茶杯',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{volume:'full'},lifecycle:'active',kind:'utensil',knownTo:['owner','vera'],allowedTo:['owner']}];
  w.scene={doors:{'cafe-door':'open'},noise:{},occluded:[],external:{'cafe-front':{revision:0,state:{桌面:'乾燥'}}}};
  prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});
  const oldFetch=global.fetch,oldRandom=Math.random;let npc=0,judgments=0,dice=0;const requests=[],choices={};
  global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);requests.push({input,request});if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(typeof reply==='function'?reply(input):reply);}npc++;return completion(choices[input.self.id]||(input.self.id==='owner'?decision:rest));};
