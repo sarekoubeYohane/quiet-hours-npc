@@ -25,7 +25,7 @@ async function signIn(id = 123) {
 }
 async function post(cookie, body, originHeader = fixture.env.AUTH_ORIGIN) {
   headers.set(new Headers({ cookie }));
-  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader }, body: JSON.stringify({operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body}) }));
+  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body}) }));
 }
 async function status(cookie) {
   headers.set(new Headers({ cookie }));

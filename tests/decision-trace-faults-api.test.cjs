@@ -102,7 +102,7 @@ test('an expired lease discards the received candidate and preserves trace ident
  let running;
  try{
   running=s.post(op);await ready;now+=440000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);
-  release();await running;const saved=await lookup(op.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.decisionTrace.outcome,'unknown');assert.ok(saved.decisionTrace.dispatches[0].responseBody);assert.ok(saved.decisionTrace.steps.some(step=>step.kind==='lease-invalid'));
+  release();await running;for(let i=0;i<30;i++){if((await lookup(op.operationId)).decisionTrace.dispatches[0].responseBody)break;await new Promise(r=>setTimeout(r,5));}const saved=await lookup(op.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.decisionTrace.outcome,'unknown');assert.ok(saved.decisionTrace.dispatches[0].responseBody);assert.equal(saved.decisionTrace.dispatches[0].discarded,true);assert.ok(saved.decisionTrace.steps.some(step=>step.kind==='round-failure'));
   assert.equal(saved.decisionTrace.requestId,saved.decisionTraces.records.find(item=>item.operationId===op.operationId).requestId);
   const before=structuredClone(saved.world);await s.post(op);assert.equal(sent,1);assert.deepEqual((await lookup(op.operationId)).world,before);
  }finally{release();await running;Date.now=clock;s.restore();}
@@ -113,8 +113,8 @@ test('an evicted or cleared in-flight trace is not reinserted by a late worker',
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let sent=0;
  global.fetch=async()=>{sent++;entered();await gate;throw Error('late provider failure');};let running;
  try{
-  running=s.post(op);await ready;now+=440000;
-  for(let i=0;i<66;i++){now++;assert.equal((await s.post({operation:'takeover'})).status,200);}
+  running=s.post(op);await ready;now+=440000;await running;
+  for(let i=0;i<66;i++){now++;const response=await s.post({operation:'takeover'});assert.equal(response.status,200,await response.clone().text());}
   assert.equal((await lookup(op.operationId)).decisionTrace,null);
   const before=(await lookup(op.operationId)).world;release();await running;const after=await lookup(op.operationId);
   assert.equal(after.decisionTrace,null);assert.deepEqual(after.world.characters,before.characters);assert.deepEqual(after.world.objects,before.objects);assert.equal(after.world.turn,before.turn);assert.equal(after.world.aiUsage.totalCalls,1);assert.equal((await s.post(op)).status,410);assert.equal(sent,1);assert.ok(after.decisionTraces.retention.count<=64);

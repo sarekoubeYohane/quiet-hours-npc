@@ -59,7 +59,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
       return callback.headers.getSetCookie().find(value => value.startsWith('qh_session=')).split(';')[0];
     };
     const first = await signIn(), second = await signIn();
-    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body }) });
+    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body }) });
     const fakeKey = 'worker-fixture-key-never-real';
     const saved = await post({ operation: 'set-model-key', mode: 'openai', key: fakeKey });
     assert.equal(saved.status, 200);

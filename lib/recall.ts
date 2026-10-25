@@ -1,4 +1,4 @@
-import { awaitSignal, deadlineSignal } from './round-time-policy';
+import { awaitSignal, deadlineSignal, signalExpired } from './round-time-policy';
 import type { Character, World } from './world';
 import { MemoryValidationError, memoryBytes, memoryStateBytes, recallableMemoryProjection, boundMemoryWithMetadata, type LongMemory } from './memory';
 import { database } from './store';
@@ -14,7 +14,7 @@ export async function recallMemories(options: {
   const { owner, character, snapshot, version, questions, guard } = options;
   const deadline = Math.min(options.workDeadline, Date.now() + 10000);
   const recallSignal=deadlineSignal(deadline,'recall');
-  const wait=<T,>(work:Promise<T>)=>awaitSignal(work,recallSignal);
+  const wait=async<T,>(work:Promise<T>):Promise<T>=>{try{return await awaitSignal(work,recallSignal);}catch(error){if(signalExpired(recallSignal))throw Error('回想索引或搜尋逾時，本回合已回復。');throw error;}};
   const scope = { owner, world: 'primary', npc: character.id };
   const services = recallServices();
   const signal = () => {

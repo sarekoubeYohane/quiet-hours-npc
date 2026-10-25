@@ -24,10 +24,10 @@ test('a response explicitly associated with another request cannot change the wo
  assert.deepEqual(await(await POST(request(body))).json(),failure);assert.equal(calls,1);
  }finally{global.fetch=original;}
 });
-test('a response after the operation work deadline retains known usage but cannot submit an action',async()=>{
+test('a response after the absolute deadline is discarded and cannot change settled usage or submit an action',async()=>{
  store.install(worldWithAdjudication());const original=global.fetch,clock=Date.now;let instant=clock(),calls=0;Date.now=()=>instant;
  global.fetch=async()=>{if(++calls===4)instant+=401000;return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(candidate)}}]});};
- try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));const before=await read(); const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).characters,before.characters);assert.equal((await read()).aiUsage.totalInputTokens,36);
+ try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));const before=await read(); const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).characters,before.characters);assert.equal((await read()).aiUsage.totalInputTokens,27);assert.equal((await read()).aiUsage.totalUnknownCalls,1);
  }finally{global.fetch=original;Date.now=clock;}
 });
 test('injected adjudication receives separate minimal authority input while the existing action still uses program execution and persistence',async()=>{

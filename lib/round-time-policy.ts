@@ -18,13 +18,15 @@ export function deadlineSignal(deadline:number, source:string, parent?:AbortSign
   return signal;
 }
 export const signalTiming=(signal:AbortSignal)=>limits.get(signal);
+export const signalExpired=(signal:AbortSignal)=>signal.aborted||(limits.get(signal)?.deadline??Infinity)<=Date.now();
+export function checkSignal(signal:AbortSignal):void{if(signalExpired(signal))throw signal.reason??new DOMException('工作期限已到期。','TimeoutError');}
 // Reject waiting without pretending the underlying write was cancelled. Callers
 // retain their original queue; no continuation from this promise can run effects.
 export function awaitSignal<T>(work:Promise<T>,signal:AbortSignal):Promise<T>{
   return new Promise((resolve,reject)=>{
     const abort=()=>reject(signal.reason??new DOMException('工作期限已到期。','TimeoutError'));
-    if(signal.aborted){work.catch(()=>{});abort();return;}
+    if(signalExpired(signal)){work.catch(()=>{});abort();return;}
     signal.addEventListener('abort',abort,{once:true});
-    work.then(value=>{if(signal.aborted)abort();else resolve(value);},reject).finally(()=>signal.removeEventListener('abort',abort));
+    work.then(value=>{if(signalExpired(signal))abort();else resolve(value);},reject).finally(()=>signal.removeEventListener('abort',abort));
   });
 }

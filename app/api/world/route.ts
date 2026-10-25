@@ -1,4 +1,4 @@
-import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal } from '@/lib/round-time-policy';
+import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace } from '@/lib/decision-trace-capture';
 import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
@@ -129,8 +129,9 @@ export async function GET(request?: Request) {
   return observeWorldRequest(trace => readWorld(request, trace));
 }
 export async function POST(request: Request, services?: WorldTaskServices) {
-  const responseDeadline=deadlineSignal(Date.now()+roundClientMs,'http-response');
-  return awaitSignal(observeWorldRequest(trace => mutateWorld(request, trace, services,responseDeadline)),responseDeadline).catch(()=>reply({...uncertainResult.body,operationUncertain:true},502));
+  const receivedAt=Date.now();
+  const responseDeadline=deadlineSignal(receivedAt+roundClientMs,'http-response');
+  return awaitSignal(observeWorldRequest(trace => mutateWorld(request, trace, services,responseDeadline,receivedAt)),responseDeadline).catch(()=>reply({...uncertainResult.body,operationUncertain:true},502));
 }
 
 async function readWorld(request: Request | undefined, trace: WorldTrace) {
@@ -195,7 +196,7 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
 }
 
 
-async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices,responseSignal?:AbortSignal) {
+async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices,responseSignal?:AbortSignal,receivedAt=Date.now()) {
   const id = await owner();
   if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
@@ -203,6 +204,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   let workSignal:AbortSignal|undefined,finishSignal:AbortSignal|undefined;
   const workWait=<T,>(promise:Promise<T>)=>workSignal?awaitSignal(promise,workSignal):promise;
   const finishWait=<T,>(promise:Promise<T>)=>finishSignal?awaitSignal(promise,finishSignal):promise;
+  const modelSignal=()=>deadlineSignal(Math.min(Date.now()+roundTimePolicy.modelMs,workDeadline),workDeadline-Date.now()<roundTimePolicy.modelMs?'round-work':'model',workSignal);
   let decisionTrace:ReturnType<typeof createDecisionTrace>|undefined;
   let traceSaved=false,traceWriteFailed=false;
   let traceStatus:{status:string;gap?:string;lastKnownStage?:string}={status:'pending',gap:'world-and-trace-are-separate-transactions'};
@@ -321,11 +323,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
     responseSignal?.throwIfAborted();request.signal.throwIfAborted();
+    if(Date.now()>=receivedAt+roundTimePolicy.deliveryMs)throw new DOMException('受理準備逾時，未開始回合。','TimeoutError');
     const db = database();
     const leaseCreatedAt=Date.now();
     workDeadline=leaseCreatedAt+roundTimePolicy.workMs;
     lease=leaseCreatedAt+roundLeaseMs;
-    workSignal=deadlineSignal(workDeadline,'round-work',request.signal);
+    workSignal=deadlineSignal(workDeadline,'round-work',AbortSignal.any([request.signal,...(responseSignal?[responseSignal]:[])]));
     finishSignal=deadlineSignal(lease,'fixed-lease');
     trace.lease = lease;
     journal.results[operationId] = { pending: lease };
@@ -334,11 +337,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (!acquired.meta.changes) { traceWorld(trace, 'lease-wait', { outcome: 'contended' }); return waiting(); }
     locked = true;
     responseSignal?.throwIfAborted();workSignal.throwIfAborted();
+    if(Date.now()>=receivedAt+roundTimePolicy.deliveryMs)throw new DOMException('取得租約逾時，未開始回合。','TimeoutError');
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     evidence=createOperationEvidence({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,world:beforeOperation,deployment:currentEnvironment(),
       ...(b.operation==='advance'?{replay:{operation:'advance',operationId,worldContext:b.worldContext,mode:b.mode!,model:b.model,minutes:b.minutes!}}:{})});
-    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment()},writeTrace);
+    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment(),timePolicy:{version:roundTimePolicy.version,leaseCreatedAt,workDeadline,leaseDeadline:lease,clientMs:roundClientMs}},writeTrace);
     // All configured service credentials must be known before the first private
     // checkpoint: an NPC input can accidentally contain the other provider key.
     decisionTrace.step('time-policy',undefined,{version:roundTimePolicy.version,leaseCreatedAt,leaseAcquiredAt:Date.now(),workDeadline,leaseDeadline:lease,clientMs:roundClientMs});
@@ -427,7 +431,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               observer: npcObserver?event=>workWait(Promise.resolve(npcObserver(event))):undefined,
               enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
               verifyCurrent: verifyLease,
-              signal: () => { const remaining = workDeadline - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return deadlineSignal(Math.min(Date.now()+roundTimePolicy.modelMs,workDeadline),remaining<roundTimePolicy.modelMs?'round-work':'model',workSignal); },
+              signal:modelSignal,
               beforeContinuation: async () => {
                 await guard('chat', 1);
                 traceWorld(trace, 'model-continuation-dispatch');
@@ -455,7 +459,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:deadlineSignal(Math.min(Date.now()+roundTimePolicy.modelMs,workDeadline),'adjudication',workSignal),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
+              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
@@ -490,6 +494,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         failure = error instanceof Error ? error : new Error('記憶容量驗證失敗，本回合沒有推進。');
       }
     }
+    // The final synchronous activity/effect/validation segment can outlast an
+    // abort timer callback. Only a completed in-budget candidate may enter the
+    // separate commit/rollback window.
+    if(!failure){try{checkSignal(workSignal!);}catch(error){restoreWorld(world,beforeOperation);failure=error instanceof Error?error:new Error('世界工作期限已到期。');decisionTrace?.step('round-failure',undefined,{name:failure.name,stage:'work-complete'});}}
     const usage = currentUsage(world);
     const result: OperationResult = failure
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
@@ -497,8 +505,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     decisionTrace?.step('world-candidate',undefined,{outcome:failure?'rolled-back':'candidate',failure:failure?.message});
     candidateWorld=world;
     decisionTrace?.step('commit-start',undefined,{candidateOutcome:failure?'rolled-back':'committed',candidateVersion:version+1});
+    paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
     try{await finishWait(decisionTrace!.persist());}catch{traceWriteFailed=true;decisionTrace?.gap('checkpoint-deadline');}
-    finishSignal!.throwIfAborted();
+    finishSignal!.throwIfAborted();responseSignal?.throwIfAborted();request.signal.throwIfAborted();
     result.body.decisionTraceStatus=traceWriteFailed?{status:'write-failed',gap:'trace-write-failed'}:{status:'pending',gap:'world-and-trace-are-separate-transactions'};
     result.body.operationEvidence=finishEvidence(world,failure?'rolled-back':'committed',version+1);
     journal.results[operationId] = result;
@@ -506,7 +515,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     trimJournal(journal, 8, operationId);
     paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
     traceWorld(trace, 'commit-start');
-    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), pendingJournal).run());
+    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
     if (!saved.meta.changes) {
       commitRejected=true;decisionTrace?.step('commit-conflict',undefined,{worldCommitted:false});await finishTrace('not-committed');
       traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
@@ -535,12 +544,17 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         const observed=await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
         const receipt=observed&&(JSON.parse(observed.operations) as Journal).results[operationId];
         if(receipt&&'status' in receipt){
+          // A different tab can settle an expired pending marker as uncertain
+          // before this worker stops. That receipt has no committed paid ledger;
+          // retain our measured/unknown attempts once without changing its body.
+          if(receipt.body.operationUncertain&&!paidRetained&&paidAfter){await retainPaidUsage(database(),id,paidBefore,paidAfter);paidRetained=true;}
           const original=receipt.body.operationEvidence as OperationEvidence|undefined;
           const outcome=receipt.body.operationUncertain?'unknown':original?.outcome||'unknown';
           decisionTrace?.step('journal-confirmed',undefined,{outcome,resultVersion:original?.resultVersion});
-          receipt.body.decisionTraceStatus=await finishTrace(outcome,outcome==='committed'||outcome==='rolled-back'?candidateWorld:undefined,original?.resultVersion);
+          const settledTraceStatus=await finishTrace(outcome,outcome==='committed'||outcome==='rolled-back'?candidateWorld:undefined,original?.resultVersion);
+          if(!receipt.body.operationUncertain)receipt.body.decisionTraceStatus=settledTraceStatus;
           traceWorld(trace,'journal-confirmed',{outcome:receipt.body.operationUncertain?'uncertain':'settled'});
-          await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?').bind(`$.results."${operationId}".body.decisionTraceStatus`,JSON.stringify(receipt.body.decisionTraceStatus),id,`$.results."${operationId}".body.operationEvidence.requestId`,trace.requestId).run();
+          if(!receipt.body.operationUncertain)await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?').bind(`$.results."${operationId}".body.decisionTraceStatus`,JSON.stringify(receipt.body.decisionTraceStatus),id,`$.results."${operationId}".body.operationEvidence.requestId`,trace.requestId).run();
           return settledReply(receipt);
         }
         if(!receipt||!('pending' in receipt)||receipt.pending!==lease){decisionTrace?.step('journal-unavailable',undefined,{gap:'original-operation-receipt-unavailable'});decisionTrace?.gap('original-operation-receipt-unavailable');await finishTrace(commitRejected?'not-committed':'unknown');return reply({...uncertainResult.body,decisionTraceStatus:traceStatus},uncertainResult.status);}

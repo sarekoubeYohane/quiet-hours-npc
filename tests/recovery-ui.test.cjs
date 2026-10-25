@@ -31,16 +31,18 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
 
  let waiting=true,fault=null,committed=false;
  const payloads=[];
- const originalFetch=global.fetch,clock=Date.now,timer=global.setTimeout;
+ const originalFetch=global.fetch,clock=Date.now,timer=global.setTimeout,signalTimeout=AbortSignal.timeout;
+ const requestedTimeouts=[];AbortSignal.timeout=ms=>{requestedTimeouts.push(ms);return signalTimeout(ms);};
  let instant=clock();Date.now=()=>instant;
  // Accelerate transport waits and visual playback; only injected waits advance wall time.
  global.setTimeout=(fn,ms,...args)=>timer(fn,ms<=3000||(process.env.RECOVERY_AUTOMATIC&&ms===30000)?0:ms,...args);
  global.fetch=async(_url,options)=>{
   if(fault){instant+=1000;return new Response(fault.body,{status:fault.status,headers:{'Content-Type':fault.type}});}
   if(!options?.method)return GET(new Request(new URL(_url,'https://test.invalid')));
+  assert.equal(options.headers['X-World-Time-Policy'],'round-v1');
   payloads.push(options.body);
   if(waiting){instant+=1000;return Response.json({retryable:true,error:'世界正處理另一個回合，正在等待後重試。'},{status:409});}
-  const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:options.body}));
+  const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{...options.headers,origin:'https://test.invalid'},body:options.body}));
   if(!committed){committed=true;waiting=true;throw Error('response lost');}
   return response;
  };
@@ -80,6 +82,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   assert.equal(!!button('重試未完成操作'),false,'reload must reconcile the saved operation');
   assert.equal(button('下一回合').disabled,false);
   assert.equal(new Set(payloads).size,1);
+  assert.ok(requestedTimeouts.includes(445000),'new client waits for the complete bounded round');assert.equal(requestedTimeouts.includes(125000),false);
   assert.equal((await (await GET()).json()).world.turn,historyTurns+1);
   // A reload/foreground read must not submit a saved request the server never accepted.
   const unknown=JSON.stringify({operation:'advance',minutes:15,mode:'demo',operationScope:'test-owner',operationId:`${instant}:${crypto.randomUUID()}`});
@@ -126,7 +129,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   };
   const running=send(uncertain);
   try{
-   await ready;instant+=130000;
+   await ready;instant+=440000;
    const expired=await send(uncertain);
    assert.equal((await expired.json()).operationUncertain,true);
    const saved=JSON.stringify(uncertain);sessionStorage.setItem('quiet-hours:pending:test-owner',saved);
@@ -144,7 +147,9 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   const scene=await build('acceptance-scene').enterAcceptanceScene(build('world').seedWorld());
   scene.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   scene.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});
-  store.install(scene);sessionStorage.clear();
+  // A live UI rejects older versions; preserve monotonic versions when the
+  // fixture switches to its next isolated scene.
+  store.replaceCommittedWorld(scene);sessionStorage.clear();
   await send({operation:'set-model-key',mode:'openai',key:'test-key',worldContext:scene.contextId});
   const routeTransport=global.fetch;let rejectedCalls=0;
   global.fetch=async(input,options)=>{
@@ -157,7 +162,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
    return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
   };
   try{
-   assert.equal((await send({operation:'advance',minutes:15,mode:'openai',model:'gpt-6.1-sol',worldContext:scene.contextId})).status,502);
+   const rejected=await send({operation:'advance',minutes:15,mode:'openai',model:'gpt-6.1-sol',worldContext:scene.contextId});assert.equal(rejected.status,502);const rejectedBody=await rejected.json();assert.ok(rejectedBody.adjudicationFailure,JSON.stringify(rejectedBody));
    await click('重新載入');
    const details=document.querySelector('[data-adjudication-failure]');
    assert.ok(details,'reload exposes the saved candidate diagnosis');
@@ -166,5 +171,5 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
    assert.doesNotMatch(details.textContent,/test-key/);
    assert.equal(rejectedCalls,2);assert.equal((await (await GET()).json()).world.turn,0);
   }finally{global.fetch=routeTransport;}
- }finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;Date.now=clock;global.setTimeout=timer;await window.happyDOM.close();}
+ }finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;Date.now=clock;global.setTimeout=timer;AbortSignal.timeout=signalTimeout;await window.happyDOM.close();}
 });

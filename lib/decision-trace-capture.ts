@@ -10,7 +10,7 @@ export function traceWorldSnapshot(world: World) {
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
     actors:world.characters.map(actor=>({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan}))});
 }
-export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
+export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown;timePolicy?:{version:string;leaseCreatedAt:number;workDeadline:number;leaseDeadline:number;clientMs:number}}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
   const secrets=new Set<string>();let unknownCredentials=false,contentLimitExceeded=false,omittedOriginalBytes=0;
   const omitContent=()=>unknownCredentials||contentLimitExceeded;
   const trace:DecisionTrace={...context,schemaVersion:1,acceptedAt:Date.now(),lastKnownStage:'accepted',dispatches:[],steps:[],gaps:[],redacted:false};
@@ -52,11 +52,11 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       }else if(active&&event.kind==='fetch-start'){active.fetchStartedAt=event.at;return;}
       else if(active&&event.kind==='dispatch'){if(active.stage==='dispatch-prepared')active.stage='dispatched';trace.lastKnownStage=String(active.stage);}
       else if(active&&event.kind==='headers'){active.httpStatus=event.httpStatus;active.headersReceivedAt=Date.now();active.stage='response-headers';trace.lastKnownStage='response-headers';}
-      else if(active&&(event.kind==='response'||event.kind==='late-response')){if(!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=Date.now();active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
+      else if(active&&(event.kind==='response'||event.kind==='late-response')){if(!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=event.at??Date.now();if(event.kind==='response'&&event.usage){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
         active.discarded=true;
         try{const usage=JSON.parse(event.responseBody)?.usage;if(typeof usage?.prompt_tokens==='number'&&typeof usage?.completion_tokens==='number'&&Number.isFinite(usage.prompt_tokens)&&Number.isFinite(usage.completion_tokens)&&usage.prompt_tokens>=0&&usage.completion_tokens>=0)active.lateUsage={inputTokens:usage.prompt_tokens,outputTokens:usage.completion_tokens};}catch{/* Malformed late bodies remain raw evidence. */}
       }}
-      else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=Date.now();}
+      else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}
       else if(active&&event.kind==='candidate'){if(!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
       else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage,...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
       await persist();

@@ -62,7 +62,7 @@ try {
         return { meta: { changes: 0 } };
       }
       // Simulate the database execution clock, including uncancellable delayed SQL.
-      const executedSql=sql.replace("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)",String(Date.now()));
+      const executedSql=sql.replaceAll("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)",String(Date.now()));
       const result = db.prepare(executedSql).run(...values);
       if (finalSave && uncertain) { uncertain = false; throw Error('Unknown commit outcome'); }
       return { meta: { changes: Number(result.changes) } };

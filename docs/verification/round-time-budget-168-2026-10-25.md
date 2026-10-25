@@ -20,7 +20,59 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" DEADLINE_EXPECT
 
 ## 回歸與審查
 
-原版 operations、conflict、decision-trace-faults 三組52項基準先通過，避免把既有保護當作本輪新增能力。新版持續測試與審查結果於交付時補記。
+原版 operations、conflict、decision-trace-faults 三組52項基準先通過，避免把既有保護當作本輪新增能力。
+
+新增永久API／SQLite完成案例的實測（虛擬時間）：
+
+| 案例 | 提交耗時 | 聊天／回想 | trace寫入 |
+| --- | ---: | --- | ---: |
+| 8×14秒 | 112秒 | 8聊天 | 51 |
+| 8×12秒＋每次trace0.4秒 | 113.2秒 | 8聊天 | 51 |
+| 合法回想完整鏈＋每次trace0.4秒 | 293.2秒 | 12聊天＋4embedding＋4search；各服務2秒 | 75 |
+
+每案從原ID讀回durable世界、回饋與意圖，核對turn／minute、用量只計一次，再同ID重送比對status／body與零新增派送。正常denied候選仍是成功回合中的角色回饋。
+
+獨立code-review依技能分成Standards與Spec兩軸，固定基準main `4c54b15`，首個整合checkpoint `244ae7d`。Standards發現一項截止契約問題與一項usage解析重複的維護性判斷；Spec發現兩項P1，已交同一實作者修正並加入永久回歸：
+
+- 受理前讀取延遲200秒後啟動完整鏈，HTTP445秒先回uncertain，內層原本仍可能第12次派送並提交。必須將response截止傳遞到工作及CAS，並在付費前檢查受理餘量。
+- 有效body已知30／10 tokens，但trace保存延遲500秒時，收尾截止先於paidAfter快照，durable用量錯為0。必須在可停止的收尾等待前凍結付費差額，保持只補存一次。
+
+以上是review時的實際RED，不是理論風險；整合checkpoint `609e350` 已承接兩項P1及重複解析修正，另加入下列永久回歸：
+
+| 驗收 | 可觀察結果 |
+| --- | --- |
+| 12×22.9秒聊天、4次9秒回想、0.4秒trace、58秒外層guard | 虛擬394秒完整提交，75次trace寫入，未超過25／10／400秒包絡 |
+| 外層guard延遲401秒 | 400秒停止、零模型派送；晚到guard不恢復執行 |
+| 4角色候選順序 | 後一角色實際NPC輸入承接前一候選工具變化，最後revision5一次保存 |
+| 500秒不可取消trace保存 | 已知30／10 tokens只保存一次、無新派送與候選恢復 |
+| 過慢受理 | 超過15秒在付費前停止；無延後租約造成的HTTP後執行 |
+| request斷線／回想服務逾時 | 停止後無續答，完整故事回復；原ID仍精確重放 |
+| 舊120秒pending | 按原存絕對期限變成pending／uncertain，沒有套430秒延長 |
+
+複查另取得第三個實際RED：prepared保存把時鐘推進26秒，但abort timer callback尚未執行時，原先仍HTTP200／2次fetch，應為零。新增絕對期限同步檢查，包含await入口／返回、實際fetch及body／用量分類；逾時body僅保留lateUsage證據，原定案未知用量不被改寫。原兩項P1已由Spec審查者獨立重跑原repro，2／2轉綠。
+
+最後整體回歸另取得費用競爭RED：另一分頁先把過期pending定為uncertain後，原worker曾漏補其已發生的付費帳，實際totalCalls=0、應為1。新永久案例要求原worker只補一次已知／未知帳，保留原uncertain的HTTP status／body逐項相同，不重套世界效果；此案例已RED→GREEN。
+
+同步活動／效果的最後D20邊界亦經RED→GREEN：活動將時鐘推到401秒時，原先HTTP200，修正後HTTP502、整輪回復，兩次已知呼叫與60 input tokens保留，骰子只執行一次，同ID精確重放。工作→收尾入口明確檢查絕對工作截止，不能借用30秒提交餘量執行候選。
+
+## 最終交付檢查
+
+最終產品提交 `2293286`，整合於 `5efa09c`；後續只有文件／整合歷史整理，不變更已測產品。以下命令從repo根目錄執行：
+
+| 檢查 | 結果 |
+| --- | --- |
+| `pnpm test`（runner自動preload no-network） | **648／648通過**：世界／活動606、登入32、實際workerd／migration10；零失敗／跳過 |
+| 原始單項RED命令（上節） | 最終1／1 GREEN，8×14秒完整提交 |
+| `pnpm typecheck` | 通過，無型別錯誤 |
+| 對全部變更TS／TSX／CJS／MJS執行ESLint | 零錯誤；world-app既有useEffect缺少act依賴warning 1項 |
+| `pnpm build:production` | 通過；另斷言產物Wrangler name為quiet-hours-npc、APP_ENV為production |
+| Markdown本地連結、`git diff --check` | 通過 |
+
+新增永久測試 `tests/round-deadline-api.test.cjs` 納入預設runner，涵蓋完成包絡、直接await／不可取消尾端、總／單次截止、斷線、舊client、原絕對pending、同步效果與費用競爭。`tests/recovery-ui.test.cjs` 以真實React／DOM驗證新POST等待445秒、政策header、斷線與原ID恢復，不靠原始碼字串檢查。逐slot驗收讀取後一NPC真正的input.objects，狀態依序為sound／broken／sound／broken，最終工具revision5一次保存。
+
+既有 `operations`／`conflict`／`decision-trace-faults`／`recall` 等回歸涵蓋兩分頁、不同ID、租約失效、晚到body／usage、archive有而journal缺失、CAS前失敗／後遺失回覆、trace失敗、淘汰／reset晚到UPDATE及預算。舊測試僅將正常新client請求加政策header、現行租約故障值更新到新窗口；明示舊120秒pending與舊125秒client另保留專項，沒有套新常數改寫舊期限。
+
+code-review兩軸均完成最終複核，**無剩餘實質發現**。Standards獨立重跑絕對截止、實際slot順序、uncertain用量及同步效果；Spec獨立重跑兩項原P1、絕對截止、uncertain已知／未知用量兩案及同步效果，全部通過。所有發現均由同一實作者修正，再回到原API／SQLite seam驗證；沒有以縮小規格或正式模型試跑替代。
 
 ## 範圍與限制
 
