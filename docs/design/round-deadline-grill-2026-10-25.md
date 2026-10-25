@@ -43,4 +43,6 @@
 
 此設計對原期限政策的修訂記入 [ADR 0004](../adr/0004-operation-evidence-stays-outside-story.md#166完整回合採有界時間預算)。沒有新增領域用語，GLOSSARY 不放入工程計時常數。設計已確認與實作通過分開：目前 RED 尚未因產品修正轉綠。
 
+使用者接續要求 to-tickets，沿已確認的一個垂直切片發布 [#168 實作工作票](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/168)，無前置並標記 ready-for-agent；#166保留為主規格且未修改。工作票以Parent連結標明從屬，詳見[工作票配置](round-deadline-ticket-plan.md)。
+
 #85 的泡茶 loop 仍需技術修正後另行授權的有限正式行為觀察；本次設計決定、本地替身及期限診斷都不代表行為通過。
