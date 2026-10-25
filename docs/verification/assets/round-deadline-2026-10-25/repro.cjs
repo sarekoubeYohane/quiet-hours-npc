@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Uses the existing CommonJS API/SQLite test seam. */
 /* Diagnostic only: synthetic replies, virtual elapsed time, existing API/SQLite seam.
  * No product fix. Reproduce RED with DEADLINE_EXPECT_COMPLETE=1.
  * Run via tests/run-activities.mjs, with tooling/verification/no-network.mjs preloaded.

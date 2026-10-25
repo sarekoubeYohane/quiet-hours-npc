@@ -148,5 +148,5 @@ RED已取得兩次一致結果；最小case實際約3.8秒，虛擬時間110秒�
 
 - 私有原件解析／ZIP CRC／SHA-256、前後故事比較、B prior與A final比較、七次usage加總及四NPC引用集合均由擷取器斷言通過；只輸出白名單欄位。
 - 最終harness：六項對照通過；單獨RED命令1項失敗，正是`502 !== 200`的預期完成能力缺口。最終RED單獨執行兩次一致重現，未修改產品使其轉綠。
-- Node語法、Python AST、JSON解析、Markdown本地連結、公開JSON敏感欄位掃描與git diff --check通過。人工核對表格數值與原件白名單結果。
+- Node語法、harness針對性ESLint、Python AST、JSON解析、Markdown本地連結、公開JSON敏感欄位掃描與git diff --check通過。人工核對表格數值與原件白名單結果。
 - 只有本報告、合成harness、白名單擷取器及兩份去識別JSON；app／lib／components／tests／migration／部署設定皆未變。未跑完整產品suite或瀏覽器；診斷之外的既有保護以本次實際涵蓋範圍為限。
