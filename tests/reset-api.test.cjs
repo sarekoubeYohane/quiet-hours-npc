@@ -26,7 +26,7 @@ async function signIn(id = 123) {
 }
 async function post(cookie, body) {
   headers.set(new Headers({ cookie }));
-  const response = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin }, body: JSON.stringify({ mode: 'demo', operationId: operationId(), ...body }) }));
+  const response = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ mode: 'demo', operationId: operationId(), ...body }) }));
   if (body.operation === 'set-model-key' && response.ok) {
     await post(cookie, { operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6-luna' } });
   }
@@ -182,7 +182,7 @@ test('reset is a journaled mutation: it needs an operation identifier and the cu
   freshDatabase();
   const cookie = await signIn();
   headers.set(new Headers({ cookie }));
-  const missing = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin }, body: JSON.stringify({ mode: 'demo', operation: 'reset' }) }));
+  const missing = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ mode: 'demo', operation: 'reset' }) }));
   assert.equal(missing.status, 400);
   const foreign = await resetWorld(cookie, { operationScope: 'github:999' });
   assert.equal(foreign.status, 409);

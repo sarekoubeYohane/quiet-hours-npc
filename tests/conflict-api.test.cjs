@@ -6,7 +6,7 @@ const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${n
 const { seedWorld } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
 const advance = async mode => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', mode: mode || 'openai', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const read = async () => (await (await GET()).json());
 const counters = value => { const copy = {...value}; delete copy.costs; return copy; };

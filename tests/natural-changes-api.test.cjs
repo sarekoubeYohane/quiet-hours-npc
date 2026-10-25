@@ -26,7 +26,7 @@ async function setup(adjust = () => {}) {
   world.objects = [{ id: 'natural-cup', source: 'known-cup', label: '自然變化測試杯', region: 'cafe-front', holder: 'owner', owner: 'owner', revision: 1, state: { temperature: 'warm' }, stateTransitions: { temperature: ['warm', 'hot', 'cool'] }, lifecycle: 'active', kind: 'utensil', knownTo: ['owner'], allowedTo: ['owner'] }];
   adjust(world);
   store.install(world);
-  const post = body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: operationId(), mode: 'openai', model: 'gpt-6-luna', ...body }) }));
+  const post = body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: operationId(), mode: 'openai', model: 'gpt-6-luna', ...body }) }));
   assert.equal((await post({ operation: 'set-model-key', key: 'fixture-key' })).status, 200);
   let decision = proposal;
   let candidate = accepted([{ kind: 'state', objectId: 'natural-cup', expectedRevision: 1, key: 'temperature', value: 'hot' }, natural()]);

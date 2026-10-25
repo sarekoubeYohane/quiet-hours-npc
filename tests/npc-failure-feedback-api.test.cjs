@@ -10,7 +10,7 @@ const report = require('../docs/verification/assets/pr131-live-acceptance/eviden
 const read = async () => (await (await GET()).json()).world;
 const id = () => Date.now() + ':' + crypto.randomUUID();
 const request = body => new Request('https://test.invalid/api/world', {
-  method: 'POST', headers: { origin: 'https://test.invalid' }, body: JSON.stringify({ operationId: id(), mode: 'demo', ...body }),
+  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: id(), mode: 'demo', ...body }),
 });
 const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
 async function scenario({ hiddenTarget = false } = {}) {

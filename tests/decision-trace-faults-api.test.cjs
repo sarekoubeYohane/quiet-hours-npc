@@ -79,7 +79,7 @@ test('a conflict replacing the journal cannot turn the same accepted operation i
 for(const task of ['npc','adjudication'])test(`${task} timeout records no answer then preserves a late discarded reply without resuming world work`,async()=>{
  const s=await scenario(),original=global.fetch,originalTimeout=AbortSignal.timeout,op=operation();let release,entered;
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let calls=0;
- AbortSignal.timeout=ms=>originalTimeout(Math.min(ms,100));
+ AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
  global.fetch=async(url,init)=>{
   calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if((input.contractVersion==='world-adjudication.v1')!==(task==='adjudication'))return original(url,init);
   entered();await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:JSON.stringify(proposal)}}]});
@@ -101,8 +101,8 @@ test('an expired lease discards the received candidate and preserves trace ident
  global.fetch=async()=>{sent++;entered();await gate;return Response.json({usage:{prompt_tokens:6,completion_tokens:2},choices:[{message:{content:JSON.stringify({...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null}})}}]});};
  let running;
  try{
-  running=s.post(op);await ready;now+=130000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);
-  release();await running;const saved=await lookup(op.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.decisionTrace.outcome,'unknown');assert.ok(saved.decisionTrace.dispatches[0].responseBody);assert.ok(saved.decisionTrace.steps.some(step=>step.kind==='lease-invalid'));
+  running=s.post(op);await ready;now+=440000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);
+  release();await running;for(let i=0;i<30;i++){if((await lookup(op.operationId)).decisionTrace.dispatches[0].responseBody)break;await new Promise(r=>setTimeout(r,5));}const saved=await lookup(op.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.decisionTrace.outcome,'unknown');assert.ok(saved.decisionTrace.dispatches[0].responseBody);assert.equal(saved.decisionTrace.dispatches[0].discarded,true);assert.ok(saved.decisionTrace.steps.some(step=>step.kind==='round-failure'));
   assert.equal(saved.decisionTrace.requestId,saved.decisionTraces.records.find(item=>item.operationId===op.operationId).requestId);
   const before=structuredClone(saved.world);await s.post(op);assert.equal(sent,1);assert.deepEqual((await lookup(op.operationId)).world,before);
  }finally{release();await running;Date.now=clock;s.restore();}
@@ -113,8 +113,8 @@ test('an evicted or cleared in-flight trace is not reinserted by a late worker',
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let sent=0;
  global.fetch=async()=>{sent++;entered();await gate;throw Error('late provider failure');};let running;
  try{
-  running=s.post(op);await ready;now+=130000;
-  for(let i=0;i<66;i++){now++;assert.equal((await s.post({operation:'takeover'})).status,200);}
+  running=s.post(op);await ready;now+=440000;await running;
+  for(let i=0;i<66;i++){now++;const response=await s.post({operation:'takeover'});assert.equal(response.status,200,await response.clone().text());}
   assert.equal((await lookup(op.operationId)).decisionTrace,null);
   const before=(await lookup(op.operationId)).world;release();await running;const after=await lookup(op.operationId);
   assert.equal(after.decisionTrace,null);assert.deepEqual(after.world.characters,before.characters);assert.deepEqual(after.world.objects,before.objects);assert.equal(after.world.turn,before.turn);assert.equal(after.world.aiUsage.totalCalls,1);assert.equal((await s.post(op)).status,410);assert.equal(sent,1);assert.ok(after.decisionTraces.retention.count<=64);
@@ -158,7 +158,7 @@ for(const status of [200,429])test(`HTTP ${status} body-read failure preserves k
 
 test('an abort during the prepared checkpoint does not invent a provider dispatch',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let sent=0;
- AbortSignal.timeout=()=>{const controller=new AbortController();store.onNextTraceWrite(()=>controller.abort());return controller.signal;};
+ AbortSignal.timeout=ms=>{if(ms>25000)return originalTimeout(ms);const controller=new AbortController();store.onNextTraceWrite(()=>controller.abort());return controller.signal;};
  global.fetch=async()=>{sent++;throw Error('must not dispatch');};
  try{
   const r=await s.post(op);assert.equal(r.status,502);const data=await lookup(op.operationId),d=data.decisionTrace.dispatches[0];assert.equal(sent,0);assert.equal(d.stage,'dispatch-prepared');assert.equal(d.responseBody,undefined);assert.equal(data.operation.evidence.counts.npc,0);assert.equal(data.world.turn,0);
@@ -194,7 +194,7 @@ test('fault records obey the shared count, byte and single-record limits through
 
 test('an oversized late reply keeps known usage, discard classification and gaps in its bounded receipt',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let release,entered;const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
- AbortSignal.timeout=ms=>originalTimeout(Math.min(ms,100));
+ AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
  global.fetch=async()=>{entered();store.onNextTraceWrite(()=>{throw Error('fixture one checkpoint failure');});await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:'x'.repeat(1100000)}}]});};let running;
  try{
   running=s.post(op);await ready;assert.equal((await running).status,502);const before=await lookup(op.operationId);release();

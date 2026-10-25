@@ -14,7 +14,7 @@ async function setup(modify = () => {}) {
   world.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
   world.characters.forEach(c => {if(c.id !== 'vera') c.control = {mode:'taken-over'};});
   modify(world); store.install(world);
-  const post = body => POST(new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'demo',...body})}));
+  const post = body => POST(new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'demo',...body})}));
   await post({operation:'set-model-key',mode:'openai',key:'fixture-key'});
   return {post,advance:{operation:'advance',minutes:15,mode:'openai',model:'gpt-6.1-sol',operationId:id()}};
 }

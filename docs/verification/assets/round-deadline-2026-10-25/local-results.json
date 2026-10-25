@@ -1,0 +1,324 @@
+{
+  "kind": "synthetic diagnostic outcomes, not product fix",
+  "controls": [
+    {
+      "case": "cumulative-body",
+      "status": 502,
+      "calls": 8,
+      "traceWrites": 49,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        12000
+      ],
+      "lastWireRemainingMs": 12000,
+      "headers": 200,
+      "failure": {
+        "kind": "timeout",
+        "stage": "response-body"
+      },
+      "failureOffset": 110000,
+      "turn": 0,
+      "outcome": "rolled-back",
+      "knownTokens": 280,
+      "unknownCalls": 1
+    },
+    {
+      "case": "cumulative-dispatch",
+      "status": 502,
+      "calls": 8,
+      "traceWrites": 48,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        12000
+      ],
+      "lastWireRemainingMs": 12000,
+      "headers": null,
+      "failure": {
+        "kind": "timeout",
+        "stage": "dispatch"
+      },
+      "failureOffset": 110000,
+      "turn": 0,
+      "outcome": "rolled-back",
+      "knownTokens": 280,
+      "unknownCalls": 1
+    },
+    {
+      "case": "fast-control",
+      "status": 200,
+      "calls": 8,
+      "traceWrites": 51,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        12000,
+        24000,
+        36000,
+        48000,
+        60000,
+        72000,
+        84000
+      ],
+      "signalOffsets": [
+        0,
+        12000,
+        24000,
+        36000,
+        48000,
+        60000,
+        72000,
+        84000
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000
+      ],
+      "lastWireRemainingMs": 25000,
+      "headers": 200,
+      "failure": null,
+      "failureOffset": null,
+      "turn": 1,
+      "outcome": "committed",
+      "knownTokens": 320,
+      "unknownCalls": 0
+    },
+    {
+      "case": "storage-pressure",
+      "status": 502,
+      "calls": 8,
+      "traceWrites": 49,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        800,
+        14800,
+        28800,
+        42800,
+        56800,
+        70800,
+        84800,
+        98800
+      ],
+      "signalOffsets": [
+        400,
+        14400,
+        28400,
+        42400,
+        56400,
+        70400,
+        84400,
+        98400
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        11600
+      ],
+      "lastWireRemainingMs": 11200,
+      "headers": 200,
+      "failure": {
+        "kind": "timeout",
+        "stage": "response-body"
+      },
+      "failureOffset": 110400,
+      "turn": 0,
+      "outcome": "rolled-back",
+      "knownTokens": 280,
+      "unknownCalls": 1
+    },
+    {
+      "case": "three-actor-control",
+      "status": 200,
+      "calls": 6,
+      "traceWrites": 39,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000
+      ],
+      "signalOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000
+      ],
+      "lastWireRemainingMs": 25000,
+      "headers": 200,
+      "failure": null,
+      "failureOffset": null,
+      "turn": 1,
+      "outcome": "committed",
+      "knownTokens": 240,
+      "unknownCalls": 0
+    },
+    {
+      "case": "single-call-control",
+      "status": 200,
+      "calls": 2,
+      "traceWrites": 15,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        14000
+      ],
+      "signalOffsets": [
+        0,
+        14000
+      ],
+      "signalBudgets": [
+        25000,
+        25000
+      ],
+      "lastWireRemainingMs": 25000,
+      "headers": 200,
+      "failure": null,
+      "failureOffset": null,
+      "turn": 1,
+      "outcome": "committed",
+      "knownTokens": 80,
+      "unknownCalls": 0
+    }
+  ],
+  "red": {
+    "case": {
+      "case": "cumulative-body",
+      "status": 502,
+      "calls": 8,
+      "traceWrites": 49,
+      "leaseObservedAtOffset": 0,
+      "leaseOffset": 120000,
+      "wireOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalOffsets": [
+        0,
+        14000,
+        28000,
+        42000,
+        56000,
+        70000,
+        84000,
+        98000
+      ],
+      "signalBudgets": [
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        25000,
+        12000
+      ],
+      "lastWireRemainingMs": 12000,
+      "headers": 200,
+      "failure": {
+        "kind": "timeout",
+        "stage": "response-body"
+      },
+      "failureOffset": 110000,
+      "turn": 0,
+      "outcome": "rolled-back",
+      "knownTokens": 280,
+      "unknownCalls": 1
+    },
+    "expectedStatus": 200,
+    "actualStatus": 502,
+    "assertion": "RED: four sequential NPC/adjudication pairs at 14s each should have a viable round budget; final body is cut short",
+    "testCount": 1,
+    "failureCount": 1,
+    "identicalRepetitions": 2,
+    "durationMs": 3865.30389
+  }
+}
