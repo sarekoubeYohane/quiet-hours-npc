@@ -1,6 +1,6 @@
 # 完整回合時間政策：Grill 決策紀錄（2026-10-25）
 
-承接 [#166](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/166) 與[診斷報告](../verification/round-deadline-diagnosis-2026-10-25.md)。本文件記錄已確認方向及尚未完成的規格工作；不是已交付修正，也不授權產品修改、部署、付費模型或正式世界推進。
+承接 [#166](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/166) 與[診斷報告](../verification/round-deadline-diagnosis-2026-10-25.md)。本文件記錄已確認設計；正式規格已依 to-spec 更新至 #166 並標記 ready-for-agent。這不是已交付修正，本輪只發布規格與文件，未修改產品、部署、呼叫付費模型或推進正式世界。
 
 ## Q1 已確認：A，接受較長但有限的完整回合等待
 
@@ -39,6 +39,8 @@
 
 ## 流程狀態
 
-Q1 已解決，不重新訪談已確認的不變條件。補充查證沒有產生新的產品或架構分岔，設計樹可收束；目前只待使用者確認上述整體理解，尚未發布 ready-for-agent 規格。確認後直接以 to-spec 更新 #166，維持一個可驗收的垂直切片；不建立重複 Issue。具體秒數、延遲測試及舊 client 相容機制由工程定稿，不再要求使用者猜測實作細節。
+2026-10-25，使用者在整體設計摘要後要求「to spec」，確認收束並進入規格發布。#166 已依 to-spec 整理問題、方案、18 則使用者故事、實作決策與9組驗收條件，標記 ready-for-agent；維持一個可驗收的垂直切片，沒有新增重複 Issue 或子票。最高層世界 API → transport 替身 → 真實序列化／測試 SQLite → 原 ID 查詢及重送沿使用者既有指定；具體秒數、延遲測試及舊 client 相容機制由工程在規格界線內定稿，不再要求使用者猜測實作細節。
+
+此設計對原期限政策的修訂記入 [ADR 0004](../adr/0004-operation-evidence-stays-outside-story.md#166完整回合採有界時間預算)。沒有新增領域用語，GLOSSARY 不放入工程計時常數。設計已確認與實作通過分開：目前 RED 尚未因產品修正轉綠。
 
 #85 的泡茶 loop 仍需技術修正後另行授權的有限正式行為觀察；本次設計決定、本地替身及期限診斷都不代表行為通過。
