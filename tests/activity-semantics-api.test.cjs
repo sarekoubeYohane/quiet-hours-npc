@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
@@ -16,7 +17,7 @@ test('chosen open-ended period survives reload and expires without another decis
  const s=await setup(()=>rest);try{
  const first={operation:'advance',minutes:15,operationId:operationId()};const response=await s.post(first);assert.equal(response.status,200,await response.clone().text());let w=await s.read();const start=w.characters[0].plan.startedAt;assert.equal(w.characters[0].plan.until,start+30);assert.equal(w.characters[0].plan.timeIntent.kind,'open-ended');assert.deepEqual(s.counts(),{npc:1,judgments:0});
  await s.post(first);assert.deepEqual(s.counts(),{npc:1,judgments:0});
- assert.equal((await s.post({operation:'advance',minutes:15})).status,200);w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,/時段.*到期/);assert.deepEqual(s.counts(),{npc:1,judgments:0});assert.equal(w.objects,undefined);
+ assert.equal((await s.post({operation:'advance',minutes:15})).status,200);w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,/時段.*到期/);assert.deepEqual(s.counts(),{npc:1,judgments:0});assert.deepEqual(nonPhoneObjects(w),[]);
  assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.deepEqual(s.counts(),{npc:2,judgments:0});assert.equal(s.inputs[1].currentActivity,null);
  }finally{s.restore();}
 });
@@ -25,8 +26,8 @@ const goal={type:'propose',target:'meal',content:'把這份準備中的餐點做
 const meal=w=>{w.supplies=[{id:'meal',label:'這份準備中的餐點',region:'cafe-front',remaining:1,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];};
 test('explicit completion goal uses world time forty-five rather than estimated fifteen and saves its real result at completion',async()=>{
  const s=await setup(()=>goal,(input,request)=>{assert.equal(input.timeIntent.kind,'completion');assert.ok(request.response_format.json_schema.schema.required.includes('completionMinutes'));return {status:'accepted',effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes:45};},meal);try{
- const first={operation:'advance',minutes:15,operationId:operationId()};let response=await s.post(first);assert.equal(response.status,200,await response.clone().text());let w=await s.read();const plan=w.characters[0].plan;assert.equal(plan.until-plan.startedAt,45);assert.equal(plan.timeIntent.kind,'completion');assert.equal(w.objects,undefined);assert.equal(w.supplies[0].remaining,1);
- await s.post(first);assert.deepEqual(s.counts(),{npc:1,judgments:1});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects,undefined);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.equal(w.objects[0].id,'meal:1');assert.equal(w.supplies[0].remaining,0);assert.deepEqual(s.counts(),{npc:1,judgments:1});assert.equal(w.aiUsage.totalCalls,2);
+ const first={operation:'advance',minutes:15,operationId:operationId()};let response=await s.post(first);assert.equal(response.status,200,await response.clone().text());let w=await s.read();const plan=w.characters[0].plan;assert.equal(plan.until-plan.startedAt,45);assert.equal(plan.timeIntent.kind,'completion');assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies[0].remaining,1);
+ await s.post(first);assert.deepEqual(s.counts(),{npc:1,judgments:1});await s.post({operation:'advance',minutes:15});w=await s.read();assert.deepEqual(nonPhoneObjects(w),[]);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.equal(nonPhoneObjects(w)[0].id,'meal:1');assert.equal(w.supplies[0].remaining,0);assert.deepEqual(s.counts(),{npc:1,judgments:1});assert.equal(w.aiUsage.totalCalls,2);
  }finally{s.restore();}
 });
 test('the same supported work action distinguishes an open-ended period from a program-confirmed completion',async()=>{
@@ -36,14 +37,14 @@ test('the same supported work action distinguishes an open-ended period from a p
 });
 test('unsupported open-ended world methods and unrepresented resting goals do not fabricate completed results or call an estimator',async()=>{
  for(const decision of [{...goal,timeIntent:{kind:'open-ended',maxMinutes:null},durationMinutes:30},{...rest,timeIntent:{kind:'completion',maxMinutes:null},content:'休息到完全康復'}]){
-  const s=await setup(()=>decision,undefined,meal);try{const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,200,await response.clone().text());const w=await s.read();assert.equal(w.objects,undefined);assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,/無法落實|不支援/);assert.deepEqual(s.counts(),{npc:1,judgments:0});}finally{s.restore();}
+  const s=await setup(()=>decision,undefined,meal);try{const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,200,await response.clone().text());const w=await s.read();assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.characters[0].plan,undefined);assert.match(w.characters[0].activity,/無法落實|不支援/);assert.deepEqual(s.counts(),{npc:1,judgments:0});}finally{s.restore();}
  }
 });
 test('generic completion cap compares aligned world time before execution and rejects invalid effects rather than hiding them',async()=>{
  let decision={...goal,timeIntent:{kind:'completion',maxMinutes:20}};
  const s=await setup(()=>decision,()=>({status:'accepted',effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes:20}),meal);try{
- const first={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(first)).status,200);let w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.equal(w.objects,undefined);assert.equal(w.supplies[0].remaining,1);assert.match(w.characters[0].activity,/30.*20/);await s.post(first);assert.deepEqual(s.counts(),{npc:1,judgments:1});
- decision={...goal,timeIntent:{kind:'completion',maxMinutes:30}};await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan.until-w.characters[0].plan.startedAt,30);assert.equal(w.objects,undefined);await s.post({operation:'advance',minutes:15});assert.equal((await s.read()).objects[0].id,'meal:1');assert.deepEqual(s.counts(),{npc:2,judgments:2});
+ const first={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(first)).status,200);let w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies[0].remaining,1);assert.match(w.characters[0].activity,/30.*20/);await s.post(first);assert.deepEqual(s.counts(),{npc:1,judgments:1});
+ decision={...goal,timeIntent:{kind:'completion',maxMinutes:30}};await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.characters[0].plan.until-w.characters[0].plan.startedAt,30);assert.deepEqual(nonPhoneObjects(w),[]);await s.post({operation:'advance',minutes:15});assert.equal(nonPhoneObjects(await s.read())[0].id,'meal:1');assert.deepEqual(s.counts(),{npc:2,judgments:2});
  }finally{s.restore();}
  const invalid=await setup(()=>({...goal,timeIntent:{kind:'completion',maxMinutes:5}}),()=>({status:'accepted',effects:[{kind:'materialize',supplyId:'unknown',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes:30}),meal);try{assert.equal((await invalid.post({operation:'advance',minutes:15})).status,502);const w=await invalid.read();assert.equal(w.turn,0);assert.equal(w.objects,undefined);assert.equal(w.aiUsage.totalCalls,2);}finally{invalid.restore();}
 });
@@ -55,7 +56,7 @@ test('illegal generic completion times and mismatched final stage reject atomica
 });
 test('a failed completion save preserves the original plan for a later retry without a second model dispatch',async()=>{
  const s=await setup(()=>goal,()=>({status:'accepted',effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes:30}),meal);try{
- await s.post({operation:'advance',minutes:15});const before=await s.read();store.conflictOnNextSave();const body={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(body)).status,502);let w=await s.read();assert.deepEqual(w.characters[0].plan,before.characters[0].plan);assert.equal(w.objects,undefined);await s.post(body);assert.deepEqual(s.counts(),{npc:1,judgments:1});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects[0].id,'meal:1');assert.equal(w.characters[0].plan,undefined);assert.deepEqual(s.counts(),{npc:1,judgments:1});
+ await s.post({operation:'advance',minutes:15});const before=await s.read();store.conflictOnNextSave();const body={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(body)).status,502);let w=await s.read();assert.deepEqual(w.characters[0].plan,before.characters[0].plan);assert.deepEqual(nonPhoneObjects(w),[]);await s.post(body);assert.deepEqual(s.counts(),{npc:1,judgments:1});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(nonPhoneObjects(w)[0].id,'meal:1');assert.equal(w.characters[0].plan,undefined);assert.deepEqual(s.counts(),{npc:1,judgments:1});
  }finally{s.restore();}
 });
 test('program-confirmed operation cap blocks before its visible result and open-ended fifteen never loops inside a slot',async()=>{

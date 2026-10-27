@@ -1,4 +1,4 @@
-import { applyPhoneAction, phoneForActor } from './phones';
+import { applyPhoneAction, phoneForActor, deliverPhoneMessage } from './phones';
 import { arrangementsForDecision } from './arrangements';
 import { pausedProjection } from './paused-activities';
 import { preferencesForDecision } from './preferences';
@@ -8,7 +8,7 @@ import type { RoutineRule, RoutinePlace } from './routine-rules';
 import { knownWorldObjects, knownWorldSupplies, type SceneSupply, type WorldObject, type ActivityPhase } from './world-effects';
 import type { CostLedger, ModelPrice } from './costs';
 import { cognitiveProjection, type CognitiveState } from './cognition';
-import { memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
+import { MemoryValidationError, memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
 import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
 import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
@@ -114,7 +114,7 @@ c.activity='向 '+target.name+' 提出請求。';
 text=c.name+' 對 '+target.name+' 說：「'+content+'」'+effects[resolution.outcome];
 audience=witnesses;
 }
-else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
+else if(a.type==='message'){if(!target||target.id===c.id||!content)throw new MemoryValidationError('收訊人無效，訊息尚未傳送。');deliverPhoneMessage(w,c,target,content,!!options.dryRun);if(options.dryRun)return;audience=[c.id];c.activity=`傳了一則訊息給 ${target.name} 的手機。`;text=`${c.name} 已向 ${target.name} 的手機傳送一則私人訊息。`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
 if(a.target==='tea')throw Error('泡茶需要已驗證的物件效果，不能只用確定動作宣稱完成。');
@@ -163,7 +163,7 @@ else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return
 else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
-  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution);
+  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:undefined);
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){

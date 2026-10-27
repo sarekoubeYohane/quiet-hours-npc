@@ -12,7 +12,7 @@ export function traceActorSnapshot(actor:Character) {
 // Observer-only snapshots never become World fields or prompt inputs. Each is
 // frozen at the dispatch boundary, including relevant facts that did not change.
 export function traceWorldSnapshot(world: World) {
-  return structuredClone({minute:world.minute,turn:world.turn,objects:world.objects||[],supplies:world.supplies||[],
+  return structuredClone({minute:world.minute,turn:world.turn,phones:world.phones,objects:world.objects||[],supplies:world.supplies||[],
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
     actors:world.characters.map(traceActorSnapshot)});
 }

@@ -169,7 +169,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   const privateEvent = ['reflect', 'message', 'intervention', 'blocked', 'observe'].includes(event.kind) || event.scene?.target === 'observer';
   if (event.kind === 'continue') return;
   if (privateEvent || !event.scene) {
-    for (const character of world.characters) if (event.audience.includes(character.id)&&(!isSleeping(character)||event.actor===character.id)) remember(world, character, event.text, event);
+    for (const character of world.characters) if (event.audience.includes(character.id)&&(!isSleeping(character)||event.actor===character.id)) remember(world, character, character.id===event.actor?actorExperience??event.text:event.text, event);
     return;
   }
   for(const change of event.scene.externalChanges||[])if(change.target.type==='body'&&change.movement)world.currentSensory!.presence[change.target.id]={region:change.movement.toRegion,clue:event.id};

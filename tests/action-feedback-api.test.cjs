@@ -55,6 +55,8 @@ test('identical known histories produce identical feedback when only hidden stoc
  const outputs=[];
  for(const variant of [0,1]){
   const s=await scenario({reply:{...denied,explanation:{summary:'PRIVATE-REASON-'+variant,facts:[]}},decision:{...proposal,target:'cup-a'},modify:w=>{
+   // Equivalent histories include the same known handset identity; new activation must not add unrelated UUID variance.
+   w.objects.push({...vessel('feedback-phone'),kind:'phone',holder:'owner',state:{condition:'sound'}});
    w.objects.find(o=>o.id==='cup-a').state.hidden='PRIVATE-STATE-'+variant;w.objects.find(o=>o.id==='cup-a').stateExposure={hidden:'hidden'};
    w.supplies=[{id:'supply',label:'有限茶葉',region:'cafe-front',kind:'food',initialState:{},remaining:variant,owner:'owner',knownTo:['owner'],allowedTo:variant?['owner']:['PRIVATE-LIST']}];
   }});
@@ -67,6 +69,8 @@ test('free routine reuse retains known broken utensil context while private supp
  const values=[];
  for(const variant of [0,1]){
   const s=await scenario({decision:{...proposal,type:'work',target:'tea',content:'泡茶',purpose:'泡茶',durationMinutes:15},modify:w=>{
+   // Keep this public device identical while varying only hidden supply/grant facts.
+   w.objects.push({...vessel('feedback-phone'),kind:'phone',holder:'owner',state:{condition:'sound'}});
    w.routineRules=[{id:'known-tea',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner']}];
    const cup=w.objects.find(o=>o.id==='cup-a');cup.state.condition='broken';cup.stateTransitions.condition=['broken','sound'];
    w.objects=w.objects.filter(o=>o.id!=='cup-b');cup.owner='private-owner';cup.allowedTo=variant?['owner']:['private-list'];

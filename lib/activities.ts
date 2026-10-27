@@ -1,3 +1,5 @@
+import { normalDecisionInput } from './npc-input';
+import { acknowledgeArrangementCues, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
 import { activatePhones } from './phones';
 import { managePausedActivity } from './paused-activities';
 import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bodyIntervalBase, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
@@ -14,7 +16,7 @@ import { demoDecision, pendingInterventions, record, type Action, type AIUsage, 
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
-export type ActivityDecision = { arrangements?:import('./arrangements').ArrangementState; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -27,7 +29,7 @@ export function budgetReached(usage: AIUsage, limits: BudgetLimits): boolean {
   return (limits.calls !== null && usage.calls >= limits.calls) ||
     (limits.tokens !== null && usage.inputTokens + usage.outputTokens >= limits.tokens);
 }
-const attentionKinds = new Set(['message', 'intervention']);
+const attentionKinds = new Set(['intervention']);
 
 export class BudgetExceeded extends Error {
   constructor() { super('已達玩家 AI 用量上限。自動運行已暫停；可調整上限或切換規則試玩。'); }
@@ -53,7 +55,7 @@ export function attentionMarker(world: World, character: Character): string {
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
   if(character.plan?.bodyActivity?.kind==='sleep')return isSleeping(character);
   return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
-    pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character);
+    pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character) && (!character.arrangements?.items.some(item=>item.status==='active')||normalDecisionInput(world,character,modelKey).self.arrangementCues.length===0);
 }
 
 function mayChooseAutonomously(character: Character): boolean {
@@ -115,6 +117,7 @@ export async function advanceActivities(world: World, options: {
       character.activity = '待命，等待下一個指定行動。';
       continue;
     }
+    if(character.arrangements?.items.some(item=>item.status==='active'))refreshArrangementCues(world,character,normalDecisionInput(world,character,modelKey));
     if (!controlledDecision && canContinue(world, character, modelKey)) {
       progressActivity(world,character,'automatic');
       if (ai) usage.savedDecisions++;
@@ -153,6 +156,7 @@ export async function advanceActivities(world: World, options: {
     if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
     if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
     if (decision.arrangements) character.arrangements = decision.arrangements;
+    acknowledgeArrangementCues(character,decision.arrangementCueReceipts,world.minute);
     if (decision.preferences) character.preferences = decision.preferences;
     consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;

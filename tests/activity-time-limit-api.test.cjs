@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
@@ -13,9 +14,9 @@ async function scenario(minutes=30,maxMinutes=15,options={}){
 }
 test('explicit limit stops before execution but persists approval; next autonomous choice reloads and reuses it',async()=>{
  const s=await scenario();try{
-  const op={operation:'advance',minutes:15,operationId:id()};let r=await s.post(op);assert.equal(r.status,200,await r.clone().text());let w=await s.read(),owner=w.characters.find(c=>c.id==='owner');assert.equal(w.turn,1);assert.equal(owner.plan,undefined);assert.equal(w.objects,undefined);assert.equal(w.supplies,undefined);assert.equal(w.routineRules[0].templates.find(t=>t.operation==='tea').result.minutes,30);assert.ok(w.routinePlaces[0].confirmedOperations.includes('tea'));assert.match(owner.activity,/30/);assert.match(owner.activity,/15/);assert.match(owner.activity,/尚未啟動/);assert.deepEqual(s.counts(),{npc:1,judgments:1});
+  const op={operation:'advance',minutes:15,operationId:id()};let r=await s.post(op);assert.equal(r.status,200,await r.clone().text());let w=await s.read(),owner=w.characters.find(c=>c.id==='owner');assert.equal(w.turn,1);assert.equal(owner.plan,undefined);assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies,undefined);assert.equal(w.routineRules[0].templates.find(t=>t.operation==='tea').result.minutes,30);assert.ok(w.routinePlaces[0].confirmedOperations.includes('tea'));assert.match(owner.activity,/30/);assert.match(owner.activity,/15/);assert.match(owner.activity,/尚未啟動/);assert.deepEqual(s.counts(),{npc:1,judgments:1});
   await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});
-  s.choose({timeIntent:{kind:'completion',maxMinutes:30}});r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());w=await s.read();assert.equal(w.characters.find(c=>c.id==='owner').plan.until-w.characters.find(c=>c.id==='owner').plan.startedAt,30);assert.equal(w.objects[0].state.contents,'water');assert.match(JSON.stringify(s.inputs[1].self),/尚未啟動/);assert.deepEqual(s.counts(),{npc:2,judgments:1});
+  s.choose({timeIntent:{kind:'completion',maxMinutes:30}});r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());w=await s.read();assert.equal(w.characters.find(c=>c.id==='owner').plan.until-w.characters.find(c=>c.id==='owner').plan.startedAt,30);assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.match(JSON.stringify(s.inputs[1].self),/尚未啟動/);assert.deepEqual(s.counts(),{npc:2,judgments:1});
   await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects.filter(o=>o.state.beverage==='tea').length,1);assert.equal(w.aiUsage.totalCalls,3);assert.equal(w.routineRules.length,1);
  }finally{s.restore();}
 });
@@ -23,7 +24,7 @@ test('aligned completion is compared against the unchanged explicit cap and repe
  for(const [reasonable,cap,starts] of [[20,20,false],[20,30,true],[5,15,true],[30,null,true]]){
   const s=await scenario(reasonable,cap);try{
    assert.equal((await s.post({operation:'advance',minutes:15})).status,200);let w=await s.read();assert.equal(w.routineRules[0].templates.find(t=>t.operation==='tea').result.minutes,reasonable===5?15:30);
-   if(!starts){assert.equal(w.objects,undefined);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.match(w.characters.find(c=>c.id==='owner').activity,/20/);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects,undefined);assert.deepEqual(s.counts(),{npc:2,judgments:1});}
+   if(!starts){assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.match(w.characters.find(c=>c.id==='owner').activity,/20/);await s.post({operation:'advance',minutes:15});w=await s.read();assert.deepEqual(nonPhoneObjects(w),[]);assert.deepEqual(s.counts(),{npc:2,judgments:1});}
    else{assert.ok(w.objects?.length);assert.doesNotMatch(w.characters.find(c=>c.id==='owner').activity,/上限/);}
   }finally{s.restore();}
  }

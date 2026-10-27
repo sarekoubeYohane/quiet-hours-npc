@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const fixture=require('./fixtures/life-loop.cjs');
@@ -68,8 +69,8 @@ test('the same thirst pressure accepts drinking water, preparing tea, socializin
 test('reconfirmation probes a legacy background tea method without committing its pending supplies or objects',async()=>{
  const s=await scenario(false,w=>{delete owner(w).needs;w.objects=[];delete w.supplies;w.routineRules=[{id:'old-background-tea',version:1,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['tea'],templates:[{operation:'tea',verbs:['泡'],subjects:['茶'],purposes:['飲用'],result:{kind:'brew',contents:'tea',minutes:30}}]}];});try{
   s.transport.judge(()=>({status:'unsupported',effects:[],stages:[],check:null,routine:null,completionMinutes:null}));const proposal=fixture.choose('propose',{target:'cafe',content:'泡茶',purpose:'飲用',durationMinutes:30,reconfirmBodyConsequences:true});s.transport.choose(proposal);
-  let w=await s.advance();assert.deepEqual(w.objects,[]);assert.equal(w.supplies,undefined);assert.equal(s.transport.counts().adjudication,1);assert.equal(w.bodyReconfirmation.attempts.length,1);
-  w=await s.advance();assert.deepEqual(w.objects,[]);assert.equal(w.supplies,undefined);assert.equal(s.transport.counts().adjudication,1);
-  s.transport.choose({...proposal,reconfirmBodyConsequences:false});w=await s.advance();assert.equal(w.objects.length,1);assert.equal(w.objects[0].state.contents,'water');assert.ok(w.supplies.some(supply=>supply.pending));assert.equal(s.transport.counts().adjudication,1);
+  let w=await s.advance();assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies,undefined);assert.equal(s.transport.counts().adjudication,1);assert.equal(w.bodyReconfirmation.attempts.length,1);
+  w=await s.advance();assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies,undefined);assert.equal(s.transport.counts().adjudication,1);
+  s.transport.choose({...proposal,reconfirmBodyConsequences:false});w=await s.advance();assert.equal(nonPhoneObjects(w).length,1);assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.ok(w.supplies.some(supply=>supply.pending));assert.equal(s.transport.counts().adjudication,1);
  }finally{s.restore();}
 });
