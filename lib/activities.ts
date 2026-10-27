@@ -1,3 +1,4 @@
+import { activateBodyNeeds, advanceBodyNeeds, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
 import { advanceNaturalChanges } from './natural-changes';
 import { emitExternalConsequences } from './world-effects';
 import { requiresWorldEffects, type EffectCandidate } from './world-effects';
@@ -49,7 +50,7 @@ export function attentionMarker(world: World, character: Character): string {
 
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
   return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
-    pendingInterventions(world, character).length === 0;
+    pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character);
 }
 
 function mayChooseAutonomously(character: Character): boolean {
@@ -57,7 +58,8 @@ function mayChooseAutonomously(character: Character): boolean {
 }
 
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
-  const next = { ...world, minute: world.minute + minutes };
+  const next = structuredClone(world);
+  activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
   return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
 }
 
@@ -80,8 +82,10 @@ export async function advanceActivities(world: World, options: {
   if (ai) {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
+  activateBodyNeeds(world);
   world.minute += minutes; world.lastMode = mode;
   advanceNaturalChanges(world,world.minute,emitExternalConsequences);
+  advanceBodyNeeds(world);
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
@@ -134,6 +138,7 @@ export async function advanceActivities(world: World, options: {
     if((controlledDecision||!ai)&&requiresWorldEffects(decision.action)){
       decision.freeCandidate=bindRoutine(world,character,decision.action,decision.durationMinutes,undefined,minutes,decision.timeIntent?.maxMinutes)??{status:'unsupported',effects:[],stages:[],check:null};
     }
+    acknowledgeBodyNeeds(character);
     character.observationCursor = observedCount;
     if (decision.longTerm) character.longTerm = decision.longTerm;
     if (decision.shortTerm) character.shortTerm = decision.shortTerm;

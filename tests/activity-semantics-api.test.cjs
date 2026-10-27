@@ -48,7 +48,7 @@ test('generic completion cap compares aligned world time before execution and re
  const invalid=await setup(()=>({...goal,timeIntent:{kind:'completion',maxMinutes:5}}),()=>({status:'accepted',effects:[{kind:'materialize',supplyId:'unknown',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes:30}),meal);try{assert.equal((await invalid.post({operation:'advance',minutes:15})).status,502);const w=await invalid.read();assert.equal(w.turn,0);assert.equal(w.objects,undefined);assert.equal(w.aiUsage.totalCalls,2);}finally{invalid.restore();}
 });
 test('illegal generic completion times and mismatched final stage reject atomically and replay without another dispatch',async()=>{
- for(const completionMinutes of [0,-1,91,1e300,null,'30']){
+ for(const completionMinutes of [0,-1,1441,1e300,null,'30']){
   const s=await setup(()=>goal,()=>({status:'accepted',effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}],stages:[],check:null,routine:null,completionMinutes}),meal);try{const body={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(body)).status,502);const w=await s.read();assert.equal(w.turn,0);assert.equal(w.objects,undefined);assert.equal(w.supplies[0].remaining,1);await s.post(body);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
  }
  const s=await setup(()=>goal,()=>({status:'accepted',effects:[],stages:[{afterMinutes:15,preconditions:[],effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}]}],check:null,routine:null,completionMinutes:45}),meal);try{assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal((await s.read()).objects,undefined);}finally{s.restore();}

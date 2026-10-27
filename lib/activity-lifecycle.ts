@@ -1,3 +1,4 @@
+import { adjudicationLimits } from './adjudication-limits';
 import { invalidateNaturalChanges } from './natural-changes';
 import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
@@ -6,7 +7,7 @@ import type { ActivityDecision } from './activities';
 
 // This module mutates only the current round candidate. Model dispatch, NPC
 // choices, usage accounting and the whole-round persistence remain outside.
-export const activityDurations = [15, 30, 45, 60, 75, 90];
+export const activityDurations = [...adjudicationLimits.phaseMinutes];
 export const sustainedActions = new Set(['propose', 'rest', 'work', 'reflect', 'observe']);
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;

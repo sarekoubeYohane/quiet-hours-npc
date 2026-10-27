@@ -25,7 +25,7 @@ test('confirmed times fifteen, five and twenty align without treating a longer e
  }
 });
 test('missing scope times and illegal completion times fail atomically with paid usage and safe replay',async()=>{
- for(const value of [0,-1,91,null,'30',undefined]){
+ for(const value of [0,-1,1441,null,'30',undefined]){
   const s=await scenario(value);try{const operation={operation:'advance',minutes:15,operationId:id()};const r=await s.post(operation);assert.equal(r.status,502);const w=await s.read();assert.equal(w.turn,0);assert.equal(w.routineRules,undefined);assert.equal(w.objects,undefined);assert.equal(w.supplies,undefined);assert.equal(w.aiUsage.totalCalls,2);await s.post(operation);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
  }
 });

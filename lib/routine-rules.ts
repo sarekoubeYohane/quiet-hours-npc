@@ -1,3 +1,4 @@
+import { adjudicationLimits } from './adjudication-limits';
 import { bindWorldRoutine } from './routine-world-programs';
 import type { RoutineWorldProgram } from './routine-world-contract';
 import { bindRoutineProgram } from './routine-programs';
@@ -44,7 +45,7 @@ function validTemplate(t:RoutineTemplate):boolean {
  const slots=(xs:unknown,max:number)=>Array.isArray(xs)&&xs.length>0&&xs.length<=16&&xs.every(x=>typeof x==='string'&&x.length>0&&x.length<=max);
  if(!slots(t.verbs,24)||!slots(t.subjects,40)||!slots(t.purposes,60))return false;
  const kinds:Record<RoutineOperation,RoutineTemplate['result']['kind']>={tea:'brew',coffee:'brew',food:'serve',drink:'consume',wash:'clean',return:'release'};
- if(kinds[t.operation]!==t.result.kind||!Number.isSafeInteger(t.result.minutes)||t.result.minutes<15||t.result.minutes>90||t.result.minutes%15!==0)return false;
+ if(kinds[t.operation]!==t.result.kind||!Number.isSafeInteger(t.result.minutes)||t.result.minutes<15||t.result.minutes>adjudicationLimits.maxMinutes||t.result.minutes%15!==0)return false;
  if(t.result.kind==='brew')return (t.result.contents==='tea'||t.result.contents==='coffee');
  return (t.result.kind==='clean'?t.result.contents==='empty':t.result.contents===undefined);
 }
