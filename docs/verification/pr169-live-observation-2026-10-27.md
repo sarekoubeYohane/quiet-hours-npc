@@ -8,15 +8,17 @@
 
 接續 [10/26 無有效 Key 的預檢停止報告 PR #170](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/170)。使用者表示已加 Key 並要求再試，沿原授權繼續，沒有擴大付費上限。
 
-- 最新 main 仍為 `e445cfd4beda2dca6ad1085b65923ebf838ba0a3`，即 [PR #169](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/169) merge commit。正式站 UI 與 `/api/environment` 直接核對 production `e445cfd`、builtAt=`2026-10-25T06:59:50.744Z`（台北 10/25 14:59）；不是只看 GitHub 已合併。
+- 預檢時 main 為 `e445cfd4beda2dca6ad1085b65923ebf838ba0a3`，即 [PR #169](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/169) merge commit。正式站 UI 與 `/api/environment` 直接核對 production `e445cfd`、builtAt=`2026-10-25T06:59:50.744Z`（台北 10/25 14:59）；不是只看 GitHub 已合併。
 - 沿前輪已讀 AGENTS、Matt Pocock、GLOSSARY、ADR 0001–0005、[#166](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/166)、[#168](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/168)、#169 內容與留言；本輪再次核對 main、AGENTS、diagnosing-bugs／pr 原文。工程依據為[時間政策](../design/round-time-budget.md)、[操作／私有實錄契約](../design/operation-evidence.md)、[隔離場景](../design/minimal-acceptance-scene.md)及[操作恢復流程](operation-evidence-live-runbook.md)。本輪為受限正式觀察，不進入修改產品或注入故障的診斷階段。
-- 歷史對照：[10/24 報告](pr162-live-observation-2026-10-24.md)、[#165 固定版報告](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/067ee67d1c05be5f35ae1e608a151b624e2b439e/docs/verification/loop-followup-2026-10-25.md)、[截止診斷](round-deadline-diagnosis-2026-10-25.md)及[#168 本地驗證](round-time-budget-168-2026-10-25.md)。#165 文件不在 main，沿先前已取得的固定提交讀取結果，不把缺檔當作無歷史。
+- 歷史對照：[10/24 報告](pr162-live-observation-2026-10-24.md)、[#165 固定版報告](https://github.com/sarekoubeYohane/quiet-hours-npc/blob/067ee67d1c05be5f35ae1e608a151b624e2b439e/docs/verification/loop-followup-2026-10-25.md)、[截止診斷](round-deadline-diagnosis-2026-10-25.md)及[#168 本地驗證](round-time-budget-168-2026-10-25.md)。#165 文件在預檢時的 main 尚不存在，沿先前已取得的固定提交讀取結果，不把缺檔當作無歷史。
 - 起點 version 331、minute 750（D1 12:30）、turn 2，`daily-life-v1`、四角色在前台。與 10/26 私人終點排除 aiUsage 後完整故事深度相等；原日常世界仍暫存，沒有進出／重建／重置。API 不暴露暫存原世界，本輪沒有匯出或還原它。
 - 原 ID `1792903190773:9d9c6634-d693-4389-b32d-3a483aff124d` GET 為 settled／保存的 HTTP 502／rolled-back。沒有 pending／uncertain 待恢復；沒有重送這個舊操作。UI 自動運行為「開始自動」，沒有進行中回合，之後全程手動。未讀 DB 鎖列，不宣稱排除所有外部裝置的操作者。
 - OpenAI `configured=true`，有未到期 Key，儲存服務可用；只讀狀態，不讀憑證。新分頁原為規則試玩，為執行本次已授權真實測試，沿正常 UI 恢復原 OpenAI 直連；模型選項仍為 GPT-6 Luna，裁定仍為 OpenAI／gpt-6.1-sol。24 筆實際 request 再核對 NPC=gpt-6-luna、裁定=gpt-6.1-sol，沒有換模型。
 - 回想 `enabled=false`，與原隔離場景一致；每輪最多 4 NPC＋4 裁定。預算仍每小時 240 calls／5,000,000 tokens，起點本小時用量 0，沒有調高。新載入前端版本為 e445cfd；首輪實錄的 `round-v1`／clientMs=445000 與受理成功支持新版政策已接通，但未另捕獲 request header 或刻意等待到 445 秒。
 
 付費前先私人保存當前世界與原操作實錄。整批限制仍為最多 4 advance／32 派送／已知 500,000 tokens／首次付費起 30 分鐘。沿歷史預檢的 **250,000 tokens 作下一完整回合保守開輪餘量**；這是成本停止判斷，不是 provider 硬上限或精確預約。第 2 輪前餘 391,964，第 3 輪前餘 279,671，均可開輪；第 3 輪後餘 164,490，不開第 4 輪。
+
+交付時另發現 main 已前進至 `850d736b45b7d7af22a5e11d82e0384fab07be4e`，包含使用者合併的 #165／#170／#167。GitHub compare 相對預檢基準只有新增兩份歷史報告，無產品程式差異；三輪私有實錄仍逐筆標示實際執行部署 e445cfd，不把後來的 main 當成本輪已測版本。本輪沒有代為合併或部署。
 
 ## 三次操作與原子提交
 
