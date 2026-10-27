@@ -1,7 +1,7 @@
 import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
 import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
 import { normalDecisionInput } from './npc-input';
-import { acknowledgeArrangementCues, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
+import { acknowledgeArrangementCues, initializeKnownConditionOrder, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
 import { activatePhones } from './phones';
 import { managePausedActivity } from './paused-activities';
 import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bodyIntervalBase, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
@@ -69,7 +69,7 @@ function mayChooseAutonomously(character: Character): boolean {
 
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = structuredClone(world);
-  activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
+  initializeKnownConditionOrder(next);activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
   const potentialReminder=hasDueCalendarReminder(next);
   return next.characters.filter(character => mayChooseAutonomously(character) && (!canContinue(next, character, modelKey)||potentialReminder&&!isSleeping(character))).length;
 }
@@ -94,6 +94,7 @@ export async function advanceActivities(world: World, options: {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
   activatePhones(world);
+  initializeKnownConditionOrder(world);
   activateBodyNeeds(world);
   const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
   const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));

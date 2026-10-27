@@ -59,6 +59,8 @@ T5 的提交不明特別模擬「寫入已成功，但 save 回覆及第一次 j
 | A29 UI／證據鏈 | 同旅程 Chromium 的真 WorldApp／API／SQLite 五張畫面、重載／重送與 owner 私有 trace result.phones；觀察者面板不代讀。 |
 | A30 交付界線 | 本表、ADR0008、工程入口、相容回退及有限驗收交接；各切片及本票 fixture／瀏覽器與真實模型限制分開。最終兩軸 code-review／完整回歸由整合 PR 收尾記錄。 |
 
+最終獨立審查另補 [review API 反例](../../tests/flexible-life-review-api.test.cjs)：A9 的真實已知離開／返回落在同一角色兩次 slot 之間，內在 cue 與手機提醒皆再次喚起且不重播；A4／A9 同分鐘多人線索在合法 forget 與短期 FIFO 後不重播，但同分鐘稍後的新線索仍喚起，內部序號不進模型／Embedding（另見 recall API）；A1／A15 的條件欄位換序可合法 complete／drop／archive，實質改動仍拒絕；A16 的原始私訊前後空白及換行精確保存於裝置與發訊人經歷。三個初始反例均先 RED 再 GREEN，見 [審查修正證據](flexible-life-review-fixes.md)。
+
 ## 真 Chromium 的同一旅程
 
 [瀏覽器 runner](../../tooling/verification/browser-flexible-life-integration.mjs) 與 T1 使用相同純外部 transport fixture 及旅程，但所有活動／提醒／閱讀／保存均走真正應用。

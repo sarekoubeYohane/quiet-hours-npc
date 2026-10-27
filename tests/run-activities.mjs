@@ -81,7 +81,7 @@ try {
 
   allTests.push('tests/phone-memos-api.test.cjs','tests/phone-inbox-api.test.cjs','tests/arrangements-api.test.cjs','tests/arrangement-cues-api.test.cjs');
   allTests.push('tests/phone-notifications-api.test.cjs');
-  allTests.push('tests/phone-calendar-api.test.cjs');
+  allTests.push('tests/phone-calendar-api.test.cjs','tests/flexible-life-review-api.test.cjs');
   allTests.push('tests/flexible-life-integration-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
