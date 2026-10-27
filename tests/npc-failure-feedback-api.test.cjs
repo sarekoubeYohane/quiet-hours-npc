@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test = require('node:test');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name + '.cjs'));
@@ -95,7 +96,7 @@ test('unsupported tea feedback preserves the distinction and changes no proposal
     assert.match(next.self.activity, /由自己決定/);
     assert.match(JSON.stringify(next.self), /借用需要店主自己同意/);
     assert.doesNotMatch(next.self.activity, /沒有杯子|店主拒絕|無權使用|沒有茶包/);
-    assert.deepEqual((await read()).objects, before.objects);
+    assert.deepEqual(nonPhoneObjects(await read()), nonPhoneObjects(before));
     const attempts = s.adjudications.filter(input => input.actor.id === 'vera');
     assert.equal(attempts.length, 2);
     assert.equal(attempts[1].action.content, attempts[0].action.content);

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test = require('node:test');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name + '.cjs'));
@@ -80,7 +81,7 @@ test('tea has no success fallback when the cup is absent, budget is exhausted, o
     try {
       const response = await post(advance), result = await response.json();
       assert.equal(response.status,variant==='missing'?200:variant==='budget'?429:502);
-      const saved = await read(); assert.deepEqual(saved.objects,before.objects);
+      const saved = await read(); if(variant==='missing')assert.deepEqual(nonPhoneObjects(saved),nonPhoneObjects(before));else assert.deepEqual(saved.objects,before.objects);
       assert.doesNotMatch(JSON.stringify(saved.events),/泡了一壺茶/);
       if(variant!=='missing') {assert.equal(saved.turn,before.turn);assert.equal(saved.minute,before.minute);}
       if(variant==='invalid') {assert.equal(result.stopReason.code,'candidate_contract'); assert.equal(result.adjudicationFailure.actorId,'vera');}

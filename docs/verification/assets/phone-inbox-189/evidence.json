@@ -1,0 +1,12 @@
+{
+  "fixture": true,
+  "paidCalls": 0,
+  "uiAdvances": 4,
+  "npcTransportCalls": 3,
+  "adjudicationCalls": 0,
+  "replyChains": 0,
+  "actualReaders": [
+    "vera"
+  ],
+  "reloadAndReplayConsistent": true
+}

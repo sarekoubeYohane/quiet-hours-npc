@@ -1,0 +1,103 @@
+{
+  "fixture": true,
+  "paidCalls": 0,
+  "uiAdvances": 10,
+  "quietApiAdvances": 12,
+  "counts": {
+    "npc": 9,
+    "adjudication": 1
+  },
+  "sleepingRounds": 12,
+  "elapsedMinutes": 510,
+  "checkpoints": [
+    {
+      "name": "recorded",
+      "minute": 510,
+      "turn": 2,
+      "arrangement": "active",
+      "reminderVersion": 1,
+      "readers": [],
+      "notifications": 0,
+      "counts": {
+        "npc": 2,
+        "adjudication": 0
+      }
+    },
+    {
+      "name": "missed-asleep",
+      "minute": 585,
+      "turn": 5,
+      "arrangement": "active",
+      "reminderVersion": 1,
+      "readers": [],
+      "notifications": 1,
+      "counts": {
+        "npc": 3,
+        "adjudication": 1
+      }
+    },
+    {
+      "name": "late-read",
+      "minute": 900,
+      "turn": 16,
+      "arrangement": "active",
+      "reminderVersion": 1,
+      "readers": [
+        "owner"
+      ],
+      "notifications": 1,
+      "counts": {
+        "npc": 5,
+        "adjudication": 1
+      }
+    },
+    {
+      "name": "postponed",
+      "minute": 915,
+      "turn": 17,
+      "arrangement": "active",
+      "reminderVersion": 2,
+      "readers": [
+        "owner"
+      ],
+      "notifications": 1,
+      "counts": {
+        "npc": 6,
+        "adjudication": 1
+      }
+    },
+    {
+      "name": "continue-after-reminder",
+      "minute": 960,
+      "turn": 20,
+      "arrangement": "active",
+      "reminderVersion": 2,
+      "readers": [
+        "owner"
+      ],
+      "notifications": 2,
+      "counts": {
+        "npc": 8,
+        "adjudication": 1
+      }
+    },
+    {
+      "name": "dropped",
+      "minute": 990,
+      "turn": 22,
+      "arrangement": "dropped",
+      "reminderVersion": 2,
+      "readers": [
+        "owner"
+      ],
+      "notifications": 2,
+      "counts": {
+        "npc": 9,
+        "adjudication": 1
+      }
+    }
+  ],
+  "reloadAndReplayConsistent": true,
+  "traceContainsPrivatePhoneAuthority": true,
+  "pageErrors": []
+}

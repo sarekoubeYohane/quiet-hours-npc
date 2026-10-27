@@ -5,14 +5,14 @@ import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redac
 
 export function traceActorSnapshot(actor:Character) {
   return structuredClone({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan,
-    needs:actor.needs,preferences:actor.preferences,habits:actor.habits,habitEvidence:actor.habitEvidence,habitEvidenceDropped:actor.habitEvidenceDropped,
+    arrangements:actor.arrangements,needs:actor.needs,preferences:actor.preferences,habits:actor.habits,habitEvidence:actor.habitEvidence,habitEvidenceDropped:actor.habitEvidenceDropped,
     eventHabits:actor.eventHabits,pausedActivity:actor.pausedActivity,intents:actor.intents});
 }
 
 // Observer-only snapshots never become World fields or prompt inputs. Each is
 // frozen at the dispatch boundary, including relevant facts that did not change.
 export function traceWorldSnapshot(world: World) {
-  return structuredClone({minute:world.minute,turn:world.turn,objects:world.objects||[],supplies:world.supplies||[],
+  return structuredClone({minute:world.minute,turn:world.turn,phones:world.phones,objects:world.objects||[],supplies:world.supplies||[],
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
     actors:world.characters.map(traceActorSnapshot)});
 }

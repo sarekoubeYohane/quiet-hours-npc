@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const read=async()=> (await (await GET()).json()).world;
@@ -37,10 +38,10 @@ test('partition records an aggregate immediately and separating one portion pres
 test('new finite materialization preserves supply provenance and quantity through consumption while old saved objects are not backfilled',async()=>{
  const w=fixture();w.objects=[];w.supplies[0].remaining=1;const s=await setup(w);try{
   s.choose(accepted([{kind:'materialize',supplyId:'last-cake',expectedRemaining:1}]),proposal('last-cake'));
-  let saved=await advance(),meal=saved.objects[0];assert.deepEqual(meal.quantity,{amount:1,unit:'item'});assert.deepEqual(meal.sources,[{type:'supply',id:'last-cake',revision:null,amount:1,unit:'item',owner:'cass'}]);
-  s.choose(accepted([{kind:'consume',objectId:meal.id,expectedRevision:meal.revision}]),proposal(meal.id));saved=await advance();assert.equal(saved.objects[0].quantity.amount,0);assert.equal(saved.objects[0].lifecycle,'consumed');assert.equal(saved.supplies[0].remaining,0);
+  let saved=await advance(),meal=nonPhoneObjects(saved)[0];assert.deepEqual(meal.quantity,{amount:1,unit:'item'});assert.deepEqual(meal.sources,[{type:'supply',id:'last-cake',revision:null,amount:1,unit:'item',owner:'cass'}]);
+  s.choose(accepted([{kind:'consume',objectId:meal.id,expectedRevision:meal.revision}]),proposal(meal.id));saved=await advance();assert.equal(nonPhoneObjects(saved)[0].quantity.amount,0);assert.equal(nonPhoneObjects(saved)[0].lifecycle,'consumed');assert.equal(saved.supplies[0].remaining,0);
  }finally{s.restore();}
- const old=fixture();store.install(old);const saved=await read();assert.equal(saved.objects[0].quantity,undefined);assert.equal(saved.objects[0].sources,undefined);
+ const old=fixture();store.install(old);const saved=await read();assert.equal(nonPhoneObjects(saved)[0].quantity,undefined);assert.equal(nonPhoneObjects(saved)[0].sources,undefined);
 });
 
 test('formation receipts retain bounded reasons sources quantities and selected results without backfilling old evidence',async()=>{
@@ -121,7 +122,7 @@ test('controlled D20 formation outcomes retain only selected full partial or fai
   const s=await setup(),previous=Math.random;let rolls=0;Math.random=()=>{rolls++;return (die-.5)/20;};try{
    const full=partition(),partial=partition();partial.outputs[0].id='partial-pieces';partial.outputs[0].quantity.amount=2;
    s.choose({...accepted([]),check:{difficulty:12,ability:'切分'},branches:[{outcomes:['critical-success','success'],effects:[full],stages:[]},{outcomes:['mixed'],effects:[partial],stages:[]},{outcomes:['failure','critical-failure'],effects:[{kind:'consume',objectId:'cake',expectedRevision:1}],stages:[]}]});
-   const id=Date.now()+':'+crypto.randomUUID();let saved=await advance({operationId:id});assert.equal(saved.events.findLast(event=>event.kind==='attempt').resolution.outcome,outcome);assert.equal(rolls,1);assert.equal(saved.objects.filter(o=>o.id!=='cake'&&o.lifecycle==='active').reduce((sum,o)=>sum+o.quantity.amount,0),parts);assert.equal(saved.objects.some(o=>o.id==='cake-pieces'),outcome==='critical-success'||outcome==='success');assert.equal(saved.objects.some(o=>o.id==='partial-pieces'),outcome==='mixed');
+   const id=Date.now()+':'+crypto.randomUUID();let saved=await advance({operationId:id});assert.equal(saved.events.findLast(event=>event.kind==='attempt').resolution.outcome,outcome);assert.equal(rolls,1);assert.equal(nonPhoneObjects(saved).filter(o=>o.id!=='cake'&&o.lifecycle==='active').reduce((sum,o)=>sum+o.quantity.amount,0),parts);assert.equal(saved.objects.some(o=>o.id==='cake-pieces'),outcome==='critical-success'||outcome==='success');assert.equal(saved.objects.some(o=>o.id==='partial-pieces'),outcome==='mixed');
    const before=saved.objects,counts=s.counts();saved=await advance({operationId:id});assert.deepEqual(saved.objects,before);assert.deepEqual(s.counts(),counts);assert.equal(rolls,1);
   }finally{s.restore();Math.random=previous;}
  }

@@ -1,3 +1,8 @@
+import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
+import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
+import { normalDecisionInput } from './npc-input';
+import { acknowledgeArrangementCues, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
+import { activatePhones } from './phones';
 import { managePausedActivity } from './paused-activities';
 import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bodyIntervalBase, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
 import { advanceNaturalChanges } from './natural-changes';
@@ -13,7 +18,7 @@ import { demoDecision, pendingInterventions, record, type Action, type AIUsage, 
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
-export type ActivityDecision = { reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -26,7 +31,7 @@ export function budgetReached(usage: AIUsage, limits: BudgetLimits): boolean {
   return (limits.calls !== null && usage.calls >= limits.calls) ||
     (limits.tokens !== null && usage.inputTokens + usage.outputTokens >= limits.tokens);
 }
-const attentionKinds = new Set(['message', 'intervention']);
+const attentionKinds = new Set(['intervention']);
 
 export class BudgetExceeded extends Error {
   constructor() { super('已達玩家 AI 用量上限。自動運行已暫停；可調整上限或切換規則試玩。'); }
@@ -51,8 +56,11 @@ export function attentionMarker(world: World, character: Character): string {
 
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
   if(character.plan?.bodyActivity?.kind==='sleep')return isSleeping(character);
-  return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
-    pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character);
+  if(!(canResumeActivity(world,character,modelKey)||!!character.plan&&character.plan.timeIntent?.kind==='open-ended'&&character.plan.modelKey===modelKey)||character.plan!.attention!==attentionMarker(world,character)||pendingInterventions(world,character).length||hasUnevaluatedNeed(character))return false;
+  const arrangements=character.arrangements?.items.some(item=>item.status==='active'),notifications=world.phones?.devices.some(d=>d.notifications?.some(n=>n.cancelledAt===undefined&&n.exposures.some(e=>e.actorId===character.id&&e.reevaluationOfferedAt===undefined&&e.observationIds.length)));
+  if(!arrangements&&!notifications)return true;
+  const input=normalDecisionInput(world,character,modelKey);
+  return !input.self.arrangementCues.length&&!hasUnevaluatedPhoneNotification(world,character,input.self.noticeOpportunities);
 }
 
 function mayChooseAutonomously(character: Character): boolean {
@@ -62,7 +70,8 @@ function mayChooseAutonomously(character: Character): boolean {
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = structuredClone(world);
   activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
-  return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
+  const potentialReminder=hasDueCalendarReminder(next);
+  return next.characters.filter(character => mayChooseAutonomously(character) && (!canContinue(next, character, modelKey)||potentialReminder&&!isSleeping(character))).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -84,6 +93,7 @@ export async function advanceActivities(world: World, options: {
   if (ai) {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
+  activatePhones(world);
   activateBodyNeeds(world);
   const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
   const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));
@@ -94,6 +104,7 @@ export async function advanceActivities(world: World, options: {
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     try {
+    advanceCalendarReminders(world);
     const control = character.control;
     discardLegacyActivity(world,character);
     wakeSleepingActivity(world,character);
@@ -113,6 +124,7 @@ export async function advanceActivities(world: World, options: {
       character.activity = '待命，等待下一個指定行動。';
       continue;
     }
+    if(character.arrangements?.items.some(item=>item.status==='active'))refreshArrangementCues(world,character,normalDecisionInput(world,character,modelKey));
     if (!controlledDecision && canContinue(world, character, modelKey)) {
       progressActivity(world,character,'automatic');
       if (ai) usage.savedDecisions++;
@@ -143,6 +155,7 @@ export async function advanceActivities(world: World, options: {
     if((controlledDecision||!ai)&&requiresWorldEffects(decision.action)){
       decision.freeCandidate=bindRoutine(world,character,decision.action,decision.durationMinutes,undefined,minutes,decision.timeIntent?.maxMinutes)??{status:'unsupported',effects:[],stages:[],check:null};
     }
+    acknowledgePhoneNotifications(world,character,decision.phoneNotificationReceipts,world.minute);
     acknowledgeBodyNeeds(character);
     character.observationCursor = observedCount;
     if (decision.eventHabits) character.eventHabits=decision.eventHabits;
@@ -150,6 +163,8 @@ export async function advanceActivities(world: World, options: {
     if (decision.shortTerm) character.shortTerm = decision.shortTerm;
     if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
     if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
+    if (decision.arrangements) character.arrangements = decision.arrangements;
+    acknowledgeArrangementCues(character,decision.arrangementCueReceipts,world.minute);
     if (decision.preferences) character.preferences = decision.preferences;
     consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
