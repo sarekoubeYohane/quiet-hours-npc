@@ -1,3 +1,4 @@
+import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
 import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
 import { normalDecisionInput } from './npc-input';
 import { acknowledgeArrangementCues, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
@@ -69,7 +70,8 @@ function mayChooseAutonomously(character: Character): boolean {
 export function plannedCalls(world: World, minutes: number, modelKey: string): number {
   const next = structuredClone(world);
   activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
-  return next.characters.filter(character => mayChooseAutonomously(character) && !canContinue(next, character, modelKey)).length;
+  const potentialReminder=hasDueCalendarReminder(next);
+  return next.characters.filter(character => mayChooseAutonomously(character) && (!canContinue(next, character, modelKey)||potentialReminder&&!isSleeping(character))).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -102,6 +104,7 @@ export async function advanceActivities(world: World, options: {
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     try {
+    advanceCalendarReminders(world);
     const control = character.control;
     discardLegacyActivity(world,character);
     wakeSleepingActivity(world,character);

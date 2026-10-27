@@ -22,11 +22,19 @@ const referenceSchema={type:'array',minItems:1,maxItems:8,items:{type:'object',p
 export const arrangementConditionSchema={anyOf:[{type:'object',properties:{kind:{type:'string',enum:['time']},minute:{type:'integer',minimum:0}},required:['kind','minute'],additionalProperties:false},{type:'object',properties:{kind:{type:'string',enum:['event']},clueKind:{type:'string',enum:['person','speech','sound','door','activity']},source:{type:'string'},region:{type:'string'}},required:['kind','clueKind','source','region'],additionalProperties:false},{type:'object',properties:{kind:{type:'string',enum:['context']},region:{type:'string'}},required:['kind','region'],additionalProperties:false}]};
 export const arrangementUpdatesSchema={type:'array',maxItems:4,items:{type:'object',properties:{operation:{type:'string',enum:['upsert','keep','complete','drop','archive']},id:{type:'string'},version:{type:'integer',minimum:0},text:{type:'string'},condition:arrangementConditionSchema,references:referenceSchema,reason:{type:'string'}},required:['operation','id','version','text','condition','references','reason'],additionalProperties:false}};
 export const arrangementPrompt='arrangementUpdates 是同次正常決策中的柔性安排更新，不是強制作息。upsert 使用穩定id、新項目version=0／修改用本次self.arrangements的版本、text、condition、references（本次本人可見short／long記憶id/version）、reason。condition 為 {kind:"time",minute:世界絕對分鐘}、{kind:"event",clueKind:"person|speech|sound|door|activity",source:已知人物id或空字串,region:已知區域或空字串} 或 {kind:"context",region:已知區域}。keep／complete／drop／archive 同樣帶回本次可見原text與condition、有效來源與理由；可用upsert明示延期。沒有更新回空陣列。安排、需求、喜好與習慣由你自行取捨並排列intents，沒有安排也合法。安排不複製活動進度。安排最多16筆（含已完成／放下的身份）；已完成／放下可明示archive釋放索引，仍有效安排不可歸檔；容量滿須保留資料並在後續決策取捨，不能默默刪除。內在安排只有實際可見記憶保留完整內容時才展示，未展示不是已放下；到期不代表你已察覺錯過，也不強制執行。';
-function validCondition(value:ArrangementCondition){
+export function validArrangementCondition(value:ArrangementCondition){
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
  if(value.kind==='time')return fields(value,['kind','minute'])&&Number.isSafeInteger(value.minute)&&value.minute>=0;
  if(value.kind==='context')return fields(value,['kind','region'])&&bounded(value.region,128);
  return value.kind==='event'&&fields(value,['kind','clueKind','source','region'])&&['person','speech','sound','door','activity'].includes(value.clueKind)&&typeof value.source==='string'&&typeof value.region==='string'&&memoryBytes(value)<=512;
+}
+export function validateArrangementConditionScope(w:World,c:Character,condition:ArrangementCondition){
+  if(condition.kind==='event'&&condition.source&&!w.characters.some(p=>p.id===condition.source))throw new MemoryValidationError('安排人物未知');
+  if(condition.kind!=='time'&&condition.region&&!regions.some(r=>r.id===condition.region)){
+   // Static scene regions are checked against the same known scene projection.
+   const knownRegions=new Set([c.region,c.location,...w.characters.filter(p=>p.id===c.id).map(p=>p.region)]);
+   if(!knownRegions.has(condition.region))throw new MemoryValidationError('安排區域未知');
+  }
 }
 export function updateArrangements(w:World,c:Character,value:unknown,visible:Character):{arrangements?:ArrangementState;experiences:ShortMemory[]}{
  if(value===undefined||Array.isArray(value)&&value.length===0)return {experiences:[]};
@@ -34,7 +42,7 @@ export function updateArrangements(w:World,c:Character,value:unknown,visible:Cha
  const state:ArrangementState=structuredClone(c.arrangements||{schemaVersion:1,items:[]}),experiences:ShortMemory[]=[],seen=new Set();
  const shown=arrangementsForDecision(c,visible).items.filter(i=>visible.arrangements?.items.some(shown=>shown.id===i.id&&shown.version===i.version));
  for(const item of value){
-  if(!item||typeof item!=='object'||!fields(item,['operation','id','version','text','condition','references','reason'])||!['upsert','keep','complete','drop','archive'].includes(item.operation)||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<0||!bounded(item.text,512)||!bounded(item.reason,256)||!validCondition(item.condition)||!Array.isArray(item.references)||!item.references.length||item.references.length>8||seen.has(item.id))throw new MemoryValidationError('安排候選格式無效');
+  if(!item||typeof item!=='object'||!fields(item,['operation','id','version','text','condition','references','reason'])||!['upsert','keep','complete','drop','archive'].includes(item.operation)||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<0||!bounded(item.text,512)||!bounded(item.reason,256)||!validArrangementCondition(item.condition)||!Array.isArray(item.references)||!item.references.length||item.references.length>8||seen.has(item.id))throw new MemoryValidationError('安排候選格式無效');
   seen.add(item.id);
   const old=state.items.find(i=>i.id===item.id);
   if(old?old.version!==item.version||!shown.some(i=>i.id===item.id&&i.version===item.version):item.version!==0||item.operation!=='upsert'||state.archived?.some(i=>i.id===item.id))throw new MemoryValidationError('安排版本過期或本次未展示');
@@ -42,12 +50,7 @@ export function updateArrangements(w:World,c:Character,value:unknown,visible:Cha
    if(!ref||typeof ref!=='object'||Array.isArray(ref)||!bounded(ref.id,128)||!Number.isSafeInteger(ref.version)||ref.version<1||!fields(ref,['kind','id','version'])||!['short','long'].includes(ref.kind)||!(ref.kind==='short'?visible.shortTerm:visible.longTerm)?.some(m=>m.characterId===c.id&&m.id===ref.id&&m.version===ref.version&&(!('state'in m)||!m.state||m.state==='active')))throw new MemoryValidationError('安排只能引用本次本人可見經歷');
   }
   const condition=item.condition as ArrangementCondition;
-  if(condition.kind==='event'&&condition.source&&!w.characters.some(p=>p.id===condition.source))throw new MemoryValidationError('安排人物未知');
-  if(condition.kind!=='time'&&condition.region&&!regions.some(r=>r.id===condition.region)){
-   // Static scene regions are checked against the same known scene projection.
-   const knownRegions=new Set([c.region,c.location,...w.characters.filter(p=>p.id===c.id).map(p=>p.region)]);
-   if(!knownRegions.has(condition.region))throw new MemoryValidationError('安排區域未知');
-  }
+  validateArrangementConditionScope(w,c,condition);
   if(item.operation==='keep')continue;
   if(item.operation==='archive'){if(!old||old.status==='active')throw new MemoryValidationError('不能歸檔未完成安排');state.items=state.items.filter(i=>i.id!==item.id);state.archived=[...(state.archived||[]),{id:old.id,version:old.version}].slice(-24);continue;}
   if(old&&item.operation!=='upsert'&&(item.text!==old.text||JSON.stringify(condition)!==JSON.stringify(old.condition)))throw new MemoryValidationError('完成／放下不能暗改安排');
@@ -65,6 +68,6 @@ export function validateArrangements(c:Character){
   if(item.conditionSince!==undefined&&(!Number.isFinite(item.conditionSince)||item.conditionSince<0||item.conditionSince>item.time))throw new MemoryValidationError('安排條件啟用時間無效');
   const cue=item.cue;
   if(cue&&(memoryBytes(cue)>1024||!fields(cue,['conditionKey','lastMatch','epoch','trigger'])||cue.conditionKey!==conditionKey(item.condition)||cue.lastMatch!==null&&!bounded(cue.lastMatch,1024)||!Number.isSafeInteger(cue.epoch)||cue.epoch<0||cue.trigger&&(!fields(cue.trigger,['key','at','handledAt'])||!bounded(cue.trigger.key,2048)||!Number.isFinite(cue.trigger.at)||cue.trigger.handledAt!==undefined&&!Number.isFinite(cue.trigger.handledAt))))throw new MemoryValidationError('安排喚起游標無效');
-  if(item.characterId!==c.id||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<1||!Number.isFinite(item.time)||!bounded(item.text,512)||!validCondition(item.condition)||!['active','completed','dropped'].includes(item.status)||!bounded(item.memory?.id,128)||item.memory.version!==1)throw new MemoryValidationError('安排狀態無效');
+  if(item.characterId!==c.id||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<1||!Number.isFinite(item.time)||!bounded(item.text,512)||!validArrangementCondition(item.condition)||!['active','completed','dropped'].includes(item.status)||!bounded(item.memory?.id,128)||item.memory.version!==1)throw new MemoryValidationError('安排狀態無效');
  }
 }

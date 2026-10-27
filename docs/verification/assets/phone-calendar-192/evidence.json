@@ -1,0 +1,96 @@
+{
+  "fixture": true,
+  "calls": 8,
+  "calendar": [
+    {
+      "id": "calendar-talk",
+      "version": 3,
+      "text": "外部原文：稍後考慮談茶，並未答應邀約。",
+      "createdAt": 1290,
+      "updatedAt": 1365,
+      "sharedWith": [],
+      "readers": [
+        {
+          "actorId": "owner",
+          "at": 1335,
+          "version": 1
+        }
+      ],
+      "arrangement": {
+        "id": "later-talk",
+        "version": 1
+      },
+      "schedule": {
+        "kind": "time",
+        "minute": 1410
+      },
+      "reminder": {
+        "version": 3,
+        "enabled": false,
+        "condition": {
+          "kind": "time",
+          "minute": 1410
+        },
+        "conditionSince": 1365
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "5229d9ed-ab71-47f5-b8b6-389fe0c18ed7",
+      "kind": "reminder",
+      "recordId": "calendar-talk",
+      "recordVersion": 1,
+      "key": "[\"time:1320\",1,\"time:1320\"]",
+      "generation": 1,
+      "emittedAt": 1320,
+      "eventId": "16a71c76-70ba-4f1e-bf47-ff7e6d00ee61",
+      "exposures": [
+        {
+          "actorId": "owner",
+          "status": "noticed",
+          "observationIds": [
+            "16a71c76-70ba-4f1e-bf47-ff7e6d00ee61:owner:0"
+          ],
+          "reevaluationOfferedAt": 1320,
+          "handledAt": 1320
+        }
+      ],
+      "cancelledAt": 1350
+    }
+  ],
+  "arrangements": {
+    "schemaVersion": 1,
+    "items": [
+      {
+        "id": "later-talk",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1275,
+        "text": "以後想討論茶的香氣",
+        "condition": {
+          "kind": "time",
+          "minute": 1560
+        },
+        "status": "active",
+        "references": [
+          {
+            "kind": "short",
+            "id": "legacy:owner:memory:0:1260",
+            "version": 1
+          }
+        ],
+        "conditionSince": 1275,
+        "memory": {
+          "id": "a7246403-eca0-4c92-a80f-3fdf75145720",
+          "version": 1
+        },
+        "cue": {
+          "conditionKey": "time:1560",
+          "lastMatch": null,
+          "epoch": 0
+        }
+      }
+    ]
+  }
+}

@@ -14,7 +14,7 @@ export const phoneNotificationLimits={records:128,perInput:4};
 export function emitPhoneNotification(w:World,device:PhoneData,source:{kind:PhoneNotification['kind'];recordId:string;recordVersion:number;key?:string;generation?:number}){
  const key=source.key||'delivery',generation=source.generation??1;
  if(!Number.isSafeInteger(generation)||generation<1||!Number.isSafeInteger(source.recordVersion)||source.recordVersion<1||key.length>2048)throw new MemoryValidationError('通知版本或條件引用無效。');
- const previous=device.notifications?.find(n=>n.kind===source.kind&&n.recordId===source.recordId&&n.recordVersion===source.recordVersion&&n.key===key);if(previous)return previous;
+ const previous=device.notifications?.find(n=>n.cancelledAt===undefined&&n.kind===source.kind&&n.recordId===source.recordId&&n.recordVersion===source.recordVersion&&n.key===key);if(previous)return previous;
  const prior=device.notificationDedup?.find(n=>n.kind===source.kind&&n.recordId===source.recordId);
  if(prior&&(source.recordVersion<prior.recordVersion||source.recordVersion===prior.recordVersion&&generation<=prior.generation))return;
  if(!prior&&(device.notificationDedup?.length||0)>=phoneNotificationLimits.records)throw new MemoryValidationError('通知來源已滿，未刪除有效去重資料。');
