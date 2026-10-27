@@ -53,7 +53,7 @@ export function updateArrangements(w:World,c:Character,value:unknown,visible:Cha
   validateArrangementConditionScope(w,c,condition);
   if(item.operation==='keep')continue;
   if(item.operation==='archive'){if(!old||old.status==='active')throw new MemoryValidationError('不能歸檔未完成安排');state.items=state.items.filter(i=>i.id!==item.id);state.archived=[...(state.archived||[]),{id:old.id,version:old.version}].slice(-24);continue;}
-  if(old&&item.operation!=='upsert'&&(item.text!==old.text||JSON.stringify(condition)!==JSON.stringify(old.condition)))throw new MemoryValidationError('完成／放下不能暗改安排');
+  if(old&&item.operation!=='upsert'&&(item.text!==old.text||conditionKey(condition)!==conditionKey(old.condition)))throw new MemoryValidationError('完成／放下不能暗改安排');
   const next:Arrangement={id:item.id,characterId:c.id,version:item.version+1,time:w.minute,text:item.text,condition,status:item.operation==='complete'?'completed':item.operation==='drop'?'dropped':'active',references:item.references,conditionSince:old&&conditionKey(old.condition)===conditionKey(condition)?old.conditionSince??old.time:w.minute,...(old?.cue&&conditionKey(old.condition)===conditionKey(condition)?{cue:old.cue}:{}),memory:{id:crypto.randomUUID(),version:1}};
   const index=state.items.findIndex(i=>i.id===next.id);if(index<0)state.items.push(next);else state.items[index]=next;
   experiences.push({id:next.memory.id,version:1,characterId:c.id,time:w.minute,text:arrangementExperience(next),source:{kind:'experience'}});
@@ -67,7 +67,7 @@ export function validateArrangements(c:Character){
  for(const item of state.items){
   if(item.conditionSince!==undefined&&(!Number.isFinite(item.conditionSince)||item.conditionSince<0||item.conditionSince>item.time))throw new MemoryValidationError('安排條件啟用時間無效');
   const cue=item.cue;
-  if(cue&&(memoryBytes(cue)>1024||!fields(cue,['conditionKey','lastMatch','epoch','trigger'])||cue.conditionKey!==conditionKey(item.condition)||cue.lastMatch!==null&&!bounded(cue.lastMatch,1024)||!Number.isSafeInteger(cue.epoch)||cue.epoch<0||cue.trigger&&(!fields(cue.trigger,['key','at','handledAt'])||!bounded(cue.trigger.key,2048)||!Number.isFinite(cue.trigger.at)||cue.trigger.handledAt!==undefined&&!Number.isFinite(cue.trigger.handledAt))))throw new MemoryValidationError('安排喚起游標無效');
+  if(cue&&(memoryBytes(cue)>1024||!fields(cue,['conditionKey','lastMatch','epoch','trigger','observationCursor'])||cue.conditionKey!==conditionKey(item.condition)||cue.lastMatch!==null&&!bounded(cue.lastMatch,1024)||!Number.isSafeInteger(cue.epoch)||cue.epoch<0||cue.observationCursor&&(!fields(cue.observationCursor,['id','time','sequence'])||!bounded(cue.observationCursor.id,128)||!Number.isFinite(cue.observationCursor.time)||cue.observationCursor.time<0||cue.observationCursor.sequence!==undefined&&(!Number.isSafeInteger(cue.observationCursor.sequence)||cue.observationCursor.sequence<0))||cue.trigger&&(!fields(cue.trigger,['key','at','handledAt'])||!bounded(cue.trigger.key,2048)||!Number.isFinite(cue.trigger.at)||cue.trigger.handledAt!==undefined&&!Number.isFinite(cue.trigger.handledAt))))throw new MemoryValidationError('安排喚起游標無效');
   if(item.characterId!==c.id||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<1||!Number.isFinite(item.time)||!bounded(item.text,512)||!validArrangementCondition(item.condition)||!['active','completed','dropped'].includes(item.status)||!bounded(item.memory?.id,128)||item.memory.version!==1)throw new MemoryValidationError('安排狀態無效');
  }
 }

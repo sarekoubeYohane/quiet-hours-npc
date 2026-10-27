@@ -1,6 +1,5 @@
-import { boundPhoneNotifications } from './phone-notifications';
-import { normalDecisionInput, boundPhoneInput } from './npc-input';
-import { arrangementCuesForDecision, arrangementCueReceipts } from './arrangement-cues';
+import { normalDecisionInput, finalizeDecisionInput } from './npc-input';
+import { arrangementCueReceipts } from './arrangement-cues';
 import { phonePrompt, phoneForActor, validatePhoneActionReferences } from './phones';
 import { arrangementsForDecision, arrangementUpdatesSchema, arrangementPrompt, updateArrangements } from './arrangements';
 import { preferenceUpdatesSchema, preferencePrompt, updatePreferences } from './preferences';
@@ -137,15 +136,10 @@ try {
     if(memoryBytes({input, recalledMemories:handles}) > 88*1024) throw Error('回想後記憶輸入超過 88 KiB，本回合已回復。');
     visible.shortTerm = (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version));
     visible.longTerm = (c.longTerm || []).filter(item => input.self.longTerm.some(shown => shown.id === item.id && shown.version === item.version));
-    input.phoneReferenceGap=boundPhoneInput(w,c,input,handles);
-    decisionContext.phoneReferences=input.phones;
     input.self.arrangements=arrangementsForDecision(c,visible);
     while(input.self.arrangements.items.length&&memoryBytes({input,recalledMemories:handles})>88*1024)input.self.arrangements.items.pop();
-    const allCues=arrangementCuesForDecision(w,c,input);
-    input.self.arrangementCues=allCues.slice(0,4);
-    while(input.self.arrangementCues.length&&memoryBytes({input,recalledMemories:handles})>88*1024-1024)input.self.arrangementCues.pop();
-    input.self.arrangementCueGap=allCues.length-input.self.arrangementCues.length;
-    boundPhoneNotifications(w,c,input,{recalledMemories:handles});
+    finalizeDecisionInput(w,c,input,handles);
+    decisionContext.phoneReferences=input.phones;
     visible.arrangements={schemaVersion:1,items:input.self.arrangements.items};
     messages[1].content = JSON.stringify(input);
     visible.preferences = {schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0};
