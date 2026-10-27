@@ -54,3 +54,21 @@ NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-
 
 
 `browser-natural-changes.mjs` 以真WorldApp／API／SQLite驗證冷卻、環境乾燥、條件破壞後恢復仍失效、重載及原ID UI重送。8次推進，8 NPC決策＋5裁定，零付費模型；截圖與篩選證據輸出 `docs/verification/assets/natural-changes/`，並非正式站驗收。
+
+## 自主生活循環（#172–#181）
+
+沿上方同一 Playwright／Chromium 環境，從 repository 根目錄執行：
+
+```sh
+node tooling/verification/browser-life-needs.mjs
+node tooling/verification/browser175-176.mjs
+node tooling/verification/browser-sleep.mjs
+node tooling/verification/browser-preferences.mjs
+node tooling/verification/browser-life-habits.mjs
+node tooling/verification/browser-life-forecast.mjs
+node tooling/verification/browser-life-integration.mjs
+```
+
+各 runner 使用真實 WorldApp／世界 API／JSON／SQLite，只有 auth、Worker bindings、模型 transport、時鐘及骰子是可控邊界。`BROWSER_ARTIFACT_DIR` 須為可寫目錄；個別 runner 可採其預設 repository 證據目錄。沒有真實 Key，不連正式世界，不以替身證明真實 NPC 會形成相同行為。本輪使用 Chromium 143、Playwright 及 Noto Sans TC；支援一般已安裝 Chromium，或設定 `CHROMIUM_MODULE` 為 `@sparticuz/chromium`。
+
+需求、長活動、睡眠、喜好、習慣及私有追溯各有獨立 API／SQLite 案例，預設 `pnpm test` 收錄於 `tests/run-activities.mjs`。各基線、參數／容量、相容及回退政策見[自主生活工程契約](../../docs/design/autonomous-life.md)；正式付費驗收另依[有限交接流程](../../docs/verification/autonomous-life-live-runbook.md)取得授權。

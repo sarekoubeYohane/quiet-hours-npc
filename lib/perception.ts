@@ -1,3 +1,4 @@
+import { isSleeping, isSleepStimulus } from './needs';
 import { knownExternalState, type PhysicalState } from './world-state';
 import { addExperience } from './memory';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
@@ -33,6 +34,7 @@ export function normalizePerception(world: World) {
 }
 export function connectingDoor(from: string, to: string) { return doors.find(door => door.regions.includes(from) && door.regions.includes(to)); }
 export function canSee(world: World, observer: Character, region: string) {
+  if(isSleeping(observer))return false;
   const own = regionOf(observer);
   if (world.scene?.occluded.includes(region)) return false;
   if (own === region) return true;
@@ -143,6 +145,7 @@ export function remember(world: World, character: Character, text: string, event
 }
 export function saveObservation(world: World, character: Character, observation: Observation) {
   addExperience(character, world.minute, observation.text, observation);
+  if(isSleeping(character)&&isSleepStimulus(observation)&&character.plan)character.plan.sleep={...character.plan.sleep,elapsedMinutes:character.plan.sleep?.elapsedMinutes??0,stimulusWakeAt:world.minute};
 }
 // Passive events and active probes share the same subjective projection and
 // persistence; only their observer-facing explanations differ.
@@ -166,7 +169,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   const privateEvent = ['reflect', 'message', 'intervention', 'blocked', 'observe'].includes(event.kind) || event.scene?.target === 'observer';
   if (event.kind === 'continue') return;
   if (privateEvent || !event.scene) {
-    for (const character of world.characters) if (event.audience.includes(character.id)) remember(world, character, event.text, event);
+    for (const character of world.characters) if (event.audience.includes(character.id)&&(!isSleeping(character)||event.actor===character.id)) remember(world, character, event.text, event);
     return;
   }
   for(const change of event.scene.externalChanges||[])if(change.target.type==='body'&&change.movement)world.currentSensory!.presence[change.target.id]={region:change.movement.toRegion,clue:event.id};
@@ -174,7 +177,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   const audience: string[] = [];
   for (const character of world.characters) {
     if (character.id === event.actor && !event.scene.externalChanges) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
-    const candidates = eventCandidates(world, character, event);
+    const candidates = eventCandidates(world, character, event).filter(candidate=>!isSleeping(character)||isSleepStimulus(candidate));
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;
     const trace = observationTrace(world, character, event, candidates, trial);

@@ -7,15 +7,15 @@ const accepted={status:'accepted',effects:[effect],check:null,stages:[],branches
 test('public candidate parsing is world-independent and preserves explicit legal and illegal boundary cases',()=>{
  const world=seedWorld(),before=structuredClone(world);
  for(const [minutes,expected] of [[.1,15],[15,15],[15.1,30],[90,90]])assert.equal(parseEffectCandidate(JSON.stringify({...accepted,completionMinutes:minutes})).confirmedDurationMinutes,expected);
- for(const minutes of [0,-1,90.1,'15'])assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,completionMinutes:minutes})));
+ for(const minutes of [0,-1,1440.1,'15'])assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,completionMinutes:minutes})));
  for(const status of ['denied','unsupported'])assert.equal(parseEffectCandidate(JSON.stringify({status,effects:[],check:null})).status,status);
  assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,status:'maybe'})));
  assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,effects:[{kind:'world-patch',value:{}}]})));
  assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,effects:Array(5).fill(effect)})));
  assert.deepEqual(world,before);
- assert.equal(effectCandidateSchema.properties.completionMinutes.anyOf[1].maximum,90);
+ assert.equal(effectCandidateSchema.properties.completionMinutes.anyOf[1].maximum,1440);
  assert.deepEqual(effectCandidateSchema.properties.status.enum,['accepted','denied','unsupported']);
- assert.ok(effectRules.some(rule=>rule.includes('90')&&rule.includes('15')));
+ assert.ok(effectRules.some(rule=>rule.includes('1440')&&rule.includes('15')));
 });
 test('the world API sends the centralized free contract and executes only after current authority validation',async()=>{
  const {POST,GET}=load('route'),store=load('store');
@@ -36,8 +36,8 @@ test('the world API sends the centralized free contract and executes only after 
   const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));
   assert.equal(response.status,200,await response.clone().text());
   assert.deepEqual(captured.schema.properties.status.enum,['accepted','denied','unsupported']);
-  assert.equal(captured.schema.properties.completionMinutes.anyOf[1].maximum,90);
-  assert.ok(captured.input.effectRules.some(rule=>rule.includes('共同界線')&&rule.includes('90')));
+  assert.equal(captured.schema.properties.completionMinutes.anyOf[1].maximum,1440);
+  assert.ok(captured.input.effectRules.some(rule=>rule.includes('共同界線')&&rule.includes('1440')));
   assert.equal((await (await GET()).json()).world.objects[0].id,'meal:1');
   assert.equal(store.snapshot().objects[0].id,'meal:1');
   assert.equal(store.snapshot().supplies[0].remaining,0);

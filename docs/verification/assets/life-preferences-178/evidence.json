@@ -1,0 +1,1304 @@
+{
+  "fixture": true,
+  "modelCalls": 8,
+  "world": {
+    "routinePlaces": [
+      {
+        "location": "cafe",
+        "purpose": "cafe",
+        "operators": [
+          "owner"
+        ]
+      }
+    ],
+    "minute": 1290,
+    "turn": 2,
+    "lastMode": "openai",
+    "characters": [
+      {
+        "id": "cass",
+        "intents": [],
+        "name": "Cass",
+        "color": "#eb9e79",
+        "location": "kris-home",
+        "mood": "平靜",
+        "personality": "努力保持冷靜；害怕被留下，但也想保有自己的選擇。",
+        "abilityTags": [
+          "不擅長髮飾設計"
+        ],
+        "goal": "先安頓自己，慢慢想清楚接下來的生活。",
+        "activity": "安靜休息了一會兒。",
+        "relationships": {
+          "vera": "在乎她，也需要幾天空間。",
+          "kris": "暫時借住；信任她務實的支持。"
+        },
+        "memories": [
+          {
+            "id": "legacy:cass:memory:0:1260",
+            "time": 1260,
+            "text": "與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。"
+          },
+          {
+            "id": "f928d9c8-c9fd-47e3-8e43-6db08802d7fd",
+            "time": 1275,
+            "text": "Cass 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+            "time": 1275,
+            "text": "Kris 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99:cass:0",
+            "time": 1290,
+            "text": "Kris 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "fd6fdb06-393e-4d6f-a4dd-930ed7b2f6ca",
+            "time": 1290,
+            "text": "Cass 讓自己安靜休息了一會兒。"
+          }
+        ],
+        "attentionConditions": [],
+        "observationCursor": 2,
+        "region": "kris-home-main",
+        "observations": [
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "kris",
+            "region": "kris-home-main",
+            "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+            "time": 1275
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "kris",
+            "region": "kris-home-main",
+            "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99:cass:0",
+            "time": 1290
+          }
+        ],
+        "shortTerm": [
+          {
+            "id": "legacy:cass:memory:0:1260",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1260,
+            "text": "與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "f928d9c8-c9fd-47e3-8e43-6db08802d7fd",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1275,
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "cass",
+              "region": "kris-home-main"
+            },
+            "eventId": "0829899b-8456-4513-9adf-3532b1a03d2f"
+          },
+          {
+            "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1275,
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "kris",
+              "region": "kris-home-main",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Kris 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "kris",
+              "region": "kris-home-main",
+              "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+              "time": 1275
+            },
+            "consumed": true
+          },
+          {
+            "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99:cass:0",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1290,
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "kris",
+              "region": "kris-home-main",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Kris 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "kris",
+              "region": "kris-home-main",
+              "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99:cass:0",
+              "time": 1290
+            },
+            "consumed": true
+          },
+          {
+            "id": "fd6fdb06-393e-4d6f-a4dd-930ed7b2f6ca",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1290,
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "cass",
+              "region": "kris-home-main"
+            },
+            "eventId": "0e749916-5c66-40de-b42c-41dcb22b9da4"
+          }
+        ],
+        "longTerm": [],
+        "needs": {
+          "version": 1,
+          "activatedAt": 1260,
+          "updatedAt": 1290,
+          "values": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          },
+          "assessed": {
+            "hunger": 0,
+            "thirst": 0,
+            "fatigue": 0,
+            "sleep": 0
+          },
+          "history": [
+            {
+              "minute": 1275,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20,
+                "thirst": 20,
+                "fatigue": 15,
+                "sleep": 20
+              },
+              "after": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              }
+            },
+            {
+              "minute": 1290,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              },
+              "after": {
+                "hunger": 21.5,
+                "thirst": 23,
+                "fatigue": 15.5,
+                "sleep": 22
+              }
+            }
+          ],
+          "dropped": 0
+        },
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1275,
+            "observationId": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+            "reason": "一般線索，等待正常決策"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          }
+        ],
+        "memoryTrace": [],
+        "preferences": {
+          "schemaVersion": 1,
+          "items": [],
+          "trace": [
+            {
+              "id": "quiet-moment",
+              "version": 1,
+              "time": 1275,
+              "operation": "upsert",
+              "references": [
+                {
+                  "kind": "short",
+                  "id": "legacy:cass:memory:0:1260",
+                  "version": 1
+                }
+              ],
+              "reason": "這次經歷讓我想保留安靜片刻。"
+            },
+            {
+              "id": "quiet-moment",
+              "version": 1,
+              "time": 1290,
+              "operation": "withdraw",
+              "references": [
+                {
+                  "kind": "short",
+                  "id": "legacy:cass:memory:0:1260",
+                  "version": 1
+                }
+              ],
+              "reason": "我已重新考慮這個偏好。"
+            }
+          ],
+          "droppedTrace": 0
+        },
+        "habits": [
+          {
+            "key": "3:kris-home:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "kris-home",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1290
+          }
+        ]
+      },
+      {
+        "id": "vera",
+        "intents": [],
+        "name": "Vera",
+        "color": "#a2bdf0",
+        "location": "vera-home",
+        "mood": "平靜",
+        "personality": "不善言詞，習慣以陪伴表達關心；正在練習不把所有責任攬在身上。",
+        "abilityTags": [
+          "擅長髮飾設計"
+        ],
+        "goal": "尊重 Cass 的空間，也試著做一件自己喜歡的事。",
+        "activity": "安靜休息了一會兒。",
+        "relationships": {
+          "cass": "想關心她，但不想再越界。",
+          "kris": "知道她是 Cass 信任的人。"
+        },
+        "memories": [
+          {
+            "id": "legacy:vera:memory:0:1260",
+            "time": 1260,
+            "text": "Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。"
+          },
+          {
+            "id": "3875550c-564e-44c4-80fc-ec3f5f9d96cd",
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "f1ad139e-2b63-4a3c-8fde-cdc1cb2709b2",
+            "time": 1290,
+            "text": "Vera 讓自己安靜休息了一會兒。"
+          }
+        ],
+        "attentionConditions": [],
+        "observationCursor": 0,
+        "region": "vera-home-main",
+        "observations": [],
+        "shortTerm": [
+          {
+            "id": "legacy:vera:memory:0:1260",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1260,
+            "text": "Cass 說需要幾天空間。我不知道她此刻在哪裡；我們可以用手機聯絡。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "3875550c-564e-44c4-80fc-ec3f5f9d96cd",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1275,
+            "text": "Vera 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "vera-home-main"
+            },
+            "eventId": "2502b0b2-d5f5-4a46-9aa9-8e630a02e515"
+          },
+          {
+            "id": "f1ad139e-2b63-4a3c-8fde-cdc1cb2709b2",
+            "characterId": "vera",
+            "version": 1,
+            "time": 1290,
+            "text": "Vera 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "vera",
+              "region": "vera-home-main"
+            },
+            "eventId": "a2bce5e6-8c0c-4ca5-94ab-aea0642f0a8f"
+          }
+        ],
+        "longTerm": [],
+        "needs": {
+          "version": 1,
+          "activatedAt": 1260,
+          "updatedAt": 1290,
+          "values": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          },
+          "assessed": {
+            "hunger": 0,
+            "thirst": 0,
+            "fatigue": 0,
+            "sleep": 0
+          },
+          "history": [
+            {
+              "minute": 1275,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20,
+                "thirst": 20,
+                "fatigue": 15,
+                "sleep": 20
+              },
+              "after": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              }
+            },
+            {
+              "minute": 1290,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              },
+              "after": {
+                "hunger": 21.5,
+                "thirst": 23,
+                "fatigue": 15.5,
+                "sleep": 22
+              }
+            }
+          ],
+          "dropped": 0
+        },
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          }
+        ],
+        "memoryTrace": [],
+        "habits": [
+          {
+            "key": "3:vera-home:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "vera-home",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1290
+          }
+        ]
+      },
+      {
+        "id": "kris",
+        "intents": [],
+        "name": "Kris",
+        "color": "#d4c485",
+        "location": "kris-home",
+        "mood": "平靜",
+        "personality": "成熟、務實，不替別人決定人生；先處理吃飯與休息等眼前的事情。",
+        "goal": "提供安全的暫住空間，讓 Cass 自己思考。",
+        "activity": "安靜休息了一會兒。",
+        "relationships": {
+          "cass": "願意幫忙，但不替她做決定。",
+          "vera": "不代替兩人傳遞私密談話。"
+        },
+        "memories": [
+          {
+            "id": "legacy:kris:memory:0:1260",
+            "time": 1260,
+            "text": "Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。"
+          },
+          {
+            "id": "0829899b-8456-4513-9adf-3532b1a03d2f:kris:0",
+            "time": 1275,
+            "text": "Cass 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "db3308d6-9b6f-4a27-b84f-7f2b219f173b",
+            "time": 1275,
+            "text": "Kris 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "222cffaf-e3e8-4ef6-98e7-785010495952",
+            "time": 1290,
+            "text": "Kris 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+            "time": 1290,
+            "text": "Cass 讓自己安靜休息了一會兒。"
+          }
+        ],
+        "attentionConditions": [],
+        "observationCursor": 1,
+        "region": "kris-home-main",
+        "observations": [
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "cass",
+            "region": "kris-home-main",
+            "id": "0829899b-8456-4513-9adf-3532b1a03d2f:kris:0",
+            "time": 1275
+          },
+          {
+            "sense": "sight",
+            "kind": "activity",
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "clarity": "clear",
+            "source": "cass",
+            "region": "kris-home-main",
+            "id": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+            "time": 1290
+          }
+        ],
+        "shortTerm": [
+          {
+            "id": "legacy:kris:memory:0:1260",
+            "characterId": "kris",
+            "version": 1,
+            "time": 1260,
+            "text": "Cass 暫時借住。我可以幫她安頓，不必逼她今晚做出決定。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "0829899b-8456-4513-9adf-3532b1a03d2f:kris:0",
+            "characterId": "kris",
+            "version": 1,
+            "time": 1275,
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "cass",
+              "region": "kris-home-main",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Cass 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "cass",
+              "region": "kris-home-main",
+              "id": "0829899b-8456-4513-9adf-3532b1a03d2f:kris:0",
+              "time": 1275
+            },
+            "consumed": true
+          },
+          {
+            "id": "db3308d6-9b6f-4a27-b84f-7f2b219f173b",
+            "characterId": "kris",
+            "version": 1,
+            "time": 1275,
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "kris",
+              "region": "kris-home-main"
+            },
+            "eventId": "8ff867ba-6be5-4a9b-9884-7184b8cc0698"
+          },
+          {
+            "id": "222cffaf-e3e8-4ef6-98e7-785010495952",
+            "characterId": "kris",
+            "version": 1,
+            "time": 1290,
+            "text": "Kris 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "kris",
+              "region": "kris-home-main"
+            },
+            "eventId": "1a7c4dca-2b47-4540-a710-1dbb7746fb99"
+          },
+          {
+            "id": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+            "characterId": "kris",
+            "version": 1,
+            "time": 1290,
+            "text": "Cass 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "observation",
+              "person": "cass",
+              "region": "kris-home-main",
+              "sense": "sight",
+              "clarity": "clear"
+            },
+            "observation": {
+              "sense": "sight",
+              "kind": "activity",
+              "text": "Cass 讓自己安靜休息了一會兒。",
+              "clarity": "clear",
+              "source": "cass",
+              "region": "kris-home-main",
+              "id": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+              "time": 1290
+            }
+          }
+        ],
+        "longTerm": [],
+        "needs": {
+          "version": 1,
+          "activatedAt": 1260,
+          "updatedAt": 1290,
+          "values": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          },
+          "assessed": {
+            "hunger": 0,
+            "thirst": 0,
+            "fatigue": 0,
+            "sleep": 0
+          },
+          "history": [
+            {
+              "minute": 1275,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20,
+                "thirst": 20,
+                "fatigue": 15,
+                "sleep": 20
+              },
+              "after": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              }
+            },
+            {
+              "minute": 1290,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              },
+              "after": {
+                "hunger": 21.5,
+                "thirst": 23,
+                "fatigue": 15.5,
+                "sleep": 22
+              }
+            }
+          ],
+          "dropped": 0
+        },
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "observationId": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+            "reason": "一般線索，等待正常決策"
+          }
+        ],
+        "memoryTrace": [],
+        "habits": [
+          {
+            "key": "3:kris-home:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "kris-home",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1290
+          }
+        ]
+      },
+      {
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "安靜休息了一會兒。",
+        "relationships": {},
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          },
+          {
+            "id": "0ec8f327-8323-40c6-8c59-c61cf4825ff0",
+            "time": 1275,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          },
+          {
+            "id": "ac7d7e0a-4efe-4f79-a09d-1af95b8549ab",
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。"
+          }
+        ],
+        "intents": [],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observationCursor": 0,
+        "region": "cafe-front",
+        "observations": [],
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "0ec8f327-8323-40c6-8c59-c61cf4825ff0",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "ab1fd0ae-3238-4142-8b95-895d1e3de6d0"
+          },
+          {
+            "id": "ac7d7e0a-4efe-4f79-a09d-1af95b8549ab",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1290,
+            "text": "店主 讓自己安靜休息了一會兒。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "eventId": "a7c33d41-d735-4f92-9596-64e8c65c299b"
+          }
+        ],
+        "longTerm": [],
+        "needs": {
+          "version": 1,
+          "activatedAt": 1260,
+          "updatedAt": 1290,
+          "values": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          },
+          "assessed": {
+            "hunger": 0,
+            "thirst": 0,
+            "fatigue": 0,
+            "sleep": 0
+          },
+          "history": [
+            {
+              "minute": 1275,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20,
+                "thirst": 20,
+                "fatigue": 15,
+                "sleep": 20
+              },
+              "after": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              }
+            },
+            {
+              "minute": 1290,
+              "reason": "世界時間",
+              "before": {
+                "hunger": 20.75,
+                "thirst": 21.5,
+                "fatigue": 15.25,
+                "sleep": 21
+              },
+              "after": {
+                "hunger": 21.5,
+                "thirst": 23,
+                "fatigue": 15.5,
+                "sleep": 22
+              }
+            }
+          ],
+          "dropped": 0
+        },
+        "attentionDiagnostics": [
+          {
+            "time": 1275,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          },
+          {
+            "time": 1290,
+            "reason": "正常決策或重新評估時取得待用觀察"
+          }
+        ],
+        "memoryTrace": [],
+        "habits": [
+          {
+            "key": "3:cafe:rest:",
+            "type": "rest",
+            "target": "",
+            "location": "cafe",
+            "period": 3,
+            "observedDays": [
+              1
+            ],
+            "lastSeen": 1290
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "id": "opening",
+        "time": 1260,
+        "actor": "world",
+        "text": "雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。",
+        "kind": "opening",
+        "audience": [
+          "cass",
+          "kris"
+        ]
+      },
+      {
+        "id": "0829899b-8456-4513-9adf-3532b1a03d2f",
+        "time": 1275,
+        "actor": "cass",
+        "text": "Cass 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "cass",
+          "kris"
+        ],
+        "scene": {
+          "from": "kris-home",
+          "to": "kris-home",
+          "fromRegion": "kris-home-main",
+          "toRegion": "kris-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Cass 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "cass",
+                "region": "kris-home-main",
+                "id": "0829899b-8456-4513-9adf-3532b1a03d2f:kris:0",
+                "time": 1275
+              }
+            ],
+            "reason": "直接察覺"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "2502b0b2-d5f5-4a46-9aa9-8e630a02e515",
+        "time": 1275,
+        "actor": "vera",
+        "text": "Vera 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera"
+        ],
+        "scene": {
+          "from": "vera-home",
+          "to": "vera-home",
+          "fromRegion": "vera-home-main",
+          "toRegion": "vera-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698",
+        "time": 1275,
+        "actor": "kris",
+        "text": "Kris 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "cass",
+          "kris"
+        ],
+        "scene": {
+          "from": "kris-home",
+          "to": "kris-home",
+          "fromRegion": "kris-home-main",
+          "toRegion": "kris-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Kris 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "kris",
+                "region": "kris-home-main",
+                "id": "8ff867ba-6be5-4a9b-9884-7184b8cc0698:cass:0",
+                "time": 1275
+              }
+            ],
+            "reason": "直接察覺"
+          },
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "ab1fd0ae-3238-4142-8b95-895d1e3de6d0",
+        "time": 1275,
+        "actor": "owner",
+        "text": "店主 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "a2bce5e6-8c0c-4ca5-94ab-aea0642f0a8f",
+        "time": 1290,
+        "actor": "vera",
+        "text": "Vera 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "vera"
+        ],
+        "scene": {
+          "from": "vera-home",
+          "to": "vera-home",
+          "fromRegion": "vera-home-main",
+          "toRegion": "vera-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99",
+        "time": 1290,
+        "actor": "kris",
+        "text": "Kris 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "cass",
+          "kris"
+        ],
+        "scene": {
+          "from": "kris-home",
+          "to": "kris-home",
+          "fromRegion": "kris-home-main",
+          "toRegion": "kris-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Kris 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "kris",
+                "region": "kris-home-main",
+                "id": "1a7c4dca-2b47-4540-a710-1dbb7746fb99:cass:0",
+                "time": 1290
+              }
+            ],
+            "reason": "直接察覺"
+          },
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "a7c33d41-d735-4f92-9596-64e8c65c299b",
+        "time": 1290,
+        "actor": "owner",
+        "text": "店主 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "owner"
+        ],
+        "scene": {
+          "from": "cafe",
+          "to": "cafe",
+          "fromRegion": "cafe-front",
+          "toRegion": "cafe-front",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "cass",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      },
+      {
+        "id": "0e749916-5c66-40de-b42c-41dcb22b9da4",
+        "time": 1290,
+        "actor": "cass",
+        "text": "Cass 讓自己安靜休息了一會兒。",
+        "kind": "rest",
+        "audience": [
+          "cass",
+          "kris"
+        ],
+        "scene": {
+          "from": "kris-home",
+          "to": "kris-home",
+          "fromRegion": "kris-home-main",
+          "toRegion": "kris-home-main",
+          "target": ""
+        },
+        "perception": [
+          {
+            "characterId": "vera",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          },
+          {
+            "characterId": "kris",
+            "status": "direct",
+            "observations": [
+              {
+                "sense": "sight",
+                "kind": "activity",
+                "text": "Cass 讓自己安靜休息了一會兒。",
+                "clarity": "clear",
+                "source": "cass",
+                "region": "kris-home-main",
+                "id": "0e749916-5c66-40de-b42c-41dcb22b9da4:kris:0",
+                "time": 1290
+              }
+            ],
+            "reason": "直接察覺"
+          },
+          {
+            "characterId": "owner",
+            "status": "no-opportunity",
+            "observations": [],
+            "reason": "沒有可接觸的線索"
+          }
+        ]
+      }
+    ],
+    "perceptionTrials": {},
+    "probeResults": {},
+    "currentSensory": {
+      "presence": {
+        "cass": {
+          "region": "kris-home-main",
+          "clue": "initial:cass:kris-home-main"
+        },
+        "vera": {
+          "region": "vera-home-main",
+          "clue": "initial:vera:vera-home-main"
+        },
+        "kris": {
+          "region": "kris-home-main",
+          "clue": "initial:kris:kris-home-main"
+        },
+        "owner": {
+          "region": "cafe-front",
+          "clue": "initial:owner:cafe-front"
+        }
+      },
+      "activities": {
+        "cass": {
+          "clue": "0e749916-5c66-40de-b42c-41dcb22b9da4",
+          "region": "kris-home-main",
+          "action": {
+            "type": "rest",
+            "target": ""
+          }
+        },
+        "vera": {
+          "clue": "a2bce5e6-8c0c-4ca5-94ab-aea0642f0a8f",
+          "region": "vera-home-main",
+          "action": {
+            "type": "rest",
+            "target": ""
+          }
+        },
+        "kris": {
+          "clue": "1a7c4dca-2b47-4540-a710-1dbb7746fb99",
+          "region": "kris-home-main",
+          "action": {
+            "type": "rest",
+            "target": ""
+          }
+        },
+        "owner": {
+          "clue": "a7c33d41-d735-4f92-9596-64e8c65c299b",
+          "region": "cafe-front",
+          "action": {
+            "type": "rest",
+            "target": ""
+          }
+        }
+      }
+    },
+    "scene": {
+      "doors": {
+        "cafe-door": "open"
+      },
+      "noise": {},
+      "occluded": []
+    },
+    "adjudication": {
+      "provider": "openai",
+      "model": "fixture-world"
+    },
+    "aiUsage": {
+      "windowStartedAt": 1792080000000,
+      "calls": 8,
+      "inputTokens": 80,
+      "outputTokens": 40,
+      "unknownCalls": 0,
+      "totalCalls": 8,
+      "totalInputTokens": 80,
+      "totalOutputTokens": 40,
+      "totalUnknownCalls": 0,
+      "savedDecisions": 0,
+      "costs": {
+        "total": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 8,
+            "input": 80,
+            "output": 40,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 8,
+            "lastDispatchAt": 1792080000000
+          }
+        },
+        "hour": {
+          "npc:unknown:openai:gpt-6-luna": {
+            "task": "npc",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "price": null,
+            "calls": 8,
+            "input": 80,
+            "output": 40,
+            "cachedInput": 0,
+            "knownUsd": 0,
+            "unknownCalls": 8,
+            "lastDispatchAt": 1792080000000
+          }
+        }
+      }
+    }
+  }
+}

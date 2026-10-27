@@ -69,6 +69,7 @@ export function commitWorldChanges(w:World,clone:World):void {
  for(const actor of w.characters){
   const next=clone.characters.find(c=>c.id===actor.id)!;
   if(next.physical)actor.physical=next.physical;else delete actor.physical;
+  if(next.needs)actor.needs=next.needs;else delete actor.needs;
   actor.location=next.location;actor.region=next.region;
  }
 }

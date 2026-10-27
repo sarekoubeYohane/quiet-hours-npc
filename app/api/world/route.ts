@@ -1,10 +1,11 @@
+import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
-import { createDecisionTrace } from '@/lib/decision-trace-capture';
+import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
 import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
-import { bindRoutine, routineOffer, routineCandidateSchema, resolveRoutineCandidate } from '@/lib/routine-rules';
+import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, routineOffer, routineCandidateSchema, resolveRoutineCandidate } from '@/lib/routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
 import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
@@ -400,7 +401,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           if (held?.locked_until !== lease || held.version !== version || Date.now() >= workDeadline){decisionTrace?.discard('lease-invalid');decisionTrace?.step('lease-invalid',undefined,{expectedVersion:version,observedVersion:held?.version,leaseHeld:held?.locked_until===lease,deadlineExpired:Date.now()>=workDeadline});throw Error('世界租約或工作期限已到期，本回合停止付費請求。');}
         };
         await advanceActivities(world, {
-          onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{activity:c.activity,plan:c.plan,shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
+          onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,
           beforeDecision: async () => {
@@ -447,7 +448,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               return decision;
             }
             if(requiresWorldEffects(decision.action) && !decision.continueExisting){
-              const reused=bindRoutine(w,c,decision.action,decision.durationMinutes,undefined,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data));
+              const selection=selectRoutineForDecision(w,c,decision.action,decision.durationMinutes,b.minutes!,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),decision.reconfirmBodyConsequences);
+              const reused=selection.candidate;
+              const priorRuleIds=new Set((w.routineRules||[]).map(rule=>rule.id));
               decisionTrace?.step('rule-selection',c.id,{branch:reused?'program-result':'adjudication-required',candidate:reused||null});
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
@@ -456,7 +459,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
+              const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
@@ -464,6 +467,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}
+              if(selection.reconfirming&&selection.signature&&decision.freeCandidate.status!=='accepted')retainUnconfirmedBodyReview(w,selection.signature);
+              if(selection.reconfirming&&decision.freeCandidate.status==='accepted'&&(!confirmsBodyConsequences(decision.freeCandidate)||!(w.routineRules||[]).some(rule=>rule.version===3&&!priorRuleIds.has(rule.id))))throw new EffectValidationError('身體後果重新確認須保存含明示攝取或時間後果的新日常範圍。',{reason:'body_reconfirmation_scope'});
               decisionTrace?.step('bound-candidate',c.id,{candidate:decision.freeCandidate});
               adjudicationAttempt.stage='effects';
               }

@@ -29,7 +29,7 @@ test('aligned completion is compared against the unchanged explicit cap and repe
  }
 });
 test('invalid explicit limits are technical failures before adjudication and replay never redispatches',async()=>{
- for(const maxMinutes of [0,-1,91,'15',undefined]){
+ for(const maxMinutes of [0,-1,1441,'15',undefined]){
   const s=await scenario(30,maxMinutes);try{
    if(maxMinutes===undefined)s.choose({timeIntent:{kind:'completion'}});
    const op={operation:'advance',minutes:15,operationId:id()};assert.equal((await s.post(op)).status,502);const w=await s.read();assert.equal(w.turn,0);assert.equal(w.routineRules,undefined);assert.equal(w.objects,undefined);assert.equal(w.aiUsage.totalCalls,1);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:0});

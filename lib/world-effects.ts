@@ -1,3 +1,4 @@
+import { changeBodyNeeds, type IngestEffect } from './needs';
 import { routineBindingsHold, rebindRoutineEffects, type RoutinePhaseBindings } from './routine-world-bindings';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
@@ -8,7 +9,7 @@ export { applyBoundedStateChanges, commitWorldChanges } from './world-state';
 import { effectCandidateSchema, effectRules, validObjectKind } from './adjudication-contract';
 import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
-import type { Action, Character, World } from './world';
+import type { Action, ActivityPlan, Character, World } from './world';
 import { canSee, regionOf, regions, connectingDoor } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
@@ -26,7 +27,7 @@ export type StateChange={key:string;from:string|null;value:string};
 export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
 export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
 export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation:'materialize';supplyId:string;expectedRemaining:number}|{operation:'take'|'place'|'consume'|'destroy';objectId:string;expectedRevision:number});
-export type Effect=ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
+export type Effect=IngestEffect|ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
 export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;requiredTools?:string[]};
@@ -35,7 +36,8 @@ export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPha
 // attempt without storing model-authored IDs or the first historical die in a rule.
 export type TrialBinding={operation:string;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
-export type EffectCandidate={pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;knownBlockedReason?:string;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type ActivityIdentity={version:1;key:string;label:string};
+export type EffectCandidate={activityIdentity?:ActivityIdentity;resumable?:boolean;bodyActivity?:import('./needs').BodyActivity;pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;knownBlockedReason?:string;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
 export function hasObjectPermission(object:{owner:string;allowedTo:string[];coOwners?:string[]},actorId:string):boolean {
  return object.allowedTo.includes(actorId)||(!object.coOwners||object.coOwners.length<=1)&&object.owner===actorId;
 }
@@ -78,7 +80,7 @@ export function authorityForProposal(w:World,c:Character){
  const supplies=knownWorldSupplies(w,c).map(s=>w.supplies!.find(full=>full.id===s.id)!);
  return {external:{bodies:w.characters.filter(person=>regionOf(person)===regionOf(c)&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:regionOf(c)})},objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v4',effectRules,effectContract:effectCandidateSchema};
 }
-function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect> {
+function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect|IngestEffect> {
  if(effect.operation==='materialize')return {kind:'materialize',supplyId:effect.supplyId,expectedRemaining:effect.expectedRemaining};
  if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
  return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
@@ -88,7 +90,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
  const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
  for(const [effectIndex,original] of effects.entries()){
   const physical=original.kind==='physical';
-  const e=physical?physicalPrimitive(original,c):original;
+  const e=physical?physicalPrimitive(original,c):original.kind==='ingest'?{kind:'consume' as const,objectId:original.objectId,expectedRevision:original.expectedRevision}:original;
   const fail:(reason:string,message:string)=>never=(reason,message)=>{
    const id=effectReferenceId(e);
    throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
@@ -146,7 +148,9 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    const priorHolder=o.holder;
    if(e.kind==='consume'){
     if(!(o.consumable??o.kind==='food')||o.holder!==c.id)fail('not_consumable','不能食用這件物品。');
-    o.lifecycle='consumed';o.holder=null;if(o.quantity)o.quantity.amount=0;results.push(`食用${o.label}`);
+    o.lifecycle='consumed';o.holder=null;if(o.quantity)o.quantity.amount=0;
+    if(original.kind==='ingest')changeBodyNeeds(c,w.minute,{hunger:-original.hungerRelief,thirst:-original.thirstRelief},`實際攝取 ${o.id}`);
+    results.push(`食用${o.label}`);
    }else if(e.kind==='destroy'){
     if(!physical&&o.owner!==c.id)fail('not_owned','不能毀壞借來的物品。');
     o.lifecycle='destroyed';o.holder=null;if(o.quantity)o.quantity.amount=0;results.push(physical?`${o.label}已損毀`:`處理了已損毀的${o.label}`);
@@ -351,6 +355,24 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
  if(phase.effects.some(e=>e.kind==='grant'||e.kind==='consent'))throw Error('活動需要新的角色選擇。');
  if(c.plan?.phases&&regionOf(c)!==c.plan.phases.origin)throw Error('角色已離開活動場景。');
 }
+// Revalidate a resumed plan without committing consequences, observations or
+// randomness. The full copy also isolates routine rebinding's phase mutations.
+export function remainingActivityConditionsHold(w:World,c:Character,plan:ActivityPlan):boolean {
+ const predicted=structuredClone(w),actor=predicted.characters.find(value=>value.id===c.id)!;
+ actor.plan=structuredClone(plan);
+ const phases=actor.plan.phases;
+ if(!phases)return true;
+ try{
+  for(let index=phases.cursor;index<phases.stages.length;index++){
+   const phase=phases.stages[index];
+   predicted.minute=Math.max(predicted.minute,actor.plan.startedAt+phase.afterMinutes);
+   checkPhase(predicted,actor,phase);
+   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes);
+  }
+  return true;
+ }catch{return false;}
+}
+
 // Validate and commit one phase as a batch; lifecycle owns the phase cursor.
 export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;

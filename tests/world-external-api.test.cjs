@@ -58,6 +58,21 @@ test('subject-only bodily changes are felt directly by the affected actor withou
 });
 
 const condition=(type,id,key,value,guard)=>({kind:'state-condition',version:1,target:{type,id},state:[{key,value}],...(guard?{guard}:{})});
+test('generic bodily changes cannot bypass NPC authority using preference or habit keys',async()=>{
+ for(const key of ['preference','preferences','喜好','偏好','habit','habits','習慣','Preferences','body.preferences','body.habits']){
+  const forged={...change('body','vera',key,null,'FORGED_PRIVATE_PREFERENCE'),exposure:'subject'};
+  const reply={...accepted([]),stages:[{afterMinutes:15,preconditions:[condition('body','vera','手背',null)],effects:[change('object','cup','volume','full','less',1),forged]}]};
+  const s=await scenario({reply});try{
+   const before=await s.read(),operationId=Date.now()+':'+crypto.randomUUID(),body={operation:'advance',minutes:15,operationId};
+   const response=await s.post(body);assert.equal(response.status,502,`the world must not write the mental key ${key} as a bodily sensation`);
+   const failed=await response.json(),after=await s.read();assert.deepEqual(after.characters,before.characters);assert.deepEqual(after.objects,before.objects);assert.deepEqual(after.events,before.events);assert.equal(after.minute,before.minute);assert.equal(after.turn,before.turn);
+   const counts=s.counts();assert.deepEqual(await(await s.post(body)).json(),failed);assert.deepEqual(s.counts(),counts);
+   s.choose(rest);await advance(s);
+   for(const request of s.requests.filter(item=>item.input.self))assert.doesNotMatch(JSON.stringify(request.input),/FORGED_PRIVATE_PREFERENCE/);
+   assert.equal(s.counts().dice,0);
+  }finally{s.restore();}
+ }
+});
 test('later phases reference relevant external conditions and preserve committed preparation when a bodily premise changes',async()=>{
  const staged={...accepted([]),completionMinutes:45,stages:[
   {afterMinutes:15,preconditions:[],effects:[change('object','cup','progress',null,'partial',1)]},

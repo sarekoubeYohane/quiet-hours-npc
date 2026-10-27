@@ -56,7 +56,9 @@ for (const [source,output] of sources) {
         }
         return { meta: { changes: 0 } };
       }
-      const result = db.prepare(sql).run(...values);
+      // Match the application clock when the production CAS checks lease expiry.
+      const executedSql=sql.replaceAll("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)",String(Date.now()));
+      const result = db.prepare(executedSql).run(...values);
       if (finalSave && uncertain) { uncertain = false; throw Error('Unknown commit outcome'); }
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
