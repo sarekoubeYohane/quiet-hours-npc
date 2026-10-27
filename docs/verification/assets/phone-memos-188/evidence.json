@@ -1,0 +1,14 @@
+{
+  "fixture": true,
+  "paidCalls": 0,
+  "uiAdvances": 4,
+  "actions": [
+    "create",
+    "list",
+    "read"
+  ],
+  "reloadConsistent": true,
+  "readerIds": [
+    "owner"
+  ]
+}

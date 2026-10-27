@@ -1,3 +1,4 @@
+import { activatePhones } from './phones';
 import { managePausedActivity } from './paused-activities';
 import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bodyIntervalBase, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
 import { advanceNaturalChanges } from './natural-changes';
@@ -84,6 +85,7 @@ export async function advanceActivities(world: World, options: {
   if (ai) {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
+  activatePhones(world);
   activateBodyNeeds(world);
   const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
   const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));

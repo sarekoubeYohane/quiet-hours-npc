@@ -56,7 +56,7 @@ export function habitLabel(habit: Habit, characters: Character[]): string {
   const person = characters.find(character => character.id === habit.target)?.name || '朋友';
   const activity = habit.activityLabel || (habit.type === 'move' ? `前往${destination}` : habit.type === 'say' ? `與 ${person} 聊聊` :
     habit.type === 'shout' ? `向 ${person} 大聲說話` : habit.type === 'persuade' ? `嘗試說服 ${person}` : habit.type === 'message' ? `傳訊息給 ${person}` : habit.type === 'work' ? ({ tea: '泡茶', tidy: '整理', craft: '畫髮飾' }[habit.target] || '工作') :
-    ({ pause:'暫停活動',resume:'恢復活動',abandon:'放棄活動',propose:'自由方法', door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動'));
+    ({ phone:'操作手機', pause:'暫停活動',resume:'恢復活動',abandon:'放棄活動',propose:'自由方法', door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動'));
   return `${habitPeriods[habit.period]}在${place}，常會${activity}`;
 }
 
@@ -85,7 +85,7 @@ export function activityIdentity(world:World,action:Action,candidate:EffectCandi
  }
  const operation=candidate?.trialBinding?.operation||routineOperation(action,world.routineRules?.flatMap(rule=>rule.templates||[]))||routineOperation(action);
  if(operation)return {key:`routine:${operation}`,label:({tea:'泡茶',coffee:'準備咖啡',food:'準備食物',drink:'飲用',wash:'清洗餐具',return:'歸還餐具'} as Record<string,string>)[operation]||operation};
- if(action.type!=='propose')return {key:`${action.type}:${['move','say','shout','persuade','message','work'].includes(action.type)?action.target||'':''}`,label:action.type==='work'?({tidy:'整理',craft:'畫髮飾'}[action.target||'']||'工作'):({pause:'暫停活動',resume:'恢復活動',abandon:'放棄活動',rest:'休息',reflect:'留些時間給自己',observe:'觀察周圍',move:'移動',say:'聊天',shout:'大聲說話',persuade:'嘗試說服',message:'傳訊息',door:'操作門'}[action.type]||'活動')};
+ if(action.type!=='propose')return {key:`${action.type}:${['move','say','shout','persuade','message','work'].includes(action.type)?action.target||'':''}`,label:action.type==='work'?({tidy:'整理',craft:'畫髮飾'}[action.target||'']||'工作'):({phone:'操作手機',pause:'暫停活動',resume:'恢復活動',abandon:'放棄活動',rest:'休息',reflect:'留些時間給自己',observe:'觀察周圍',move:'移動',say:'聊天',shout:'大聲說話',persuade:'嘗試說服',message:'傳訊息',door:'操作門'}[action.type]||'活動')};
  return {key:'unclassified',label:(action.purpose||'自由活動').slice(0,80),semanticGap:true};
 }
 
