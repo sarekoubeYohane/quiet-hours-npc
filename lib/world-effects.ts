@@ -9,7 +9,7 @@ export { applyBoundedStateChanges, commitWorldChanges } from './world-state';
 import { effectCandidateSchema, effectRules, validObjectKind } from './adjudication-contract';
 import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
-import type { Action, Character, World } from './world';
+import type { Action, ActivityPlan, Character, World } from './world';
 import { canSee, regionOf, regions, connectingDoor } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
@@ -355,6 +355,24 @@ function checkPhase(w:World,c:Character,phase:ActivityPhase):void{
  if(phase.effects.some(e=>e.kind==='grant'||e.kind==='consent'))throw Error('活動需要新的角色選擇。');
  if(c.plan?.phases&&regionOf(c)!==c.plan.phases.origin)throw Error('角色已離開活動場景。');
 }
+// Revalidate a resumed plan without committing consequences, observations or
+// randomness. The full copy also isolates routine rebinding's phase mutations.
+export function remainingActivityConditionsHold(w:World,c:Character,plan:ActivityPlan):boolean {
+ const predicted=structuredClone(w),actor=predicted.characters.find(value=>value.id===c.id)!;
+ actor.plan=structuredClone(plan);
+ const phases=actor.plan.phases;
+ if(!phases)return true;
+ try{
+  for(let index=phases.cursor;index<phases.stages.length;index++){
+   const phase=phases.stages[index];
+   predicted.minute=Math.max(predicted.minute,actor.plan.startedAt+phase.afterMinutes);
+   checkPhase(predicted,actor,phase);
+   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes);
+  }
+  return true;
+ }catch{return false;}
+}
+
 // Validate and commit one phase as a batch; lifecycle owns the phase cursor.
 export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;

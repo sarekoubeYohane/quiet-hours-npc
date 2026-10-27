@@ -21,7 +21,7 @@
 
 工程值、有限容量及舊世界啟用政策見[自主生活工程契約](docs/design/autonomous-life.md)與其切片基線，數字不是使用者已確認的產品平衡值。缺欄位世界不補造歷史，舊規則不暗中取得新恢復效果。既有角色／分析入口可查權威需求、本人感受、喜好來源、習慣證據與暫停進度，角色輸入仍不含觀察者內情。
 
-本地受控transport、SQLite及真實應用瀏覽器的結果與正式行為分開；本輪不合併、部署、付費或操作正式世界。後續按[有限正式驗收交接](docs/verification/autonomous-life-live-runbook.md)另行授權，不以fixture宣告泡茶loop全部修復。下方有日期的10/21工作快照保留歷史，並非本分支最新實作清單。
+[完整本地驗證與A1–A25覆蓋](docs/verification/autonomous-life-172-verification.md)記錄受控transport、SQLite及真實應用瀏覽器結果，與正式行為分開；本輪不合併、部署、付費或操作正式世界。後續按[有限正式驗收交接](docs/verification/autonomous-life-live-runbook.md)另行授權，不以fixture宣告泡茶loop全部修復。下方有日期的10/21工作快照保留歷史，並非本分支最新實作清單。
 
 ## 完整回合有界時間修正（2026-10-25）
 

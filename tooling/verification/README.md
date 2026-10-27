@@ -66,6 +66,7 @@ node tooling/verification/browser-sleep.mjs
 node tooling/verification/browser-preferences.mjs
 node tooling/verification/browser-life-habits.mjs
 node tooling/verification/browser-life-forecast.mjs
+node tooling/verification/browser-life-integration.mjs
 ```
 
 各 runner 使用真實 WorldApp／世界 API／JSON／SQLite，只有 auth、Worker bindings、模型 transport、時鐘及骰子是可控邊界。`BROWSER_ARTIFACT_DIR` 須為可寫目錄；個別 runner 可採其預設 repository 證據目錄。沒有真實 Key，不連正式世界，不以替身證明真實 NPC 會形成相同行為。本輪使用 Chromium 143、Playwright 及 Noto Sans TC；支援一般已安裝 Chromium，或設定 `CHROMIUM_MODULE` 為 `@sparticuz/chromium`。

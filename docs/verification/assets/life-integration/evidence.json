@@ -1,0 +1,958 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "uiAdvances": 24,
+  "apiAdvances": 110,
+  "elapsedMinutes": 3735,
+  "counts": {
+    "npc": 30,
+    "adjudication": 3
+  },
+  "resolutions": {
+    "[\"[\\\"results.v1\\\",\\\"owner\\\",[\\\"free\\\",\\\"workpiece\\\"]]\",\"cafe-front\",[],[],[{\"allowed\":true,\"consumable\":false,\"holder\":\"owner\",\"id\":\"material\",\"lifecycle\":\"active\",\"owner\":\"owner\",\"quantity\":{\"amount\":1,\"unit\":\"serving\"},\"region\":\"cafe-front\",\"source\":\"initial-fixture\",\"state\":{}},{\"allowed\":true,\"consumable\":false,\"holder\":\"owner\",\"id\":\"workpiece\",\"lifecycle\":\"active\",\"owner\":\"owner\",\"quantity\":{\"amount\":1,\"unit\":\"serving\"},\"region\":\"cafe-front\",\"source\":\"initial-fixture\",\"state\":{\"progress\":\"raw\"}}]]": {
+      "roll": 14,
+      "modifier": 0,
+      "dc": 12,
+      "total": 2,
+      "outcome": "success"
+    }
+  },
+  "seen": [
+    {
+      "name": "paused",
+      "minute": 510,
+      "turn": 2
+    },
+    {
+      "name": "ingested",
+      "minute": 525,
+      "turn": 3
+    },
+    {
+      "name": "resumed",
+      "minute": 660,
+      "turn": 9
+    },
+    {
+      "name": "sleeping",
+      "minute": 975,
+      "turn": 20
+    },
+    {
+      "name": "woke",
+      "minute": 1275,
+      "turn": 30
+    },
+    {
+      "name": "day-1",
+      "minute": 1320,
+      "turn": 33
+    },
+    {
+      "name": "day-2",
+      "minute": 2760,
+      "turn": 83
+    },
+    {
+      "name": "day-3",
+      "minute": 4200,
+      "turn": 133
+    },
+    {
+      "name": "complete",
+      "minute": 4215,
+      "turn": 134
+    }
+  ],
+  "owner": {
+    "needs": {
+      "version": 1,
+      "activatedAt": 480,
+      "updatedAt": 4215,
+      "values": {
+        "hunger": 100,
+        "thirst": 100,
+        "fatigue": 74.15,
+        "sleep": 100
+      },
+      "assessed": {
+        "hunger": 3,
+        "thirst": 3,
+        "fatigue": 2,
+        "sleep": 3
+      },
+      "history": [
+        {
+          "minute": 3405,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 61.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 62.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3435,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 62.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 62.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3465,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 62.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 63.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3495,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 63.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 63.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3525,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 63.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 64.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3555,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 64.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 64.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3585,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 64.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 65.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3615,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 65.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 65.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3645,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 65.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 66.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3675,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 66.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 66.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3705,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 66.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 67.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3735,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 67.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 67.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3765,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 67.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 68.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3795,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 68.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 68.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3825,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 68.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 69.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3855,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 69.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 69.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3885,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 69.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 70.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3915,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 70.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 70.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3945,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 70.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 71.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 3975,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 71.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 71.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4005,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 71.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 72.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4035,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 72.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 72.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4065,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 72.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4095,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4125,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.15,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4155,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.15,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4170,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.9,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4170,
+          "reason": "實際活動 exertion 15分鐘",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.9,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 75.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4185,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 75.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 75.9,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4185,
+          "reason": "實際活動 rest 15分鐘",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 75.9,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.65,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4200,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.65,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.9,
+            "sleep": 100
+          }
+        },
+        {
+          "minute": 4215,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 73.9,
+            "sleep": 100
+          },
+          "after": {
+            "hunger": 100,
+            "thirst": 100,
+            "fatigue": 74.15,
+            "sleep": 100
+          }
+        }
+      ],
+      "dropped": 113
+    },
+    "preferences": {
+      "schemaVersion": 1,
+      "items": [
+        {
+          "id": "after-work-rest",
+          "characterId": "owner",
+          "version": 1,
+          "time": 1320,
+          "topic": "短暫休息",
+          "context": "完成整理之後",
+          "text": "我喜歡完成整理後坐一會兒。",
+          "references": [
+            {
+              "kind": "short",
+              "id": "726fce0e-f677-4774-bab9-0d82208d88c0",
+              "version": 1
+            }
+          ],
+          "reason": "剛才實際休息的感受令我想保留這個偏愛。"
+        }
+      ],
+      "trace": [
+        {
+          "id": "after-work-rest",
+          "version": 1,
+          "time": 1320,
+          "operation": "upsert",
+          "references": [
+            {
+              "kind": "short",
+              "id": "726fce0e-f677-4774-bab9-0d82208d88c0",
+              "version": 1
+            }
+          ],
+          "reason": "剛才實際休息的感受令我想保留這個偏愛。"
+        }
+      ],
+      "droppedTrace": 0
+    },
+    "habits": [
+      {
+        "activityKey": "reflect:",
+        "activityLabel": "留些時間給自己",
+        "evidenceIds": [
+          "129f9116-3292-4a2e-a0dd-88db0ac9db99",
+          "c8e52d63-fae1-48d5-94ed-9a0e53a5652c",
+          "4d07f0e9-ee4d-4f23-9e02-6800108dcad4",
+          "b4633a93-7cd2-4dbd-98c2-409610466829",
+          "49e25d6d-d562-43c7-80ec-141068b488b1",
+          "180d54c2-21a3-4cd1-afdf-e2dd9bec3078",
+          "cdf22ad8-299e-4036-826c-a38064e2e21d"
+        ],
+        "key": "activity.v1:3:cafe:reflect:",
+        "type": "reflect",
+        "target": "",
+        "location": "cafe",
+        "period": 3,
+        "observedDays": [
+          1,
+          2,
+          3
+        ],
+        "lastSeen": 4215
+      },
+      {
+        "activityKey": "rest:",
+        "activityLabel": "休息",
+        "evidenceIds": [
+          "bf813c87-4ebb-4d63-82f0-81aa84bbc685",
+          "f87a17fe-42fa-4b0c-bb62-6b6534671469",
+          "2a5c1bf0-8d5f-4371-b06d-569489efb02f"
+        ],
+        "key": "activity.v1:3:cafe:rest:",
+        "type": "rest",
+        "target": "",
+        "location": "cafe",
+        "period": 3,
+        "observedDays": [
+          1,
+          2,
+          3
+        ],
+        "lastSeen": 4185
+      },
+      {
+        "activityKey": "work:tidy",
+        "activityLabel": "整理",
+        "evidenceIds": [
+          "083a164c-b087-4aea-9dff-547765a2cd0d",
+          "65628b72-8dea-4b15-b997-2ed6f263829a",
+          "f5cd22c2-61c1-430f-be81-3a52e2604c87"
+        ],
+        "key": "activity.v1:3:cafe:work:tidy",
+        "type": "work",
+        "target": "tidy",
+        "location": "cafe",
+        "period": 3,
+        "observedDays": [
+          1,
+          2,
+          3
+        ],
+        "lastSeen": 4170
+      },
+      {
+        "activityKey": "rest:",
+        "activityLabel": "休息",
+        "evidenceIds": [
+          "b1d8c3f5-f1d3-4e8e-af6e-e0f814340bb6"
+        ],
+        "key": "activity.v1:1:cafe:rest:",
+        "type": "rest",
+        "target": "",
+        "location": "cafe",
+        "period": 1,
+        "observedDays": [
+          1
+        ],
+        "lastSeen": 540
+      },
+      {
+        "activityKey": "confirmed.v1:eat-and-drink",
+        "activityLabel": "實際進食飲水",
+        "evidenceIds": [
+          "55236bd1-ddc0-4f7c-b925-a06c81ab17b2"
+        ],
+        "key": "activity.v1:1:cafe:confirmed.v1:eat-and-drink",
+        "type": "propose",
+        "target": "",
+        "location": "cafe",
+        "period": 1,
+        "observedDays": [
+          1
+        ],
+        "lastSeen": 525
+      },
+      {
+        "activityKey": "confirmed.v1:dough-ornament",
+        "activityLabel": "完成手作",
+        "evidenceIds": [
+          "f4bd01cc-3860-4563-8721-205b3c070168"
+        ],
+        "key": "activity.v1:1:cafe:confirmed.v1:dough-ornament",
+        "type": "propose",
+        "target": "",
+        "location": "cafe",
+        "period": 1,
+        "observedDays": [
+          1
+        ],
+        "lastSeen": 495
+      }
+    ],
+    "eventHabits": [
+      {
+        "key": "event.v1:work:tidy:rest::cafe",
+        "triggerKey": "work:tidy",
+        "triggerLabel": "整理",
+        "activityKey": "rest:",
+        "activityLabel": "休息",
+        "location": "cafe",
+        "observedDays": [
+          1,
+          2,
+          3
+        ],
+        "lastSeen": 4185,
+        "proposedAt": 1320,
+        "links": [
+          {
+            "trigger": {
+              "id": "ad52cf42-26c9-4cd5-a94b-e0de4371cf23",
+              "version": 1
+            },
+            "action": {
+              "id": "726fce0e-f677-4774-bab9-0d82208d88c0",
+              "version": 1
+            },
+            "evidenceId": "bf813c87-4ebb-4d63-82f0-81aa84bbc685"
+          },
+          {
+            "trigger": {
+              "id": "cda3a7d1-27cb-482e-99eb-d608934a4577",
+              "version": 1
+            },
+            "action": {
+              "id": "a77d5617-3d25-4d9f-8324-737c3be35bed",
+              "version": 1
+            },
+            "evidenceId": "f87a17fe-42fa-4b0c-bb62-6b6534671469"
+          },
+          {
+            "trigger": {
+              "id": "995b857f-ba91-46a0-b2df-69f6618d6888",
+              "version": 1
+            },
+            "action": {
+              "id": "1d214327-3b3b-4276-859b-66bd14e83d9a",
+              "version": 1
+            },
+            "evidenceId": "2a5c1bf0-8d5f-4371-b06d-569489efb02f"
+          }
+        ]
+      }
+    ]
+  },
+  "objects": [
+    {
+      "id": "workpiece",
+      "label": "木製裝飾托盤",
+      "kind": "utensil",
+      "source": "initial-fixture",
+      "revision": 3,
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "lifecycle": "active",
+      "state": {
+        "progress": "finished"
+      },
+      "consumable": false,
+      "quantity": {
+        "amount": 1,
+        "unit": "serving"
+      },
+      "stateTransitions": {
+        "progress": [
+          "raw",
+          "prepared",
+          "finished",
+          "unfinished"
+        ]
+      }
+    },
+    {
+      "id": "material",
+      "label": "製作材料",
+      "kind": "timber",
+      "source": "initial-fixture",
+      "revision": 2,
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "lifecycle": "consumed",
+      "state": {},
+      "consumable": false,
+      "quantity": {
+        "amount": 0,
+        "unit": "serving"
+      },
+      "endedByFormation": {
+        "operation": "transform",
+        "at": 495,
+        "actorId": "owner",
+        "disposition": "consumed"
+      }
+    },
+    {
+      "id": "meal",
+      "label": "本人餐點",
+      "kind": "food",
+      "source": "initial-fixture",
+      "revision": 2,
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "lifecycle": "consumed",
+      "state": {},
+      "consumable": true,
+      "quantity": {
+        "amount": 0,
+        "unit": "serving"
+      }
+    },
+    {
+      "id": "water",
+      "label": "本人飲水",
+      "kind": "drink",
+      "source": "initial-fixture",
+      "revision": 2,
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "lifecycle": "consumed",
+      "state": {},
+      "consumable": true,
+      "quantity": {
+        "amount": 0,
+        "unit": "serving"
+      }
+    },
+    {
+      "id": "prepared-material",
+      "source": "material",
+      "sources": [
+        {
+          "type": "object",
+          "id": "material",
+          "revision": 1,
+          "amount": 1,
+          "unit": "serving",
+          "owner": "owner",
+          "disposition": "consumed"
+        }
+      ],
+      "quantity": {
+        "amount": 1,
+        "unit": "serving"
+      },
+      "formation": {
+        "operation": "transform",
+        "at": 495,
+        "inputs": [
+          "material"
+        ]
+      },
+      "label": "已成形的裝飾底料",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "revision": 1,
+      "state": {},
+      "stateExposure": {},
+      "lifecycle": "active",
+      "kind": "component",
+      "consumable": false,
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    }
+  ]
+}

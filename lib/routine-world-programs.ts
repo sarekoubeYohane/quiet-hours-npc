@@ -1,3 +1,4 @@
+import { confirmsBodyConsequences } from './needs';
 import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
@@ -159,7 +160,7 @@ export function bindWorldRoutine(w:World,c:Character,action:Action,approval?:Rou
   return (rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>{const {wording,purpose}=checkRoutineMethod(method,action);observeSelection(observe,{source:'program-check',check:'method',ruleId:rule.id,version:rule.version,operation:program.operation,method,wording,purpose:wording?purpose:'not-evaluated'});return wording&&purpose;}));
  });
  let blocked:{candidate:EffectCandidate;world:World}|undefined;
- for(const rule of candidates){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id,observe);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;const original=w.routineRules?.find(value=>value.id===rule.id),bound=snapshot.routineRules?.find(value=>value.id===rule.id);if(original&&bound?.finiteSourceBindings)original.finiteSourceBindings=structuredClone(bound.finiteSourceBindings);return candidate;}
+ for(const rule of candidates.sort((left,right)=>{const confirmed=(rule:typeof left)=>(rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>matchesRoutineMethod(method,action))&&confirmsBodyConsequences(program));return Number(confirmed(right))-Number(confirmed(left));})){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id,observe);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;const original=w.routineRules?.find(value=>value.id===rule.id),bound=snapshot.routineRules?.find(value=>value.id===rule.id);if(original&&bound?.finiteSourceBindings)original.finiteSourceBindings=structuredClone(bound.finiteSourceBindings);return candidate;}
  if(blocked){w.routineAudit=blocked.world.routineAudit;return blocked.candidate;}
  if(candidates.length)audit(w,c,candidates[0],'exception');
  return;

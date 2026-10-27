@@ -105,3 +105,9 @@ export function activeBodyMinutes(actor:Character,from:number,to:number):number 
  const elapsed=Math.max(0,end-Math.max(from,plan.startedAt));
  return plan.bodyActivity.kind==='sleep'&&plan.sleep?.naturalWakeAt===undefined&&plan.sleep?.stimulusWakeAt===undefined&&actor.needs?Math.min(elapsed,sleepMinutesUntilWake(plan.bodyActivity,actor.needs.values.sleep)):elapsed;
 }
+
+// A method's saved contract, not its wording or observed bodily outcome, proves
+// whether reuse already carries explicitly confirmed physiological effects.
+export function confirmsBodyConsequences(value:{bodyActivity?:unknown;effects?:readonly {kind:string}[];stages?:readonly {effects:readonly {kind:string}[]}[];branches?:readonly {effects:readonly {kind:string}[];stages:readonly {effects:readonly {kind:string}[]}[]}[]|null}):boolean {
+ return !!value.bodyActivity||[...(value.effects||[]),...(value.stages||[]).flatMap(stage=>stage.effects),...(value.branches||[]).flatMap(branch=>[...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])].some(effect=>effect.kind==='ingest');
+}

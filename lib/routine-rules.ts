@@ -1,3 +1,4 @@
+import { confirmsBodyConsequences } from './needs';
 import { adjudicationLimits } from './adjudication-limits';
 import { bindWorldRoutine } from './routine-world-programs';
 import type { RoutineWorldProgram } from './routine-world-contract';
@@ -9,7 +10,7 @@ export type { RoutineApproval } from './adjudication-contract';
 import { routineObstacle, blockedRoutine } from './routine-obstacles';
 import type { Action, Character, World } from './world';
 import type { EffectCandidate, SceneSupply, WorldObject, Effect } from './world-effects';
-import { scheduleCompletionMinutes, EffectValidationError } from './world-effects';
+import { scheduleCompletionMinutes, EffectValidationError, effectReferenceIds } from './world-effects';
 import { regionOf } from './perception';
 import { rawRoutineMaterial, supportsRoutineDrink, usableRoutineObject, emptyRoutineVessel } from './routine-materials';
 
@@ -108,6 +109,37 @@ export function matchingRoutine(w:World,c:Character,a:Action,observe?:RoutineSel
  for(const rule of matches)observeSelection(observe,{source:'program-check',check:'legacy-scope',ruleId:rule.id,version:rule.version,scope:rule.origin===c.location,known:rule.knownTo.includes(c.id),selected:rule===selected});
  return selected;
 }
+// Reconfirmation is an explicit choice in the existing decision/adjudication
+// slot. Probe on a copy so an old binder cannot leave preparation behind when
+// this one attempt deliberately requests a new physiological contract.
+export function selectRoutineForDecision(w:World,c:Character,a:Action,duration:number,elapsedMinutes:number,maxMinutes:number|null|undefined,observe:RoutineSelectionObserver|undefined,reconfirmBodyConsequences=false):{candidate?:EffectCandidate;reconfirming:boolean;signature?:string} {
+ if(reconfirmBodyConsequences){
+  const probe=structuredClone(w),actor=probe.characters.find(person=>person.id===c.id)!;
+  const prior=bindRoutine(probe,actor,a,duration,undefined,elapsedMinutes,maxMinutes);
+  if(prior?.status==='accepted'&&!confirmsBodyConsequences(prior)){
+   const scope=probe.routineAudit?.findLast(item=>item.actorId===c.id&&item.turn===w.turn)?.ruleId;
+   const effects=[...prior.effects,...(prior.stages||[]).flatMap(stage=>stage.effects),...(prior.branches||[]).flatMap(branch=>[...branch.effects,...branch.stages.flatMap(stage=>stage.effects)])];
+   const ids=[...new Set([...(a.target?[a.target]:[]),...effects.flatMap(effectReferenceIds)])].sort();
+   const facts=ids.flatMap<Record<string,unknown>>(id=>{const object=w.objects?.find(item=>item.id===id),supply=w.supplies?.find(item=>item.id===id),body=w.characters.find(item=>item.id===id);return object?[{id,revision:object.revision,lifecycle:object.lifecycle,quantity:object.quantity}]:supply?[{id,remaining:supply.remaining}]:body?[{id,revision:body.physical?.revision??0}]:[];});
+   const signature=JSON.stringify([c.id,c.location,regionOf(c),scope,a.target,a.content,a.purpose,facts]);
+   if(signature.length>8192)throw Error('身體後果重新確認的相關條件超出有限容量。');
+   if(w.bodyReconfirmation?.attempts.some(item=>item.signature===signature)){
+    observeSelection(observe,{source:'program-check',branch:'body-reconfirmation-repeat',reason:'same-unconfirmed-method-and-facts'});
+    return {candidate:{status:'denied',effects:[],stages:[],check:null,knownBlockedReason:'先前還未能確認這個方法對身體的實際影響；這次尚未開始。是否改方法、先按原方法嘗試或等待新情況，由自己決定。'},reconfirming:false};
+   }
+   observeSelection(observe,{source:'program-check',branch:'body-reconfirmation-required',reason:'explicit-own-body-review'});
+   return {reconfirming:true,signature};
+  }
+ }
+ return {candidate:bindRoutine(w,c,a,duration,undefined,elapsedMinutes,maxMinutes,observe),reconfirming:false};
+}
+
+export function retainUnconfirmedBodyReview(world:World,signature:string):void {
+ const receipt=world.bodyReconfirmation??{attempts:[],dropped:0};
+ if(receipt.attempts.some(item=>item.signature===signature))return;
+ receipt.attempts.push({signature,minute:world.minute});receipt.dropped+=Math.max(0,receipt.attempts.length-32);receipt.attempts=receipt.attempts.slice(-32);world.bodyReconfirmation=receipt;
+}
+
 export function bindRoutine(w:World,c:Character,a:Action,duration:number,approval?:RoutineApproval,elapsedMinutes=15,maxMinutes:number|null=null,observe?:RoutineSelectionObserver):EffectCandidate|undefined {
  if(approval?.version===3)return bindWorldRoutine(w,c,a,approval,maxMinutes,observe);
  if(!approval){const generic=bindWorldRoutine(w,c,a,undefined,maxMinutes,observe);if(generic)return generic;}

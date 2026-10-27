@@ -39,10 +39,15 @@ export function learnHabit(world: World, character: Character, action: Action, f
   character.habits = habits.sort((a, b) => b.lastSeen - a.lastSeen).slice(0, 24);
 }
 
+function habitEvidenceState(habit:Pick<Habit,'observedDays'|'lastSeen'>,minute:number){
+ const days=habit.observedDays.filter(day=>day>=dayOf(minute)-20).length;
+ const age=Math.max(0,minute-habit.lastSeen);
+ const strength=Math.min(1,days/6)*Math.pow(0.5,age/1440/7);
+ return {days,strength,established:days>=3&&strength>=0.2,fading:days>=3&&age>=7*1440};
+}
+
 export function habitStrength(habit: Habit, minute: number): number {
-  const days = habit.observedDays.filter(day => day >= dayOf(minute) - 20).length;
-  const age = Math.max(0, minute - habit.lastSeen) / 1440;
-  return Math.min(1, days / 6) * Math.pow(0.5, age / 7);
+ return habitEvidenceState(habit,minute).strength;
 }
 
 export function habitLabel(habit: Habit, characters: Character[]): string {
@@ -57,11 +62,7 @@ export function habitLabel(habit: Habit, characters: Character[]): string {
 
 export function habitViews(world: World, character: Character) {
   return (character.habits || []).map(habit => {
-    const days = habit.observedDays.filter(day => day >= dayOf(world.minute) - 20).length;
-    const strength = habitStrength(habit, world.minute);
-    const established = days >= 3 && strength >= 0.2;
-    return { ...habit, days, strength, established, label: habitLabel(habit, world.characters),
-      fading: days >= 3 && world.minute - habit.lastSeen >= 7 * 1440 };
+    return { ...habit, ...habitEvidenceState(habit,world.minute), label: habitLabel(habit, world.characters) };
   }).filter(habit => habit.days > 0).sort((a, b) => Number(b.established) - Number(a.established) || b.strength - a.strength || b.lastSeen - a.lastSeen);
 }
 
@@ -139,8 +140,6 @@ export function updateEventHabits(world:World,character:Character,value:unknown,
 
 export function eventHabitViews(world:World,character:Character){
  return (character.eventHabits||[]).map(habit=>{
-  const days=habit.observedDays.filter(day=>day>=dayOf(world.minute)-20).length;
-  const strength=Math.min(1,days/6)*Math.pow(0.5,Math.max(0,world.minute-habit.lastSeen)/1440/7);
-  return {...habit,days,strength,established:days>=3&&strength>=0.2,label:`${habit.triggerLabel}之後，常會${habit.activityLabel}`,fading:days>=3&&world.minute-habit.lastSeen>=7*1440};
+  return {...habit,...habitEvidenceState(habit,world.minute),label:`${habit.triggerLabel}之後，常會${habit.activityLabel}`};
  }).filter(habit=>habit.days>0).sort((a,b)=>b.lastSeen-a.lastSeen);
 }
