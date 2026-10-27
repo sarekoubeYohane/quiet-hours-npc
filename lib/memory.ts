@@ -212,7 +212,37 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
   validateMemoryState(candidate);
   return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
 }
-export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arrangement[];capacity:number}; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
+export type LastKnownEntry = { reference: MemoryRef & { kind: 'short' | 'long' }; time: number; text?: string; textLocation?: 'self.longTerm'; source: MemorySource };
+export type LastKnownState = { entries: LastKnownEntry[]; capacity: number; omitted: number; gap: string };
+// A view of accounts already present in this request, never an independent
+// store. In particular no World, trace or forgotten memory is available here.
+function lastKnownState(short: ReturnType<typeof memoryProjection>, long: MemoryProjection, topics: string[], byteLimit: number, recalled: MemoryProjection = []): LastKnownState {
+  const state: LastKnownState = { entries: [], capacity: 8, omitted: 0, gap: '僅整理本次可見的主觀來源；未列出、已忘或未得知的狀態與後續補充仍未知，所知狀態不證明受阻原因。' };
+  const accounts = [...short.map(item => ({ ...item, kind: 'short' as const })), ...[...recalled, ...long].map(item => ({ ...item, kind: 'long' as const }))];
+  const latest = [...accounts].sort((a,b) => b.time-a.time).slice(0,4).map(item=>item.text).join('\n');
+  // Reconnect explicit identities retained in accounts even after their object
+  // leaves the active list. These tokens only rank already-visible sources.
+  for (const item of accounts) for (const match of item.text.matchAll(/\[([^\[\]\s]{1,128})\]/g)) {
+    const id=match[1];
+    if (latest.includes(' '+id+' ') || latest.includes('['+id+']')) topics.push(id);
+  }
+  const requested = (item: {id:string;version:number}) => recalled.some(ref=>ref.id===item.id&&ref.version===item.version);
+  const relevant = (text: string) => topics.some(topic => topic.length > 1 && text.includes(topic));
+  // Exact known identities/labels are relevance hints, not semantic matching or
+  // truth correction. Keep competing subjective accounts instead of collapsing
+  // them into one authoritative assertion.
+  accounts.sort((a, b) => Number(requested(b)) - Number(requested(a)) || Number(relevant(b.text)) - Number(relevant(a.text)) || b.time - a.time);
+  for (const item of accounts) {
+    if (state.entries.length === state.capacity) break;
+    const entry = { reference: { kind: item.kind, id: item.id, version: item.version }, time: item.time, ...(requested(item) ? {textLocation: 'self.longTerm' as const} : {text: item.text}), source: item.source };
+    state.entries.push(entry);
+    if (memoryBytes(state) > byteLimit) state.entries.pop();
+  }
+  state.omitted = accounts.length - state.entries.length;
+  return state;
+}
+export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState; plan?: {action: {target?: string}}; intents?: {content:string;context:string}[]; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T & { self: { arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState } } {
+  input.self.lastKnownState = undefined;
   if(input.self.arrangements)input.self.arrangements.items=[];
   const candidates = input.self.longTerm || [];
   const tendencies = input.learnedHabits || [];
@@ -245,7 +275,7 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ learnedHabits:input.learnedHabits, arrangements:input.self.arrangements, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ arrangements:input.self.arrangements, lastKnownState:input.self.lastKnownState, learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -269,6 +299,12 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
   if(input.self.preferences) for(const preference of preferences){input.self.preferences.items.push(preference);if(memoryBytes(payload())>88*1024)input.self.preferences.items.pop();}
   if(input.learnedHabits) for(const tendency of tendencies){input.learnedHabits.push(tendency);if(memoryBytes(payload())>88*1024)input.learnedHabits.pop();}
   if(input.self.arrangements&&character)for(const item of arrangementsForDecision(character,{shortTerm:character.shortTerm?.filter(m=>(input.self.shortTerm as MemoryRef[]).some(r=>r.id===m.id&&r.version===m.version)),longTerm:character.longTerm?.filter(m=>input.self.longTerm?.some(r=>r.id===m.id&&r.version===m.version))}).items){input.self.arrangements.items.push(item);if(memoryBytes(payload())>88*1024)input.self.arrangements.items.pop();}
+  const topicWords = [input.self.plan?.action.target || '', ...(input.self.intents || []).flatMap(intent => [intent.content, intent.context])];
+  const topics = topicWords.filter(Boolean);
+  const available = Math.min(8192, 88 * 1024 - memoryBytes(payload()) - 64);
+  // Leave canonical sources intact under capacity pressure; the view is a
+  // duplicate that may be omitted, and explicitly records its source gap.
+  if (available >= 512) input.self.lastKnownState = lastKnownState(input.self.shortTerm as ReturnType<typeof memoryProjection>, input.self.longTerm, topics, available, (recalledMemories as { memories?: MemoryProjection } | undefined)?.memories || []);
   return input;
 }
 export function validateMemoryState(c: Character) {

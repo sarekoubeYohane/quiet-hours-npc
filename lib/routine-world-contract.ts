@@ -6,10 +6,11 @@ import type { Effect, ActivityPhase, ResultBranch } from './world-effects';
 import type { StateCondition } from './world-state';
 import type { Difficulty } from './d20';
 
-export const routineWorldLimits={maxPrograms:8,maxBindings:8,maxMethods:8,maxStoredMethods:9,maxMethodLength:512,maxCandidateBytes:32768,maxOutputTokens:12000} as const;
-export type RoutineMethod={content:string;purpose:string};
+export const routineWorldLimits={maxPrograms:8,maxBindings:8,maxMethods:8,maxAliases:4,maxStoredMethods:9,maxMethodLength:512,maxCandidateBytes:32768,maxOutputTokens:12000} as const;
+export type RoutineMethodPair={content:string;purpose:string};
+export type RoutineMethod=RoutineMethodPair&{aliases?:RoutineMethodPair[]};
 export type RoutineBackground={label:string;kind:string;consumable:boolean;quantity:Quantity;initialState:{key:string;value:string;exposure:'public'|'hidden'}[]};
-export type RoutineBinding={role:string;type:'object'|'supply'|'body'|'environment';select:'target'|'local'|'actor'|'here'|'linked';kind:string|null;label:string|null;state:{key:string;value:string|null}[];access:'authorized'|'physical';link:{role:string;key:string}|null;background:RoutineBackground|null;quantity:Quantity|null;sourceRole:'material'|'equipment'|null;sourceSubject:string|null};
+export type RoutineBinding={role:string;type:'object'|'supply'|'body'|'environment';select:'target'|'local'|'actor'|'here'|'linked';kind:string|null;label:string|null;state:{key:string;value:string|null}[];access:'authorized'|'physical';link:{role:string;key:string;direction?:'to-role'|'from-role'}|null;background:RoutineBackground|null;quantity:Quantity|null;sourceRole:'material'|'equipment'|null;sourceSubject:string|null};
 export type RoutineWorldProgram={resumable?:boolean;bodyActivity?:BodyActivity;operation:string;methods:RoutineMethod[];bindings:RoutineBinding[];effects:Effect[];stages:ActivityPhase[];check:{difficulty:Difficulty;ability:string}|null;branches:ResultBranch[]|null};
 export type RoutineWorldApproval={family:'cafe-service';version:3;operation:string;subject:string|null;timings:{operation:string;minutes:number}[];programs:RoutineWorldProgram[]};
 const object=(properties:Record<string,object>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
@@ -17,11 +18,13 @@ const text=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const nullable=(schema:object)=>({anyOf:[{type:'null'},schema]});
 const stateEntry=object({key:text(stateChangeLimits.maxKeyLength),value:nullable({type:'string',maxLength:stateChangeLimits.maxValueLength})});
 const initialStateEntry=object({key:text(stateChangeLimits.maxKeyLength),value:{type:'string',maxLength:stateChangeLimits.maxValueLength},exposure:{type:'string',enum:['public','hidden']}});
+const methodPairSchema=object({content:text(routineWorldLimits.maxMethodLength),purpose:text(120)});
+const methodSchema=object({content:text(routineWorldLimits.maxMethodLength),purpose:text(120),aliases:{type:'array',maxItems:routineWorldLimits.maxAliases,items:methodPairSchema}});
 const symbolicEffect={$ref:'#/$defs/routineEffect'};
 const symbolicCondition={$ref:'#/$defs/routineCondition'};
 const stage=object({afterMinutes:{type:'integer',enum:[...adjudicationLimits.phaseMinutes]},preconditions:{type:'array',maxItems:adjudicationLimits.maxConditions,items:symbolicCondition},effects:{type:'array',maxItems:adjudicationLimits.maxEffects,items:symbolicEffect}});
 const path={effects:{type:'array',maxItems:0,items:symbolicEffect},stages:{type:'array',minItems:1,maxItems:adjudicationLimits.maxStages,items:stage}};
-export const routineWorldProgramSchema=object({resumable:{type:'boolean'},bodyActivity:{anyOf:[{type:'null'},bodyActivitySchema]},operation:text(60),methods:{type:'array',minItems:1,maxItems:routineWorldLimits.maxMethods,items:object({content:text(routineWorldLimits.maxMethodLength),purpose:text(120)})},bindings:{type:'array',minItems:1,maxItems:routineWorldLimits.maxBindings,items:object({role:text(40),type:{type:'string',enum:['object','supply','body','environment']},select:{type:'string',enum:['target','local','actor','here','linked']},kind:nullable(text(stateChangeLimits.maxKindLength)),label:nullable(text(120)),state:{type:'array',maxItems:stateChangeLimits.maxChanges,items:stateEntry},access:{type:'string',enum:['authorized','physical']},link:nullable(object({role:text(40),key:text(stateChangeLimits.maxKeyLength)})),background:nullable(object({label:text(120),kind:text(stateChangeLimits.maxKindLength),consumable:{type:'boolean'},quantity:quantitySchema,initialState:{type:'array',maxItems:stateChangeLimits.maxEntries,items:initialStateEntry}})),quantity:nullable(quantitySchema),sourceRole:{type:['string','null'],enum:['material','equipment',null]},sourceSubject:nullable(text(60))})},...path,stages:{...path.stages,minItems:0},check:nullable(object({difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:text(adjudicationLimits.maxValueLength)})),branches:nullable({type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:object({outcomes:{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:{type:'string',enum:[...adjudicationLimits.outcomes]}},...path})})});
+export const routineWorldProgramSchema=object({resumable:{type:'boolean'},bodyActivity:{anyOf:[{type:'null'},bodyActivitySchema]},operation:text(60),methods:{type:'array',minItems:1,maxItems:routineWorldLimits.maxMethods,items:methodSchema},bindings:{type:'array',minItems:1,maxItems:routineWorldLimits.maxBindings,items:object({role:text(40),type:{type:'string',enum:['object','supply','body','environment']},select:{type:'string',enum:['target','local','actor','here','linked']},kind:nullable(text(stateChangeLimits.maxKindLength)),label:nullable(text(120)),state:{type:'array',maxItems:stateChangeLimits.maxChanges,items:stateEntry},access:{type:'string',enum:['authorized','physical']},link:nullable(object({role:text(40),key:text(stateChangeLimits.maxKeyLength),direction:{type:'string',enum:['to-role','from-role']}})),background:nullable(object({label:text(120),kind:text(stateChangeLimits.maxKindLength),consumable:{type:'boolean'},quantity:quantitySchema,initialState:{type:'array',maxItems:stateChangeLimits.maxEntries,items:initialStateEntry}})),quantity:nullable(quantitySchema),sourceRole:{type:['string','null'],enum:['material','equipment',null]},sourceSubject:nullable(text(60))})},...path,stages:{...path.stages,minItems:0},check:nullable(object({difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:text(adjudicationLimits.maxValueLength)})),branches:nullable({type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:object({outcomes:{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:{type:'string',enum:[...adjudicationLimits.outcomes]}},...path})})});
 // The wire placeholder is never an execution revision or permission. Only the
 // trusted binder replaces it after resolving the current authority snapshot.
 export function symbolicEffectSchema(schema:unknown):unknown {
@@ -33,14 +36,22 @@ const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!val
 const bounded=(value:unknown,max:number):value is string=>typeof value==='string'&&!!value.trim()&&value.length<=max;
 export const normalizeRoutineMethod=(value:string)=>value.trim().replace(/[。！!\s]+$/u,'');
 export function checkRoutineMethod(method:RoutineMethod,action:{content?:string;purpose?:string}):{wording:boolean;purpose:boolean} {
- const wording=normalizeRoutineMethod(action.content||'')===normalizeRoutineMethod(method.content);
+ const variants=[method,...(method.aliases||[])];
+ const sameWording=variants.filter(pair=>normalizeRoutineMethod(action.content||'')===normalizeRoutineMethod(pair.content));
+ const wording=sameWording.length>0;
  // Preserve the matching predicate's short circuit. A false wording means the
  // purpose comparison did not run; diagnostic callers must label it accordingly.
- const purpose=wording&&(action.purpose||'').trim()===method.purpose.trim();
+ const purpose=wording&&sameWording.some(pair=>(action.purpose||'').trim()===pair.purpose.trim());
  return {wording,purpose};
 }
 export function matchesRoutineMethod(method:RoutineMethod,action:{content?:string;purpose?:string}):boolean {
  const {wording,purpose}=checkRoutineMethod(method,action);return wording&&purpose;
+}
+function validMethod(value:unknown):value is RoutineMethod {
+ if(!value||typeof value!=='object'||Array.isArray(value))return false;
+ const method=value as RoutineMethod;
+ const pair=(value:unknown)=>exact(value,['content','purpose'])&&bounded(value.content,routineWorldLimits.maxMethodLength)&&bounded(value.purpose,120);
+ return exact(method,['content','purpose',...(Object.hasOwn(method,'aliases')?['aliases']:[])])&&pair({content:method.content,purpose:method.purpose})&&(!Object.hasOwn(method,'aliases')||Array.isArray(method.aliases)&&method.aliases.length<=routineWorldLimits.maxAliases&&method.aliases.every(pair));
 }
 const symbol=(value:unknown):value is string=>typeof value==='string'&&/^\$[a-z][a-z0-9-]{0,39}$/u.test(value);
 function normalizeExecutionPlaceholders(value:unknown):unknown {
@@ -53,14 +64,14 @@ export function validateRoutineWorldPrograms(programs:unknown,timings:{operation
  for(const program of programs){
   if(program&&'resumable' in program&&typeof program.resumable!=='boolean')throw Error('日常可暫停確認格式無效。');
   if(program&&'bodyActivity' in program&&program.bodyActivity!==null&&!validBodyActivity(program.bodyActivity))throw Error('日常活動身體後果無效。');
-  if(!exact(program,['operation','methods','bindings','effects','stages','check','branches',...(Object.hasOwn(program,'bodyActivity')?['bodyActivity']:[]),...(Object.hasOwn(program,'resumable')?['resumable']:[])])||!bounded(program.operation,60)||!timings.some(time=>time.operation===program.operation)||!Array.isArray(program.methods)||!program.methods.length||program.methods.length>routineWorldLimits.maxMethods||program.methods.some(method=>!exact(method,['content','purpose'])||!bounded(method.content,routineWorldLimits.maxMethodLength)||!bounded(method.purpose,120))||!Array.isArray(program.bindings)||!program.bindings.length||program.bindings.length>routineWorldLimits.maxBindings||!Array.isArray(program.effects)||program.effects.length)throw Error('通用日常程序格式無效。');
+  if(!exact(program,['operation','methods','bindings','effects','stages','check','branches',...(Object.hasOwn(program,'bodyActivity')?['bodyActivity']:[]),...(Object.hasOwn(program,'resumable')?['resumable']:[])])||!bounded(program.operation,60)||!timings.some(time=>time.operation===program.operation)||!Array.isArray(program.methods)||!program.methods.length||program.methods.length>routineWorldLimits.maxMethods||program.methods.some(method=>!validMethod(method))||!Array.isArray(program.bindings)||!program.bindings.length||program.bindings.length>routineWorldLimits.maxBindings||!Array.isArray(program.effects)||program.effects.length)throw Error('通用日常程序格式無效。');
   const roles=new Map<string,RoutineBinding>();
   for(const binding of program.bindings){
    const base=['role','type','select','kind','label','state','access','link','background','quantity','sourceRole','sourceSubject'];
    if(!binding||typeof binding!=='object'||Array.isArray(binding)||Object.keys(binding).some(key=>![...base,'quantity','sourceRole'].includes(key))||base.some(key=>!Object.hasOwn(binding,key))||!bounded(binding.role,40)||!symbol('$'+binding.role)||['actor','here'].includes(binding.role)||roles.has(binding.role)||!['object','supply','body','environment'].includes(binding.type)||!['target','local','actor','here','linked'].includes(binding.select)||!['authorized','physical'].includes(binding.access)||binding.kind!==null&&!bounded(binding.kind,stateChangeLimits.maxKindLength)||binding.label!==null&&!bounded(binding.label,120)||!Array.isArray(binding.state)||binding.state.length>stateChangeLimits.maxChanges||binding.quantity!=null&&!validQuantity(binding.quantity)||binding.sourceRole!=null&&!['material','equipment'].includes(binding.sourceRole)||binding.sourceSubject!==null&&!bounded(binding.sourceSubject,60)||binding.sourceRole==='material'&&!bounded(binding.sourceSubject,60))throw Error('通用日常角色格式無效。');
    if(binding.state.some((entry:{key:string;value:unknown})=>entry.key==='vessel'&&(!symbol(entry.value)||!roles.has(entry.value.slice(1))&&!['$actor','$here'].includes(entry.value))))throw Error('日常容器條件必須引用角色。');
    if(binding.state.length)parseStateCondition({kind:'state-condition',version:1,target:{type:binding.type==='supply'?'object':binding.type,id:'$'+binding.role},state:binding.state});
-   if(binding.link!==null&&(!exact(binding.link,['role','key'])||!roles.has(binding.link.role as string)||!bounded(binding.link.key,stateChangeLimits.maxKeyLength)))throw Error('日常關聯角色尚未宣告。');
+   if(binding.link!==null&&(!exact(binding.link,['role','key',...(Object.hasOwn(binding.link,'direction')?['direction']:[])])||binding.link.direction!==undefined&&!['to-role','from-role'].includes(binding.link.direction)||!roles.has(binding.link.role as string)||!bounded(binding.link.key,stateChangeLimits.maxKeyLength)))throw Error('日常關聯角色尚未宣告。');
    if(binding.select==='linked'&&!binding.link||binding.select!=='linked'&&binding.link||binding.select==='actor'&&binding.type!=='body'||binding.select==='here'&&binding.type!=='environment'||binding.type==='environment'&&binding.select!=='here'||binding.type==='supply'&&!['local','target'].includes(binding.select)||!['object','supply'].includes(binding.type)&&binding.background!==null)throw Error('日常角色選擇與種類矛盾。');
    if(binding.background!==null){
     const bg=binding.background;
@@ -78,7 +89,10 @@ export function validateRoutineWorldPrograms(programs:unknown,timings:{operation
    seen.push(...branch.outcomes as string[]);const declared=new Set([...roles.keys(),...program.bindings.filter(binding=>binding.type==='supply').map(binding=>binding.role+'-object'),...program.bindings.filter(binding=>binding.type==='object'&&binding.background).map(binding=>binding.role+'-supply'),'actor','here']);let last=0;
    for(const phase of branch.stages){
     if(!exact(phase,['afterMinutes','preconditions','effects'])||!(adjudicationLimits.phaseMinutes as readonly unknown[]).includes(phase.afterMinutes)||(phase.afterMinutes as number)<=last||!Array.isArray(phase.preconditions)||phase.preconditions.length>adjudicationLimits.maxConditions||!Array.isArray(phase.effects)||phase.effects.length>adjudicationLimits.maxEffects)throw Error('通用日常階段格式無效。');last=phase.afterMinutes as number;
-    for(const condition of phase.preconditions)parseStateCondition(condition);
+    for(const condition of phase.preconditions as StateCondition[]){
+     parseStateCondition(condition);
+     if(!symbol(condition.target.id)||!declared.has(condition.target.id.slice(1))||condition.state.some(entry=>entry.key==='vessel'&&entry.value!==null&&(!symbol(entry.value)||!declared.has(entry.value.slice(1))))||condition.guard?.holder.check&&condition.guard.holder.value!==null&&(!symbol(condition.guard.holder.value)||!declared.has(condition.guard.holder.value.slice(1))))throw Error('日常條件引用未宣告角色。');
+    }
     for(const effect of phase.effects){
      // Outputs become declared only in their own stage, never earlier history.
      const e=effect as Effect;
@@ -90,7 +104,6 @@ export function validateRoutineWorldPrograms(programs:unknown,timings:{operation
      walk(e);if(refs.some(role=>!declared.has(role)))throw Error('通用日常引用未宣告角色。');
      parseEffectCandidate(JSON.stringify({status:'accepted',effects:[normalizeExecutionPlaceholders(e)],check:null}));
     }
-    for(const condition of phase.preconditions as StateCondition[])if(!symbol(condition.target.id)||!declared.has(condition.target.id.slice(1))||condition.state.some(entry=>entry.key==='vessel'&&entry.value!==null&&(!symbol(entry.value)||!declared.has(entry.value.slice(1))))||condition.guard?.holder.check&&condition.guard.holder.value!==null&&(!symbol(condition.guard.holder.value)||!declared.has(condition.guard.holder.value.slice(1))))throw Error('日常條件引用未宣告角色。');
    }
    const minutes=timings.find(time=>time.operation===program.operation)!.minutes;
    if(last!==Math.ceil(minutes/adjudicationLimits.minuteStep)*adjudicationLimits.minuteStep)throw Error('通用日常最後階段與確認時間矛盾。');
@@ -99,8 +112,8 @@ export function validateRoutineWorldPrograms(programs:unknown,timings:{operation
  }
 }
 export const routineWorldRules=[
- '新通用日常使用routine.version=3：programs明示methods[{content,purpose}]、bindings與stages/check/branches。effects必須空，效果放15分鐘以上階段；已確認的原長提案會可靠保存為該方法，後續當前對象不同仍重新綁定，不重問。v1/v2保留舊原義，不冒稱曾確認新後果。',
- 'bindings宣告role/type(object|supply|body|environment)/select(target|local|actor|here|linked)/kind與label(null或必要篩選)/state必要subset/access/link/background/quantity/sourceRole/sourceSubject。material須明示來源主題（如茶葉、蛋糕），食物同kind不代表同類，已知label／material／category符合該來源主題者優先；target是本次指定對象，不能找不到便替換；local限可知本地；linked按link.role/key連到既有物件。actor/here為系統角色。supply背景須明示來源用途material或equipment及label/kind/consumable/quantity/initialState逐key exposure，已知有限供應及指定物件優先，不用改名避開缺貨。',
- 'program的效果沿本次相同封閉世界effect能力，所有物件/供應/身體引用與environment target使用$role；移動目的區域或guard.region可用既有地圖固定ID（仍驗可達），或$here；expectedRevision與expectedRemaining一律0佔位，程式在當前前提成立後綁定。form/separate新output用新$role，程式每活動產生fresh ID；state.vessel可引用$vessel，杯不作原料。保留每個外在effect與形成state的明示exposure，不把reason/hidden線索告知NPC。',
+ '新通用日常使用routine.version=3：programs明示methods[{content,purpose,aliases:[{content,purpose}]}]；aliases最多4組，只確認同方法、同用途的合理表述（如飲用／喝茶），每組content與purpose成對匹配，不交叉組合；不確定或不同用途不列入。舊methods缺aliases保持原核准範圍。programs另明示bindings與stages/check/branches。effects必須空，效果放15分鐘以上階段；已確認的原長提案會可靠保存為該方法，後續當前對象不同仍重新綁定，不重問。v1/v2保留舊原義，不冒稱曾確認新後果。',
+ 'bindings宣告role/type(object|supply|body|environment)/select(target|local|actor|here|linked)/kind與label(null或必要篩選)/state必要subset/access/link/background/quantity/sourceRole/sourceSubject。material須明示來源主題（如茶葉、蛋糕），食物同kind不代表同類，已知label／material／category符合該來源主題者優先；target是本次指定對象，不能找不到便替換；local限可知本地；linked明示link.direction：to-role表示候選.state[key]等於先前角色ID；from-role表示先前角色.state[key]等於候選ID，例如先宣告drink再以drink.vessel找杯。舊資料缺direction維持to-role。link.role、binding state的$role必須先宣告，不能前向引用。actor/here為系統角色。supply背景須明示來源用途material或equipment及label/kind/consumable/quantity/initialState逐key exposure，已知有限供應及指定物件優先，不用改名避開缺貨。',
+ 'program的效果沿本次相同封閉世界effect能力，所有物件/供應/身體引用與environment target使用$role；移動目的區域或guard.region可用既有地圖固定ID（仍驗可達），或$here；expectedRevision與expectedRemaining一律0佔位，程式在當前前提成立後綁定。form/separate新output用新$role，僅能從形成效果之後引用；階段preconditions不得引用同階段尚未形成的成果。程式每活動產生fresh ID；state.vessel可引用$vessel，杯不作原料。保留每個外在effect與形成state的明示exposure，不把reason/hidden線索告知NPC。',
  'routineOffer.genericMethods允許同受限角色/場所的新明示方法ID（不是handler），例如擦桌面；若operation是原offered-family項目仍完整確認該組timings/programs。新method-only只確認自己的完整範圍。角色意願/記憶/信念不由世界程序改寫；physical不是同意，grant/consent仍由本人選擇。',
 ];

@@ -18,7 +18,7 @@ test('a confirmed shout crosses a closed door as a strong anonymous sound and tr
   assert.deepEqual(trace.observations.map(o=>({kind:o.kind,text:o.text,source:o.source,urgency:o.urgency})),[{kind:'sound',text:'儲藏室門方向傳來大聲喊叫。',source:undefined,urgency:'strong'}]);
   const calls=inputs.filter(i=>i.self.id==='owner');assert.equal(calls.length,1);assert.equal(JSON.stringify(calls[0]).includes('SHOUT_SECRET'),false);
   assert.equal(saved.characters.find(c=>c.id==='owner').plan.until,w.minute+90);assert.equal(saved.scene.doors['cafe-door'],'closed');assert.equal(saved.characters.find(c=>c.id==='vera').plan,undefined);
- },(i,request)=>{assert.ok(request.response_format.json_schema.schema.properties.type.enum.includes('shout'));return i.self.id==='vera'?{type:'shout',target:'cass',content:'小心！SHOUT_SECRET',durationMinutes:90}:i.self.id==='owner'?{type:'continue'}:{};});}finally{Math.random=random;}
+ },(i,request)=>{assert.ok(request.response_format.json_schema.schema.properties.action.anyOf.some(branch=>branch.properties.type.enum.includes('shout')));return i.self.id==='vera'?{type:'shout',target:'cass',content:'小心！SHOUT_SECRET',durationMinutes:90}:i.self.id==='owner'?{type:'continue'}:{};});}finally{Math.random=random;}
 });
 test('only a clearly heard warning triggers danger reevaluation without creating objective danger',async()=>{
  for(const [content,warning] of [['小心！杯子要掉了。',true],['這裡沒有危險，放心休息。',false]]){

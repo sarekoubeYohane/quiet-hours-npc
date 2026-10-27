@@ -53,7 +53,7 @@ async function scenario({ hiddenTarget = false } = {}) {
   };
 }
 
-test('a rejected meal attempt gives conditional permission and retry guidance in the next persisted decision', async () => {
+test('a rejected meal attempt preserves an unknown cause and autonomous retry in the next persisted decision', async () => {
   const s = await scenario();
   try {
     assert.equal((await s.advance()).status, 200);
@@ -63,7 +63,8 @@ test('a rejected meal attempt gives conditional permission and retry guidance in
     const next = s.prompts.filter(p => p.input.self.id === 'kris')[1];
     assert.ok(next);
     assert.equal(next.input.self.activity, first.characters.find(c => c.id === 'kris').activity);
-    assert.match(next.input.self.activity, /若尚未取得必要使用許可.*自行同意授權/);
+    assert.match(next.input.self.activity, /未確認本次受阻的原因/);
+    assert.doesNotMatch(next.input.self.activity, /若尚未取得必要使用許可|自行同意授權/);
     assert.match(next.input.self.activity, /方法或已知條件實質改變/);
     assert.match(JSON.stringify(next.input.self), /只有一份可供 Cass/);
     assert.doesNotMatch(JSON.stringify(next.input), /allowedTo|adjudicationFailure|operationEvidence|routineAudit/);

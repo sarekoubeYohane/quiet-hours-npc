@@ -443,6 +443,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               search: questions => workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard})),
             });
             decisionTrace?.step('npc-parsed',c.id,{action:decision.action,durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,continueExisting:decision.continueExisting});
+            if(decision.methodAssessment)decisionTrace?.step('npc-method-assessment',c.id,{methodAssessment:decision.methodAssessment,intents:decision.intents,action:decision.action},'model-self-report');
             if(requiresWorldEffects(decision.action)&&decision.timeIntent?.kind==='open-ended'&&!decision.continueExisting){
               decision.freeCandidate={status:'unsupported',effects:[],stages:[],check:null};
               return decision;

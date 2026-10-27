@@ -1,0 +1,151 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "existingUiAdvances": 15,
+  "seen": [
+    {
+      "name": "take",
+      "minute": 1275,
+      "counts": {
+        "npc": 2,
+        "judgments": 1
+      }
+    },
+    {
+      "name": "eat-old",
+      "minute": 1290,
+      "counts": {
+        "npc": 4,
+        "judgments": 2
+      }
+    },
+    {
+      "name": "retry",
+      "minute": 1305,
+      "counts": {
+        "npc": 6,
+        "judgments": 2
+      }
+    },
+    {
+      "name": "ask",
+      "minute": 1320,
+      "counts": {
+        "npc": 8,
+        "judgments": 2
+      }
+    },
+    {
+      "name": "prepare",
+      "minute": 1335,
+      "counts": {
+        "npc": 10,
+        "judgments": 3
+      }
+    },
+    {
+      "name": "eat-new",
+      "minute": 1350,
+      "counts": {
+        "npc": 12,
+        "judgments": 3
+      }
+    },
+    {
+      "name": "old-tea",
+      "minute": 1365,
+      "counts": {
+        "npc": 14,
+        "judgments": 4
+      }
+    },
+    {
+      "name": "brew",
+      "minute": 1380,
+      "counts": {
+        "npc": 16,
+        "judgments": 5
+      }
+    },
+    {
+      "name": "sip-item",
+      "minute": 1395,
+      "counts": {
+        "npc": 18,
+        "judgments": 6
+      }
+    },
+    {
+      "name": "sip-quarter",
+      "minute": 1410,
+      "counts": {
+        "npc": 20,
+        "judgments": 7
+      }
+    },
+    {
+      "name": "sip-alias",
+      "minute": 1425,
+      "counts": {
+        "npc": 22,
+        "judgments": 7
+      }
+    },
+    {
+      "name": "finish",
+      "minute": 1440,
+      "counts": {
+        "npc": 24,
+        "judgments": 8
+      }
+    },
+    {
+      "name": "water",
+      "minute": 1455,
+      "counts": {
+        "npc": 26,
+        "judgments": 9
+      }
+    },
+    {
+      "name": "drink-water",
+      "minute": 1470,
+      "counts": {
+        "npc": 28,
+        "judgments": 10
+      }
+    },
+    {
+      "name": "reflect",
+      "minute": 1485,
+      "counts": {
+        "npc": 30,
+        "judgments": 10
+      }
+    }
+  ],
+  "counts": {
+    "npc": 30,
+    "judgments": 10
+  },
+  "knownFixtureUsage": {
+    "inputTokens": 1200,
+    "outputTokens": 400
+  },
+  "capacity": {
+    "maxInputBytes": 47536,
+    "maxRequestBytes": 104466,
+    "rulesBytes": 23651,
+    "maxTraceBytes": 629370
+  },
+  "checks": {
+    "desktop": true,
+    "mobile390": true,
+    "noHorizontalOverflow": true,
+    "reloadZeroDispatch": true,
+    "replayZeroDispatch": true,
+    "sourceHistory": true,
+    "quarterAliasZeroAdjudication": true,
+    "hiddenNeverInNpcMessages": true
+  }
+}

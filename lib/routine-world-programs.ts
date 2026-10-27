@@ -3,7 +3,7 @@ import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type Rout
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
 import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject, type SceneSupply } from './world-effects';
-import { rebindRoutineEffects, type RoutinePhaseBindings } from './routine-world-bindings';
+import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, type RoutinePhaseBindings } from './routine-world-bindings';
 import type { World, Character, Action } from './world';
 import type { RoutineRule, RoutineSelectionObserver } from './routine-rules';
 
@@ -24,10 +24,18 @@ function matchesMaterialSource(source:WorldObject|SceneSupply,binding:RoutineBin
  return source.kind==='food'||kind==='food'||!kind?subject:source.kind===kind||source.kind===binding.kind;
 }
 class RoutineUnavailable extends Error {}
-function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram,rule:RoutineRule,observe?:RoutineSelectionObserver):Map<string,string>|undefined {
+function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram,rule:RoutineRule,observe?:RoutineSelectionObserver,confirming=false):Map<string,string>|undefined {
  const refs=new Map<string,string>([['actor',c.id],['here',regionOf(c)]]);
  const report=(binding:RoutineBinding,data:Record<string,unknown>)=>observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,operation:program.operation,role:binding.role,type:binding.type,...data});
  const currentRule=w.routineRules?.find(value=>value.id===rule.id)||rule;
+ const rememberSource=(binding:RoutineBinding,id:string)=>rememberRoutineSource(currentRule,program,binding,id,routineSourcePremise(w,c,binding,id));
+ const rejectPrerequisite=(binding:RoutineBinding,ids:string[])=>{
+  // A newly encountered source with a different state may need a new scope;
+  // it must not be frozen out by an older method's narrower confirmation.
+  const verified=confirming||ids.every(id=>{const premise=routineSourcePremise(w,c,binding,id);return premise!==undefined&&currentRule.confirmedSources?.some(source=>source.operation===program.operation&&source.role===binding.role&&source.type===binding.type&&source.id===id&&source.facts?.includes(premise));});
+  report(binding,{check:verified?'verified-prerequisite':'unverified-source-scope',ids:ids.slice(0,16),omittedIds:Math.max(0,ids.length-16),passed:false,conditions:['current-location','known-source','availability','access',...binding.state.map(entry=>'state:'+entry.key),...(binding.quantity?['quantity']:[])]});
+  if(verified){if(confirming)for(const id of ids.slice(0,routineSourceLimits.sources))rememberSource(binding,id);throw new RoutineUnavailable('目前已確認方法所需的外在前提尚不成立，這次尚未開始。');}
+ };
  const finiteSource=(binding:RoutineBinding)=>{
   if(!binding.background)return;
   const entries=currentRule.finiteSourceBindings??=[];
@@ -62,23 +70,42 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   if(binding.type==='object'){
    const reachable=(w.objects||[]).filter(object=>{const reach=canPhysicallyReachObject(w,c,object),permission=reach?(binding.access==='physical'||hasObjectPermission(object,c.id)&&(object.holder===null||object.holder===c.id)):undefined;report(binding,{check:'object-access',id:object.id,reach,permission:permission??'not-evaluated',access:binding.access});return reach&&permission;});
    const candidates=reachable.filter(object=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||object.state[binding.link.key]===refs.get(binding.link.role)},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||(binding.link.direction==='from-role'?w.objects?.find(source=>source.id===refs.get(binding.link!.role))?.state[binding.link.key]===object.id:object.state[binding.link.key]===refs.get(binding.link.role))},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:object.id,passed});if(!passed)return false;}return true;
    });
+   if(binding.select==='linked'&&candidates.length>1){report(binding,{check:'unbound',reason:'ambiguous-linked-objects',candidates:candidates.map(object=>object.id)});return;}
    const object=candidates[0];
-   if(object){report(binding,{check:'bound',id:object.id});if(!fromRenewableBackground(object))finiteSource(binding);refs.set(binding.role,object.id);continue;}
-   if(!binding.background){report(binding,{check:'unbound',reason:'no-object-matches-and-no-background'});return;}
+   if(object){report(binding,{check:'bound',id:object.id});rememberSource(binding,object.id);if(!fromRenewableBackground(object))finiteSource(binding);refs.set(binding.role,object.id);continue;}
+   if(!binding.background){
+    // Only known, selected objects with otherwise compatible identities
+    // prove this method's physical prerequisite failed. Missing or
+    // contradictory links, wrong kinds and ambiguous selectors remain an
+    // exception; they are not evidence for a world prohibition.
+    const target=binding.select==='target'&&!binding.link?w.objects?.find(object=>object.id===action.target&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)):undefined;
+    if(target)rejectPrerequisite(binding,[target.id]);
+    const local=binding.select==='local'&&!binding.link&&(binding.kind||binding.label)?(w.objects||[]).filter(object=>object.region===regionOf(c)&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)):[];
+    if(local.length)rejectPrerequisite(binding,local.map(object=>object.id));
+    report(binding,{check:'unbound',reason:'no-verified-object-premise'});return;
+   }
    if(binding.select==='target'&&w.objects?.some(object=>object.id===action.target)||reachable.some(object=>(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)))throw new RoutineUnavailable('指定或現有物件條件不成立，不能用日常背景代換。');
    const supply=background(binding);if(!supply.background)finiteSource(binding);refs.set(binding.role,`${supply.id}:${supply.background?.sequence??supply.remaining}`);refs.set(binding.role+'-supply',supply.id);
   }else if(binding.type==='environment'){
-   const snapshot=worldTargetSnapshot(w,{type:'environment',id:regionOf(c)}),matches=!!snapshot&&stateMatches(snapshot.state,binding);report(binding,{check:'environment-state',id:regionOf(c),snapshot:!!snapshot,passed:matches});if(!matches)return;refs.set(binding.role,regionOf(c));
+   const snapshot=worldTargetSnapshot(w,{type:'environment',id:regionOf(c)}),matches=!!snapshot&&stateMatches(snapshot.state,binding);report(binding,{check:'environment-state',id:regionOf(c),snapshot:!!snapshot,passed:matches});if(!matches){if(snapshot&&binding.state.length)rejectPrerequisite(binding,[regionOf(c)]);return;}rememberSource(binding,regionOf(c));refs.set(binding.role,regionOf(c));
   }else if(binding.type==='body'){
-   const actor=w.characters.find(actor=>{const selected=binding.select==='actor'?actor.id===c.id:binding.select==='target'?actor.id===action.target:!binding.label||actor.name.includes(binding.label);if(!selected){report(binding,{check:'body-selector',id:actor.id,passed:false});return false;}const local=regionOf(actor)===regionOf(c);if(!local){report(binding,{check:'body-location',id:actor.id,passed:false});return false;}const visible=canSee(w,c,regionOf(actor));if(!visible){report(binding,{check:'body-visibility',id:actor.id,passed:false});return false;}const state=stateMatches(actor.physical?.state||{},binding);report(binding,{check:'body-state',id:actor.id,passed:state});return state;});if(!actor)return;report(binding,{check:'bound',id:actor.id});refs.set(binding.role,actor.id);
+   const actor=w.characters.find(actor=>{const selected=binding.select==='actor'?actor.id===c.id:binding.select==='target'?actor.id===action.target:!binding.label||actor.name.includes(binding.label);if(!selected){report(binding,{check:'body-selector',id:actor.id,passed:false});return false;}const local=regionOf(actor)===regionOf(c);if(!local){report(binding,{check:'body-location',id:actor.id,passed:false});return false;}const visible=canSee(w,c,regionOf(actor));if(!visible){report(binding,{check:'body-visibility',id:actor.id,passed:false});return false;}const state=stateMatches(actor.physical?.state||{},binding);report(binding,{check:'body-state',id:actor.id,passed:state});return state;});if(!actor){
+    const selected=binding.select==='actor'?c:binding.select==='target'?w.characters.find(person=>person.id===action.target&&regionOf(person)===regionOf(c)&&canSee(w,c,regionOf(person))):undefined;
+    if(selected&&binding.state.length)rejectPrerequisite(binding,[selected.id]);
+    return;
+   }report(binding,{check:'bound',id:actor.id});rememberSource(binding,actor.id);refs.set(binding.role,actor.id);
   }else{
    let supply=w.supplies?.find(supply=>{
     const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:supply.id,passed});if(!passed)return false;}return true;
-   });if(!supply&&binding.background)supply=background(binding);if(!supply){report(binding,{check:'unbound',reason:'no-supply-matches-and-no-background'});return;}report(binding,{check:'bound',id:supply.id});
+   });if(!supply&&binding.background)supply=background(binding);if(!supply){
+    const relevant=(w.supplies||[]).filter(source=>!source.pending&&source.knownTo.includes(c.id)&&(binding.select==='target'?source.id===action.target:source.region===regionOf(c))&&(!binding.kind||source.kind===binding.kind)&&(!binding.label||source.label.includes(binding.label))&&matchesMaterialSource(source,binding));
+    if(relevant.length)rejectPrerequisite(binding,relevant.map(source=>source.id));
+    report(binding,{check:'unbound',reason:'no-verified-source-premise'});return;
+   }report(binding,{check:'bound',id:supply.id});rememberSource(binding,supply.id);
    if(!supply.background)finiteSource(binding);refs.set(binding.role,supply.id);refs.set(binding.role+'-object',`${supply.id}:${supply.background?.sequence??supply.remaining}`);
   }
  }
@@ -95,8 +122,11 @@ function substitute<T>(value:T,refs:Map<string,string>):T {
  };
  return walk(value) as T;
 }
-function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stages:ActivityPhase[]},refs:Map<string,string>):ActivityPhase[]{
+function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stages:ActivityPhase[]},refs:Map<string,string>,ruleId:string):ActivityPhase[]{
  const sim=structuredClone(w),actor=sim.characters.find(actor=>actor.id===c.id)!,stages:ActivityPhase[]=[];
+ const stateKeys=new Map<string,Set<string>>();
+ const retainKey=(id:string,key:string)=>{const keys=stateKeys.get(id)||new Set<string>();keys.add(key);stateKeys.set(id,keys);};
+ for(const binding of program.bindings){const id=refs.get(binding.role)!;for(const entry of binding.state)retainKey(id,entry.key);if(binding.link)retainKey(binding.link.direction==='from-role'?refs.get(binding.link.role)!:id,binding.link.key);}
  for(const phase of path.stages){
   for(const effect of phase.effects){if(effect.kind==='form')for(const output of effect.outputs)refs.set(output.id.slice(1),`formed:${crypto.randomUUID()}`);if(effect.kind==='separate')refs.set(effect.outputId.slice(1),`portion:${crypto.randomUUID()}`);}
   const optional=phase.effects.filter(effect=>!(effect.kind==='materialize'&&effect.supplyId.endsWith('-supply')&&effect.supplyId.startsWith('$')&&!refs.has(effect.supplyId.slice(1))));
@@ -104,8 +134,8 @@ function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stage
   const effects=rebindRoutineEffects(sim,current);
   const preconditions=substitute(phase.preconditions,refs);
   const ids=new Set([...effects.flatMap(effectReferenceIds),...preconditions.flatMap(condition=>'target' in condition?[condition.target.id]:[condition.objectId])]);
-  const bindings:RoutinePhaseBindings={objects:[...(sim.objects||[])].filter(object=>ids.has(object.id)).map(object=>({id:object.id,region:object.region,holder:object.holder,quantity:structuredClone(object.quantity||{amount:1,unit:'item'})})),bodies:sim.characters.filter(actor=>ids.has(actor.id)).map(actor=>({id:actor.id,region:regionOf(actor)}))};
-  const compiled:ActivityPhase={afterMinutes:phase.afterMinutes,preconditions,effects,routineBindings:bindings};
+  const bindings:RoutinePhaseBindings={objects:[...(sim.objects||[])].filter(object=>ids.has(object.id)).map(object=>({id:object.id,region:object.region,holder:object.holder,quantity:structuredClone(object.quantity||{amount:1,unit:'item'}),state:Object.fromEntries([...(stateKeys.get(object.id)||[])].map(key=>[key,Object.hasOwn(object.state,key)?object.state[key]:null]))})),bodies:sim.characters.filter(actor=>ids.has(actor.id)).map(actor=>({id:actor.id,region:regionOf(actor)}))};
+  const compiled:ActivityPhase={afterMinutes:phase.afterMinutes,preconditions,effects,routineBindings:bindings,routineSourceScope:{ruleId,operation:program.operation,refs:program.bindings.map(binding=>({role:binding.role,id:refs.get(binding.role)!}))}};
   sim.minute=w.minute;commitActivityPhase(sim,actor,compiled,stages.length);stages.push(compiled);
  }
  return stages;
@@ -121,6 +151,10 @@ function trialReferences(w:World,program:RoutineWorldProgram,refs:Map<string,str
  const paths=program.branches||[{stages:program.stages}];for(const path of paths)for(const phase of path.stages)for(const value of [...phase.effects,...phase.preconditions]){const copy=JSON.parse(JSON.stringify(value),(_key,item)=>typeof item==='string'&&item.startsWith('$')?(refs.get(item.slice(1))||item):item);walk(copy);}
  return [...targets.values()].filter(target=>target.type==='supply'?w.supplies?.some(value=>value.id===target.id):!!worldTargetSnapshot(w,target as {type:'object'|'body'|'environment';id:string})).map(({type,id,keys})=>JSON.stringify({routineTarget:{type,id},keys:[...keys].sort()})).sort();
 }
+function copyConfirmedSources(rule:RoutineRule,snapshot:World):void {
+ const saved=snapshot.routineRules?.find(value=>value.id===rule.id);
+ if(saved?.confirmedSources){rule.confirmedSources=structuredClone(saved.confirmedSources);rule.confirmedSourcesDropped=saved.confirmedSourcesDropped||0;rule.confirmedSourceFactsDropped=saved.confirmedSourceFactsDropped||0;}
+}
 function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:RoutineWorldApproval,maxMinutes:number|null=null,ruleId?:string,observe?:RoutineSelectionObserver):EffectCandidate|undefined {
  let rule=w.routineRules?.find(rule=>rule.version===3&&(!ruleId||rule.id===ruleId)&&rule.origin===c.location&&rule.knownTo.includes(c.id)&&(rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>matchesRoutineMethod(method,action))));
  let program=(rule?.programs as RoutineWorldProgram[]|undefined)?.find(program=>program.methods.some(method=>matchesRoutineMethod(method,action)));
@@ -134,13 +168,14 @@ function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:Routin
  if(!rule||!program){observeSelection(observe,{source:'program-check',ruleId,branch:'adjudication-required',reason:'no-matching-program'});return;}
  const duration=rule.worldTimings!.find(time=>time.operation===program.operation)!.minutes,confirmedDurationMinutes=Math.ceil(duration/15)*15;
  if(maxMinutes!==null&&confirmedDurationMinutes>maxMinutes){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,check:'time-limit',confirmedDurationMinutes,maxMinutes,passed:false});return {status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`完成這項活動需要 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`};}
- const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule,observe);}catch(error){if(error instanceof RoutineUnavailable){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'blocked',reason:error.message});audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
+ const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule,observe,!!approval);}catch(error){if(error instanceof RoutineUnavailable){copyConfirmedSources(rule,prepared);observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'blocked',reason:error.message});audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
  if(!refs){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'adjudication-required',reason:'role-binding-failed'});audit(w,c,rule,'exception');if(approval)return denied('目前已知物件或外在條件不能承接這次方法，尚未完成。');return;}
  if(!approval)audit(w,c,rule,'reused');
  let branches:{outcomes:string[];effects:Effect[];stages:ActivityPhase[]}[];
- try{branches=(program.branches||[{outcomes:['critical-success','success','mixed','failure','critical-failure'],effects:[],stages:program.stages}]).map(path=>({outcomes:path.outcomes,effects:[] as Effect[],stages:compilePath(prepared,c,program,path,new Map(refs))}));}
+ try{branches=(program.branches||[{outcomes:['critical-success','success','mixed','failure','critical-failure'],effects:[],stages:program.stages}]).map(path=>({outcomes:path.outcomes,effects:[] as Effect[],stages:compilePath(prepared,c,program,path,new Map(refs),rule.id)}));}
  catch(error){if(error instanceof EffectValidationError){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,check:'compiled-effects',passed:false,details:error.details});if(approval)return denied('目前外在前提與已確認方法不同，活動尚未完成。');audit(w,c,rule,'exception');return;}throw error;}
 
+ copyConfirmedSources(rule,prepared);
  const finite=prepared.routineRules?.find(value=>value.id===rule.id)?.finiteSourceBindings;if(finite)rule.finiteSourceBindings=structuredClone(finite);
  const newSupplies=(prepared.supplies||[]).filter(supply=>!w.supplies?.some(existing=>existing.id===supply.id));if(newSupplies.length)(w.supplies??=[]).push(...structuredClone(newSupplies));
  const references=trialReferences(w,program,refs);
@@ -160,8 +195,8 @@ export function bindWorldRoutine(w:World,c:Character,action:Action,approval?:Rou
   return (rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>{const {wording,purpose}=checkRoutineMethod(method,action);observeSelection(observe,{source:'program-check',check:'method',ruleId:rule.id,version:rule.version,operation:program.operation,method,wording,purpose:wording?purpose:'not-evaluated'});return wording&&purpose;}));
  });
  let blocked:{candidate:EffectCandidate;world:World}|undefined;
- for(const rule of candidates.sort((left,right)=>{const confirmed=(rule:typeof left)=>(rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>matchesRoutineMethod(method,action))&&confirmsBodyConsequences(program));return Number(confirmed(right))-Number(confirmed(left));})){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id,observe);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;const original=w.routineRules?.find(value=>value.id===rule.id),bound=snapshot.routineRules?.find(value=>value.id===rule.id);if(original&&bound?.finiteSourceBindings)original.finiteSourceBindings=structuredClone(bound.finiteSourceBindings);return candidate;}
- if(blocked){w.routineAudit=blocked.world.routineAudit;return blocked.candidate;}
+ for(const rule of candidates.sort((left,right)=>{const confirmed=(rule:typeof left)=>(rule.programs as RoutineWorldProgram[]||[]).some(program=>program.methods.some(method=>matchesRoutineMethod(method,action))&&confirmsBodyConsequences(program));return Number(confirmed(right))-Number(confirmed(left));})){const snapshot=structuredClone(w),candidate=bindWorldRoutineRule(snapshot,c,action,undefined,maxMinutes,rule.id,observe);if(!candidate)continue;if(candidate.status!=='accepted'){blocked??={candidate,world:snapshot};continue;}w.routineAudit=snapshot.routineAudit;w.supplies=snapshot.supplies;const original=w.routineRules?.find(value=>value.id===rule.id),bound=snapshot.routineRules?.find(value=>value.id===rule.id);if(original){copyConfirmedSources(original,snapshot);if(bound?.finiteSourceBindings)original.finiteSourceBindings=structuredClone(bound.finiteSourceBindings);}return candidate;}
+ if(blocked){w.routineAudit=blocked.world.routineAudit;for(const rule of w.routineRules||[])copyConfirmedSources(rule,blocked.world);return blocked.candidate;}
  if(candidates.length)audit(w,c,candidates[0],'exception');
  return;
 }
