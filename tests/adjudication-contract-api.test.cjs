@@ -21,7 +21,7 @@ test('the world API sends the centralized free contract and executes only after 
  const {POST,GET}=load('route'),store=load('store');
  const w=seedWorld();w.characters=[w.characters[0],w.characters.find(c=>c.id==='owner')];w.characters[1].control={mode:'taken-over'};w.adjudication={provider:'openai',model:'gpt-6-luna'};
  w.supplies=[{id:'meal',label:'餐點',region:'kris-home-main',remaining:1,owner:'cass',knownTo:['cass'],allowedTo:['cass'],kind:'food',initialState:{}}];
- store.install(w);const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+ store.install(w);const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
  const original=global.fetch;let captured;
  global.fetch=async(_url,init)=>{
   const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);

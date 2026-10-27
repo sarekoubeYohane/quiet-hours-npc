@@ -7,7 +7,7 @@ const { POST, GET } = build('route');
 const store = build('store');
 const { seedWorld } = build('world');
 const operationId = () => `${Date.now()}:${crypto.randomUUID()}`;
-const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({mode:'demo',...body})});
+const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({mode:'demo',...body})});
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
 test('reloaded API replays the exact result for an operation instead of advancing twice', async () => {
@@ -29,7 +29,7 @@ test('overlapping copies wait and an expired in-flight operation never calls the
  try {
   const running=POST(request(body)); await ready;
   const waiting=await POST(request(body)); assert.equal(waiting.status,409); assert.equal((await waiting.json()).retryable,true);
-  Date.now=()=>clock()+130000;
+  Date.now=()=>clock()+440000;
   const expired=await POST(request(body)); assert.equal(expired.status,502); const result=await expired.json(); assert.equal(result.operationUncertain,true);
   release(); await running;
   const replay=await POST(request(body)); assert.deepEqual(await replay.json(),result); assert.equal(calls,1);
@@ -105,7 +105,7 @@ test('an expired worker cannot revive its evicted result after newer operations 
  global.fetch=async()=>{entered();await gate;throw Error('provider failed');};
  try {
   const body={operation:'advance',operationId:operationId(),mode:'openai',model:'gpt-6-luna',minutes:15};
-  const running=POST(request(body));await ready;instant+=130000;
+  const running=POST(request(body));await ready;instant+=440000;await running;
   for(let i=0;i<9;i++){instant++;assert.equal((await POST(request({operation:'takeover',operationId:operationId()}))).status,200);}
   release();await running;
   const replay=await POST(request(body));assert.equal(replay.status,410);assert.equal((await replay.json()).operationExpired,true);
@@ -134,7 +134,7 @@ test('operation lookup does not dispatch unknown requests or settle an active or
   assert.equal((await (await lookup(body.operationId)).json()).operation.state,'unknown');assert.equal(calls,0);
   running=POST(request(body));await ready;
   assert.equal((await (await lookup(body.operationId)).json()).operation.state,'pending');
-  instant+=130000;
+  instant+=440000;
   assert.equal((await (await lookup(body.operationId)).json()).operation.state,'uncertain');
   assert.equal(calls,1);
   // A read must not replace pending with a tombstone: the existing writer still owns its journal.

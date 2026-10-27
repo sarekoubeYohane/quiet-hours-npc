@@ -8,7 +8,7 @@ const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10}
 test('first ordinary tea approval survives serialized reload and a new activity reuses it without adjudication',async()=>{
  const world=seedWorld();world.contextId='routine-fixture';world.adjudication={provider:'openai',model:'gpt-6.1-sol'};
  world.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});store.install(world);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch;let npc=0,adjudication=0;
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes}});}npc++;return completion({type:'work',target:'tea',content:'準備一杯普通茶',mood:'平靜',durationMinutes:30,intents:[]});};
@@ -25,7 +25,7 @@ test('first ordinary tea approval survives serialized reload and a new activity 
 
 async function scenario(modify=()=>{},candidate={status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes}},decision={type:'work',target:'tea',content:'泡茶',mood:'平靜',durationMinutes:30,intents:[]}){
  const w=seedWorld();w.contextId='routine-failures';w.adjudication={provider:'openai',model:'gpt-6.1-sol'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});modify(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch;let dispatch=0;global.fetch=async(_url,init)=>{dispatch++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?candidate:decision);};
  return {post,restore:()=>{global.fetch=previous;},calls:()=>dispatch,read:async()=>(await(await GET()).json()).world};
 }

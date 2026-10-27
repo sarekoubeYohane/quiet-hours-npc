@@ -94,7 +94,7 @@ world CAS衝突明示not-committed；throw-before經原pending確認未提交，
 
 分析頁以本次操作ID聚焦，不依舊成功operationEvidence猜測；無世界／evidence的uncertain或conflict回應也可由停止原因進詳情。原journal的世界結果、archive最後durable副本與本次HTTP回應的非持久狀態分開標示；有舊checkpoint且最終寫入失敗時，仍須顯示該筆journal的gap，不用當前最新操作替它背書。
 
-這些保存點增加序列化及D1讀寫成本；每次NPC或裁定通常多個statement，仍受原110秒工作／120秒租約及25秒provider限制，不能保證任意大型回合完成。包含40角色極端容量情境的48項本機相關回歸合計約144秒，僅證明上限與故障保障，不是正式站效能或永不逾時保證。原模型／世界／實錄不形成單一交易：fetch與dispatched保存點、世界CAS與final trace之間仍有不可消除的崩潰窗口，必須保留未知，不能補造。
+這些保存點增加序列化及D1讀寫成本；每次NPC或裁定通常多個statement，歷史 #92 交付當時受110秒工作／120秒租約及25秒provider限制；#168 已改採[完整回合時間政策](round-time-budget.md)，不能保證任意大型回合完成。包含40角色極端容量情境的48項本機相關回歸合計約144秒，僅證明上限與故障保障，不是正式站效能或永不逾時保證。原模型／世界／實錄不形成單一交易：fetch與dispatched保存點、世界CAS與final trace之間仍有不可消除的崩潰窗口，必須保留未知，不能補造。
 
 configured但無法解密的未使用Key不應阻擋demo、直接控制或另一正常供應商。此時不猜測憑證明文，實錄切換credential-redaction-unavailable骨架：省略所有body、snapshot、steps原文、result、context與自由服務／角色標籤，僅保存安全操作／HTTP UUID、程式階段、outcome與有界已知用量。實際選用服務原有readModelKey驗證仍會照常停止不合法派送，診斷不替其放行。
 
@@ -107,3 +107,8 @@ NPC 的解析／驗證邊界另傳遞可選的封閉 `failure.reason`：`json-pa
 同一私有實錄保存點、SQLite 重讀及分析詳情承接此 code；capture 與單筆超限骨架都只接收白名單 code，不附任意 message／stack／引用文字。舊實錄缺少原因時畫面標示「未記錄／未知」，未知 code 也不顯示為已確認分類。實錄寫入失敗仍只顯示最後持久保存點及原 gap，不推測未保存的理由；內容超限可保留機械原因，但不聲稱保留完整候選。此欄位不進 World、NPC 記憶、回想或一般 console。
 
 本切片沿用 #91 的既有 0005 migration、owner 權限、GET／分析入口、1MiB／64筆／16MiB及寫入缺口政策，不需新 migration。只核對並沿用本切片所需基礎，不代表 #91 或 #92 的全部歷史驗收已完成。原未保存的私有 transcript 及故障原因無法事後復原。
+
+
+## #168 安全時間證據
+
+在原私有實錄與保存 queue 中補足截止、模型及儲存／提交窗口，原內容容量、owner、遮蔽與晚到 UPDATE 保護不變。prepared 時間只表示準備保存，實際 fetch／headers／body 與 checkpoint 必須分別讀取，缺失為未知。已知用量、晚到證據及精確 journal 重放仍各負原責任。固定工作／租約與前端政策及有限延遲包絡見[完整回合工程契約](round-time-budget.md)；[驗證紀錄](../verification/round-time-budget-168-2026-10-25.md)區分本地替身與正式站未驗證。

@@ -16,7 +16,7 @@ async function setup({ oldCapabilities = false, version = 2 } = {}) {
   world.playerBudget = { calls: 120, tokens: 1000000 };
   store.install(world);
   const post = async body => POST(new Request('https://test.invalid/api/world', {
-    method: 'POST', headers: { origin: 'https://test.invalid' },
+    method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' },
     body: JSON.stringify({ operationId: operationId(), worldContext: (await read()).contextId, mode: 'openai', model: 'gpt-6-luna', ...body }),
   }));
   assert.equal((await post({ operation: 'set-model-key', key: 'fixture-key' })).status, 200);

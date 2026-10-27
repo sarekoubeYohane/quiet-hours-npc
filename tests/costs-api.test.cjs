@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=build('route'),store=build('store'),{seedWorld}=build('world');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await(await GET()).json());
 const price=(input=1,output=2,extra={})=>({provider:'openai',model:'gpt-6-luna',input,output,source:'供應商測試報價',date:'2026-10-15',...extra});
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);

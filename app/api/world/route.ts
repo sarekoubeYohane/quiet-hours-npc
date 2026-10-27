@@ -1,3 +1,4 @@
+import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace } from '@/lib/decision-trace-capture';
 import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
@@ -128,7 +129,9 @@ export async function GET(request?: Request) {
   return observeWorldRequest(trace => readWorld(request, trace));
 }
 export async function POST(request: Request, services?: WorldTaskServices) {
-  return observeWorldRequest(trace => mutateWorld(request, trace, services));
+  const receivedAt=Date.now();
+  const responseDeadline=deadlineSignal(receivedAt+roundClientMs,'http-response');
+  return awaitSignal(observeWorldRequest(trace => mutateWorld(request, trace, services,responseDeadline,receivedAt)),responseDeadline).catch(()=>reply({...uncertainResult.body,operationUncertain:true},502));
 }
 
 async function readWorld(request: Request | undefined, trace: WorldTrace) {
@@ -193,11 +196,15 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
 }
 
 
-async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices) {
+async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices,responseSignal?:AbortSignal,receivedAt=Date.now()) {
   const id = await owner();
   if (id instanceof Response) return id;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
-  let locked = false, lease = 0;
+  let locked = false, lease = 0, workDeadline=0;
+  let workSignal:AbortSignal|undefined,finishSignal:AbortSignal|undefined;
+  const workWait=<T,>(promise:Promise<T>)=>workSignal?awaitSignal(promise,workSignal):promise;
+  const finishWait=<T,>(promise:Promise<T>)=>finishSignal?awaitSignal(promise,finishSignal):promise;
+  const modelSignal=()=>deadlineSignal(Math.min(Date.now()+roundTimePolicy.modelMs,workDeadline),workDeadline-Date.now()<roundTimePolicy.modelMs?'round-work':'model',workSignal);
   let decisionTrace:ReturnType<typeof createDecisionTrace>|undefined;
   let traceSaved=false,traceWriteFailed=false;
   let traceStatus:{status:string;gap?:string;lastKnownStage?:string}={status:'pending',gap:'world-and-trace-are-separate-transactions'};
@@ -211,7 +218,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   const finishTrace=async(outcome:DecisionTrace['outcome'],world?:World,version?:number)=>{
     if(!decisionTrace)return traceStatus;
     decisionTrace.finish(outcome,world,version);
-    await decisionTrace.persist();
+    try{await finishWait(decisionTrace.persist());}catch{traceWriteFailed=true;traceStatus={status:'write-failed',gap:'checkpoint-deadline',lastKnownStage:'finalization'};}
     return traceStatus;
   };
   let evidence: ReturnType<typeof createOperationEvidence> | undefined;
@@ -284,6 +291,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         return reply({...uncertainResult.body,decisionTraceStatus:{status:'saved',gap:'journal-receipt-unavailable'}},uncertainResult.status);
       }
     }catch{return reply({error:'暫時無法確認此操作先前是否已受理，已停止派送。請稍後以同一操作重新讀取。',operationUncertain:true,decisionTraceStatus:{status:'read-failed',gap:'prior-acceptance-unavailable',lastKnownStage:'before-acceptance'}},503);}
+    if(b.operation==='advance'&&b.mode!=='demo'&&request.headers.get(timePolicyHeader)!==roundTimePolicy.version)return reply({error:'回合等待政策已更新，請重新載入觀察室後以原操作識別碼繼續。',clientUpdateRequired:true},426);
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
     if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
@@ -314,24 +322,33 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       } catch (e) { return reply({ error: e instanceof Error ? e.message : '指定行動無效。' }, 400); }
     }
     if (['takeover', 'return-control'].includes(b.operation || '') && b.target !== undefined && b.target !== 'owner') return reply({ error: '只能直接控制咖啡店主。' }, 400);
+    responseSignal?.throwIfAborted();request.signal.throwIfAborted();
+    if(Date.now()>=receivedAt+roundTimePolicy.deliveryMs)throw new DOMException('受理準備逾時，未開始回合。','TimeoutError');
     const db = database();
-    lease = Date.now() + 120000;
+    const leaseCreatedAt=Date.now();
+    workDeadline=leaseCreatedAt+roundTimePolicy.workMs;
+    lease=leaseCreatedAt+roundLeaseMs;
+    workSignal=deadlineSignal(workDeadline,'round-work',AbortSignal.any([request.signal,...(responseSignal?[responseSignal]:[])]));
+    finishSignal=deadlineSignal(lease,'fixed-lease');
     trace.lease = lease;
     journal.results[operationId] = { pending: lease };
     const pendingJournal = JSON.stringify(journal);
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
     if (!acquired.meta.changes) { traceWorld(trace, 'lease-wait', { outcome: 'contended' }); return waiting(); }
     locked = true;
+    responseSignal?.throwIfAborted();workSignal.throwIfAborted();
+    if(Date.now()>=receivedAt+roundTimePolicy.deliveryMs)throw new DOMException('取得租約逾時，未開始回合。','TimeoutError');
     traceWorld(trace, 'lease-acquired', { outcome: 'processing' });
     const beforeOperation = structuredClone(world);
     evidence=createOperationEvidence({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,world:beforeOperation,deployment:currentEnvironment(),
       ...(b.operation==='advance'?{replay:{operation:'advance',operationId,worldContext:b.worldContext,mode:b.mode!,model:b.model,minutes:b.minutes!}}:{})});
-    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment()},writeTrace);
+    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment(),timePolicy:{version:roundTimePolicy.version,leaseCreatedAt,workDeadline,leaseDeadline:lease,clientMs:roundClientMs}},writeTrace);
     // All configured service credentials must be known before the first private
     // checkpoint: an NPC input can accidentally contain the other provider key.
-    const configuredKeys=await modelKeyStatus(id);
-    for(const provider of ['openai','openrouter'] as const)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await readModelKey(id,provider));}catch{decisionTrace.omitUnsafeContent();}}
-    await decisionTrace.persist();
+    decisionTrace.step('time-policy',undefined,{version:roundTimePolicy.version,leaseCreatedAt,leaseAcquiredAt:Date.now(),workDeadline,leaseDeadline:lease,clientMs:roundClientMs});
+    const configuredKeys=await workWait(modelKeyStatus(id));
+    for(const provider of ['openai','openrouter'] as const)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await workWait(readModelKey(id,provider)));}catch{decisionTrace.omitUnsafeContent();}}
+    await workWait(decisionTrace.persist());
     let failure: Error | undefined;
     let adjudicationFailure: AdjudicationFailure | undefined;
     let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
@@ -377,8 +394,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       try {
         let dispatchKey = '';
         const verifyLease = async () => {
-          const held = await db.prepare('SELECT locked_until, version FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number;version:number}>();
-          if (held?.locked_until !== lease || held.version !== version || Date.now() >= lease - 10000){decisionTrace?.discard('lease-invalid');decisionTrace?.step('lease-invalid',undefined,{expectedVersion:version,observedVersion:held?.version,leaseHeld:held?.locked_until===lease,deadlineExpired:Date.now()>=lease-10000});await decisionTrace?.persist();throw Error('世界租約或工作期限已到期，本回合停止付費請求。');}
+          workSignal!.throwIfAborted();
+          const held = await workWait(db.prepare('SELECT locked_until, version FROM worlds WHERE owner = ?').bind(id).first<{locked_until:number;version:number}>());
+          workSignal!.throwIfAborted();
+          if (held?.locked_until !== lease || held.version !== version || Date.now() >= workDeadline){decisionTrace?.discard('lease-invalid');decisionTrace?.step('lease-invalid',undefined,{expectedVersion:version,observedVersion:held?.version,leaseHeld:held?.locked_until===lease,deadlineExpired:Date.now()>=workDeadline});throw Error('世界租約或工作期限已到期，本回合停止付費請求。');}
         };
         await advanceActivities(world, {
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{activity:c.activity,plan:c.plan,shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
@@ -386,8 +405,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           limits,
           beforeDecision: async () => {
             await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player')).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
+            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+            dispatchKey = await workWait(readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           decide: async (w, c, onUsage) => {
@@ -403,15 +422,16 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               const usage = w.aiUsage!;
               if (kind === 'chat' && budgetReached(usage, limits)) throw new BudgetExceeded();
               const reservationId = `${operationId}:${c.id}:${dispatch++}`;
-              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner')).replayed) throw Error('付費請求結果不明，禁止重送。');
+              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
+            const npcObserver=decisionTrace?.observer('npc',c,w,provider,b.model!.trim(),dispatchKey,evidence?.observer('npc',c.id,provider,b.model!.trim(),dispatchKey));
             const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
-              observer: decisionTrace?.observer('npc',c,w,provider,b.model!.trim(),dispatchKey,evidence?.observer('npc',c.id,provider,b.model!.trim(),dispatchKey)),
+              observer: npcObserver?event=>workWait(Promise.resolve(npcObserver(event))):undefined,
               enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
               verifyCurrent: verifyLease,
-              signal: () => { const remaining = lease - 10000 - Date.now(); if (remaining <= 0) throw Error('世界工作期限已到期，禁止新的模型請求。'); return AbortSignal.timeout(Math.min(25000, remaining)); },
+              signal:modelSignal,
               beforeContinuation: async () => {
                 await guard('chat', 1);
                 traceWorld(trace, 'model-continuation-dispatch');
@@ -419,7 +439,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
                 usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
                 reportCost=beginCost(usage,provider,b.model!.trim(),price);
               },
-              search: questions => recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:lease-10000, guard}),
+              search: questions => workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard})),
             });
             decisionTrace?.step('npc-parsed',c.id,{action:decision.action,durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,continueExisting:decision.continueExisting});
             if(requiresWorldEffects(decision.action)&&decision.timeIntent?.kind==='open-ended'&&!decision.continueExisting){
@@ -432,14 +452,14 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
               await guard('chat',1);
-              const key=await readModelKey(id,config.provider);
+              const key=await workWait(readModelKey(id,config.provider));
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
               const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action)};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:AbortSignal.timeout(Math.min(25000,lease-10000-Date.now())),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
+              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
@@ -449,7 +469,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               }
             }
             if (typeof services?.adjudicateExistingAction === 'function' && !decision.continueExisting && !requiresWorldEffects(decision.action)) {
-              const candidate = await services.adjudicateExistingAction(buildAdjudicationInput(w,c,decision.action));
+              const candidate = await workWait(services.adjudicateExistingAction(buildAdjudicationInput(w,c,decision.action)));
               await verifyLease();
               validateExistingAdjudication(candidate);
             }
@@ -468,12 +488,16 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       }
     }
     if (env.RECALL_ENABLED === 'true' && !world.acceptance) {
-      try { await boundRecallStorage(world, id); }
+      try { await workWait(boundRecallStorage(world, id, workSignal)); }
       catch (error) {
         restoreWorld(world,beforeOperation);
         failure = error instanceof Error ? error : new Error('記憶容量驗證失敗，本回合沒有推進。');
       }
     }
+    // The final synchronous activity/effect/validation segment can outlast an
+    // abort timer callback. Only a completed in-budget candidate may enter the
+    // separate commit/rollback window.
+    if(!failure){try{checkSignal(workSignal!);}catch(error){restoreWorld(world,beforeOperation);failure=error instanceof Error?error:new Error('世界工作期限已到期。');decisionTrace?.step('round-failure',undefined,{name:failure.name,stage:'work-complete'});}}
     const usage = currentUsage(world);
     const result: OperationResult = failure
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
@@ -481,7 +505,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     decisionTrace?.step('world-candidate',undefined,{outcome:failure?'rolled-back':'candidate',failure:failure?.message});
     candidateWorld=world;
     decisionTrace?.step('commit-start',undefined,{candidateOutcome:failure?'rolled-back':'committed',candidateVersion:version+1});
-    await decisionTrace?.persist();
+    paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
+    try{await finishWait(decisionTrace!.persist());}catch{traceWriteFailed=true;decisionTrace?.gap('checkpoint-deadline');}
+    finishSignal!.throwIfAborted();responseSignal?.throwIfAborted();request.signal.throwIfAborted();
     result.body.decisionTraceStatus=traceWriteFailed?{status:'write-failed',gap:'trace-write-failed'}:{status:'pending',gap:'world-and-trace-are-separate-transactions'};
     result.body.operationEvidence=finishEvidence(world,failure?'rolled-back':'committed',version+1);
     journal.results[operationId] = result;
@@ -489,7 +515,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     trimJournal(journal, 8, operationId);
     paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
     traceWorld(trace, 'commit-start');
-    const saved = await db.prepare('UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > ? AND operations = ?').bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), pendingJournal).run();
+    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
     if (!saved.meta.changes) {
       commitRejected=true;decisionTrace?.step('commit-conflict',undefined,{worldCommitted:false});await finishTrace('not-committed');
       traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
@@ -518,12 +544,17 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         const observed=await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
         const receipt=observed&&(JSON.parse(observed.operations) as Journal).results[operationId];
         if(receipt&&'status' in receipt){
+          // A different tab can settle an expired pending marker as uncertain
+          // before this worker stops. That receipt has no committed paid ledger;
+          // retain our measured/unknown attempts once without changing its body.
+          if(receipt.body.operationUncertain&&!paidRetained&&paidAfter){await retainPaidUsage(database(),id,paidBefore,paidAfter);paidRetained=true;}
           const original=receipt.body.operationEvidence as OperationEvidence|undefined;
           const outcome=receipt.body.operationUncertain?'unknown':original?.outcome||'unknown';
           decisionTrace?.step('journal-confirmed',undefined,{outcome,resultVersion:original?.resultVersion});
-          receipt.body.decisionTraceStatus=await finishTrace(outcome,outcome==='committed'||outcome==='rolled-back'?candidateWorld:undefined,original?.resultVersion);
+          const settledTraceStatus=await finishTrace(outcome,outcome==='committed'||outcome==='rolled-back'?candidateWorld:undefined,original?.resultVersion);
+          if(!receipt.body.operationUncertain)receipt.body.decisionTraceStatus=settledTraceStatus;
           traceWorld(trace,'journal-confirmed',{outcome:receipt.body.operationUncertain?'uncertain':'settled'});
-          await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?').bind(`$.results."${operationId}".body.decisionTraceStatus`,JSON.stringify(receipt.body.decisionTraceStatus),id,`$.results."${operationId}".body.operationEvidence.requestId`,trace.requestId).run();
+          if(!receipt.body.operationUncertain)await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?').bind(`$.results."${operationId}".body.decisionTraceStatus`,JSON.stringify(receipt.body.decisionTraceStatus),id,`$.results."${operationId}".body.operationEvidence.requestId`,trace.requestId).run();
           return settledReply(receipt);
         }
         if(!receipt||!('pending' in receipt)||receipt.pending!==lease){decisionTrace?.step('journal-unavailable',undefined,{gap:'original-operation-receipt-unavailable'});decisionTrace?.gap('original-operation-receipt-unavailable');await finishTrace(commitRejected?'not-committed':'unknown');return reply({...uncertainResult.body,decisionTraceStatus:traceStatus},uncertainResult.status);}
@@ -551,7 +582,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。', stopReason:stopReason(e) }, 502);
   } finally {
-    if (locked) try { await database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run(); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }
+    if (locked) try { await finishWait(database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run()); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }
   }
 }
 
