@@ -6,9 +6,9 @@ import type { Quantity } from './world-formation-contract';
 
 // Only a server-bound v3 plan can carry this metadata. Model phase schemas do
 // not accept it. Relevant physical facts must still hold before rebinding.
-export type RoutinePhaseBindings={objects:{id:string;region:string;holder:string|null;quantity:Quantity}[];bodies:{id:string;region:string}[]};
+export type RoutinePhaseBindings={objects:{id:string;region:string;holder:string|null;quantity:Quantity;state?:Record<string,string|null>}[];bodies:{id:string;region:string}[]};
 export function routineBindingsHold(world:World,bindings:RoutinePhaseBindings):boolean {
- return bindings.objects.every(binding=>{const object=world.objects?.find(value=>value.id===binding.id);const quantity=object?.quantity||{amount:1,unit:'item'};return !!object&&object.lifecycle==='active'&&object.region===binding.region&&object.holder===binding.holder&&quantity.amount===binding.quantity.amount&&quantity.unit===binding.quantity.unit;})&&bindings.bodies.every(binding=>{const body=world.characters.find(value=>value.id===binding.id);return !!body&&regionOf(body)===binding.region;});
+ return bindings.objects.every(binding=>{const object=world.objects?.find(value=>value.id===binding.id);const quantity=object?.quantity||{amount:1,unit:'item'};return !!object&&object.lifecycle==='active'&&object.region===binding.region&&object.holder===binding.holder&&quantity.amount===binding.quantity.amount&&quantity.unit===binding.quantity.unit&&Object.entries(binding.state||{}).every(([key,value])=>(Object.hasOwn(object.state,key)?object.state[key]:null)===value);})&&bindings.bodies.every(binding=>{const body=world.characters.find(value=>value.id===binding.id);return !!body&&regionOf(body)===binding.region;});
 }
 export function rebindRoutineEffects(world:World,input:Effect[]):Effect[]{
  const effects=structuredClone(input),versions=new Map<string,number>(),remaining=new Map<string,number>();

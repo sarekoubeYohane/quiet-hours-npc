@@ -62,9 +62,10 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   if(binding.type==='object'){
    const reachable=(w.objects||[]).filter(object=>{const reach=canPhysicallyReachObject(w,c,object),permission=reach?(binding.access==='physical'||hasObjectPermission(object,c.id)&&(object.holder===null||object.holder===c.id)):undefined;report(binding,{check:'object-access',id:object.id,reach,permission:permission??'not-evaluated',access:binding.access});return reach&&permission;});
    const candidates=reachable.filter(object=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||object.state[binding.link.key]===refs.get(binding.link.role)},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||(binding.link.direction==='from-role'?w.objects?.find(source=>source.id===refs.get(binding.link!.role))?.state[binding.link.key]===object.id:object.state[binding.link.key]===refs.get(binding.link.role))},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:object.id,passed});if(!passed)return false;}return true;
    });
+   if(binding.select==='linked'&&candidates.length>1){report(binding,{check:'unbound',reason:'ambiguous-linked-objects',candidates:candidates.map(object=>object.id)});return;}
    const object=candidates[0];
    if(object){report(binding,{check:'bound',id:object.id});if(!fromRenewableBackground(object))finiteSource(binding);refs.set(binding.role,object.id);continue;}
    if(!binding.background){report(binding,{check:'unbound',reason:'no-object-matches-and-no-background'});return;}
@@ -97,6 +98,9 @@ function substitute<T>(value:T,refs:Map<string,string>):T {
 }
 function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stages:ActivityPhase[]},refs:Map<string,string>):ActivityPhase[]{
  const sim=structuredClone(w),actor=sim.characters.find(actor=>actor.id===c.id)!,stages:ActivityPhase[]=[];
+ const stateKeys=new Map<string,Set<string>>();
+ const retainKey=(id:string,key:string)=>{const keys=stateKeys.get(id)||new Set<string>();keys.add(key);stateKeys.set(id,keys);};
+ for(const binding of program.bindings){const id=refs.get(binding.role)!;for(const entry of binding.state)retainKey(id,entry.key);if(binding.link)retainKey(binding.link.direction==='from-role'?refs.get(binding.link.role)!:id,binding.link.key);}
  for(const phase of path.stages){
   for(const effect of phase.effects){if(effect.kind==='form')for(const output of effect.outputs)refs.set(output.id.slice(1),`formed:${crypto.randomUUID()}`);if(effect.kind==='separate')refs.set(effect.outputId.slice(1),`portion:${crypto.randomUUID()}`);}
   const optional=phase.effects.filter(effect=>!(effect.kind==='materialize'&&effect.supplyId.endsWith('-supply')&&effect.supplyId.startsWith('$')&&!refs.has(effect.supplyId.slice(1))));
@@ -104,7 +108,7 @@ function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stage
   const effects=rebindRoutineEffects(sim,current);
   const preconditions=substitute(phase.preconditions,refs);
   const ids=new Set([...effects.flatMap(effectReferenceIds),...preconditions.flatMap(condition=>'target' in condition?[condition.target.id]:[condition.objectId])]);
-  const bindings:RoutinePhaseBindings={objects:[...(sim.objects||[])].filter(object=>ids.has(object.id)).map(object=>({id:object.id,region:object.region,holder:object.holder,quantity:structuredClone(object.quantity||{amount:1,unit:'item'})})),bodies:sim.characters.filter(actor=>ids.has(actor.id)).map(actor=>({id:actor.id,region:regionOf(actor)}))};
+  const bindings:RoutinePhaseBindings={objects:[...(sim.objects||[])].filter(object=>ids.has(object.id)).map(object=>({id:object.id,region:object.region,holder:object.holder,quantity:structuredClone(object.quantity||{amount:1,unit:'item'}),state:Object.fromEntries([...(stateKeys.get(object.id)||[])].map(key=>[key,Object.hasOwn(object.state,key)?object.state[key]:null]))})),bodies:sim.characters.filter(actor=>ids.has(actor.id)).map(actor=>({id:actor.id,region:regionOf(actor)}))};
   const compiled:ActivityPhase={afterMinutes:phase.afterMinutes,preconditions,effects,routineBindings:bindings};
   sim.minute=w.minute;commitActivityPhase(sim,actor,compiled,stages.length);stages.push(compiled);
  }

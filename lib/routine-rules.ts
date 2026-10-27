@@ -314,7 +314,7 @@ export function knownRoutineMethods(w:World,c:Character){
  for(const rule of [...(w.routineRules||[])].reverse()){
   if(!rule.knownTo.includes(c.id))continue;
   if(rule.version===3){
-   for(const program of rule.programs as RoutineWorldProgram[]||[])for(const method of program.methods){const minutes=rule.worldTimings?.find(time=>time.operation===program.operation)?.minutes||15;if(!methods.some(known=>known.content===method.content&&known.purpose===method.purpose))methods.push({...method,durationMinutes:Math.ceil(minutes/15)*15});}
+   for(const program of rule.programs as RoutineWorldProgram[]||[])for(const method of program.methods.flatMap(method=>[{content:method.content,purpose:method.purpose},...(method.aliases||[])])){const minutes=rule.worldTimings?.find(time=>time.operation===program.operation)?.minutes||15;if(!methods.some(known=>known.content===method.content&&known.purpose===method.purpose))methods.push({...method,durationMinutes:Math.ceil(minutes/15)*15});}
    continue;
   }
   if(![1,2].includes(rule.version)||!Array.isArray(rule.templates))continue;

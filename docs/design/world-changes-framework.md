@@ -76,3 +76,15 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 成功編譯且實際綁定有限來源、又有 background 替代選項時，引擎在該場所規則保存 server-only `finiteSourceBindings`：最多 8 個 operation、每項最多 8 個 role。這個約束防止該來源被帶往其他場所後原規則憑背景補回；可操作的新 active 來源仍優先，可正常恢復。它不複製物件歷史，不由讀取補建，不修改舊 receipt，也不把無關場所資料累積進規則。直接來自既有 renewable background 的物件不建立有限約束，因此同杯清洗後再次泡茶仍能重用。
 
 模型 wire 不接受 `finiteSourceBindings`；NPC 輸入不含該內部欄位。新操作的有界 observer evidence 在 result.rules 投影該欄位，與被確認的 background/role 一起解釋為何不能 fallback，仍受既有 evidence 大小與遮蔽限制。材料主題延用既有 schema：legacy food 按 label/material/category 比對確認主題，新 kind 按確認類別匹配，沒有把通用世界種類重新限制為 food。
+
+## #196 日常關聯方向與宣告時序
+
+新 `routine.version=3` 的 `binding.link` 明示 `direction`：`to-role` 為候選物件 `state[key] === 已綁定角色ID`；`from-role` 為先前角色 `state[key] === 候選ID`。舊保存資料缺欄位仍採 `to-role`，不反轉所有關聯。linked 多個匹配視為承接歧義，不任選第一個同名物件。bindings 依序宣告，階段 preconditions 在當階段形成效果之前驗證角色引用。每階段只保存相關 binding state／link key 的前提，續作時重驗必要關聯，不以全物件 revision 或全部 state 作失效依據。舊計畫缺新 guard 不回填歷史。詳見 [本地反例與驗證](../verification/drink-binding-196-2026-10-27.md)。
+
+## #199 已確認方法的成對表述範圍
+
+v3 的方法身份仍以已確認 `operation`、所屬規則的角色／場所與程序前提為邊界。每個 `methods` 項目可在原本同次裁定中明示至多4組 `aliases: [{content,purpose}]`。純匹配只接受原配對或明示核准的配對，不能將某組 content 與另一組 purpose 作笛卡兒積，也不推測近似句子相同。當前 target 仍由原 bindings 重新綁定，版本、來源與權利持續驗證，沒有保存或重播前次具體成果／骰子。
+
+送出的 schema 要求新候選明示 aliases 陣列（無別名填 `[]`）；舊候選與舊世界未存此欄位時保持原核准範圍，不在讀取時補造同義核准或身體後果。已知方法投影展開核准配對，沿原最多16筆容量；此列表是有界的已知方法提示，仍可提出未列新方法。未知 wording、用途改變與配對矛盾走既有一次例外裁定，observer 的 method wording／purpose 檢查保留未命中原因，不靜默改寫行動。新增別名不能提高32KiB候選或既有輸出、時間、預算上限；過大候選按原契約回復。
+
+此機制只保證**已明示核准範圍**可免費重用，不宣稱程式理解所有自然語言同義句。舊方法未確認的合理新措辭仍需原本正常裁定；沒有獨立分類、匹配或格式修復模型。觀察者操作證據白名單保留成對 aliases，角色只取得已知配對及時間，不取得私有規則 ID 或權威版本。fixture 驗證見 [#199](../verification/method-reuse-199-2026-10-27.md)。
