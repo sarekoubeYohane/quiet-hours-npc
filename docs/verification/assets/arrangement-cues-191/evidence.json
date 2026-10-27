@@ -1,0 +1,43 @@
+{
+  "fixture": true,
+  "calls": 2,
+  "arrangements": {
+    "schemaVersion": 1,
+    "items": [
+      {
+        "id": "tea-later",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1275,
+        "text": "稍後與 Vera 討論茶的香氣",
+        "condition": {
+          "kind": "time",
+          "minute": 1290
+        },
+        "status": "active",
+        "references": [
+          {
+            "kind": "short",
+            "id": "legacy:owner:memory:0:1260",
+            "version": 1
+          }
+        ],
+        "conditionSince": 1275,
+        "memory": {
+          "id": "acc80272-6e71-49be-ae9d-c9383a12aaa4",
+          "version": 1
+        },
+        "cue": {
+          "conditionKey": "time:1290",
+          "lastMatch": "time:1290",
+          "epoch": 1,
+          "trigger": {
+            "key": "[\"time:1290\",1,\"time:1290\"]",
+            "at": 1290,
+            "handledAt": 1290
+          }
+        }
+      }
+    ]
+  }
+}

@@ -93,3 +93,25 @@ test('the disclosed assessment UTF-8 byte boundary accepts 2048 and rejects 2049
   }finally{s.restore();}
  }
 });
+
+test('v2 phone action and sourced arrangement share one assessed decision and atomic replay',async()=>{
+ const source={id:'want-later',characterId:'owner',version:1,time:1200,text:'我想稍後再試另一種方法。',source:{kind:'experience'}};
+ const s=await scenario({decision:wire(rest),modify:w=>{w.characters[0].shortTerm=[source];w.characters[0].memories=[];}});
+ try{
+  // Establish the real phone baseline through the public advance, then use the
+  // identity actually provisioned by the world rather than inventing a device.
+  await advance(s);const before=await s.read(),device=before.phones.devices[0];
+  const reference={kind:'short',id:source.id,version:1};
+  const action={...rest,type:'phone',target:device.objectId,content:JSON.stringify({collection:'memos',operation:'create',id:'retry-note',version:0,text:'稍後改用另一種方法。'}),timeIntent:{kind:'completion',maxMinutes:null},arrangementUpdates:[{operation:'upsert',id:'try-later',version:0,text:'稍後重試',condition:{kind:'time',minute:before.minute+60},references:[reference],reason:'我想稍後再試'}]};
+  const candidate=wire(action,{choice:'switch',knownResults:[reference],change:{kind:'preparation',detail:'先保存筆記與稍後安排'}});s.choose(candidate);
+  const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};
+  const response=await s.post(op);assert.equal(response.status,200,await response.clone().text());
+  const actual=s.inputs.filter(x=>x.input.self).at(-1),schema=actual.request.response_format.json_schema.schema;
+  assert.equal(actual.input.contractVersion,'npc-decision.v2');assert.ok(actual.input.self.lastKnownState.entries.some(x=>x.reference.id===source.id));
+  const validate=new Ajv().compile(schema);assert.equal(validate(candidate),true,JSON.stringify(validate.errors));
+  const saved=await s.read();assert.equal(saved.phones.devices[0].memos[0].text,'稍後改用另一種方法。');assert.equal(saved.characters[0].arrangements.items[0].text,'稍後重試');assert.equal(saved.minute,before.minute+15);
+  assert.ok((await trace(op.operationId)).steps.some(x=>x.kind==='npc-method-assessment'&&x.data.methodAssessment.selectedAction.type==='phone'));
+  const counts=s.counts();await s.post(op);assert.deepEqual(s.counts(),counts);assert.equal(counts.npc,2);assert.equal(counts.judgments,0);
+  assert.deepEqual((await s.read()).phones,saved.phones);
+ }finally{s.restore();}
+});

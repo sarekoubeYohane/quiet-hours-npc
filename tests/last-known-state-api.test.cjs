@@ -31,6 +31,7 @@ test('last-known state is identical for hidden changes, preserves mistaken accou
  const outputs=[];
  for(const hidden of [0,1]){
   const s=await scenario({reply:denied,modify:w=>{
+   w.phones={schemaVersion:1,activatedAt:w.minute,devices:[]};
    w.characters[0].memories=[];w.characters[0].shortTerm=[account('mistake','我猜想杯子裡還有茶，也許是 Cass 留下的。','observation')];
    w.supplies=[{id:'private-stock',label:'背景材料',region:'cafe-front',kind:'food',remaining:hidden,owner:'owner',knownTo:['owner'],allowedTo:hidden?['owner']:[],initialState:{}}];
   }});

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Explicit model transport fixtures; API/effects/SQLite remain real. */
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const store=load('store'),{seedWorld}=load('world');
@@ -16,7 +17,7 @@ test('a known-place proposal prepares a different food source, then actual inges
 test('the same exhausted ingredient cannot be renamed into a new background source',async()=>{
  const s=await scenario({prepare:w=>{w.supplies.push({...stock(),remaining:0});}});try{
   const program=preparation();program.bindings[0].background.label='換個名字的常備麵粉';s.reply(f.approval([program],'prepare-flatbread','薄餅'));s.choose(propose('用另一個來源的麵粉做一份薄餅','準備食物'));
-  const w=await advance(s);assert.equal(w.objects?.length||0,0);assert.equal(w.characters[0].needs.values.hunger,20.75);assert.equal(w.supplies.length,2);assert.equal(w.supplies.find(x=>x.id==='flour').remaining,0);assert.match(w.routineAudit.at(-1).reason,/有限材料|背景不會補回/);assert.equal(w.characters[0].plan,undefined);
+  const w=await advance(s);assert.equal(nonPhoneObjects(w).length,0);assert.equal(w.characters[0].needs.values.hunger,20.75);assert.equal(w.supplies.length,2);assert.equal(w.supplies.find(x=>x.id==='flour').remaining,0);assert.match(w.routineAudit.at(-1).reason,/有限材料|背景不會補回/);assert.equal(w.characters[0].plan,undefined);
  }finally{s.restore();}
 });
 test('a visitor may prepare a meal from a permitted concrete source without gaining ordinary background authority',async()=>{
@@ -41,7 +42,7 @@ test('a visitor physical preparation uses real finite stock and records lack of 
 });
 test('asking another character to prepare food does not execute their work or imply their agreement',async()=>{
  const s=await scenario({actorId:'cass',prepare:w=>{const owner=w.characters.find(c=>c.id==='owner');owner.location='cafe';owner.region='cafe-front';}});try{
-  s.choose({...rest,type:'say',target:'owner',content:'店主，可以請你另外做一份薄餅嗎？',timeIntent:{kind:'completion',maxMinutes:null}});const w=await advance(s);assert.equal(s.judgments(),0);assert.equal(w.objects?.length||0,0);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].remaining,0);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.equal(w.characters.find(c=>c.id==='cass').needs.values.hunger,20.75);assert.equal(w.routineRules,undefined);
+  s.choose({...rest,type:'say',target:'owner',content:'店主，可以請你另外做一份薄餅嗎？',timeIntent:{kind:'completion',maxMinutes:null}});const w=await advance(s);assert.equal(s.judgments(),0);assert.equal(nonPhoneObjects(w).length,0);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].remaining,0);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.equal(w.characters.find(c=>c.id==='cass').needs.values.hunger,20.75);assert.equal(w.routineRules,undefined);
  }finally{s.restore();}
 });
 test('save conflict after alternative preparation leaves no half source or serving and replay does not redispatch',async()=>{

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
@@ -27,7 +28,7 @@ test('complete edible products cannot be hidden in an early phase before a later
   w.supplies=[{id:'meal',label:'完整餐點',region:'cafe-front',remaining:1,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];
   w.objects=[{id:'timer',source:'fixture',label:'計時器',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{condition:'waiting'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{condition:['waiting','done']}}];
  });
- try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);let w=await s.read();assert.equal(w.turn,0);assert.equal(w.supplies[0].remaining,1);assert.equal(w.objects.length,1);assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
+ try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);let w=await s.read();assert.equal(w.turn,0);assert.equal(w.supplies[0].remaining,1);assert.equal(nonPhoneObjects(w).length,1);assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
 });
 
 test('cafe confirmation persists a full local scope without changing a known narrow home rule',async()=>{
@@ -49,7 +50,7 @@ test('explicit preparation stages keep partial water while the full drink waits 
   w.supplies=[{id:'drink',label:'完整的茶',region:'cafe-front',remaining:1,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{vessel:'cup',beverage:'tea'}}];
   w.objects=[{id:'cup',source:'fixture',label:'杯子',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea']}}];
  });
- try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);let w=await s.read();assert.equal(w.objects[0].state.contents,'water');assert.equal(w.objects.length,1);await s.post({operation:'advance',minutes:15});assert.equal((await s.read()).objects.length,1);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects.find(o=>o.id==='cup').state.contents,'tea');assert.equal(w.objects.filter(o=>o.kind==='food').length,1);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
+ try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);let w=await s.read();assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(nonPhoneObjects(w).length,1);await s.post({operation:'advance',minutes:15});assert.equal(nonPhoneObjects(await s.read()).length,1);await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects.find(o=>o.id==='cup').state.contents,'tea');assert.equal(w.objects.filter(o=>o.kind==='food').length,1);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
 });
 test('normalizing final results cannot exceed the bounded number of effects in a stage',async()=>{
  const goal={type:'propose',target:'cafe',content:'完成這些器具的檢查',purpose:'檢查',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}};
@@ -63,7 +64,7 @@ test('consuming a completed meal in an early phase does not disguise its termina
   w.supplies=[{id:'meal',label:'完整餐點',region:'cafe-front',remaining:1,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];
   w.objects=[{id:'timer',source:'fixture',label:'計時器',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{condition:'waiting'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{condition:['waiting','done']}}];
  });
- try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);let w=await s.read();assert.equal(w.turn,0);assert.equal(w.supplies[0].remaining,1);assert.equal(w.objects.length,1);assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
+ try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);let w=await s.read();assert.equal(w.turn,0);assert.equal(w.supplies[0].remaining,1);assert.equal(nonPhoneObjects(w).length,1);assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
 });
 
 
@@ -73,6 +74,6 @@ test('terminal changes of existing food cannot happen before confirmed completio
   const s=await setup(()=>goal,()=>({status:'accepted',effects:[],stages:[{afterMinutes:15,preconditions:[],effects:[{kind,objectId:'meal:1',expectedRevision:1}]},{afterMinutes:45,preconditions:[],effects:[{kind:'state',objectId:'timer',expectedRevision:1,key:'condition',value:'done'}]}],check:null,routine:null,completionMinutes:45}),w=>{
    w.objects=[{id:'meal:1',source:'meal',label:'完整餐點',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{},lifecycle:'active',kind:'food',knownTo:['owner'],allowedTo:['owner']},{id:'timer',source:'fixture',label:'計時器',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{condition:'waiting'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{condition:['waiting','done']}}];
   });
-  try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);const w=await s.read();assert.equal(w.turn,0);assert.equal(w.objects[0].lifecycle,'active');assert.equal(w.objects[0].revision,1);assert.equal(w.objects[1].state.condition,'waiting');assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
+  try{const op={operation:'advance',minutes:15,operationId:operationId()};assert.equal((await s.post(op)).status,502);const w=await s.read();assert.equal(w.turn,0);assert.equal(nonPhoneObjects(w)[0].lifecycle,'active');assert.equal(nonPhoneObjects(w)[0].revision,1);assert.equal(w.objects[1].state.condition,'waiting');assert.equal(w.characters[0].plan,undefined);await s.post(op);assert.deepEqual(s.counts(),{npc:1,judgments:1});}finally{s.restore();}
  }
 });

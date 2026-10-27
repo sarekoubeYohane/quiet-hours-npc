@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public adjudication contract boundary. */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {seedWorld}=load('world'),{parseEffectCandidate,effectCandidateSchema,effectRules}=load('adjudication-contract');
 const effect={kind:'materialize',supplyId:'meal',expectedRemaining:1};
@@ -38,8 +39,8 @@ test('the world API sends the centralized free contract and executes only after 
   assert.deepEqual(captured.schema.properties.status.enum,['accepted','denied','unsupported']);
   assert.equal(captured.schema.properties.completionMinutes.anyOf[1].maximum,1440);
   assert.ok(captured.input.effectRules.some(rule=>rule.includes('共同界線')&&rule.includes('1440')));
-  assert.equal((await (await GET()).json()).world.objects[0].id,'meal:1');
-  assert.equal(store.snapshot().objects[0].id,'meal:1');
+  assert.equal(nonPhoneObjects((await (await GET()).json()).world)[0].id,'meal:1');
+  assert.equal(nonPhoneObjects(store.snapshot())[0].id,'meal:1');
   assert.equal(store.snapshot().supplies[0].remaining,0);
  }finally{global.fetch=original;}
 });

@@ -66,6 +66,12 @@ export function eventCandidates(world: World, observer: Character, event: import
     }
     return clues;
   }
+  if(event.kind==='phone-notification'){
+    const region=event.scene?.toRegion;if(!region||!canHear(world,observer,region))return [];
+    const here=regionOf(observer),door=connectingDoor(here,region);
+    if(here!==region&&door&&(world.scene?.doors[door.id]||'open')==='closed')return [];
+    return [{sense:'hearing',kind:'sound',text:'附近一部手機響了一聲提示音。',clarity:'vague',region,direct:false,interference:world.scene?.noise[here]==='loud'?'strong':here===region?'weak':'medium'}];
+  }
   const actor = world.characters.find(c => c.id === event.actor);
   if (!actor || !event.scene) return [];
   const here = regionOf(observer), destination = event.scene.toRegion || regionOf(actor);
@@ -169,7 +175,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   const privateEvent = ['reflect', 'message', 'intervention', 'blocked', 'observe'].includes(event.kind) || event.scene?.target === 'observer';
   if (event.kind === 'continue') return;
   if (privateEvent || !event.scene) {
-    for (const character of world.characters) if (event.audience.includes(character.id)&&(!isSleeping(character)||event.actor===character.id)) remember(world, character, event.text, event);
+    for (const character of world.characters) if (event.audience.includes(character.id)&&(!isSleeping(character)||event.actor===character.id)) remember(world, character, character.id===event.actor?actorExperience??event.text:event.text, event);
     return;
   }
   for(const change of event.scene.externalChanges||[])if(change.target.type==='body'&&change.movement)world.currentSensory!.presence[change.target.id]={region:change.movement.toRegion,clue:event.id};

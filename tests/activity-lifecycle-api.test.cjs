@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const opid=()=>Date.now()+':'+crypto.randomUUID();
@@ -15,9 +16,9 @@ async function scenario(minutes=60,prepare=()=>{},adjudicate){
 }
 test('switching after a known intervention preserves water and cancels future serving after reload and replay',async()=>{
  const s=await scenario();try{
- await s.post({operation:'advance',minutes:15});let w=await s.read();const cup=w.objects[0];assert.equal(cup.state.contents,'water');assert.equal(w.supplies.filter(x=>x.pending).length,1);
- await s.post({operation:'intervene',target:'owner',text:'有件事想請你先停下來。'});s.choose(rest);const body={operation:'advance',minutes:15,operationId:opid()};assert.equal((await s.post(body)).status,200);w=await s.read();assert.equal(w.objects[0].id,cup.id);assert.equal(w.objects[0].state.contents,'water');assert.equal(w.characters[0].plan.timeIntent.kind,'open-ended');assert.equal(w.supplies.filter(x=>x.pending).length,0);
- await s.post(body);assert.deepEqual(s.counts(),{npc:2,judgments:1});await s.post({operation:'advance',minutes:15});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects.some(x=>x.kind==='food'),false);assert.equal(w.objects[0].state.contents,'water');assert.deepEqual(s.counts(),{npc:2,judgments:1});
+ await s.post({operation:'advance',minutes:15});let w=await s.read();const cup=nonPhoneObjects(w)[0];assert.equal(cup.state.contents,'water');assert.equal(w.supplies.filter(x=>x.pending).length,1);
+ await s.post({operation:'intervene',target:'owner',text:'有件事想請你先停下來。'});s.choose(rest);const body={operation:'advance',minutes:15,operationId:opid()};assert.equal((await s.post(body)).status,200);w=await s.read();assert.equal(nonPhoneObjects(w)[0].id,cup.id);assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(w.characters[0].plan.timeIntent.kind,'open-ended');assert.equal(w.supplies.filter(x=>x.pending).length,0);
+ await s.post(body);assert.deepEqual(s.counts(),{npc:2,judgments:1});await s.post({operation:'advance',minutes:15});await s.post({operation:'advance',minutes:15});w=await s.read();assert.equal(w.objects.some(x=>x.kind==='food'),false);assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.deepEqual(s.counts(),{npc:2,judgments:1});
  }finally{s.restore();}
 });
 
@@ -50,9 +51,9 @@ test('another NPC moves an intermediate object and the ninety-minute stale compl
  },input=>input.actor.id==='cass'?{status:'accepted',effects:[],stages:[{afterMinutes:15,preconditions:[],effects:[{kind:'state',objectId:'shared-cup',expectedRevision:1,key:'contents',value:'water'}]},{afterMinutes:90,preconditions:[{objectId:'shared-cup',revision:2,region:'cafe-front',holder:null,state:[{key:'contents',value:'water'}]}],effects:[{kind:'state',objectId:'shared-cup',expectedRevision:2,key:'contents',value:'tea'}]}],check:null,routine:null,completionMinutes:90}:{status:'accepted',effects:[{kind:'transfer',objectId:'shared-cup',expectedRevision:2,toHolder:'owner',toRegion:'cafe-front'}],stages:[],check:null,routine:null,completionMinutes:15});
  try{
   s.choose(input=>input.self.id==='cass'?(++cassStep===1?{...tea,target:'shared-cup',content:'以現有杯子完成這杯茶',purpose:'完成茶飲'}:rest):(++ownerStep===1?{...rest,durationMinutes:90}:ownerStep===2?{...tea,target:'shared-cup',content:'拿起共用杯子',purpose:'攜帶杯子'}:{...rest,type:'move',target:'kris-home',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null}}));
-  assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal((await s.read()).objects[0].state.contents,'water');await s.post({operation:'intervene',target:'owner',text:'請把共用杯子帶離這裡。'});assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal((await s.read()).objects[0].holder,'owner');assert.equal((await s.post({operation:'advance',minutes:15})).status,200);
-  for(let i=45;i<90;i+=15)assert.equal((await s.post({operation:'advance',minutes:15})).status,200);let w=await s.read();const cup=w.objects[0];assert.equal(cup.region,'kris-home-main');assert.equal(cup.state.contents,'water');assert.equal(cup.holder,'owner');assert.equal(w.characters.find(c=>c.id==='cass').plan,undefined);assert.equal(w.objects.length,1);
-  assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const input=s.inputs.filter(x=>x.self.id==='cass').at(-1);assert.deepEqual(input.objects,[]);assert.doesNotMatch(input.self.activity,/kris-home|owner|店主|Kris/);assert.equal(s.counts().judgments,2);
+  assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal(nonPhoneObjects(await s.read())[0].state.contents,'water');await s.post({operation:'intervene',target:'owner',text:'請把共用杯子帶離這裡。'});assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal(nonPhoneObjects(await s.read())[0].holder,'owner');assert.equal((await s.post({operation:'advance',minutes:15})).status,200);
+  for(let i=45;i<90;i+=15)assert.equal((await s.post({operation:'advance',minutes:15})).status,200);let w=await s.read();const cup=nonPhoneObjects(w)[0];assert.equal(cup.region,'kris-home-main');assert.equal(cup.state.contents,'water');assert.equal(cup.holder,'owner');assert.equal(w.characters.find(c=>c.id==='cass').plan,undefined);assert.equal(nonPhoneObjects(w).length,1);
+  assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const input=s.inputs.filter(x=>x.self.id==='cass').at(-1);assert.deepEqual(nonPhoneObjects(input),[]);assert.doesNotMatch(input.self.activity,/kris-home|owner|店主|Kris/);assert.equal(s.counts().judgments,2);
  }finally{s.restore();}
 });
 
@@ -70,7 +71,7 @@ test('control transitions cancel the unexecuted serving while keeping actual int
    const before=await s.read();assert.equal(before.supplies.filter(x=>x.pending).length,1);assert.equal((await s.post({operation})).status,200);const w=await s.read();assert.equal(w.characters[0].plan,undefined);assert.equal(w.supplies.filter(x=>x.pending).length,0);assert.deepEqual(w.objects,before.objects);assert.deepEqual(s.counts(),{npc:1,judgments:1});
   }finally{s.restore();}
  }
- const s=await scenario();try{const response=await s.post({operation:'direct',action:{type:'work',target:'tea'}});assert.equal(response.status,400);assert.match((await response.json()).error,/已確認|規則/);assert.deepEqual(s.counts(),{npc:0,judgments:0});assert.equal((await s.read()).objects,undefined);}finally{s.restore();}
+ const s=await scenario();try{const response=await s.post({operation:'direct',action:{type:'work',target:'tea'}});assert.equal(response.status,400);assert.match((await response.json()).error,/已確認|規則/);assert.deepEqual(s.counts(),{npc:0,judgments:0});assert.deepEqual(nonPhoneObjects(await s.read()),[]);}finally{s.restore();}
 });
 test('direct deterministic work finishes in its program-confirmed unit and controlled open-ended rest expires at its chosen period',async()=>{
  const s=await scenario();try{
@@ -83,7 +84,7 @@ test('cancelling one activity removes only its unmaterialized future supplies an
  for(const operation of ['takeover','return-control']){
   const s=await scenario(60);try{
    await s.post({operation:'advance',minutes:15});let w=await s.read();
-   const cup=structuredClone(w.objects[0]),future=w.supplies.find(x=>x.pending);
+   const cup=structuredClone(nonPhoneObjects(w)[0]),future=w.supplies.find(x=>x.pending);
    const unrelated={...structuredClone(future),id:'another-activity-serving',label:'另一項活動待用材料'};
    w.supplies.push(unrelated);
    // A previously materialized source is a committed identity even if another
@@ -92,7 +93,7 @@ test('cancelling one activity removes only its unmaterialized future supplies an
    committed.pending=true;Object.assign(w.supplies.find(x=>x.id===cup.source),committed);
    store.replaceCommittedWorld(w);
    const request={operation,operationId:opid()};assert.equal((await s.post(request)).status,200);w=await s.read();
-   assert.equal(w.characters[0].plan,undefined);assert.deepEqual(w.objects,[cup]);
+   assert.equal(w.characters[0].plan,undefined);assert.deepEqual(nonPhoneObjects(w),[cup]);
    assert.equal(w.supplies.some(x=>x.id===future.id),false);
    assert.deepEqual(w.supplies.find(x=>x.id===unrelated.id),unrelated);
    assert.deepEqual(w.supplies.find(x=>x.id===committed.id),committed);

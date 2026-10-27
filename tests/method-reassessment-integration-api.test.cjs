@@ -33,6 +33,8 @@ test('combined sourced assessment and partial-formation faults stay atomic and o
 test('the same actual visible context ignores hidden stock changes and representative composed requests and traces remain measured',async()=>{
  const inputs=[],metrics=[];for(const hidden of ['SECRET_A','SECRET_B']){
   const s=await scenario({hidden,peer:false});try{
+   // The two runs compare hidden stock, with the same unrelated device baseline.
+   const baseline=await s.read();baseline.phones={schemaVersion:1,activatedAt:baseline.minute,devices:[]};store.replaceCommittedWorld(baseline);
    await step(s,'reflect');inputs.push(s.transport.frames[0].input);assert.doesNotMatch(JSON.stringify(s.transport.frames[0].request),/SECRET_A|SECRET_B|private-stock/);
    for(const name of ['old-tea','brew','sip-item','sip-quarter','sip-alias','finish','water','drink-water','reflect']){const r=await step(s,name);metrics.push({name,inputBytes:Math.max(...s.transport.frames.filter(x=>x.input.self).map(x=>Buffer.byteLength(x.request.messages[1].content))),requestBytes:Math.max(...s.transport.frames.map(x=>Buffer.byteLength(JSON.stringify(x.request)))),rulesBytes:Buffer.byteLength(JSON.stringify(r.w.routineRules)),traceBytes:Buffer.byteLength(JSON.stringify(r.trace)),assessmentBytes:Math.max(...s.transport.frames.filter(x=>x.input.self).map(x=>Buffer.byteLength(JSON.stringify(x.value.methodAssessment))))});assert.ok(r.trace.steps.length);assert.ok(!r.trace.gaps.includes('single-record-limit'));assert.ok(r.w.routineRules.length<=32);}
   }finally{s.restore();}

@@ -61,7 +61,8 @@ test('model may defer a message, update its queue, and continue without restarti
 });
 
 test('NPC can switch from its unfinished activity and persist the replacement and updated queue', async () => {
-  const world = busyWorld(); record(world, 'vera', '有新消息', 'message', ['vera', 'cass']); store.install(world);
+  // Unread phone delivery no longer supplies known content; use an actual known intervention to exercise activity switching.
+  const world = busyWorld(); record(world, 'observer', '有新消息', 'intervention', ['cass']); store.install(world);
   await model(data => data.self.id === 'cass' ? { ...action('reflect'), content: '先想一想', durationMinutes: 60 } : action('rest'), async () => {
     assert.equal((await advance()).status, 200);
     const cass = (await read()).characters[0];

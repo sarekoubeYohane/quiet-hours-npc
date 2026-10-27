@@ -27,7 +27,8 @@ test('empty and maximum eighty short-term choices remain bounded, optional and p
    assert.equal(input.self.shortTerm.length,count);assert.equal(accepts(body,[]),true);
    assert.equal(accepts(body,[{id:'unknown',version:1,reason:'重要'}]),false);
    if(count){assert.ok(input.self.longTerm.length<58);for(const ref of input.self.shortTerm)assert.equal(accepts(body,[{id:ref.id,version:ref.version,reason:'重要'}]),true);assert.equal((await read()).characters[0].longTerm.length,58);assert.equal((await read()).characters[0].shortTerm.some(m=>m.id==='short-1'.padEnd(128,'x')),true);}
-   assert.ok(Buffer.byteLength(JSON.stringify(body))<160000);console.info('selection schema fixture bytes', {count,schema:Buffer.byteLength(JSON.stringify(body.response_format.json_schema.schema)),request:Buffer.byteLength(JSON.stringify(body))});assert.equal((await read()).turn,1);
+   // Combined phone/arrangement and method-assessment schemas add bounded fields.
+   assert.ok(Buffer.byteLength(JSON.stringify(body))<164000, `composed request bytes: ${Buffer.byteLength(JSON.stringify(body))}`);console.info('selection schema fixture bytes', {count,schema:Buffer.byteLength(JSON.stringify(body.response_format.json_schema.schema)),request:Buffer.byteLength(JSON.stringify(body))});assert.equal((await read()).turn,1);
   });
  }
 });

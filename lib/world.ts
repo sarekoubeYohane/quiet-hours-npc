@@ -1,3 +1,5 @@
+import { applyPhoneAction, phoneForActor, deliverPhoneMessage } from './phones';
+import { arrangementsForDecision } from './arrangements';
 import { pausedProjection } from './paused-activities';
 import { preferencesForDecision } from './preferences';
 import { bodyFeelings, type BodyNeeds } from './needs';
@@ -6,7 +8,7 @@ import type { RoutineRule, RoutinePlace } from './routine-rules';
 import { knownWorldObjects, knownWorldSupplies, type SceneSupply, type WorldObject, type ActivityPhase } from './world-effects';
 import type { CostLedger, ModelPrice } from './costs';
 import { cognitiveProjection, type CognitiveState } from './cognition';
-import { memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
+import { MemoryValidationError, memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
 import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
 import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regions, doors, regionOf, defaultRegion, connectingDoor, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
@@ -19,10 +21,10 @@ export type HabitEvidence={confirmedIdentity?:import('./world-effects').Activity
 export type Habit={activityKey?:string;activityLabel?:string;evidenceIds?:string[];key:string;type:Action['type'];target:string;location:string;period:number;observedDays:number[];lastSeen:number};
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
-export type Character={pausedActivity?:import('./paused-activities').PausedActivity;needs?:BodyNeeds;preferences?:import('./preferences').PreferenceState;physical?:PhysicalState;id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];routineCapabilities?:import('./routine-rules').RoutineOperation[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];habitEvidence?:HabitEvidence[];habitEvidenceDropped?:number;eventHabits?:EventHabit[];intents?:Intent[];control?:OwnerControl};
+export type Character={arrangements?:import('./arrangements').ArrangementState;pausedActivity?:import('./paused-activities').PausedActivity;needs?:BodyNeeds;preferences?:import('./preferences').PreferenceState;physical?:PhysicalState;id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];routineCapabilities?:import('./routine-rules').RoutineOperation[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];habitEvidence?:HabitEvidence[];habitEvidenceDropped?:number;eventHabits?:EventHabit[];intents?:Intent[];control?:OwnerControl};
 export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string;externalChanges?:ExternalConsequence[]};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
-export type World={bodyReconfirmation?:{attempts:{signature:string;minute:number}[];dropped:number};naturalChangesDropped?:number;naturalChanges?:import('./natural-changes').NaturalChange[];branchTrialScopes?:Record<string,string[]>;routineAudit?:{turn:number;actorId:string;location?:string;ruleId:string;result:"approved"|"reused"|"blocked"|"exception"|"confirmed";reason?:string}[];routineRules?:RoutineRule[];routinePlaces?:RoutinePlace[];contextId?:string;acceptance?:{id:'daily-life-v1';original?:World;snapshot?:{format:'gzip-base64-v1';data:string};originalSavedDecisions?:number};freeTrials?:Record<string,Resolution>;supplies?:SceneSupply[];objects?:WorldObject[];adjudication?:{provider:'openai'|'openrouter';model:string};minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
-export type Action={type:'pause'|'resume'|'abandon'|'propose'|'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string;purpose?:string};
+export type World={phones?:import('./phones').PhoneState;bodyReconfirmation?:{attempts:{signature:string;minute:number}[];dropped:number};naturalChangesDropped?:number;naturalChanges?:import('./natural-changes').NaturalChange[];branchTrialScopes?:Record<string,string[]>;routineAudit?:{turn:number;actorId:string;location?:string;ruleId:string;result:"approved"|"reused"|"blocked"|"exception"|"confirmed";reason?:string}[];routineRules?:RoutineRule[];routinePlaces?:RoutinePlace[];contextId?:string;acceptance?:{id:'daily-life-v1';original?:World;snapshot?:{format:'gzip-base64-v1';data:string};originalSavedDecisions?:number};freeTrials?:Record<string,Resolution>;supplies?:SceneSupply[];objects?:WorldObject[];adjudication?:{provider:'openai'|'openrouter';model:string};minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
+export type Action={type:'phone'|'pause'|'resume'|'abandon'|'propose'|'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string;purpose?:string};
 export const locations=[{id:'kris-home',name:'Kris 的住處',note:'一盞沒關的燈，一壺剛泡好的茶。'},{id:'vera-home',name:'Vera 的房間',note:'布料、髮飾，與安靜的手機。'},{id:'cafe',name:'街角咖啡館',note:'熟悉的角落。坐下，也可能遇見人。'}];
 export function homeLocation(c:Character){return c.id==='owner'?'cafe':c.id==='vera'?'vera-home':'kris-home';}
 export function pendingInterventions(w:World,c:Character){
@@ -48,7 +50,7 @@ export function record(w:World,actor:string,text:string,kind:string,audience:str
 const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
 w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
 }
-export function perception(w:World,c:Character){return {objects:knownWorldObjects(w,c),supplies:knownWorldSupplies(w,c),time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{bodyFeelings:bodyFeelings(c),pausedActivity:pausedProjection(c),preferences:preferencesForDecision(c),physical:knownExternalState(c.physical,true),id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,cognition:cognitiveProjection(c),shortTerm:memoryProjection(c),longTerm:recallableMemoryProjection(c),memoryReview:[] as MemoryReview[],memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name,physical:knownExternalState(x.physical)}))};}
+export function perception(w:World,c:Character){return {phones:phoneForActor(w,c),objects:knownWorldObjects(w,c),supplies:knownWorldSupplies(w,c),time:timeLabel(w.minute),day:Math.floor(w.minute/1440)+1,self:{arrangements:arrangementsForDecision(c),bodyFeelings:bodyFeelings(c),pausedActivity:pausedProjection(c),preferences:preferencesForDecision(c),physical:knownExternalState(c.physical,true),id:c.id,name:c.name,color:c.color,location:c.location,region:regionOf(c),mood:c.mood,personality:c.personality,goal:c.goal,activity:c.activity,relationships:c.relationships,cognition:cognitiveProjection(c),shortTerm:memoryProjection(c),longTerm:recallableMemoryProjection(c),memoryReview:[] as MemoryReview[],memories:c.memories,abilityTags:c.abilityTags,craftInsights:c.craftInsights,plan:c.plan?{action:c.plan.action,startedAt:c.plan.startedAt,until:c.plan.until}:undefined,habits:c.habits,intents:c.intents,control:c.control,attentionConditions:c.attentionConditions,observations:decisionObservations(c).map(({time,sense,kind,text,clarity,source,region})=>({time,sense,kind,text,clarity,source,region}))},home:locations.find(l=>l.id===homeLocation(c)),pendingInterventions:pendingInterventions(w,c).map(item=>({...item,memoryId:c.shortTerm?.find(m=>m.eventId===item.id)?.id})),places:locations,scene:knownScene(w,c),observationTargets:observationTargets(w,c),contacts:w.characters.map(x=>({id:x.id,name:x.name})),visiblePeople:w.characters.filter(x=>x.id!==c.id&&canSee(w,c,regionOf(x))).map(x=>({id:x.id,name:x.name,physical:knownExternalState(x.physical)}))};}
 function craftAdvantage(c:Character):Advantage {
 const tags=c.abilityTags||[];
 if(tags.includes('完全不懂髮飾設計'))return -4;
@@ -68,7 +70,10 @@ return 0;
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;const fromRegion=regionOf(c);
 const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?a.content.trim().slice(0,500):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
-if(a.type==='move'){
+if(a.type==='phone'){
+applyPhoneAction(w,c,a,!!options.dryRun);if(options.dryRun)return;c.activity='操作了手機。';text=`${c.name} 操作了手機。`;
+}
+else if(a.type==='move'){
 const region=regions.find(x=>x.id===a.target),dest=locations.find(x=>x.id===(region?.location||a.target));
 if(!dest)throw Error('目的地無效');const nextRegion=region?.id||defaultRegion(dest.id);
 if(dest.id===c.location){const door=connectingDoor(fromRegion,nextRegion);if(!door||(w.scene?.doors[door.id]||'open')!=='open')throw Error('目的地無效或門尚未開啟');}
@@ -109,7 +114,7 @@ c.activity='向 '+target.name+' 提出請求。';
 text=c.name+' 對 '+target.name+' 說：「'+content+'」'+effects[resolution.outcome];
 audience=witnesses;
 }
-else if(a.type==='message'){if(!target||target.id===c.id||!content)throw Error('收訊人無效');audience=[c.id,target.id];c.activity=`傳了一則訊息給 ${target.name}。`;text=`${c.name} 傳訊息給 ${target.name}：「${content}」`;}
+else if(a.type==='message'){if(!target||target.id===c.id||!content)throw new MemoryValidationError('收訊人無效，訊息尚未傳送。');deliverPhoneMessage(w,c,target,content,!!options.dryRun);if(options.dryRun)return;audience=[c.id];c.activity=`傳了一則訊息給 ${target.name} 的手機。`;text=`${c.name} 已向 ${target.name} 的手機傳送一則私人訊息。`;}
 else if(a.type==='rest'){c.activity='安靜休息了一會兒。';text=`${c.name} 讓自己安靜休息了一會兒。`;audience=witnesses;}
 else if(a.type==='work'){
 if(a.target==='tea')throw Error('泡茶需要已驗證的物件效果，不能只用確定動作宣稱完成。');
@@ -158,7 +163,7 @@ else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return
 else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
-  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution);
+  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:undefined);
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){

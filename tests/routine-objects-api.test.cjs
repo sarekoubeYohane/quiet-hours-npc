@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
@@ -50,9 +51,9 @@ test('specific vessels, finite clean-vessel shortage, tool restrictions and miss
   {objects:[{...tool(),owner:'cass',allowedTo:[]},vessel()]},
  ];
  for(const entry of cases){const s=await scenario(entry);if(entry.decision)s.decision(entry.decision);try{
-  const before=await s.read(),w=await advance(s);assert.deepEqual(w.objects,before.objects);assert.deepEqual(w.supplies,before.supplies);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.ok(!w.objects.some(o=>o.state.beverage==='tea'));
+  const before=await s.read(),w=await advance(s);assert.deepEqual(nonPhoneObjects(w),nonPhoneObjects(before));assert.deepEqual(w.supplies,before.supplies);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);assert.ok(!w.objects.some(o=>o.state.beverage==='tea'));
  }finally{s.restore();}}
- const usable=await scenario({objects:[tool(),vessel('chosen')]});usable.decision({...proposal,target:'chosen'});try{const w=await advance(usable);assert.equal(w.objects.find(o=>o.id==='chosen').state.contents,'tea');assert.equal(w.objects.filter(o=>'contents' in o.state).length,1);}finally{usable.restore();}
+ const usable=await scenario({objects:[tool(),vessel('chosen')]});usable.decision({...proposal,target:'chosen'});try{const w=await advance(usable);assert.equal(nonPhoneObjects(w).find(o=>o.id==='chosen').state.contents,'tea');assert.equal(nonPhoneObjects(w).filter(o=>'contents' in o.state).length,1);}finally{usable.restore();}
 });
 
 test('the required brewing tool is rechecked across a long activity while earlier water remains saved',async()=>{
@@ -76,8 +77,8 @@ test('new drink, wash and brew activities reuse the saved rule and the washed ve
 
 test('explicit time shortage saves approval without materializing, then a new activity can start under the saved rule',async()=>{
  const s=await scenario({minutes:30});s.decision({...proposal,timeIntent:{kind:'completion',maxMinutes:15}});try{
-  let w=await advance(s);assert.equal(w.routineRules[0].templates.length,6);assert.equal(w.objects.length,1);assert.equal(w.supplies,undefined);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);
-  s.decision({...proposal,content:'泡一杯茶'});w=await advance(s);const cup=w.objects.find(o=>'contents' in o.state);assert.equal(cup.state.contents,'water');assert.ok(w.characters.find(c=>c.id==='owner').plan);w=await advance(s);assert.equal(w.objects.find(o=>o.id===cup.id).state.contents,'tea');assert.equal(s.inputs.filter(i=>i.contractVersion==='world-adjudication.v1').length,1);
+  let w=await advance(s);assert.equal(w.routineRules[0].templates.length,6);assert.equal(nonPhoneObjects(w).length,1);assert.equal(w.supplies,undefined);assert.equal(w.characters.find(c=>c.id==='owner').plan,undefined);
+  s.decision({...proposal,content:'泡一杯茶'});w=await advance(s);const cup=nonPhoneObjects(w).find(o=>'contents' in o.state);assert.equal(cup.state.contents,'water');assert.ok(w.characters.find(c=>c.id==='owner').plan);w=await advance(s);assert.equal(nonPhoneObjects(w).find(o=>o.id===cup.id).state.contents,'tea');assert.equal(s.inputs.filter(i=>i.contractVersion==='world-adjudication.v1').length,1);
  }finally{s.restore();}
 });
 
