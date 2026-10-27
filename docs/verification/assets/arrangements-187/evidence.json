@@ -1,0 +1,32 @@
+{
+  "fixture": true,
+  "calls": 8,
+  "arrangements": {
+    "schemaVersion": 1,
+    "items": [
+      {
+        "id": "tea-later",
+        "characterId": "cass",
+        "version": 2,
+        "time": 1290,
+        "text": "稍後與 Vera 討論茶的香氣",
+        "condition": {
+          "kind": "time",
+          "minute": 0
+        },
+        "status": "dropped",
+        "references": [
+          {
+            "kind": "short",
+            "id": "legacy:cass:memory:0:1260",
+            "version": 1
+          }
+        ],
+        "memory": {
+          "id": "10a1cbdd-48a8-49d5-8219-22ffb34d43a0",
+          "version": 1
+        }
+      }
+    ]
+  }
+}

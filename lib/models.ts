@@ -1,10 +1,11 @@
+import { arrangementsForDecision, arrangementUpdatesSchema, arrangementPrompt, updateArrangements } from './arrangements';
 import { preferenceUpdatesSchema, preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
 import { knownRoutineMethods } from './routine-rules';
 import { requestModel, type ModelObserver } from './model-adapter';
 export const npcContractVersion = 'npc-decision.v1';
 import { cognitionForDecision, cognitiveUpdatesSchema, knownPeopleForDecision, relationshipsProjection, updateCognition, type CognitiveDecisionContext } from './cognition';
-import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, budgetMemoryInput, memoryBytes, memorySelectionSchema, memorySelectionSchemaFor, evaluateMemories, memoryOperationSchema } from './memory';
+import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, normalizeMemory, budgetMemoryInput, memoryBytes, memorySelectionSchema, memorySelectionSchemaFor, evaluateMemories, memoryOperationSchema } from './memory';
 import { parseAttention, clueKinds } from './attention';
 import { npcPlaybook } from './playbook';
 import { perception,type World,type Character,type Action,type Intent } from './world';
@@ -39,10 +40,11 @@ const actionSchema = { type: 'object', properties: {
   intents: { type: 'array', maxItems: 12, items: intentSchema },
   memorySelections: memorySelectionSchema,
   memoryOperations: memoryOperationSchema,
+  arrangementUpdates: arrangementUpdatesSchema,
   preferenceUpdates: preferenceUpdatesSchema,
   habitCandidates:habitCandidateSchema,
   cognitiveUpdates: cognitiveUpdatesSchema, interpretation: { type: 'string', maxLength: 256 },
-}, required: ['reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'intents', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates'], additionalProperties: false };
+}, required: ['reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'intents', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
 
 function parseDecision(value: unknown, allowedTypes: string[], world: World, character: Character, context: CognitiveDecisionContext): ActivityDecision {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
@@ -50,8 +52,8 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(data.reconfirmBodyConsequences!==undefined&&typeof data.reconfirmBodyConsequences!=='boolean')throw Error('身體後果重新確認選擇格式無效。');
   if(data.reconfirmBodyConsequences===true&&data.type!=='propose')throw Error('只有新提案可選擇重新確認身體後果。');
   if (data.contractVersion !== undefined && data.contractVersion !== npcContractVersion) throw Error('NPC 契約版本不相容。');
-  const work = { habitCandidates:data.habitCandidates, preferenceUpdates: data.preferenceUpdates, memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
-  if (memoryBytes(work) > 8192 || (Array.isArray(data.habitCandidates)?data.habitCandidates.length:0) + (Array.isArray(data.memorySelections) ? data.memorySelections.length : 0) + (Array.isArray(data.cognitiveUpdates) ? data.cognitiveUpdates.length : 0) + (Array.isArray(data.memoryOperations) ? data.memoryOperations.length : 0) + (Array.isArray(data.preferenceUpdates) ? data.preferenceUpdates.length : 0) > 4) throw Error();
+  const work = { arrangementUpdates:data.arrangementUpdates, habitCandidates:data.habitCandidates, preferenceUpdates: data.preferenceUpdates, memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
+  if (memoryBytes(work) > 8192 || (Array.isArray(data.arrangementUpdates)?data.arrangementUpdates.length:0) + (Array.isArray(data.habitCandidates)?data.habitCandidates.length:0) + (Array.isArray(data.memorySelections) ? data.memorySelections.length : 0) + (Array.isArray(data.cognitiveUpdates) ? data.cognitiveUpdates.length : 0) + (Array.isArray(data.memoryOperations) ? data.memoryOperations.length : 0) + (Array.isArray(data.preferenceUpdates) ? data.preferenceUpdates.length : 0) > 4) throw Error();
   const text = (value: unknown, max: number, nonempty = false) => typeof value === 'string' && value.length <= max && (!nonempty || value.trim().length > 0);
   if (!allowedTypes.includes(data.type as string) || !text(data.target, 100) || !text(data.content, 500) || !text(data.mood, 20) ||
     !activityDurations.includes(data.durationMinutes as number) || !Array.isArray(data.intents) || data.intents.length > 12 ||
@@ -75,11 +77,16 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   });
   const attention = parseAttention(world, character, data.attentionConditions);
   if (data.interpretation !== undefined && (!text(data.interpretation, 256) || new TextEncoder().encode(data.interpretation as string).length > 256)) throw Error();
-  const preferences = updatePreferences(character, data.preferenceUpdates, world.minute, context.visible);
   const cognition = updateCognition(character, data.cognitiveUpdates, world.minute, context);
+  const arrangement = updateArrangements(world,character,data.arrangementUpdates,context.visible);
+  const memoryCandidate=evaluateMemories({ ...character, ...(cognition ? {cognition} : {}) },data.memorySelections,data.memoryOperations,context.visible.longTerm as Parameters<typeof evaluateMemories>[3],context.memoryReview,context.visible.shortTerm||[]);
+  if(arrangement.experiences.length)memoryCandidate.shortTerm=[...(memoryCandidate.shortTerm||character.shortTerm||[]),...arrangement.experiences];
+  const preferences = updatePreferences(character, data.preferenceUpdates, world.minute, context.visible);
+  const composed={...character,...memoryCandidate,...(cognition?{cognition}:{}),...(arrangement.arrangements?{arrangements:arrangement.arrangements}:{})};
+  normalizeMemory(composed);memoryCandidate.shortTerm=composed.shortTerm;
   if(data.type==='propose'&&(!text(data.purpose,300,true)||!text(data.content,500,true)))throw Error();
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood, ...(data.type==='propose'?{purpose:data.purpose}:{}) } as Action;
-  return { ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...evaluateMemories({ ...character, ...(cognition ? { cognition } : {}) }, data.memorySelections, data.memoryOperations, context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview, context.visible.shortTerm || []), attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
+  return { ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { observer?: ModelObserver; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const direct=provider==='openai';
@@ -90,11 +97,11 @@ const perceived = perception(w,{...c,memories:c.memories.slice(-12),habits:undef
 perceived.self.cognition = cognitionForDecision(c, perceived.contacts, perceived.visiblePeople);
 perceived.self.relationships = relationshipsProjection(perceived.self.cognition.relationshipTags);
 const input = budgetMemoryInput({contractVersion:npcContractVersion,...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
-const visible: Character = { ...c, shortTerm: (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version)), longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), preferences: { schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0 }, cognition: { ...input.self.cognition, trace: [] } };
+const visible: Character = { ...c, arrangements:{schemaVersion:1,items:input.self.arrangements.items}, shortTerm: (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version)), longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), preferences: { schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0 }, cognition: { ...input.self.cognition, trace: [] } };
 const decisionContext: CognitiveDecisionContext = { visible, knownPeople: knownPeopleForDecision(visible, input.contacts.map(person => person.id)), memoryReview: input.self.memoryReview, historyCandidates: input.self.cognition.historyCandidates || [] };
-const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+preferencePrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
+const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+arrangementPrompt+"\n"+preferencePrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
 messages[0].content+=habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
-messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates 五類陣列合計最多4項，連同 interpretation 的更新 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；intents 依既有最多12筆自主排序，不把喜好或習慣變成命令。';
+messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates 六類陣列合計最多4項，連同 interpretation 的更新 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；intents 依既有最多12筆自主排序，不把喜好或習慣變成命令。';
 let recalled = false;
 for (;;) {
 const requestId = crypto.randomUUID();
@@ -124,9 +131,12 @@ try {
     budgetMemoryInput(input, c, { memories, handles });
     input.self.longTerm = [...memories, ...input.self.longTerm];
     if(memoryBytes({input, recalledMemories:handles}) > 88*1024) throw Error('回想後記憶輸入超過 88 KiB，本回合已回復。');
-    messages[1].content = JSON.stringify(input);
     visible.shortTerm = (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version));
     visible.longTerm = (c.longTerm || []).filter(item => input.self.longTerm.some(shown => shown.id === item.id && shown.version === item.version));
+    input.self.arrangements=arrangementsForDecision(c,visible);
+    while(input.self.arrangements.items.length&&memoryBytes({input,recalledMemories:handles})>88*1024)input.self.arrangements.items.pop();
+    visible.arrangements={schemaVersion:1,items:input.self.arrangements.items};
+    messages[1].content = JSON.stringify(input);
     visible.preferences = {schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0};
     visible.cognition = { ...input.self.cognition, trace: [] };
     decisionContext.memoryReview = input.self.memoryReview;
