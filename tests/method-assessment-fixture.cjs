@@ -1,0 +1,4 @@
+function assessment(action,extra={}){return {purpose:'照顧自己的生活',knownResults:[],choice:'new',method:action.content||'繼續原活動',change:{kind:'not-applicable',detail:''},reason:'依自己的想法決定',selectedAction:{type:action.type,target:action.target},intentIds:(action.intents||[]).map(x=>x.id),...extra};}
+function wire(action,extra={}){return {contractVersion:'npc-decision.v2',action:{type:action.type,target:action.target,content:action.content,purpose:action.purpose||''},methodAssessment:assessment(action,extra),mood:action.mood,durationMinutes:action.durationMinutes,timeIntent:action.timeIntent,intents:action.intents||[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',reconfirmBodyConsequences:false,preferenceUpdates:[],habitCandidates:[]};}
+
+module.exports={assessment,wire};

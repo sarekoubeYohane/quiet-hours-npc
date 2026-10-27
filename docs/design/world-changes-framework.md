@@ -81,6 +81,10 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 
 新 `routine.version=3` 的 `binding.link` 明示 `direction`：`to-role` 為候選物件 `state[key] === 已綁定角色ID`；`from-role` 為先前角色 `state[key] === 候選ID`。舊保存資料缺欄位仍採 `to-role`，不反轉所有關聯。linked 多個匹配視為承接歧義，不任選第一個同名物件。bindings 依序宣告，階段 preconditions 在當階段形成效果之前驗證角色引用。每階段只保存相關 binding state／link key 的前提，續作時重驗必要關聯，不以全物件 revision 或全部 state 作失效依據。舊計畫缺新 guard 不回填歷史。詳見 [本地反例與驗證](../verification/drink-binding-196-2026-10-27.md)。
 
+## #197 舊1 item的部分攝取
+
+沿現有有界形成／分拆能力：當次裁定可明示 `form partition` 將完整舊物轉成同來源的等份整體，再 `separate` 真正要攝取的份額並 `ingest`；保留原來源、權利、全部狀態曝光及容器，轉換不補貨、不自行恢復需求、不推定毫升。只有真正攝取部分取得本次確認的比例恢復；最後耗盡才同步更新容器。讀取舊資料仍不補容量或歷史，也不變更原正整數數量契約。技術 `endedByFormation`／`lifecycle=consumed` 與實際攝取分開；見 [機械路徑與限制](../verification/partial-drink-197-2026-10-27.md)。
+
 ## #199 已確認方法的成對表述範圍
 
 v3 的方法身份仍以已確認 `operation`、所屬規則的角色／場所與程序前提為邊界。每個 `methods` 項目可在原本同次裁定中明示至多4組 `aliases: [{content,purpose}]`。純匹配只接受原配對或明示核准的配對，不能將某組 content 與另一組 purpose 作笛卡兒積，也不推測近似句子相同。當前 target 仍由原 bindings 重新綁定，版本、來源與權利持續驗證，沒有保存或重播前次具體成果／骰子。

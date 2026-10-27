@@ -1,26 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Explicit model and saved-world fixtures. */
-const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
-const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
-const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const f=require('./routine-world-programs-fixture.cjs');
-const opid=()=>Date.now()+':'+crypto.randomUUID();
-const item=(id,kind,state,lifecycle='active')=>({id,kind,state,lifecycle,label:kind==='drink'?'茶':'杯子',source:'fixture',region:'cafe-front',holder:'owner',owner:'owner',revision:1,consumable:kind==='drink',quantity:{amount:lifecycle==='active'?1:0,unit:'item'},knownTo:['owner'],allowedTo:['owner']});
-function drinkProgram(target='tea',direction='from-role',minutes=15){
- const bindings=target==='tea'?[f.binding('drink','object','target',[{key:'beverage',value:'tea'}],{kind:'drink'}),f.binding('vessel','object','linked',[{key:'contents',value:'tea'}],{kind:'utensil',link:{role:'drink',key:'vessel',direction}})]:[f.binding('vessel','object','target',[{key:'contents',value:'tea'}],{kind:'utensil'}),f.binding('drink','object','linked',[{key:'beverage',value:'tea'}],{kind:'drink',link:{role:'vessel',key:'vessel',...(direction?{direction}:{})}})];
- return f.program('drink-serving','喝這杯茶','飲用',bindings,[f.phase(minutes,[{kind:'ingest',version:1,objectId:'$drink',expectedRevision:0,hungerRelief:0,thirstRelief:15},f.change('vessel','contents','tea','empty')])]);
-}
-async function scenario(program,prepare=()=>{}){
- const w=seedWorld();w.contextId='drink-binding-fixture';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-judge'};w.objects=[item('old-cup','utensil',{contents:'empty'}),item('old-tea','drink',{vessel:'old-cup',beverage:'tea'},'consumed'),item('cup','utensil',{contents:'tea'}),item('tea','drink',{vessel:'cup',beverage:'tea'})];prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
- await post({operation:'set-model-key',key:'fixture-key'});const old=global.fetch,inputs=[],requests=[];let npc=0,judgments=0;let decision={type:'propose',target:program.bindings[0].role==='drink'?'tea':'cup',content:'喝這杯茶',purpose:'飲用',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}};
- global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);requests.push(request);inputs.push(input);let value;if(input.contractVersion==='world-adjudication.v1'){judgments++;value=f.approval([program],'drink-serving','茶');}else{npc++;value=decision;}return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});};
- return{post,inputs,requests,read:async()=>(await(await GET()).json()).world,choose:v=>{decision=v;},counts:()=>({npc,judgments}),restore:()=>{global.fetch=old;}};
-}
-async function advance(s,extra={}){const r=await s.post({operation:'advance',minutes:15,...extra});assert.equal(r.status,200,await r.clone().text());return s.read();}
+const test=require('node:test'),assert=require('node:assert/strict');
+const {scenario,drinkProgram,advance,item,store,seedWorld,f,opid}=require('./drink-fixture.cjs');
 test('人工最小反例：從茶的 vessel 找真正杯子，完整攝取保存且下一次決策收到本人結果',async()=>{
  const s=await scenario(drinkProgram());try{const body={operationId:opid()};const w=await advance(s,body);assert.equal(w.objects.find(o=>o.id==='tea').lifecycle,'consumed');assert.equal(w.objects.find(o=>o.id==='cup').state.contents,'empty');assert.equal(w.objects.find(o=>o.id==='old-cup').revision,1);assert.equal(w.characters[0].needs.values.thirst,6.5);assert.deepEqual(store.snapshot().objects,w.objects);await advance(s,body);assert.deepEqual(s.counts(),{npc:1,judgments:1});s.choose({type:'reflect',target:'',content:'想想剛才',mood:'平靜',durationMinutes:15,intents:[]});await advance(s);assert.match(JSON.stringify(s.inputs.at(-1)),/喝這杯茶/);assert.equal((await s.read()).objects.filter(o=>o.kind==='utensil'&&o.lifecycle==='active').length,2);}finally{s.restore();}
 });
-module.exports={scenario,drinkProgram,advance,item};
 test('舊方向與明示 to-role 均從杯子找茶，不因同名舊杯改動身份',async()=>{
  for(const direction of [null,'to-role']){const s=await scenario(drinkProgram('cup',direction));try{const w=await advance(s);assert.equal(w.objects.find(o=>o.id==='tea').lifecycle,'consumed');assert.equal(w.objects.find(o=>o.id==='cup').state.contents,'empty');assert.equal(w.objects.find(o=>o.id==='old-cup').revision,1);}finally{s.restore();}}
 });

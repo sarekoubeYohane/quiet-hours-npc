@@ -24,7 +24,7 @@ export type OperationEvidence = {
 export type OperationSummary = { operationId: string; operation?: string; status: number; requestId?: string; version?: number; evidenceAvailable: boolean };
 
 type Shape = true | { [key: string]: Shape } | Shape[];
-const proposalShape: Shape = { contractVersion: true, type: true, target: true, content: true, purpose: true, durationMinutes: true, timeIntent: { kind: true, maxMinutes: true } };
+const proposalShape: Shape = { action: {type:true,target:true,content:true,purpose:true}, contractVersion: true, type: true, target: true, content: true, purpose: true, durationMinutes: true, timeIntent: { kind: true, maxMinutes: true } };
 const naturalStateShape:Shape={target:{type:true,id:true},changes:[{key:true,from:true,value:true}],exposure:true};
 const stateConditionShape:Shape={kind:true,version:true,target:{type:true,id:true},state:[{key:true,value:true}],guard:{region:true,holder:{check:true,value:true}}};
 const naturalChangeShape:Shape={id:true,version:true,source:{actorId:true,turn:true},scheduledAt:true,committedAt:true,nominalDueAt:true,dueAt:true,conditions:[stateConditionShape],effects:[naturalStateShape],reason:true,status:true,settledAt:true,invalidatedAt:true,invalidation:true};

@@ -13,7 +13,8 @@ import { demoDecision, pendingInterventions, record, type Action, type AIUsage, 
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
-export type ActivityDecision = { reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type MethodAssessment = { purpose:string; knownResults:{kind:'short'|'long';id:string;version:number}[]; choice:'new'|'retry'|'continue'|'wait'|'switch'|'drop'; method:string; change:{kind:'none'|'source'|'target'|'preparation'|'operation'|'condition'|'not-applicable';detail:string}; reason:string; selectedAction:{type:Action['type']|'continue';target:string}; intentIds:string[] };
+export type ActivityDecision = { methodAssessment?:MethodAssessment; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
