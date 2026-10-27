@@ -1,0 +1,141 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "counts": {
+    "npc": 2,
+    "judgments": 1
+  },
+  "checks": {
+    "uiAdvance": true,
+    "sqliteReload": true,
+    "ingestion": true,
+    "restActualMinutes": true,
+    "sameOperationReplay": true,
+    "privateFeelings": true
+  },
+  "needs": {
+    "version": 1,
+    "activatedAt": 1260,
+    "updatedAt": 1305,
+    "values": {
+      "hunger": 7.25,
+      "thirst": 24.5,
+      "fatigue": 11.25,
+      "sleep": 23
+    },
+    "assessed": {
+      "hunger": 0,
+      "thirst": 0,
+      "fatigue": 0,
+      "sleep": 0
+    },
+    "history": [
+      {
+        "minute": 1275,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 20,
+          "thirst": 20,
+          "fatigue": 15,
+          "sleep": 20
+        },
+        "after": {
+          "hunger": 20.75,
+          "thirst": 21.5,
+          "fatigue": 15.25,
+          "sleep": 21
+        }
+      },
+      {
+        "minute": 1275,
+        "reason": "實際攝取 meal",
+        "before": {
+          "hunger": 20.75,
+          "thirst": 21.5,
+          "fatigue": 15.25,
+          "sleep": 21
+        },
+        "after": {
+          "hunger": 5.75,
+          "thirst": 21.5,
+          "fatigue": 15.25,
+          "sleep": 21
+        }
+      },
+      {
+        "minute": 1290,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 5.75,
+          "thirst": 21.5,
+          "fatigue": 15.25,
+          "sleep": 21
+        },
+        "after": {
+          "hunger": 6.5,
+          "thirst": 23,
+          "fatigue": 15.5,
+          "sleep": 22
+        }
+      },
+      {
+        "minute": 1290,
+        "reason": "實際活動 rest 15分鐘",
+        "before": {
+          "hunger": 6.5,
+          "thirst": 23,
+          "fatigue": 15.5,
+          "sleep": 22
+        },
+        "after": {
+          "hunger": 6.5,
+          "thirst": 23,
+          "fatigue": 13.25,
+          "sleep": 22
+        }
+      },
+      {
+        "minute": 1305,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 6.5,
+          "thirst": 23,
+          "fatigue": 13.25,
+          "sleep": 22
+        },
+        "after": {
+          "hunger": 7.25,
+          "thirst": 24.5,
+          "fatigue": 11.25,
+          "sleep": 23
+        }
+      }
+    ],
+    "dropped": 0
+  },
+  "objects": [
+    {
+      "id": "meal",
+      "source": "fixture",
+      "label": "這份餐點",
+      "region": "cafe-front",
+      "holder": null,
+      "owner": "owner",
+      "revision": 2,
+      "state": {},
+      "lifecycle": "consumed",
+      "kind": "food",
+      "consumable": true,
+      "quantity": {
+        "amount": 0,
+        "unit": "serving"
+      },
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    }
+  ]
+}

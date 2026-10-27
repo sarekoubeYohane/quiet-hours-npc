@@ -3,12 +3,18 @@ import { isCandidateFailureReason, type ModelObserver, type ModelObservation } f
 import { decisionTraceLimits, omitDecisionTraceContent, type DecisionTrace } from './decision-traces';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 
+export function traceActorSnapshot(actor:Character) {
+  return structuredClone({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan,
+    needs:actor.needs,preferences:actor.preferences,habits:actor.habits,habitEvidence:actor.habitEvidence,habitEvidenceDropped:actor.habitEvidenceDropped,
+    eventHabits:actor.eventHabits,pausedActivity:actor.pausedActivity,intents:actor.intents});
+}
+
 // Observer-only snapshots never become World fields or prompt inputs. Each is
 // frozen at the dispatch boundary, including relevant facts that did not change.
 export function traceWorldSnapshot(world: World) {
   return structuredClone({minute:world.minute,turn:world.turn,objects:world.objects||[],supplies:world.supplies||[],
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
-    actors:world.characters.map(actor=>({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan}))});
+    actors:world.characters.map(traceActorSnapshot)});
 }
 export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown;timePolicy?:{version:string;leaseCreatedAt:number;workDeadline:number;leaseDeadline:number;clientMs:number}}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
   const secrets=new Set<string>();let unknownCredentials=false,contentLimitExceeded=false,omittedOriginalBytes=0;

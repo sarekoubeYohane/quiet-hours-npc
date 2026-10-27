@@ -1,3 +1,4 @@
+import { validatePreferences, type Preference } from './preferences';
 import { validateCognition, projectRelationships, relationshipsProjection, type Belief, type RelationshipTag } from './cognition';
 import type { Character } from './world';
 import type { Observation } from './perception';
@@ -210,8 +211,12 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
   validateMemoryState(candidate);
   return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
 }
-export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
+export function budgetMemoryInput<T extends { self: { preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
   const candidates = input.self.longTerm || [];
+  const tendencies = input.learnedHabits || [];
+  if(input.learnedHabits) input.learnedHabits = [];
+  const preferences = input.self.preferences?.items || [];
+  if(input.self.preferences) input.self.preferences.items = [];
   const cognition = input.self.cognition;
   const beliefs = cognition?.beliefs || [], tags = cognition?.relationshipTags || [];
   if (cognition) { cognition.beliefs = []; cognition.relationshipTags = []; input.self.relationships = {}; }
@@ -238,7 +243,7 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -259,10 +264,13 @@ export function budgetMemoryInput<T extends { self: { shortTerm: unknown[]; long
   }
   input.self.memoryReview = input.self.memoryReview.filter(ref => ref.kind === 'trace' || (ref.kind === 'short' ? input.self.shortTerm as MemoryRef[] : input.self.longTerm!).some(item => item.id === ref.id && item.version === ref.version));
   if (cognition?.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.filter(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version));
+  if(input.self.preferences) for(const preference of preferences){input.self.preferences.items.push(preference);if(memoryBytes(payload())>88*1024)input.self.preferences.items.pop();}
+  if(input.learnedHabits) for(const tendency of tendencies){input.learnedHabits.push(tendency);if(memoryBytes(payload())>88*1024)input.learnedHabits.pop();}
   return input;
 }
 export function validateMemoryState(c: Character) {
   validateCognition(c);
+  validatePreferences(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
   const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   const shortIds = new Set<string>();
@@ -292,6 +300,6 @@ export function validateMemoryState(c: Character) {
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
 export function memoryStateBytes(c: Character) {
-  const state = { shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
+  const state = { preferences:c.preferences, shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
   return memoryBytes(state);
 }

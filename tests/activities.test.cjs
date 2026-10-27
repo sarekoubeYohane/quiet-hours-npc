@@ -13,6 +13,8 @@ const options = (decide, extras = {}) => ({ minutes: 15, mode: 'openai', modelKe
 const restful = async (w, c, usage) => { usage({ inputTokens: 100, outputTokens: 20 }); return { action: { type: 'rest' }, durationMinutes: 90 }; };
 
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
+const learnStartedHabit = (world, character, action, from) => { resolve(world, character, action); learnHabit(world, character, action, from); };
+
 
 test('90-minute activities reuse five later rounds without calls or duplicate memories', async () => {
   const world = worldWithAdjudication(); let calls = 0;
@@ -112,12 +114,12 @@ test('model payload includes only recent memories and reports usage even with in
 
 test('a habit needs three different world days, not repeated actions in one day', () => {
   const world = worldWithAdjudication(), character = world.characters[0];
-  for (let i = 0; i < 10; i++) learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  for (let i = 0; i < 10; i++) learnStartedHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
   assert.equal(habitViews(world, character)[0].days, 1);
   assert.equal(habitsForDecision(world, character).length, 0);
-  world.minute += 1440; learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  world.minute += 1440; learnStartedHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
   assert.equal(habitViews(world, character)[0].established, false);
-  world.minute += 1440; learnHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
+  world.minute += 1440; learnStartedHabit(world, character, { type: 'work', target: 'tidy' }, character.location);
   assert.equal(habitViews(world, character)[0].established, true);
   assert.equal(habitsForDecision(world, character)[0].observedDays, 3);
   assert.equal(JSON.parse(JSON.stringify(character)).habits[0].observedDays.length, 3);
@@ -125,7 +127,7 @@ test('a habit needs three different world days, not repeated actions in one day'
 
 test('habit relevance respects time and place, and unused habits weaken', () => {
   const world = worldWithAdjudication(), character = world.characters[0];
-  for (let i = 0; i < 3; i++) { world.minute = 1260 + i * 1440; learnHabit(world, character, { type: 'rest' }, character.location); }
+  for (let i = 0; i < 3; i++) { world.minute = 1260 + i * 1440; learnStartedHabit(world, character, { type: 'rest' }, character.location); }
   const strength = habitStrength(character.habits[0], world.minute);
   assert.equal(habitsForDecision(world, character).length, 1);
   character.location = 'cafe'; assert.equal(habitsForDecision(world, character).length, 0);
@@ -154,8 +156,8 @@ test('model receives only its own established habits, without raw statistics or 
   const world = worldWithAdjudication(), cass = world.characters[0], vera = world.characters[1];
   for (let i = 0; i < 3; i++) {
     world.minute = 1260 + i * 1440;
-    learnHabit(world, cass, { type: 'work', target: 'tidy' }, cass.location);
-    learnHabit(world, vera, { type: 'work', target: 'craft' }, vera.location);
+    learnStartedHabit(world, cass, { type: 'work', target: 'tidy' }, cass.location);
+    learnStartedHabit(world, vera, { type: 'work', target: 'craft' }, vera.location);
   }
   let payload;
   const fakeFetch = async (url, init) => { payload = JSON.parse(init.body); return Response.json({ choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] }) } }] }); };

@@ -64,10 +64,10 @@ test('program-confirmed operation cap blocks before its visible result and open-
  }finally{s.restore();}
 });
 test('open-ended periods admit all fifteen-minute schedule units and reject non-granular values',async()=>{
- for(const durationMinutes of [45,75]){
+ for(const durationMinutes of [45,75,105,1440]){
   const s=await setup(()=>({...rest,durationMinutes}));try{const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,200,await response.clone().text());const w=await s.read();assert.equal(w.characters[0].plan.until-w.characters[0].plan.startedAt,durationMinutes);assert.deepEqual(s.counts(),{npc:1,judgments:0});}finally{s.restore();}
  }
- for(const durationMinutes of [20,0,105]){
+ for(const durationMinutes of [20,0,1441,1455]){
   const s=await setup(()=>({...rest,durationMinutes}));try{assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal((await s.read()).turn,0);assert.deepEqual(s.counts(),{npc:1,judgments:0});}finally{s.restore();}
  }
 });

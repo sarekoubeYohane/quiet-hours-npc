@@ -1,8 +1,9 @@
-import { activateBodyNeeds, advanceBodyNeeds, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
+import { managePausedActivity } from './paused-activities';
+import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bodyIntervalBase, hasUnevaluatedNeed, acknowledgeBodyNeeds } from './needs';
 import { advanceNaturalChanges } from './natural-changes';
 import { emitExternalConsequences } from './world-effects';
 import { requiresWorldEffects, type EffectCandidate } from './world-effects';
-import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, startActivity } from './activity-lifecycle';
+import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, wakeSleepingActivity, startActivity } from './activity-lifecycle';
 export { activityDurations, canResumeActivity } from './activity-lifecycle';
 import { bindRoutine } from './routine-rules';
 import { projectRelationships, type CognitiveState } from './cognition';
@@ -12,7 +13,7 @@ import { demoDecision, pendingInterventions, record, type Action, type AIUsage, 
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
-export type ActivityDecision = { timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -49,6 +50,7 @@ export function attentionMarker(world: World, character: Character): string {
 }
 
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
+  if(character.plan?.bodyActivity?.kind==='sleep')return isSleeping(character);
   return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
     pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character);
 }
@@ -83,6 +85,8 @@ export async function advanceActivities(world: World, options: {
     if (budgetReached(usage, limits)) throw new BudgetExceeded();
   }
   activateBodyNeeds(world);
+  const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
+  const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));
   world.minute += minutes; world.lastMode = mode;
   advanceNaturalChanges(world,world.minute,emitExternalConsequences);
   advanceBodyNeeds(world);
@@ -92,6 +96,7 @@ export async function advanceActivities(world: World, options: {
     try {
     const control = character.control;
     discardLegacyActivity(world,character);
+    wakeSleepingActivity(world,character);
     let controlledDecision:ActivityDecision|undefined;
     if (control?.pending) {
       const action=control.pending;
@@ -140,13 +145,20 @@ export async function advanceActivities(world: World, options: {
     }
     acknowledgeBodyNeeds(character);
     character.observationCursor = observedCount;
+    if (decision.eventHabits) character.eventHabits=decision.eventHabits;
     if (decision.longTerm) character.longTerm = decision.longTerm;
     if (decision.shortTerm) character.shortTerm = decision.shortTerm;
     if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
     if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
+    if (decision.preferences) character.preferences = decision.preferences;
     consumeMemories(character);
     if (decision.attentionConditions) character.attentionConditions = decision.attentionConditions;
     for (const reason of decision.attentionDiagnostics || []) noteAttention(world, character, reason);
+    if (['pause','resume','abandon'].includes(decision.action.type)) {
+      if (decision.intents) character.intents=decision.intents;
+      managePausedActivity(world,character,decision.action.type as 'pause'|'resume'|'abandon',decision.action.target,modelKey,attentionMarker(world,character));
+      continue;
+    }
     if (decision.continueExisting) {
       if (!canResumeActivity(world, character, modelKey)) {
         throw Error('沒有可延續的原活動，請選擇新行動。');
@@ -159,8 +171,8 @@ export async function advanceActivities(world: World, options: {
     }
     if (decision.intents) character.intents = decision.intents;
     try {
-      if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai}))continue;
-      if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from);
+      if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai,bodyMinutes:bodyMinutes.get(character.id),bodyBase:bodyBases.get(character.id)}))continue;
+      if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from, decision.freeCandidate);
       if(controlledDecision&&character.plan)control!.active=true;
     } catch (error) {
       if (error instanceof MemoryValidationError || requiresWorldEffects(decision.action)) throw error;

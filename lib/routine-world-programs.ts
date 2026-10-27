@@ -144,7 +144,7 @@ function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:Routin
  const newSupplies=(prepared.supplies||[]).filter(supply=>!w.supplies?.some(existing=>existing.id===supply.id));if(newSupplies.length)(w.supplies??=[]).push(...structuredClone(newSupplies));
  const references=trialReferences(w,program,refs);
  observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:approval?'approved':'reused',bindings:Object.fromEntries(refs),operation:program.operation});
- return {status:'accepted',pendingResultSupplies:newSupplies.map(supply=>supply.id),effects:[],stages:[],branches:branches as EffectCandidate['branches'],check:program.check,confirmedDurationMinutes,trialBinding:{operation:program.operation,subject:refs.get(program.bindings[0].role)!,references}};
+ return {...(program.resumable?{resumable:true}:{}),...(program.bodyActivity?{bodyActivity:structuredClone(program.bodyActivity)}:{}),status:'accepted',pendingResultSupplies:newSupplies.map(supply=>supply.id),effects:[],stages:[],branches:branches as EffectCandidate['branches'],check:program.check,confirmedDurationMinutes,trialBinding:{operation:program.operation,subject:refs.get(program.bindings[0].role)!,references}};
 }
 
 // A known method may have several separately confirmed scopes. Resolve each

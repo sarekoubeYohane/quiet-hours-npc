@@ -1,0 +1,125 @@
+{
+  "fixture": true,
+  "browser": "Chromium",
+  "npc": 2,
+  "judge": 1,
+  "modelCalls": 3,
+  "minute": 1380,
+  "needs": {
+    "version": 1,
+    "activatedAt": 1260,
+    "updatedAt": 1380,
+    "values": {
+      "hunger": 45,
+      "thirst": 51,
+      "fatigue": 60,
+      "sleep": 20
+    },
+    "assessed": {
+      "hunger": 1,
+      "thirst": 1,
+      "fatigue": 1,
+      "sleep": 0
+    },
+    "history": [
+      {
+        "minute": 1275,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 39,
+          "thirst": 39,
+          "fatigue": 70,
+          "sleep": 40
+        },
+        "after": {
+          "hunger": 39.75,
+          "thirst": 40.5,
+          "fatigue": 70.25,
+          "sleep": 41
+        }
+      },
+      {
+        "minute": 1275,
+        "reason": "實際活動 sleep 15分鐘",
+        "before": {
+          "hunger": 39.75,
+          "thirst": 40.5,
+          "fatigue": 70.25,
+          "sleep": 41
+        },
+        "after": {
+          "hunger": 39.75,
+          "thirst": 40.5,
+          "fatigue": 68.75,
+          "sleep": 37.5
+        }
+      },
+      {
+        "minute": 1305,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 39.75,
+          "thirst": 40.5,
+          "fatigue": 68.75,
+          "sleep": 37.5
+        },
+        "after": {
+          "hunger": 41.25,
+          "thirst": 43.5,
+          "fatigue": 66.25,
+          "sleep": 32.5
+        }
+      },
+      {
+        "minute": 1335,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 41.25,
+          "thirst": 43.5,
+          "fatigue": 66.25,
+          "sleep": 32.5
+        },
+        "after": {
+          "hunger": 42.75,
+          "thirst": 46.5,
+          "fatigue": 63.75,
+          "sleep": 27.5
+        }
+      },
+      {
+        "minute": 1365,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 42.75,
+          "thirst": 46.5,
+          "fatigue": 63.75,
+          "sleep": 27.5
+        },
+        "after": {
+          "hunger": 44.25,
+          "thirst": 49.5,
+          "fatigue": 61.25,
+          "sleep": 22.5
+        }
+      },
+      {
+        "minute": 1380,
+        "reason": "世界時間與實際活動",
+        "before": {
+          "hunger": 44.25,
+          "thirst": 49.5,
+          "fatigue": 61.25,
+          "sleep": 22.5
+        },
+        "after": {
+          "hunger": 45,
+          "thirst": 51,
+          "fatigue": 60,
+          "sleep": 20
+        }
+      }
+    ],
+    "dropped": 0
+  },
+  "activity": "正在進行自己選定的活動時段，約剩 45 分鐘。"
+}

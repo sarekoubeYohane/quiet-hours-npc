@@ -12,6 +12,7 @@ export type AdjudicationInput = {
   target?: { id: string; location: string; region?: string };
   rules: string[];
   durationMinutes?: number;
+  knownActivityIdentities?: {version:1;key:string;label:string}[];
 };
 export type WorldTaskServices = {
   // Dependency injection at the server handler, never selectable by a JSON request.
@@ -107,6 +108,7 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
   const target = world.characters.find(character => character.id === action.target);
   return {
     contractVersion: adjudicationContractVersion,
+    knownActivityIdentities:[...new Map((actor.habitEvidence||[]).filter(item=>item.confirmedIdentity).map(item=>[item.confirmedIdentity!.key,item.confirmedIdentity!])).values()].slice(-24),
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
