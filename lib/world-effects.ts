@@ -73,7 +73,7 @@ export function knownWorldObjects(w:World,c:Character){
  return (w.objects||[]).filter(o=>o.lifecycle==='active'&&(o.holder===c.id||o.knownTo.includes(c.id)&&canSee(w,c,o.region))).map(o=>({id:o.id,label:o.label,region:o.region,holder:o.holder,state:Object.fromEntries(Object.entries(o.state).filter(([key])=>o.stateExposure?.[key]!=='hidden')),kind:o.kind,...(o.quantity?{quantity:o.quantity}:{}),...(o.consumable===undefined?{}:{consumable:o.consumable})}));
 }
 export function knownWorldSupplies(w:World,c:Character){
- return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind}));
+ return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind,availability:'unknown' as const}));
 }
 export function authorityForProposal(w:World,c:Character){
  const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
@@ -279,7 +279,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   // blockedReason remains an observer diagnostic: even program-derived reasons
   // can depend on hidden stock or grants. Only actor-known grounds may leave it.
   const summary=candidate.knownBlockedReason||(candidate.status==='denied'
-   ?'這次方法沒有成功，尚未執行，沒有新增成果。若尚未取得必要使用許可，須由有權角色自行同意授權；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
+   ?'這次方法沒有成功，尚未執行，沒有新增成果。未確認本次受阻的原因；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
    :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
   recordActionResult(w,c,action,summary,'blocked');return false;
  }
