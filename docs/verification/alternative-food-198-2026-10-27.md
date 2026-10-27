@@ -32,7 +32,7 @@
 重現命令：
 
 ```sh
-node --import ./tooling/verification/no-network.mjs tests/run-activities.mjs tests/alternative-food-api.test.cjs tests/routine-sharing-api.test.cjs tests/routine-world-changes-api.test.cjs
+NODE_OPTIONS="--import=$PWD/tooling/verification/no-network.mjs" node tests/run-activities.mjs tests/alternative-food-api.test.cjs tests/routine-sharing-api.test.cjs tests/routine-world-changes-api.test.cjs
 ```
 
 ## 相容及既有畫面

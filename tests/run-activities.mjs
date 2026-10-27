@@ -81,6 +81,7 @@ try {
   allTests.push('tests/life-habits-api.test.cjs', 'tests/life-trace-api.test.cjs', 'tests/life-cognition-integration-api.test.cjs', 'tests/life-integration-api.test.cjs');
 
   allTests.push('tests/last-known-state-api.test.cjs', 'tests/method-assessment-api.test.cjs', 'tests/drink-binding-api.test.cjs', 'tests/partial-drink-api.test.cjs', 'tests/alternative-food-api.test.cjs');
+  allTests.push('tests/method-reassessment-integration-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
