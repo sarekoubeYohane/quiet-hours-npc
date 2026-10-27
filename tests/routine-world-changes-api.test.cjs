@@ -89,7 +89,7 @@ test('a v3 method saves environment body and natural effects together and reuses
  try{
   s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});let w=await advance();assert.equal(w.scene.external['cafe-front'].state.污漬,'無');assert.equal(w.characters[0].physical.state.手腕,'輕微酸痛');assert.equal(w.characters[0].physical.exposure.手腕,'subject');assert.equal(w.naturalChanges.length,1);assert.equal(w.naturalChanges[0].status,'pending');
   s.choose({type:'rest',target:'',content:'休息',mood:'平靜',durationMinutes:15,intents:[]});w=await advance();assert.equal(w.scene.external['cafe-front'].state.濕潤,'乾');assert.equal(w.naturalChanges[0].status,'executed');assert.deepEqual(s.counts(),{npc:2,adjudication:1});assert.deepEqual(store.snapshot().naturalChanges,w.naturalChanges);
-  s.reply({status:'denied',completionMinutes:null,stages:[],branches:null,effects:[],check:null,routine:null});s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});w=await advance();assert.deepEqual(s.counts(),{npc:3,adjudication:2});assert.equal(w.routineRules.length,1);assert.equal(w.naturalChanges.length,1);
+  s.reply({status:'denied',completionMinutes:null,stages:[],branches:null,effects:[],check:null,routine:null});s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});w=await advance();assert.deepEqual(s.counts(),{npc:3,adjudication:1},'the same confirmed environment now fails its saved prerequisite without another adjudication');assert.equal(w.routineRules.length,1);assert.equal(w.naturalChanges.length,1);
  }finally{s.restore();}
 });
 test('natural changes to unrelated state do not invalidate a v3 phase but related conditions retain earlier committed progress',async()=>{

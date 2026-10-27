@@ -1,5 +1,5 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
-import { routineBindingsHold, rebindRoutineEffects, type RoutinePhaseBindings } from './routine-world-bindings';
+import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -30,7 +30,7 @@ export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation
 export type Effect=IngestEffect|ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;requiredTools?:string[]};
+export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;routineSourceScope?:RoutineSourceScope;requiredTools?:string[]};
 export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
 // Internal only: a trusted routine binder can identify each current vessel/material
 // attempt without storing model-authored IDs or the first historical die in a rule.
@@ -379,6 +379,7 @@ export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,inde
  checkPhase(clone,actor,phase);
  const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined);
  commitWorldChanges(w,clone);
+ recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  emitExternalConsequences(w,c.id,phase.effects);
  return results;
 }

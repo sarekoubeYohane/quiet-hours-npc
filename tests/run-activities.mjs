@@ -75,6 +75,7 @@ try {
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
+  allTests.push('tests/verified-obstacles-api.test.cjs');
   allTests.push('tests/action-feedback-api.test.cjs', 'tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs', 'tests/candidate-diagnostics-api.test.cjs');
   allTests.push('tests/round-deadline-api.test.cjs', 'tests/preferences-api.test.cjs', 'tests/long-activities-api.test.cjs', 'tests/life-needs-api.test.cjs', 'tests/sleep-api.test.cjs');
   allTests.push('tests/life-habits-api.test.cjs', 'tests/life-trace-api.test.cjs', 'tests/life-cognition-integration-api.test.cjs', 'tests/life-integration-api.test.cjs');
