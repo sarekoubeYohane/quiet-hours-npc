@@ -38,15 +38,16 @@ test('an intervention interrupts only its recipient and is consumed by the next 
   await advanceActivities(world, opts); assert.deepEqual(called, []);
 });
 
-test('private thoughts and unread device delivery do not interrupt another NPC before notification', async () => {
+test('private thoughts stay private while actually noticed generic phone sound offers recipient reevaluation', async () => {
   const world = worldWithAdjudication(); await advanceActivities(world, options(restful));
   const vera = world.characters.find(c => c.id === 'vera');
   const cass = world.characters.find(c => c.id === 'cass');
   record(world, 'kris', '私密想法', 'reflect', ['kris']);
   assert.equal(canContinue(world, cass, 'openai:test'), true);
   assert.equal(canContinue(world, vera, 'openai:test'), true);
-  resolve(world, cass, { type: 'message', target: 'vera', content: '晚安' });
-  assert.equal(canContinue(world, vera, 'openai:test'), true);
+  const priorRandom=Math.random;Math.random=()=>0.8;
+  try{resolve(world, cass, { type: 'message', target: 'vera', content: '晚安' });}finally{Math.random=priorRandom;}
+  assert.equal(canContinue(world, vera, 'openai:test'), false);
   assert.equal(canContinue(world, world.characters.find(c => c.id === 'kris'), 'openai:test'), true);
 });
 

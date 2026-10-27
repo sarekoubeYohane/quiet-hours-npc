@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
@@ -20,8 +21,8 @@ test('legacy state still rejects an unlisted tea stain without mutating the save
  try{const before=await s.read(),r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,502);assert.match((await r.json()).error,/物件不支援/);const saved=await s.read();assert.deepEqual(saved.objects,before.objects);assert.equal(saved.turn,before.turn);assert.deepEqual(s.counts(),{npc:1,adjudication:1,dice:0});}finally{s.restore();}
 });
 test('a model-confirmed unlisted state persists on the same cup and is available to a later proposal',async()=>{
- const s=await scenario();try{let saved=await advance(s);assert.equal(saved.objects.length,1);assert.equal(saved.objects[0].id,'cup');assert.equal(saved.objects[0].source,'original-cup');assert.equal(saved.objects[0].owner,'owner');assert.equal(saved.objects[0].state.surface,'茶漬');assert.equal(saved.objects[0].revision,2);
- s.reply(accepted([{...change('濕潤',2),changes:[{key:'surface',from:'茶漬',value:'濕潤'}]}]));saved=await advance(s);assert.equal(saved.objects[0].state.surface,'濕潤');const request=s.inputs.filter(item=>item.input.self).at(-1);assert.equal(request.input.objects[0].state.surface,'茶漬');assert.deepEqual(s.counts(),{npc:2,adjudication:2,dice:0});}finally{s.restore();}
+ const s=await scenario();try{let saved=await advance(s);assert.equal(nonPhoneObjects(saved).length,1);assert.equal(nonPhoneObjects(saved)[0].id,'cup');assert.equal(nonPhoneObjects(saved)[0].source,'original-cup');assert.equal(nonPhoneObjects(saved)[0].owner,'owner');assert.equal(nonPhoneObjects(saved)[0].state.surface,'茶漬');assert.equal(nonPhoneObjects(saved)[0].revision,2);
+ s.reply(accepted([{...change('濕潤',2),changes:[{key:'surface',from:'茶漬',value:'濕潤'}]}]));saved=await advance(s);assert.equal(nonPhoneObjects(saved)[0].state.surface,'濕潤');const request=s.inputs.filter(item=>item.input.self).at(-1);assert.equal(nonPhoneObjects(request.input)[0].state.surface,'茶漬');assert.deepEqual(s.counts(),{npc:2,adjudication:2,dice:0});}finally{s.restore();}
 });
 
 test('the actual schema prompt parser and receipt expose the same bounded new state without leaking its reason to NPCs',async()=>{

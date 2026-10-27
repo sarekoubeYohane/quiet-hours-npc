@@ -21,3 +21,15 @@
 既有手機缺inbox欄位時，首個成功advance加空收件匣與inboxActivatedAt，GET不改。啟用前既有主觀記憶原樣保留；歷史事件audience、睡眠略過、缺失與已忘內容均不推算成readers或回填收件匣。歷史知情／閱讀狀態未知明示在觀察面板。不查舊trace復活正文。
 
 phoneExperience延伸collection參數，共用裝置存取、有效版本、實際記憶來源與列表分頁；presentation上界每機（32備忘錄+64訊息）×角色數，不累積逐次歷史。私人trace的世界快照包含phones，用於驗證送達／讀取／故障，絕不進NPC輸入。#190沿deliverPhoneMessage回傳的device/message承接通知責任，本票送達不宣稱已通知或已察覺。
+
+## #190 裝置通知與一次正常考慮機會
+
+成功送達在同一回合裝置發出一次普通提示音。`emitPhoneNotification`共用message/reminder、資料ID／版本與condition key去重；依裝置實際區域建立外在線索，由真正perceiveEvent/D20判定每個角色的感知機會與察覺。通知不含正文、寄件人或對方意圖，不能將物主當聲音來源。關閉隔門與不同場所沒有普通提示音機會；同區噪音沿既有感知干擾。睡眠先沿共同刺激過濾，普通音不喚醒或擲骰。錯過的聲響不重播，未讀保留由之後主動查看發現。
+
+每部通知最多128筆，每角色一份exposure狀態，只有真正短期感知來源仍在本次有限輸入時才列handle；每次最多4項，與原88KiB輸入共同受限。缺口明示。獨立`reevaluationOfferedAt`表示這批察覺已取得一次正常重新考慮的排程機會，避免被省略的多則通知每輪額外開模型；只有真正派送給該NPC的handle才有`handledAt`。未展示仍未處理，可在後來本來就需要的正常決策承接。這不是已讀、相信或安排完成。128筆硬滿明示回復，不默默刪未處理；不建立背景清理或額外AI。
+
+通知資料、觀察、知情、排程機會、實際處理與活動同輪保存。continue沿共同活動進度；待命不被迫自主決策。短期觀察consume不等於notification已處理，不依全體游標一併標記。模型回想後重新依最終實際輸入綁定handle，原ID回放不再發音／擲骰／決策。
+
+通知128筆達滿時，僅回收最舊的所有察覺均已處理、沒有實際察覺、或使用者／NPC明示刪除／取消／新版本取代的結算細節，notificationHistoryDropped明示缺口。未讀正文和未處理察覺不因回收刪除。每個目前來源另以notificationDedup保存最高recordVersion／generation／key，最多128來源，重載和舊generation不能重響；message generation=1，提醒generation沿共同條件epoch。舊聲音細節被釋放仍保留當前來源的去重。cancelPhoneRecordNotifications給行事曆明示取消／換版本使用，不偽造handledAt；明示刪除來源才釋放其去重handle。沒有背景清理／模型呼叫。
+
+模型輸入採中性的self.noticeOpportunities，只有handle與實際可見observationIds；不將observer知道的手機來源、正文／寄件人或內部通知種類注入角色。D20誤認或模糊聲響沿原主觀內容，不以欄位名稱更正為「這其實是手機」。

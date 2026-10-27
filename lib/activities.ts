@@ -1,3 +1,4 @@
+import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
 import { normalDecisionInput } from './npc-input';
 import { acknowledgeArrangementCues, refreshArrangementCues, type ArrangementCueReceipt } from './arrangement-cues';
 import { activatePhones } from './phones';
@@ -16,7 +17,7 @@ import { demoDecision, pendingInterventions, record, type Action, type AIUsage, 
 import { learnHabit } from './habits';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
-export type ActivityDecision = { arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -54,8 +55,11 @@ export function attentionMarker(world: World, character: Character): string {
 
 export function canContinue(world: World, character: Character, modelKey: string): boolean {
   if(character.plan?.bodyActivity?.kind==='sleep')return isSleeping(character);
-  return (canResumeActivity(world, character, modelKey) || !!character.plan && character.plan.timeIntent?.kind==='open-ended' && character.plan.modelKey===modelKey) && character.plan!.attention === attentionMarker(world, character) &&
-    pendingInterventions(world, character).length === 0 && !hasUnevaluatedNeed(character) && (!character.arrangements?.items.some(item=>item.status==='active')||normalDecisionInput(world,character,modelKey).self.arrangementCues.length===0);
+  if(!(canResumeActivity(world,character,modelKey)||!!character.plan&&character.plan.timeIntent?.kind==='open-ended'&&character.plan.modelKey===modelKey)||character.plan!.attention!==attentionMarker(world,character)||pendingInterventions(world,character).length||hasUnevaluatedNeed(character))return false;
+  const arrangements=character.arrangements?.items.some(item=>item.status==='active'),notifications=world.phones?.devices.some(d=>d.notifications?.some(n=>n.cancelledAt===undefined&&n.exposures.some(e=>e.actorId===character.id&&e.reevaluationOfferedAt===undefined&&e.observationIds.length)));
+  if(!arrangements&&!notifications)return true;
+  const input=normalDecisionInput(world,character,modelKey);
+  return !input.self.arrangementCues.length&&!hasUnevaluatedPhoneNotification(world,character,input.self.noticeOpportunities);
 }
 
 function mayChooseAutonomously(character: Character): boolean {
@@ -148,6 +152,7 @@ export async function advanceActivities(world: World, options: {
     if((controlledDecision||!ai)&&requiresWorldEffects(decision.action)){
       decision.freeCandidate=bindRoutine(world,character,decision.action,decision.durationMinutes,undefined,minutes,decision.timeIntent?.maxMinutes)??{status:'unsupported',effects:[],stages:[],check:null};
     }
+    acknowledgePhoneNotifications(world,character,decision.phoneNotificationReceipts,world.minute);
     acknowledgeBodyNeeds(character);
     character.observationCursor = observedCount;
     if (decision.eventHabits) character.eventHabits=decision.eventHabits;

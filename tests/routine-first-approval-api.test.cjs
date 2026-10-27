@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const ordinaryTimes=offer=>(offer?.operations||[]).map(operation=>({operation,minutes:['tea','coffee'].includes(operation)?30:15}));
@@ -29,7 +30,7 @@ test('first natural-language cafe proposal reaches bounded background approval a
   let response=await post({operation:'advance',minutes:15});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
   let saved=(await(await GET()).json()).world;
   assert.equal(saved.routineRules?.length,1,'ordinary background was never offered/approved; NPC can only wait for nonexistent supplies');
-  assert.ok(offered);assert.equal(saved.objects[0].state.contents,'water');
+  assert.ok(offered);assert.equal(nonPhoneObjects(saved)[0].state.contents,'water');
   assert.equal(saved.objects.some(o=>o.kind==='food'),false,'approval must not complete the drink early');
   await post({operation:'advance',minutes:15});saved=(await(await GET()).json()).world;assert.ok(saved.objects.some(o=>o.state.beverage==='tea'));
   await post({operation:'advance',minutes:15});await post({operation:'advance',minutes:15});saved=(await(await GET()).json()).world;
@@ -52,14 +53,14 @@ test('interpretation cannot grant a nonoperator or an incapable operator backgro
 
 test('first interpreted approval respects exhausted materials and never replaces a fabricated target',async()=>{
  const exhausted=await firstApproval(w=>{w.supplies=[{id:'empty-tea',label:'最後的茶葉',region:'cafe-front',remaining:0,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];});
- assert.equal(exhausted.response.status,200);assert.equal(exhausted.world.supplies.length,1);assert.equal(exhausted.world.supplies[0].remaining,0);assert.equal(exhausted.world.objects,undefined);assert.equal(exhausted.world.routineAudit[0].result,'approved');assert.match(exhausted.world.routineAudit[0].reason,/用完/);
+ assert.equal(exhausted.response.status,200);assert.equal(exhausted.world.supplies.length,1);assert.equal(exhausted.world.supplies[0].remaining,0);assert.deepEqual(nonPhoneObjects(exhausted.world),[]);assert.equal(exhausted.world.routineAudit[0].result,'approved');assert.match(exhausted.world.routineAudit[0].reason,/用完/);
  const target=await firstApproval(()=>{},'tea',{type:'propose',target:'invented-cup',content:'為自己沖泡一杯普通的茶',purpose:'給自己一點暖意',mood:'平靜',durationMinutes:30,intents:[]});
- assert.equal(target.response.status,200);assert.equal(target.world.objects,undefined);assert.equal(target.world.supplies,undefined);
+ assert.equal(target.response.status,200);assert.deepEqual(nonPhoneObjects(target.world),[]);assert.equal(target.world.supplies,undefined);
 });
 
 test('home interpretation confirms only one procedure and preserves the local resource boundary',async()=>{
  const result=await firstApproval(w=>{const c=w.characters.find(c=>c.id==='owner');c.location='vera-home';c.region='vera-home-main';w.routinePlaces.push({location:'vera-home',purpose:'home',operators:['owner']});},'tea',{type:'propose',target:'vera-home',content:'為自己沖泡一杯普通的茶',purpose:'給自己一點暖意',mood:'平靜',durationMinutes:30,intents:[]});
- assert.equal(result.response.status,200,JSON.stringify(result.body));assert.deepEqual(result.world.routineRules[0].operations,['tea']);assert.deepEqual(result.world.routinePlaces.find(p=>p.location==='vera-home').confirmedOperations,['tea']);assert.ok(result.world.objects.every(o=>o.region==='vera-home-main'));assert.deepEqual(result.world.routinePlaces[0].confirmedOperations,undefined);
+ assert.equal(result.response.status,200,JSON.stringify(result.body));assert.deepEqual(result.world.routineRules[0].operations,['tea']);assert.deepEqual(result.world.routinePlaces.find(p=>p.location==='vera-home').confirmedOperations,['tea']);assert.equal(nonPhoneObjects(result.world).length,1);assert.ok(nonPhoneObjects(result.world).every(o=>o.region==='vera-home-main'));assert.deepEqual(result.world.routinePlaces[0].confirmedOperations,undefined);
 });
 
 test('a natural food interpretation without a resolvable subject cannot persist a nameless serving',async()=>{
@@ -69,8 +70,8 @@ test('a natural food interpretation without a resolvable subject cannot persist 
 
 test('interpreted food has a bounded named result; cake cannot be invented or replaced by an ordinary meal',async()=>{
  const decision={type:'propose',target:'cafe',content:'做一點吃的給自己',purpose:'填飽肚子',mood:'平靜',durationMinutes:15,intents:[]};
- const meal=await firstApproval(()=>{},'food',decision,'簡餐');assert.equal(meal.response.status,200);assert.equal(meal.world.objects[0].label,'簡餐');assert.equal(meal.world.supplies[0].label,'簡餐');
- const cake=await firstApproval(()=>{},'food',{...decision,content:'拿點蛋糕來吃'},'蛋糕');assert.equal(cake.response.status,200);assert.equal(cake.world.objects,undefined);assert.equal(cake.world.supplies,undefined);
+ const meal=await firstApproval(()=>{},'food',decision,'簡餐');assert.equal(meal.response.status,200);assert.equal(nonPhoneObjects(meal.world)[0].label,'簡餐');assert.equal(meal.world.supplies[0].label,'簡餐');
+ const cake=await firstApproval(()=>{},'food',{...decision,content:'拿點蛋糕來吃'},'蛋糕');assert.equal(cake.response.status,200);assert.deepEqual(nonPhoneObjects(cake.world),[]);assert.equal(cake.world.supplies,undefined);
  const substitute=await firstApproval(()=>{},'food',{...decision,content:'拿點蛋糕來吃'},'簡餐');assert.equal(substitute.response.status,502);assert.equal(substitute.world.objects,undefined);
  const unknown=await firstApproval(()=>{},'food',decision,'未核准的食物');assert.equal(unknown.response.status,502);assert.equal(unknown.world.supplies,undefined);
 });
@@ -84,7 +85,7 @@ test('natural drinking interpretation preserves tea versus coffee rather than co
 
 test('a known home tea procedure does not suppress the cafe operator offer for coffee',async()=>{
  const result=await firstApproval(w=>{w.routineRules=[{id:'home-tea',version:1,family:'cafe-service',operations:['tea'],origin:'vera-home',knownTo:['owner'],templates:[{operation:'tea',verbs:['泡'],subjects:['茶'],purposes:['泡茶'],result:{kind:'brew',contents:'tea',minutes:30}}]}];},'coffee',{type:'propose',target:'cafe',content:'替自己做一杯咖啡休息一下',purpose:'休息',mood:'平靜',durationMinutes:30,intents:[]});
- assert.equal(result.response.status,200,JSON.stringify(result.body));assert.ok(result.offer.operations.includes('coffee'));assert.equal(result.world.objects[0].state.contents,'water');assert.deepEqual(result.world.routineRules[0].operations,['tea']);assert.ok(result.world.routineRules[1].operations.includes('coffee'));
+ assert.equal(result.response.status,200,JSON.stringify(result.body));assert.ok(result.offer.operations.includes('coffee'));assert.equal(nonPhoneObjects(result.world)[0].state.contents,'water');assert.deepEqual(result.world.routineRules[0].operations,['tea']);assert.ok(result.world.routineRules[1].operations.includes('coffee'));
 });
 
 test('unknown operations and contradictory literal interpretations fail atomically',async()=>{

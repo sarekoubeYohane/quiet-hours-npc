@@ -1,3 +1,4 @@
+import { boundPhoneNotifications } from './phone-notifications';
 import type { Character, World } from './world';
 import { perception } from './world';
 import { budgetMemoryInput, memoryBytes } from './memory';
@@ -16,7 +17,8 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
  const phoneReferenceGap=boundPhoneInput(w,c,input);
  const allCues=arrangementCuesForDecision(w,c,input),arrangementCues=allCues.slice(0,4);
  while(arrangementCues.length&&memoryBytes({input,arrangementCues})>88*1024-1024)arrangementCues.pop();
- return {...input,phoneReferenceGap,self:{...input.self,arrangementCues,arrangementCueGap:allCues.length-arrangementCues.length}};
+ const final={...input,phoneReferenceGap,self:{...input.self,arrangementCues,arrangementCueGap:allCues.length-arrangementCues.length,noticeOpportunities:[] as {id:string;observationIds:string[]}[],noticeOpportunityGap:0}};
+ boundPhoneNotifications(w,c,final);return final;
 }
 
 // Device identity and the ability to list remain available even when optional

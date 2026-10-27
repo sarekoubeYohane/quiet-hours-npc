@@ -66,6 +66,12 @@ export function eventCandidates(world: World, observer: Character, event: import
     }
     return clues;
   }
+  if(event.kind==='phone-notification'){
+    const region=event.scene?.toRegion;if(!region||!canHear(world,observer,region))return [];
+    const here=regionOf(observer),door=connectingDoor(here,region);
+    if(here!==region&&door&&(world.scene?.doors[door.id]||'open')==='closed')return [];
+    return [{sense:'hearing',kind:'sound',text:'附近一部手機響了一聲提示音。',clarity:'vague',region,direct:false,interference:world.scene?.noise[here]==='loud'?'strong':here===region?'weak':'medium'}];
+  }
   const actor = world.characters.find(c => c.id === event.actor);
   if (!actor || !event.scene) return [];
   const here = regionOf(observer), destination = event.scene.toRegion || regionOf(actor);

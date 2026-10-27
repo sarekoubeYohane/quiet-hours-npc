@@ -1,3 +1,4 @@
+import { emitPhoneNotification, cancelPhoneRecordNotifications, type PhoneNotification, type PhoneNotificationDedup } from './phone-notifications';
 import type { Action, Character, World } from './world';
 import type { WorldObject } from './world-effects';
 import { canSee, regionOf } from './perception';
@@ -5,7 +6,7 @@ import { addExperience, MemoryValidationError } from './memory';
 
 export type PhoneRecord={id:string;version:number;text:string;createdAt:number;updatedAt:number;sharedWith:string[];readers:{actorId:string;at:number;version:number}[]};
 export type PhoneMessage=PhoneRecord&{from:string;to:string;deliveredAt:number};
-export type PhoneData={objectId:string;memos:PhoneRecord[];inbox?:PhoneMessage[];inboxActivatedAt?:number;screen:{collection:string;id:string;version:number}[];presentations?:{actorId:string;memoryId:string;collection:string;id:string;version:number}[]};
+export type PhoneData={objectId:string;notifications?:PhoneNotification[];notificationDedup?:PhoneNotificationDedup[];notificationHistoryDropped?:number;memos:PhoneRecord[];inbox?:PhoneMessage[];inboxActivatedAt?:number;screen:{collection:string;id:string;version:number}[];presentations?:{actorId:string;memoryId:string;collection:string;id:string;version:number}[]};
 export type PhoneState={schemaVersion:1;activatedAt:number;devices:PhoneData[]};
 export const phoneLimits={records:32,textCharacters:300,textBytes:1024,screen:4,sharedReaders:8,inbox:64};
 // Only called on a mutable round candidate. Never normalize on GET.
@@ -99,7 +100,7 @@ export function applyPhoneAction(w:World,c:Character,a:Action,dryRun=false){
  if(dryRun)return;
  if(operation==='create')d.memos.push({id:p.id,version:1,text:p.text as string,createdAt:w.minute,updatedAt:w.minute,sharedWith:[],readers:[]});
  else if(operation==='update'){r!.text=p.text as string;r!.version++;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
- else if(operation==='delete'){if(collection==='memos')d.memos=d.memos.filter(item=>item.id!==p.id);else d.inbox=d.inbox?.filter(item=>item.id!==p.id);d.presentations=d.presentations?.filter(item=>item.collection!==collection||item.id!==p.id);d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
+ else if(operation==='delete'){if(collection==='inbox')cancelPhoneRecordNotifications(d,'message',p.id,w.minute,{deleted:true});if(collection==='memos')d.memos=d.memos.filter(item=>item.id!==p.id);else d.inbox=d.inbox?.filter(item=>item.id!==p.id);d.presentations=d.presentations?.filter(item=>item.collection!==collection||item.id!==p.id);d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='share'){if(!r!.sharedWith.includes(p.reader as string))r!.sharedWith.push(p.reader as string);r!.version++;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='display'){for(const actor of w.characters)if(regionOf(actor)===o.region&&canSee(w,actor,o.region)&&!o.knownTo.includes(actor.id))o.knownTo.push(actor.id);d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);d.screen.push({collection,id:r!.id,version:r!.version});}
  phoneExperience(w,c,d,`我已在手機完成${label} ${operation}：${p.id} v${operation==='create'?1:r!.version}${operation==='create'||operation==='update'?`，原文「${p.text}」`:''}。`,operation==='delete'?[]:[(collection==='memos'?d.memos:d.inbox||[]).find(item=>item.id===p.id)!],collection);
@@ -114,5 +115,5 @@ export function deliverPhoneMessage(w:World,sender:Character,recipient:Character
  if(destination.inbox.length>=phoneLimits.inbox)throw new MemoryValidationError('收件匣已滿，未刪除未讀或原文，訊息尚未送達。');
  if(dryRun)return;
  const message:PhoneMessage={id:crypto.randomUUID(),version:1,text,createdAt:w.minute,updatedAt:w.minute,from:sender.id,to:recipient.id,deliveredAt:w.minute,sharedWith:[],readers:[]};
- destination.inbox.push(message);return {device:destination,message};
+ destination.inbox.push(message);emitPhoneNotification(w,destination,{kind:'message',recordId:message.id,recordVersion:message.version});return {device:destination,message};
 }

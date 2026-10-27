@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
+const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
@@ -14,12 +15,12 @@ test('first ordinary tea approval survives serialized reload and a new activity 
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion({status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:ordinaryTimes}});}npc++;return completion({type:'work',target:'tea',content:'準備一杯普通茶',mood:'平靜',durationMinutes:30,intents:[]});};
  try{
   const advance={operation:'advance',minutes:15};const first=await post(advance);assert.equal(first.status,200,(await first.clone().json()).error);
-  let saved=(await(await GET()).json()).world;assert.equal(saved.routineRules.length,1);assert.equal(saved.objects[0].state.contents,'water');assert.equal(adjudication,1);
-  await post(advance);saved=(await(await GET()).json()).world;assert.equal(saved.objects[0].state.contents,'tea');assert.equal(saved.characters.find(c=>c.id==='owner').plan,undefined);
+  let saved=(await(await GET()).json()).world;assert.equal(saved.routineRules.length,1);assert.equal(nonPhoneObjects(saved)[0].state.contents,'water');assert.equal(adjudication,1);
+  await post(advance);saved=(await(await GET()).json()).world;assert.equal(nonPhoneObjects(saved)[0].state.contents,'tea');assert.equal(saved.characters.find(c=>c.id==='owner').plan,undefined);
   // GET uses SQLite JSON serialization; next POST loads a separate world object.
   const operation={...advance,operationId:id()};assert.equal((await post(operation)).status,200);assert.equal((await post(operation)).status,200);
-  saved=(await(await GET()).json()).world;assert.equal(saved.objects.filter(o=>o.kind==='utensil').length,2);assert.equal(saved.objects.filter(o=>o.kind==='utensil')[1].state.contents,'water');assert.equal(adjudication,1);assert.equal(npc,2);assert.equal(saved.aiUsage.totalCalls,3);
-  await post(advance);saved=(await(await GET()).json()).world;assert.equal(saved.objects.filter(o=>o.kind==='utensil')[1].state.contents,'tea');assert.ok(saved.routineAudit.some(e=>e.result==='reused'));
+  saved=(await(await GET()).json()).world;assert.equal(nonPhoneObjects(saved).filter(o=>o.kind==='utensil').length,2);assert.equal(nonPhoneObjects(saved).filter(o=>o.kind==='utensil')[1].state.contents,'water');assert.equal(adjudication,1);assert.equal(npc,2);assert.equal(saved.aiUsage.totalCalls,3);
+  await post(advance);saved=(await(await GET()).json()).world;assert.equal(nonPhoneObjects(saved).filter(o=>o.kind==='utensil')[1].state.contents,'tea');assert.ok(saved.routineAudit.some(e=>e.result==='reused'));
  }finally{global.fetch=previous;}
 });
 
@@ -40,14 +41,14 @@ test('save failure cannot expose half-approved ordinary background or a future p
 });
 test('approval with a fabricated object target fails closed and cannot make an alternative cup',async()=>{
  const s=await scenario(()=>{},undefined,{type:'propose',target:'invented-cup',content:'泡一杯茶',purpose:'泡茶',mood:'平靜',durationMinutes:30,intents:[]});
- try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const w=await s.read();assert.equal(w.objects,undefined);assert.equal(w.supplies,undefined);assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有成功/);}finally{s.restore();}
+ try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const w=await s.read();assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies,undefined);assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有成功/);}finally{s.restore();}
 });
 test('ordinary rule diagnostics stay out of the next NPC decision and memory while physical results remain visible',async()=>{
- const s=await scenario();try{await s.post({operation:'advance',minutes:15});await s.post({operation:'advance',minutes:15});const previous=global.fetch;let input;global.fetch=async(url,init)=>{input=JSON.parse(JSON.parse(init.body).messages[1].content);return previous(url,init);};await s.post({operation:'advance',minutes:15});assert.equal(input.objects[0].state.contents,'tea');assert.doesNotMatch(JSON.stringify(input),/routineAudit|ruleId|routine-approved|routine-reuse|首次裁定|沿用日常規則/);}finally{s.restore();}
+ const s=await scenario();try{await s.post({operation:'advance',minutes:15});await s.post({operation:'advance',minutes:15});const previous=global.fetch;let input;global.fetch=async(url,init)=>{input=JSON.parse(JSON.parse(init.body).messages[1].content);return previous(url,init);};await s.post({operation:'advance',minutes:15});assert.equal(nonPhoneObjects(input)[0].state.contents,'tea');assert.doesNotMatch(JSON.stringify(input),/routineAudit|ruleId|routine-approved|routine-reuse|首次裁定|沿用日常規則/);}finally{s.restore();}
 });
 test('explicit exhausted tea materials cannot be replaced by ordinary background',async()=>{
  const s=await scenario(w=>{w.supplies=[{id:'last-tea',label:'明確有限的茶葉',region:'cafe-front',remaining:0,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];});
- try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const w=await s.read();assert.equal(w.objects,undefined);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].remaining,0);assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有成功/);}finally{s.restore();}
+ try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);const w=await s.read();assert.deepEqual(nonPhoneObjects(w),[]);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].remaining,0);assert.match(w.characters.find(c=>c.id==='owner').activity,/沒有成功/);}finally{s.restore();}
 });
 
 test('one confirmed scope prepares a genuinely different coffee after tea with no extra adjudication',async()=>{
@@ -130,7 +131,7 @@ test('existing meal generator respects object capacity without evicting history 
 
 test('exhausted finished English coffee serving never counts as raw coffee ingredients',async()=>{
  const s=await scenario(w=>{w.routineRules=[{id:'r',version:1,family:'cafe-service',operations:['coffee'],origin:'cafe',knownTo:['owner']}];w.supplies=[{id:'old-serving',label:'coffee',region:'cafe-front',remaining:0,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{vessel:'old-cup',beverage:'coffee'}}];},undefined,{type:'propose',target:'cafe',content:'準備一杯咖啡',purpose:'飲用',mood:'平靜',durationMinutes:30,intents:[]});
- try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal((await s.read()).objects[0].state.contents,'water');await s.post({operation:'advance',minutes:15});const w=await s.read();assert.ok(w.objects.some(o=>o.state.beverage==='coffee'));assert.equal(w.supplies.find(s=>s.id==='old-serving').remaining,0);assert.equal(s.calls(),1);}finally{s.restore();}
+ try{assert.equal((await s.post({operation:'advance',minutes:15})).status,200);assert.equal(nonPhoneObjects(await s.read())[0].state.contents,'water');await s.post({operation:'advance',minutes:15});const w=await s.read();assert.ok(w.objects.some(o=>o.state.beverage==='coffee'));assert.equal(w.supplies.find(s=>s.id==='old-serving').remaining,0);assert.equal(s.calls(),1);}finally{s.restore();}
 });
 
 test('linked serving and cup require coherent transfers and consumption without implicit effects',async()=>{

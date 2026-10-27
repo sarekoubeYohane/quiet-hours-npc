@@ -1,3 +1,4 @@
+import { boundPhoneNotifications } from './phone-notifications';
 import { normalDecisionInput, boundPhoneInput } from './npc-input';
 import { arrangementCuesForDecision, arrangementCueReceipts } from './arrangement-cues';
 import { phonePrompt, phoneForActor, validatePhoneActionReferences } from './phones';
@@ -101,6 +102,7 @@ const input=normalDecisionInput(w,c,`${direct?'openai':'ai'}:${model}`);
 const visible: Character = { ...c, arrangements:{schemaVersion:1,items:input.self.arrangements.items}, shortTerm: (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version)), longTerm: (c.longTerm || []).filter(item => input.self.longTerm.some(visible => visible.id === item.id && visible.version === item.version)), preferences: { schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0 }, cognition: { ...input.self.cognition, trace: [] } };
 const decisionContext: NpcDecisionContext = { phoneReferences:input.phones,visible, knownPeople: knownPeopleForDecision(visible, input.contacts.map(person => person.id)), memoryReview: input.self.memoryReview, historyCandidates: input.self.cognition.historyCandidates || [] };
 const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+arrangementPrompt+"\n"+preferencePrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。JSON 同時加入 intents 陣列，按你選定的優先順序完整回傳仍需保留的意圖（最多12個），省略表示放下；每筆含 id（穩定識別碼）、content（想滿足的方向）、intensity（強度）、importance（重要程度）、urgency（急迫性）、context（等待條件及簡短背景）。三種程度使用 low、medium、high，排序不必按分數。沒有意圖時回傳空陣列。"},{role:'user',content:JSON.stringify(input)}];
+messages[0].content+=' self.noticeOpportunities只是你實際取得的新主觀線索的一次考慮機會，可能模糊或誤認，不能由handle推知真正來源、裝置、寄件人或正文。依實際所見所聽自行判斷，若想查看手機再主動list/read。可continue或自行暫停／改序，忽略不代表已讀。未展示缺口不表示已處理，不額外開手機決策。';
 messages[0].content+=' self.arrangementCues是你實際可知條件下想起既有安排的一次考慮機會；不強制行動、完成、意圖置頂或改變活動，可continue、延期或放下。相同條件不每輪提醒。';
 messages[0].content+=phonePrompt+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates 六類陣列合計最多4項，連同 interpretation 的更新 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；intents 依既有最多12筆自主排序，不把喜好或習慣變成命令。';
@@ -143,6 +145,7 @@ try {
     input.self.arrangementCues=allCues.slice(0,4);
     while(input.self.arrangementCues.length&&memoryBytes({input,recalledMemories:handles})>88*1024-1024)input.self.arrangementCues.pop();
     input.self.arrangementCueGap=allCues.length-input.self.arrangementCues.length;
+    boundPhoneNotifications(w,c,input,{recalledMemories:handles});
     visible.arrangements={schemaVersion:1,items:input.self.arrangements.items};
     messages[1].content = JSON.stringify(input);
     visible.preferences = {schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0};
@@ -157,6 +160,7 @@ try {
   const decision=parseDecision(value,allowedTypes,w,c,decisionContext);
   if(JSON.stringify(decision).includes(key))throw Error();
   decision.arrangementCueReceipts=arrangementCueReceipts(w,c,input);
+  decision.phoneNotificationReceipts=input.self.noticeOpportunities.map(n=>n.id);
   return decision;
 }
 catch(e) { if(candidateStage.startsWith('npc-')){try{await recall?.observer?.({kind:'failure',failure:candidateStage==='npc-candidate-parse'?'candidate-format':'candidate-validation',stage:candidateStage,reason:candidateStage==='npc-candidate-parse'?'json-parse':e instanceof MemorySelectionReferenceError?'memory-selection-reference':e instanceof MemoryValidationError&&!(e instanceof MemorySelectionFormatError)?'memory-constraint':'field-format'});}catch{/* Evidence cannot change the original validation failure. */}}if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
