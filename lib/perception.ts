@@ -19,6 +19,9 @@ export type CurrentSensoryState = { presence: Record<string, { region: string; c
 export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[]; external?:Record<string,PhysicalState> };
 export type Observation = { id: string; time: number; sense: 'sight' | 'hearing' | 'touch'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; objectId?: string; supplyId?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
 export class PerceptionCapacityError extends Error {}
+// Confirmed by the existing world adjudication/routine binder, never an NPC
+// wording, a clock value or an arbitrary caller-supplied retry token.
+export type DiscoveryMethod = {version:1;kind:'activity'|'routine';key:string};
 export function defaultRegion(location: string) { return regions.find(region => region.location === location)!.id; }
 export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
 export function normalizePerception(world: World) {
@@ -256,9 +259,9 @@ export function supplyObservationCandidates(world: World, character: Character, 
 export function discoverWorldObjects(world: World, character: Character, event: import('./world').WorldEvent, ids: string[]) {
   return discoverWorldResources(world, character, event, ids, []);
 }
-export function discoverWorldResources(world: World, character: Character, event: import('./world').WorldEvent, objectIds: string[], supplyIds: string[]) {
+export function discoverWorldResources(world: World, character: Character, event: import('./world').WorldEvent, objectIds: string[], supplyIds: string[], method?:DiscoveryMethod) {
   const candidates = [...objectObservationCandidates(world, character, objectIds), ...supplyObservationCandidates(world, character, supplyIds)];
-  return resolveProbe(world, character, event, 'sight', candidates, candidates.map(candidate => candidate.objectId ? 'object:'+candidate.objectId : 'supply:'+candidate.supplyId));
+  return resolveProbe(world, character, event, 'sight', candidates, candidates.map(candidate => candidate.objectId ? 'object:'+candidate.objectId : 'supply:'+candidate.supplyId),method);
 }
 export function probeCurrent(world: World, character: Character, event: import('./world').WorldEvent) {
   const sense = event.scene?.content === 'hearing' ? 'hearing' : 'sight';
@@ -291,24 +294,36 @@ export function probeCurrent(world: World, character: Character, event: import('
   }
   resolveProbe(world, character, event, sense, candidates, clues);
 }
-function resolveProbe(world: World, character: Character, event: import('./world').WorldEvent, sense: 'sight' | 'hearing', candidates: SensoryCandidate[], clues: string[]) {
+function resourceReceipt(trace:PerceptionTrace,candidate:SensoryCandidate,key:string):PerceptionTrace {
+  const own=trace.observations.filter(observation=>candidate.objectId?observation.objectId===candidate.objectId:observation.supplyId===candidate.supplyId);
+  return {characterId:trace.characterId,status:own.length?'noticed':'missed',observations:own,reason:'同一資源與確認方法的已保存結果。',opportunity:key,...(trace.resolution?{resolution:trace.resolution,factors:trace.factors}:{})};
+}
+function assertProbeCapacity(world:World,count:number,extra:unknown):void {
+  if(Object.keys(world.probeResults||{}).length+count>2048||new TextEncoder().encode(JSON.stringify([world.probeResults,world.perceptionTrials,extra])).length>1024*1024)
+    throw new PerceptionCapacityError('物品探索的感知保存容量已滿；保留既有結果，未重新擲骰或判定缺貨。');
+}
+function resolveProbe(world: World, character: Character, event: import('./world').WorldEvent, sense: 'sight' | 'hearing', candidates: SensoryCandidate[], clues: string[],method?:DiscoveryMethod) {
   const here = regionOf(character);
-  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [...sensoryCandidateIdentity(c), c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
+  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [...sensoryCandidateIdentity(c), c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort(),...(method?[method]:[])]);
   const previous = world.probeResults?.[probeKey];
   if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return previous; }
   const abilities=(character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort();
   const resources=candidates.filter(candidate=>candidate.objectId||candidate.supplyId).map(candidate=>{
     const identity=[...sensoryCandidateIdentity(candidate),candidate.direct,candidate.interference];
-    const key=JSON.stringify(['resource-probe.v1',character.id,here,sense,identity,abilities]);
+    const legacyKey=JSON.stringify(['resource-probe.v1',character.id,here,sense,identity,abilities]);
+    const key=method?JSON.stringify(['resource-probe.v2',character.id,here,sense,identity,abilities,method]):legacyKey;
     let prior=world.probeResults?.[key];
     // Original group receipts remain authoritative. Reuse them without a read
     // migration or a fresh die when a later search selects a different subset.
-    if(!prior)for(const [storedKey,result] of Object.entries(world.probeResults||{})){
+    const hasConfirmedScope=!!method&&Object.keys(world.probeResults||{}).some(storedKey=>{let stored:unknown;try{stored=JSON.parse(storedKey);}catch{return false;}return Array.isArray(stored)&&stored[0]==='resource-probe.v2'&&stored[1]===character.id&&stored[2]===here&&stored[3]===sense&&JSON.stringify(stored[4])===JSON.stringify(identity)&&JSON.stringify(stored[5])===JSON.stringify(abilities);});
+    if(!prior&&!hasConfirmedScope)prior=world.probeResults?.[legacyKey];
+    if(!prior&&!hasConfirmedScope)for(const [storedKey,result] of Object.entries(world.probeResults||{})){
       let stored:unknown;try{stored=JSON.parse(storedKey);}catch{continue;}
-      if(Array.isArray(stored)&&stored[0]===character.id&&stored[1]===here&&stored[2]===sense&&Array.isArray(stored[4])&&JSON.stringify(stored[6])===JSON.stringify(abilities)&&stored[4].some(tuple=>JSON.stringify(tuple)===JSON.stringify(identity))){prior={...result,status:result.observations.some(observation=>candidate.objectId?observation.objectId===candidate.objectId:observation.supplyId===candidate.supplyId)?'noticed':'missed'};break;}
+      if(Array.isArray(stored)&&stored.length===7&&stored[0]===character.id&&stored[1]===here&&stored[2]===sense&&Array.isArray(stored[4])&&JSON.stringify(stored[6])===JSON.stringify(abilities)&&stored[4].some(tuple=>JSON.stringify(tuple)===JSON.stringify(identity))){prior=resourceReceipt(result,candidate,key);break;}
     }
-    return {candidate,key,prior};
+    return {candidate,key,prior,adopt:!!method&&!!prior&&!world.probeResults?.[key]};
   });
+  const aliases=resources.filter(resource=>resource.adopt).map(({candidate,key,prior})=>[key,resourceReceipt(prior!,candidate,key)] as const);
   const reused=resources.filter(resource=>resource.prior);
   const fresh=resources.filter(resource=>!resource.prior);
   if(reused.length){
@@ -317,6 +332,7 @@ function resolveProbe(world: World, character: Character, event: import('./world
     const reusedClues=new Set(reused.map(({candidate})=>candidate.objectId?`object:${candidate.objectId}`:`supply:${candidate.supplyId}`));
     clues=clues.filter(clue=>!reusedClues.has(clue));
     if(!candidates.length){
+      if(aliases.length){assertProbeCapacity(world,aliases.length,aliases);for(const [key,value] of aliases)(world.probeResults??={})[key]=value;}
       const trace:PerceptionTrace={characterId:character.id,status:'no-opportunity',observations:[],reason:'相同資源與接觸條件，沿用先前結果；沒有新增觀察經歷。',reusedResources:reused.map(({candidate,prior})=>({...(candidate.objectId?{objectId:candidate.objectId}:{supplyId:candidate.supplyId}),status:prior!.status}))};
       event.perception=[trace];return trace;
     }
@@ -324,20 +340,17 @@ function resolveProbe(world: World, character: Character, event: import('./world
   // Keep prior receipts rather than evicting them and allowing reload/rewording
   // to farm a new roll. A capacity error is technical, never world absence.
   const reserved=fresh.map(({key,candidate})=>[key,{characterId:character.id,status:'noticed',observations:[{...candidate,id:'x'.repeat(128),time:world.minute}],reason:'主動查探取得錯誤主觀感知',opportunity:key,resolution:{roll:20,modifier:4,dc:16,total:24,outcome:'critical-success'},factors:{ability:4,attention:2,interference:'medium'}}]);
-  if (resources.length && (Object.keys(world.probeResults || {}).length+fresh.length+1 > 2048 ||
-    new TextEncoder().encode(JSON.stringify([world.probeResults, world.perceptionTrials, probeKey, probeKey, probeKey, probeKey, candidates, candidates, candidates, reserved])).length > 1024 * 1024)) {
-    throw new PerceptionCapacityError('物品探索的感知保存容量已滿；保留既有結果，未重新擲骰或判定缺貨。');
-  }
+  if(resources.length)assertProbeCapacity(world,fresh.length+aliases.length+1,[probeKey,probeKey,probeKey,probeKey,candidates,candidates,candidates,reserved,aliases]);
   const uncertain = candidates.filter(c => !c.direct);
-  const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort()]), uncertain, true) : undefined;
+  const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort(),...(method?[method]:[])]), uncertain, true) : undefined;
   const trace = observationTrace(world, character, event, candidates, trial, true);
   if(reused.length){trace.reason+='；部分資源沿用先前接觸結果，沒有重新擲骰或重寫經歷。';trace.reusedResources=reused.map(({candidate,prior})=>({...(candidate.objectId?{objectId:candidate.objectId}:{supplyId:candidate.supplyId}),status:prior!.status}));}
   const observations = trace.observations;
   event.perception = [trace];
   (world.probeResults ??= {})[probeKey] = event.perception[0];
+  for(const [key,value] of aliases)world.probeResults![key]=value;
   for(const {key,candidate} of fresh){
-    const own=observations.filter(observation=>candidate.objectId?observation.objectId===candidate.objectId:observation.supplyId===candidate.supplyId);
-    world.probeResults![key]={characterId:character.id,status:own.length?'noticed':'missed',observations:own,reason:'同一資源接觸條件的已保存結果。',opportunity:key,...(trace.resolution?{resolution:trace.resolution,factors:trace.factors}:{})};
+    world.probeResults![key]=resourceReceipt(trace,candidate,key);
   }
   if (!observations.length) remember(world, character, sense === 'hearing' ? '專注聆聽後，沒有聽到新的線索。' : '仔細查看後，沒有發現新的線索。');
   return trace;

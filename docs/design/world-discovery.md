@@ -23,3 +23,11 @@
 discover 可放在正式完成／階段／結果分支。必要時間、未開始、完成、續做與中斷沿原生命週期。`effectReferenceIds`／`effectSupplyReferenceIds` 對 discover 收集兩類來源，用於完整驗證、分支選中來源、取消尚未執行 pending 資料及暫停引用；日常 symbolic schema／解析承接 objectIds／supplyIds 的 $role，拒絕歷史固定 ID。#209 再沿既有日常背景接通 pending 確認，沒有在本票預先核准。
 
 無 SQL migration。舊世界缺 supplyId／supply 欄位可讀，GET 不觸發模型、不補知情、不從 trace 復活遺忘。所有世界與角色知情沿整輪版本／租約／原子保存；較後角色失敗、技術錯誤或保存衝突不留下發現。新 JSON 寫入後回退須保留理解 v5 與新來源欄位的讀寫器，不丟欄位、不重置世界。
+
+## #208 補修：實質不同的已確認查找方法
+
+先前 resource-probe.v1 只按資源與接觸條件保存，讓首次查找漏看後，即使世界確認真正不同的方法仍永久沿用舊失敗。現在沿既有主持 activityIdentity（最多64字語義 key）或已確認 routine operation（最多60字）形成 server-only `DiscoveryMethod {version:1,kind:'activity'|'routine',key}`。即時效果傳入原感知通道；需要查找的活動階段保存 optional discoveryMethod，經 SQLite 續做仍用同一方法。NPC 原句、方法自述、時點、無關世界版本與物件實例 ID 均不作方法身份，沒有新增模型服務。
+
+有確認方法的群組及資源機會按 resource-probe.v2 保存；同方法別名／改字仍不重擲，主持確認不同方法才讓尚未察覺的來源有新機會，同次新候選維持群組一次 D20。新機會仍沿既有物理與權利邊界，不代表取得／授權。沒有方法身份的舊入口保留原 key；舊無方法資源／群組 receipt 在首次實際確認方法時保守沿用，僅該寫操作建立有界方法 alias，不從歷史猜方法、不在 GET 補資料。之後不同已確認方法可形成新機會。alias／v2／舊 receipt 共用2048筆、1MiB上限，滿時技術失敗，不淘汰舊結果洗骰。
+
+相容與證據見[方法補修驗證](../verification/world-discovery-method-208-2026-10-28.md)。
