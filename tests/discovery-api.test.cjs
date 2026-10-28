@@ -98,3 +98,17 @@ test('private trace separates actual authority request, candidate, submitted kno
   s.choose(rest);await s.advance();assert.ok(s.npc().at(-1).input.objects.some(o=>o.id==='unknown-object'));
  }finally{s.restore();}
 });
+
+test('regrouping already-tried resources does not reroll old failures; new resources still get one new shared opportunity',async()=>{
+ const s=await scenario();try{
+  let rolls=0;Math.random=()=>{rolls++;return .075;};s.reply(accepted([discover(['unknown-object'])]));let w=await s.advance();assert.deepEqual(w.objects[0].knownTo,[]);assert.equal(rolls,1);const memories=w.characters[0].shortTerm.length;
+  Math.random=()=>{rolls++;return .975;};s.reply(accepted([discover(['unknown-object'],['unknown-supply'])]));w=await s.advance();assert.deepEqual(w.objects[0].knownTo,[],'same physical resource cannot reroll because the candidate set changed');assert.deepEqual(w.supplies[0].knownTo,['owner']);assert.equal(rolls,2);assert.equal(w.characters[0].shortTerm.filter(m=>m.observation?.supplyId==='unknown-supply').length,1);assert.ok(w.characters[0].shortTerm.length>memories);
+  s.reply(accepted([discover(['unknown-object'])]));w=await s.advance();assert.equal(rolls,2);assert.deepEqual(w.objects[0].knownTo,[]);
+ }finally{s.restore();}
+});
+
+test('a completion cap below one turn validates a discover candidate without rolling or writing speculative clues',async()=>{
+ const s=await scenario();try{
+  let rolls=0;Math.random=()=>{rolls++;return .975;};s.choose({...rest,type:'propose',target:'cafe-front',content:'查看附近物品',purpose:'確認線索',timeIntent:{kind:'completion',maxMinutes:5}});const w=await s.advance();assert.deepEqual(w.objects[0].knownTo,[]);assert.equal(w.characters[0].plan,undefined);assert.equal(rolls,0);assert.equal(w.events.some(e=>e.kind==='observe'),false);
+ }finally{s.restore();}
+});

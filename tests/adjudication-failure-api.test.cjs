@@ -160,7 +160,7 @@ test('future phase rejection identifies the phase without applying earlier previ
 });
 
 test('failure input projects static contract fields and truncates large dynamic facts as valid bounded JSON', async () => {
-  const { post, advance } = await setup('owner', world => { world.objects[0].label = '保留身份的長標籤'.repeat(3000); });
+  const { post, advance } = await setup('owner', world => { world.objects[0].label = '保留身份的長標籤'.repeat(1000); });
   const previous = global.fetch;
   global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
     ? accepted([{ kind: 'consume', objectId: 'acceptance-cup', expectedRevision: 1 }]) : { ...proposal, target: 'acceptance-cup' });

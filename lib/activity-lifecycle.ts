@@ -111,7 +111,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(!candidate.branches&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes&&candidate.bodyActivity?.kind!=='sleep'){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
-        if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null});
+        if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null},undefined,{validateOnly:true});
         candidate={status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
       }
     }
