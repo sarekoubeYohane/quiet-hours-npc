@@ -8,7 +8,7 @@ const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import
 for (const args of [
   ['tests/run-activities.mjs'],
   ['tests/run-auth.mjs'],
-  ['--test', 'tests/auth-workerd.test.mjs', 'tests/model-keys-workerd.test.mjs', 'tests/migration-gate.test.mjs'],
+  ['--test', 'tests/auth-workerd.test.mjs', 'tests/model-keys-workerd.test.mjs', 'tests/migration-gate.test.mjs', 'tooling/experiments/check-autonomous-demand-211.test.mjs'],
 ]) {
   const result = spawnSync(process.execPath, args, { stdio: 'inherit', env });
   if (result.status !== 0) {

@@ -42,3 +42,13 @@ UI 共17輪，explore／direct 同上述計數；1280px 與390px檢查無水平�
 API 隱藏對照代表量測為 request107423 bytes、NPC input15015 bytes、trace369241 bytes、world59018 bytes、receipts3591 bytes、2規則、短期經歷最大7821 bytes／17條；UI各輪量測見 evidence.json。沒有無界需求佇列或額外保存索引。未推進正式世界、部署、合併 main 或修改／關閉 #205。
 
 最終合入來源範圍修補 `82a3b3c` 後，本票11條加來源、普通背景、方法機會及方法承接相關局部 **50/50** 通過，0失敗／略過／取消；包含上述同 kind 奶酪反例 red→green。真WorldApp雙路也在該產品重跑通過，主要來源／授權／直接準備／手機圖已目視。Typecheck、變更檔 ESLint、diffcheck 通過。完整 repository 回歸由整合分支最終統一執行，不把本票局部稱為全repo驗證。
+
+## Standards
+
+固定基準 `9bd0e56`，產品及整合證據版 `69dc75e`。獨立審查對照 AGENTS、docs/agents、相關 ADR／工程契約與 Fowler smell baseline；覆核完整差異，另檢查後段 finiteScope、#210 測試、UI 與公開情境。最終 **0 findings**，未發現硬標準違反或具實際風險的 smell。
+
+## Spec
+
+同一固定差異對照 #205–#211，最終 **0 新 findings**。先前重現的舊感知 receipt、長物件 ID、預檢誤擲、候選改組重擲、有效方法新機會、普通來源重複／權利及有限範圍問題均已修正，反例與證據保留於各票紀錄。#210 的對話、感知、保存、下一次實際請求、雙方同意、交付及故障回復均走正式程式。
+
+兩軸最終皆為0，沒有剩餘最高級別 finding。這是程式能力及工程證據審查；#211 真實模型尚未執行，不能解讀為自主需求行為已改善。固定公開情境與離線材料見 [#211 預註冊及缺項](autonomous-demand-211-preregistration.md)，產品 pin 保留 `69dc75e`；後續材料／驗證紀錄提交不改寫該產品版本。
