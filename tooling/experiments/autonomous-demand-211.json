@@ -1,8 +1,8 @@
 {
   "version": 1,
   "issue": 211,
-  "status": "blocked-before-registration",
-  "implementationCommit": null,
+  "status": "materials-registered-live-blocked",
+  "implementationCommit": "69dc75e1d6719fb4aaedf87f7bbd16cd479eda60",
   "sceneSha256": "16e774c4d5e688d5f71378bd6f95deb7b0a3eb2e3f2e96f17d1858144123e17d",
   "authorizationReference": null,
   "priceSnapshot": null,
@@ -77,13 +77,13 @@
   "sceneFile": "tooling/experiments/autonomous-demand-211.scene.json",
   "sceneVersion": "demand-integration.v1",
   "sceneFixtureSource": "tests/fixtures/demand-integration-loop.cjs",
-  "sceneGeneratedFromCommit": "9c76c5fef3bbf759169b3ccf889d0f37ef6305cd",
+  "sceneGeneratedFromCommit": "69dc75e1d6719fb4aaedf87f7bbd16cd479eda60",
   "ownerSeedInvariant": {
     "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
     "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
     "intents": []
   },
-  "sceneFixtureSha256": "435a39cdf5fe3828c896bda3c5eb589e2c158b1315e5584abc9724ee0e4994aa",
+  "sceneFixtureSha256": "dbe947193577593993209dc257edb40fd3ea479a6b3eadd6d00c1d19eb3d3aa7",
   "materialReadiness": {
     "status": "offline-materials-only",
     "liveProviderCredentialVerified": false,

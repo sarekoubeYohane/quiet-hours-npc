@@ -20,7 +20,7 @@ writeFileSync(sceneFile, scene.json);
 const planFile = 'tooling/experiments/autonomous-demand-211.json';
 const plan = JSON.parse(readFileSync(planFile, 'utf8'));
 Object.assign(plan, { sceneFile, sceneSha256: createHash('sha256').update(scene.json).digest('hex'), sceneVersion: scene.version,
-  sceneFixtureSource: 'tests/fixtures/demand-integration-loop.cjs', sceneGeneratedFromCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim(),
+  sceneFixtureSource: 'tests/fixtures/demand-integration-loop.cjs', sceneGeneratedFromCommit: plan.implementationCommit || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim(),
   sceneFixtureSha256: createHash('sha256').update(readFileSync('tests/fixtures/demand-integration-loop.cjs', 'utf8').replaceAll('\r\n', '\n')).digest('hex'), ownerSeedInvariant: selectOwner(seedWorld()) });
 writeFileSync(planFile, JSON.stringify(plan, null, 2) + '\n');
 console.log(JSON.stringify({ sceneFile, sceneSha256: plan.sceneSha256, ownerSeedUnchanged: true, realProviderCalls: 0 }));
