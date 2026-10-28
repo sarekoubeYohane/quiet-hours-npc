@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "issue": 211,
+  "status": "blocked-before-registration",
+  "implementationCommit": null,
+  "sceneSha256": null,
+  "authorizationReference": null,
+  "priceSnapshot": null,
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "adjudicationModel": "gpt-6-luna",
+  "reasoningEffort": "none",
+  "recallServices": false,
+  "providerRetries": false,
+  "repetitionsPerScenario": 2,
+  "schedule": ["supply-question:1", "explicit-request:1", "offer-accepted:1", "offer-accepted:2", "explicit-request:2", "supply-question:2"],
+  "window": {"maxAdvancesPerTrial": 8, "minutesPerAdvance": 15},
+  "limits": {
+    "maxNewAdvances": 48,
+    "maxProviderCalls": 96,
+    "maxMeasuredInputAndOutputTokens": 2000000,
+    "maxUsd": 1,
+    "maxElapsedMinutesFromFirstPaidCall": 45,
+    "effectiveLimit": "minimum of this plan, available authorization, and existing player limits"
+  },
+  "customer": {"actor": "cass", "transport": "controlled-world-action", "initialMessages": {
+    "supply-question": "請問現在有什麼可以吃的？",
+    "explicit-request": "我現在想吃一份普通簡餐，可以幫我準備嗎？",
+    "offer-accepted": "我有點餓，還沒決定要吃什麼。"
+  }},
+  "owner": {"actor": "owner", "transport": "real-model-only", "initialIntentMutation": false, "forcedFirstAction": null},
+  "classifications": ["introduction-or-clarification", "actual-investigation", "physical-preparation-acquisition-delivery", "reasonable-wait-or-negotiation", "concrete-known-obstacle", "autonomous-refusal-or-change", "repeated-answer-without-new-information", "technical-interruption", "insufficient-evidence"],
+  "stopOn": ["any-limit-or-insufficient-next-round-reserve", "unknown-usage-or-cost", "technical-error", "pending-or-uncertain-commit", "version-or-scene-mismatch", "information-or-identity-inconsistency", "user-stop"],
+  "paidExecutionEnabled": false
+}
