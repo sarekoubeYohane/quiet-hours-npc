@@ -294,4 +294,3 @@ function resolveProbe(world: World, character: Character, event: import('./world
   if (!observations.length) remember(world, character, sense === 'hearing' ? '專注聆聽後，沒有聽到新的線索。' : '仔細查看後，沒有發現新的線索。');
   return trace;
 }
-
