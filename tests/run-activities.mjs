@@ -86,6 +86,7 @@ try {
   allTests.push('tests/phone-notifications-api.test.cjs');
   allTests.push('tests/phone-calendar-api.test.cjs');
   allTests.push('tests/flexible-life-integration-api.test.cjs');
+  allTests.push('tests/object-observation-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

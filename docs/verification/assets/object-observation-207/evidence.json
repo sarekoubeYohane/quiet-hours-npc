@@ -1,0 +1,25 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "npc": 3,
+  "adjudication": 0,
+  "rolls": 1,
+  "checks": {
+    "actualUiAdvances": 3,
+    "movementNotKnowledge": true,
+    "discoveryNotPossession": true,
+    "sqliteReload": true,
+    "nextActualMessages": true,
+    "noHiddenState": true,
+    "reloadZeroDispatch": true,
+    "replayZeroDispatch": true,
+    "mobileNoOverflow": true,
+    "pageErrors": []
+  },
+  "capacity": {
+    "inputBytes": 6173,
+    "worldBytes": 14755,
+    "memoryBytes": 2247,
+    "probeReceiptBytes": 1616
+  }
+}

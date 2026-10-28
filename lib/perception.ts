@@ -17,7 +17,8 @@ export const regions: Region[] = [
 export const doors: Door[] = [{ id: 'cafe-door', name: '儲藏室門', regions: ['cafe-front', 'cafe-storeroom'] }];
 export type CurrentSensoryState = { presence: Record<string, { region: string; clue: string }>; activities: Record<string, { clue: string; region: string; action: import('./world').Action }> };
 export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[]; external?:Record<string,PhysicalState> };
-export type Observation = { id: string; time: number; sense: 'sight' | 'hearing' | 'touch'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
+export type Observation = { id: string; time: number; sense: 'sight' | 'hearing' | 'touch'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; objectId?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
+export class PerceptionCapacityError extends Error {}
 export function defaultRegion(location: string) { return regions.find(region => region.location === location)!.id; }
 export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
 export function normalizePerception(world: World) {
@@ -44,7 +45,7 @@ export function canSee(world: World, observer: Character, region: string) {
 
 export type PerceptionTrace = { characterId: string; status: 'direct' | 'uncertain' | 'no-opportunity' | 'noticed' | 'missed'; observations: Observation[]; reason: string; opportunity?: string; resolution?: Resolution; falsePerception?: FalsePerceptionDiagnostic; factors?: { ability: number; attention: number; interference: string } };
 export type PerceptionTrial = { opportunity: string; resolution: Resolution; factors: { ability: number; attention: number; interference: string }; candidates: SensoryCandidate[]; falsePerception?: FalsePerceptionDiagnostic };
-export type SensoryCandidate = { sense: Observation['sense']; kind: Observation['kind']; text: string; clarity: Observation['clarity']; source?: string; region?: string; urgency?: Observation['urgency']; direct: boolean; interference?: 'weak' | 'medium' | 'strong' };
+export type SensoryCandidate = { sense: Observation['sense']; kind: Observation['kind']; text: string; clarity: Observation['clarity']; source?: string; objectId?: string; region?: string; urgency?: Observation['urgency']; direct: boolean; interference?: 'weak' | 'medium' | 'strong' };
 export function canHear(world: World, observer: Character, region: string) {
   return regionOf(observer) === region || !!connectingDoor(regionOf(observer), region);
 }
@@ -136,12 +137,12 @@ export function resolvePerception(world: World, character: Character, eventId: s
     (!action.target || action.target === candidate.region || action.target === candidate.source));
   const attention = focused || observing ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
   const modifier = Math.max(-4, Math.min(4, ability + attention)) as Advantage;
-  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => [c.sense, c.kind, c.text, c.source, c.region]).sort(), interference, ability, attention]);
+  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => [c.sense, c.kind, c.text, c.source, c.objectId, c.region]).sort(), interference, ability, attention]);
   const previous = world.perceptionTrials?.[opportunity];
   if (previous) return previous;
   const resolution = judgeD20(rollD20(), modifier, dc);
   const falseResult = resolution.outcome === 'critical-failure' ? falsePerception(world, character, candidates) : undefined;
-  const selected = ['success', 'critical-success'].includes(resolution.outcome) ? candidates : resolution.outcome === 'mixed' ? candidates.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined })) : [];
+  const selected = ['success', 'critical-success'].includes(resolution.outcome) ? candidates : resolution.outcome === 'mixed' ? candidates.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined, objectId: undefined })) : [];
   const trial: PerceptionTrial = { opportunity, resolution, factors: { ability, attention, interference }, candidates: falseResult ? [falseResult.candidate] : selected, ...(falseResult ? { falsePerception: falseResult.diagnostic } : {}) };
   (world.perceptionTrials ??= {})[opportunity] = trial;
   return trial;
@@ -151,13 +152,17 @@ export function remember(world: World, character: Character, text: string, event
 }
 export function saveObservation(world: World, character: Character, observation: Observation) {
   addExperience(character, world.minute, observation.text, observation);
+  if (observation.objectId && observation.clarity === 'clear') {
+    const object = world.objects?.find(item => item.id === observation.objectId);
+    if (object && !object.knownTo.includes(character.id)) object.knownTo.push(character.id);
+  }
   if(isSleeping(character)&&isSleepStimulus(observation)&&character.plan)character.plan.sleep={...character.plan.sleep,elapsedMinutes:character.plan.sleep?.elapsedMinutes??0,stimulusWakeAt:world.minute};
 }
 // Passive events and active probes share the same subjective projection and
 // persistence; only their observer-facing explanations differ.
 function observationTrace(world: World, character: Character, event: import('./world').WorldEvent, candidates: SensoryCandidate[], trial?: PerceptionTrial, active = false): PerceptionTrace {
   const selected = [...candidates.filter(candidate => candidate.direct), ...(trial?.candidates || [])];
-  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, region, urgency }, index) => ({ sense, kind, text, clarity, source, region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
+  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, objectId, region, urgency }, index) => ({ sense, kind, text, clarity, source, ...(objectId ? { objectId } : {}), region, urgency, id: `${event.id}:${character.id}:${objectId || index}`, time: world.minute }));
   for (const observation of observations) saveObservation(world, character, observation);
   const status = trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity';
   const reason = active ? trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索' :
@@ -222,6 +227,22 @@ export function validateProbe(world: World, character: Character, target?: strin
   const known = observationTargets(world, character);
   if (!known.regions.some(r => r.id === target) && !known.people.some(c => c.id === target)) throw Error('只能查探已知的附近區域或對象');
 }
+// World-side discovery input, never the NPC's known-object projection. No dice,
+// memory or world writes occur here, so candidate validation can use a clone.
+export function objectObservationCandidates(world: World, character: Character, ids?: string[]): SensoryCandidate[] {
+  if ((world.objects?.length || 0) > 512) throw new PerceptionCapacityError('物品探索超過世界物件容量；未截斷執行依據。');
+  return (world.objects || []).filter(object => (!ids || ids.includes(object.id)) && object.lifecycle === 'active' && canSee(world, character, object.region) &&
+    (object.holder === null || world.characters.some(holder => holder.id === object.holder && regionOf(holder) === object.region)))
+    .map(object => ({ sense: 'sight', kind: 'activity', objectId: object.id, region: object.region, clarity: 'clear',
+      text: `看見${regions.find(region => region.id === object.region)?.name || '附近'}有${object.label}。`,
+      direct: false, interference: 'medium' }));
+}
+// Call only after the activity's facts commit; information does not transfer
+// possession, rights, quantities or an object's physical revision.
+export function discoverWorldObjects(world: World, character: Character, event: import('./world').WorldEvent, ids: string[]) {
+  const candidates = objectObservationCandidates(world, character, ids);
+  return resolveProbe(world, character, event, 'sight', candidates, candidates.map(candidate => `object:${candidate.objectId}`));
+}
 export function probeCurrent(world: World, character: Character, event: import('./world').WorldEvent) {
   const sense = event.scene?.content === 'hearing' ? 'hearing' : 'sight';
   const target = event.scene?.target;
@@ -248,9 +269,22 @@ export function probeCurrent(world: World, character: Character, event: import('
       clues.push(activity.clue);
     }
   }
-  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [c.sense, c.kind, c.text, c.source, c.region, c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
+  if (sense === 'sight') for (const candidate of objectObservationCandidates(world, character).filter(candidate => !target || target === candidate.region)) {
+    candidates.push(candidate); clues.push(`object:${candidate.objectId}`);
+  }
+  resolveProbe(world, character, event, sense, candidates, clues);
+}
+function resolveProbe(world: World, character: Character, event: import('./world').WorldEvent, sense: 'sight' | 'hearing', candidates: SensoryCandidate[], clues: string[]) {
+  const here = regionOf(character);
+  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [c.sense, c.kind, c.text, c.source, c.objectId, c.region, c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
   const previous = world.probeResults?.[probeKey];
-  if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return; }
+  if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return previous; }
+  // Keep prior receipts rather than evicting them and allowing reload/rewording
+  // to farm a new roll. A capacity error is technical, never world absence.
+  if (candidates.some(candidate => candidate.objectId) && (Object.keys(world.probeResults || {}).length >= 2048 ||
+    new TextEncoder().encode(JSON.stringify([world.probeResults, world.perceptionTrials, probeKey, candidates, candidates])).length > 1024 * 1024)) {
+    throw new PerceptionCapacityError('物品探索的感知保存容量已滿；保留既有結果，未重新擲骰或判定缺貨。');
+  }
   const uncertain = candidates.filter(c => !c.direct);
   const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort()]), uncertain, true) : undefined;
   const trace = observationTrace(world, character, event, candidates, trial, true);
@@ -258,4 +292,6 @@ export function probeCurrent(world: World, character: Character, event: import('
   event.perception = [trace];
   (world.probeResults ??= {})[probeKey] = event.perception[0];
   if (!observations.length) remember(world, character, sense === 'hearing' ? '專注聆聽後，沒有聽到新的線索。' : '仔細查看後，沒有發現新的線索。');
+  return trace;
 }
+
