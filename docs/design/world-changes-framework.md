@@ -104,3 +104,7 @@ v3 已確認程序本身保存 method 配對、場所／知情範圍及有限的
 沒有相容來源身份／缺角色宣告、錯誤或歧義 link、kind／label 不符、編譯效果故障、格式、unsupported、逾時與預算停止不構成可驗證世界障礙。沒有已確認程序或只有 explanation 的一般否決，仍是一次正常有界例外裁定，本輪沒有把它們永久記成世界禁令，也不宣稱所有未知提案已能免費否決。舊規則不補造新核准、遺忘不由私有診斷補回，整輪保存／回復／原ID重送沿原責任。
 
 #200 review 修正：身份相同不證明前提未變。指紋只包含本角色相關可達／權利、來源存續／餘量與該 role 明示的必要狀態／份量，忽略權威 revision、無關鍵及其他角色的許可。綁定或首次前提確認記錄當時指紋；同一方法的實際階段提交後，server-only `routineSourceScope` 才保存該方法自己造成的後續前提。預檢在副本上，未來狀態不寫入真正規則；階段／整輪保存失敗共同回復。另一行動把同杯 light→none 之後再變 heavy，不更新舊擦拭方法的指紋，因此 heavy 可重新走新 scope，而 none 的未變重試仍免費。原始模型 phase schema／parser 不接受這個內部 metadata；指紋不列入 NPC 或操作證據白名單的原文，觀察者仍可用相關 world snapshot 與匹配分支核對。
+
+## #206 來源範圍反例
+
+legacy serve 的供應選擇由明確 target／確認 dish 綁定；不得用全區 food 名稱掃描，把一份耗盡成品升格成所有餐點的限制。v3 製作的 material sourceSubject／kind／state 與有限來源角色仍保留，整體普通原料的明確範圍也不可由背景重生。無新持久資料；[API／SQLite／實際輸入及既有畫面驗收](../verification/source-scope-206-2026-10-28.md)。
