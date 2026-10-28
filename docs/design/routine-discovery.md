@@ -12,7 +12,11 @@
 
 新建來源保存 optional `background.scope={version:1,role,subject}`，值來自已驗證 binding 的 sourceRole／sourceSubject，不另建分類或 canonical 索引。canonical 重用依區域、種類及已確認來源用途／主題識別既存適用來源，再核對方法明示必要的 state subset；顯示名稱、新 rule ID 及 prospective background 空白初態不產生新來源。保留來源真實的額外狀態、份量、曝光與 consumable，不用新方法的背景描述重寫來源。無權使用既有適用來源時拒絕另造自己所有的替代供應。無指定時合法有限來源先於普通背景，選定時先經時間可用性、必要狀態、知情及權利篩選；明確 target 保持優先，不讓耗盡／未到時／無權來源誤擋另一合法來源。多位 operator 先選已有許可來源；只有同一無權來源時，查找可辨識它但不授予許可，也不另造自己所有的替代供應。既有 owner／allowedTo／sequence 保持。
 
-未知但適用的有限來源是世界權威限制，查找確認不以 knownTo 過濾它；可以發現該來源，但不補回耗盡，也不把其私有原因送入 NPC。真正 phase 再驗當前 operator 與本範圍限制，較晚出現的限制阻止待確認背景。已知／未知的已成立普通來源實際 materialize 也使用相同有限約束檢查；自由候選可由來源 optional scope 核對，舊來源缺 scope 時僅在已綁方法可知真正範圍，不猜全場所限制。用途／sourceSubject／kind 的純來源 predicate 由 `routine-materials` 共用，沿既有來源語義，不以所有 food 作整體限制。
+未知但適用的有限來源是世界權威限制，查找確認不以 knownTo 過濾它；可以發現該來源，但不補回耗盡，也不把其私有原因送入 NPC。真正 phase 再驗當前 operator 與本範圍限制，較晚出現的限制阻止待確認背景。已知／未知的已成立普通來源實際 materialize 也使用相同有限約束檢查；自由候選可由來源 optional scope 核對，舊來源缺 scope 時僅在已綁方法可知真正範圍，不猜全場所限制。
+
+單份原料適合某方法，不表示它限制所有同類普通來源。跨來源原料限制須由權威來源明示 optional `finiteScope={version:1,coverage:'region'|'location',subject}`；subject 最多128 UTF-8 bytes並與方法 sourceSubject 相同。region 限原區域，location 沿既有地圖映射涵蓋同場所各區域，不能換到儲藏室繞過。單份 label、kind、material／category 均不推定整體範圍，即使名稱或 category 同為「食材」。來源自身 remaining、明確 target 及既有 finiteSourceBindings 仍生效，不藉缺 metadata 復活既有耗盡來源。舊世界讀取不補 finiteScope；未知版本、額外欄位或格式無效於使用時技術失敗並回復，不能轉成缺貨經歷。
+
+同場所遠端明示 location 限制以主持專用 `finiteRestrictions` 提供 type／id／region／scope／readOnly，不帶遠端 label、狀態、私有理由或其他庫存，也不允許遠端取得／查探。最多32筆，與當地物品／供應共用64KiB上限，explorationScope.restrictionsOmitted 明示省略並影響 complete；正式執行仍檢查完整世界。NPC 投影保持不含此權威 metadata。
 
 普通與特殊、大量的合理性由同次世界裁定依場所背景確認，程式維持既有 quantity／資料上限及權利，不增加物品白名單或額外分類模型。程式不能證明所有語義裁定必然正確；拒絕案例與格式無效候選分別驗證，不將替身拒絕宣稱為所有真實模型必然拒絕。
 

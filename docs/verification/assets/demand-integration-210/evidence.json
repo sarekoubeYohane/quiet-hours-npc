@@ -1,0 +1,355 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "routes": [
+    {
+      "route": "explore",
+      "fixture": true,
+      "publicSceneSha256": "16e774c4d5e688d5f71378bd6f95deb7b0a3eb2e3f2e96f17d1858144123e17d",
+      "uiAdvances": 9,
+      "npc": 18,
+      "judgments": 4,
+      "rolls": 1,
+      "steps": [
+        {
+          "name": "inquire",
+          "minute": 1275,
+          "npc": 2,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "answer",
+          "minute": 1290,
+          "npc": 4,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "offer",
+          "minute": 1305,
+          "npc": 6,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "search",
+          "minute": 1320,
+          "npc": 8,
+          "judgments": 1,
+          "rolls": 1,
+          "sources": 4,
+          "meal": null
+        },
+        {
+          "name": "prepare",
+          "minute": 1335,
+          "npc": 10,
+          "judgments": 1,
+          "rolls": 1,
+          "sources": 4,
+          "meal": {
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner"
+            ],
+            "acceptedBy": null
+          }
+        },
+        {
+          "name": "grant",
+          "minute": 1350,
+          "npc": 12,
+          "judgments": 2,
+          "rolls": 1,
+          "sources": 4,
+          "meal": {
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": null
+          }
+        },
+        {
+          "name": "consent",
+          "minute": 1365,
+          "npc": 14,
+          "judgments": 3,
+          "rolls": 1,
+          "sources": 4,
+          "meal": {
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": [
+              "cass"
+            ]
+          }
+        },
+        {
+          "name": "deliver",
+          "minute": 1380,
+          "npc": 16,
+          "judgments": 4,
+          "rolls": 1,
+          "sources": 4,
+          "meal": {
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
+            "holder": "cass",
+            "owner": "owner",
+            "revision": 2,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": []
+          }
+        },
+        {
+          "name": "reflect",
+          "minute": 1395,
+          "npc": 18,
+          "judgments": 4,
+          "rolls": 1,
+          "sources": 4,
+          "meal": {
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
+            "holder": "cass",
+            "owner": "owner",
+            "revision": 2,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": []
+          }
+        }
+      ],
+      "checks": {
+        "actualWorldApp": true,
+        "actualReplyBeforeOwnerOffer": true,
+        "searchOptional": false,
+        "sourceOnlyBeforePreparation": true,
+        "realPreparation": true,
+        "grantNotConsent": true,
+        "guestChoseConsent": true,
+        "realDelivery": true,
+        "ownerPreserved": true,
+        "deliveryNotIngestion": true,
+        "sqliteReload": true,
+        "nextActualMessages": true,
+        "hiddenAbsentFromNpc": true,
+        "reloadAndReplayZeroDispatch": true,
+        "desktop1280": true,
+        "mobile390NoOverflow": true,
+        "pageErrors": []
+      },
+      "capacity": {
+        "maxNpcInputBytes": 18642,
+        "maxRequestBytes": 107463,
+        "maxTraceBytes": 394460,
+        "worldBytes": 73810,
+        "sourcesBytes": 1286,
+        "rulesBytes": 4023,
+        "memoryBytes": 18607
+      }
+    },
+    {
+      "route": "direct",
+      "fixture": true,
+      "publicSceneSha256": "16e774c4d5e688d5f71378bd6f95deb7b0a3eb2e3f2e96f17d1858144123e17d",
+      "uiAdvances": 8,
+      "npc": 16,
+      "judgments": 3,
+      "rolls": 0,
+      "steps": [
+        {
+          "name": "inquire",
+          "minute": 1275,
+          "npc": 2,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "answer",
+          "minute": 1290,
+          "npc": 4,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "offer",
+          "minute": 1305,
+          "npc": 6,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": null
+        },
+        {
+          "name": "prepare",
+          "minute": 1320,
+          "npc": 8,
+          "judgments": 0,
+          "rolls": 0,
+          "sources": 3,
+          "meal": {
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner"
+            ],
+            "acceptedBy": null
+          }
+        },
+        {
+          "name": "grant",
+          "minute": 1335,
+          "npc": 10,
+          "judgments": 1,
+          "rolls": 0,
+          "sources": 3,
+          "meal": {
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": null
+          }
+        },
+        {
+          "name": "consent",
+          "minute": 1350,
+          "npc": 12,
+          "judgments": 2,
+          "rolls": 0,
+          "sources": 3,
+          "meal": {
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
+            "holder": "owner",
+            "owner": "owner",
+            "revision": 1,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": [
+              "cass"
+            ]
+          }
+        },
+        {
+          "name": "deliver",
+          "minute": 1365,
+          "npc": 14,
+          "judgments": 3,
+          "rolls": 0,
+          "sources": 3,
+          "meal": {
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
+            "holder": "cass",
+            "owner": "owner",
+            "revision": 2,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": []
+          }
+        },
+        {
+          "name": "reflect",
+          "minute": 1380,
+          "npc": 16,
+          "judgments": 3,
+          "rolls": 0,
+          "sources": 3,
+          "meal": {
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
+            "holder": "cass",
+            "owner": "owner",
+            "revision": 2,
+            "lifecycle": "active",
+            "allowedTo": [
+              "owner",
+              "cass"
+            ],
+            "acceptedBy": []
+          }
+        }
+      ],
+      "checks": {
+        "actualWorldApp": true,
+        "actualReplyBeforeOwnerOffer": true,
+        "searchOptional": true,
+        "sourceOnlyBeforePreparation": false,
+        "realPreparation": true,
+        "grantNotConsent": true,
+        "guestChoseConsent": true,
+        "realDelivery": true,
+        "ownerPreserved": true,
+        "deliveryNotIngestion": true,
+        "sqliteReload": true,
+        "nextActualMessages": true,
+        "hiddenAbsentFromNpc": true,
+        "reloadAndReplayZeroDispatch": true,
+        "desktop1280": true,
+        "mobile390NoOverflow": true,
+        "pageErrors": []
+      },
+      "capacity": {
+        "maxNpcInputBytes": 15432,
+        "maxRequestBytes": 106739,
+        "maxTraceBytes": 364768,
+        "worldBytes": 57532,
+        "sourcesBytes": 815,
+        "rulesBytes": 2660,
+        "memoryBytes": 14931
+      }
+    }
+  ],
+  "totals": {
+    "uiAdvances": 17,
+    "npc": 34,
+    "judgments": 7
+  },
+  "limitations": "Controlled NPC and judge transports prove program capability, not autonomous behavior of a real model."
+}
