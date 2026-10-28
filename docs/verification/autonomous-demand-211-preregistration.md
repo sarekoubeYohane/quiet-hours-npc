@@ -1,6 +1,6 @@
 # #211 真實多輪需求處理：事前登記與預檢
 
-日期：2026-10-28（Asia/Taipei）。狀態：**尚未啟動真實測試，#211 行為驗收未通過**。本文件和[機器可讀方案](../../tooling/experiments/autonomous-demand-211.json)先固定觀察設計；#210 完成前，實作版本、場景 hash 及派送程式尚不能封存。這是準備材料，不是付費執行授權。
+日期：2026-10-28（Asia/Taipei）。狀態：**尚未啟動真實測試，#211 行為驗收未通過**。本文件和[機器可讀方案](../../tooling/experiments/autonomous-demand-211.json)固定既有觀察設計；公開合成初始場景已保存完整 JSON 與 SHA256，產品與 #210 證據固定為 `69dc75e1d6719fb4aaedf87f7bbd16cd479eda60`，不使用本材料文件自己的提交。本輪只提供離線材料檢查，沒有完成可轉送真實模型的多輪 runner。這是準備材料，不是付費執行授權。
 
 依據 [#205](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/205)、[#211](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/211)、[既有有限驗收流程](autonomous-life-live-runbook.md)及 ADR 0001／0004／0007。既有 114 次歷史單步回放保持其原範圍，不併入本次成功率。
 
@@ -11,13 +11,17 @@
 - 本機歷史診斷的四批 40／30／20／24 次單步回放已完成；最後一批記錄 attempted=completed=24，並非保留 24 次未用授權。診斷報告明示 Key 只保存在程序記憶體，測試結束後已清除，未寫入檔案或聊天。
 - 此工作樹沒有 `.env*`／`.dev.vars*`，本次程序沒有名稱符合 OpenAI／OpenRouter／API_KEY／MODEL_KEY 的環境變數。此結論只表示本機目前沒有可用憑證來源；沒有讀取正式資料庫、解密帳號 Key 或假定其他登入工作階段仍有 Key。
 - 未找到涵蓋本次隔離多輪實驗且尚可使用的明確有限付費授權。歷史實驗 manifest 與已完成用量是執行證據，不能自行轉成新額度。[舊 runbook](autonomous-life-live-runbook.md)的額度也明標為「待授權」。
-- 尚缺 #210 通過後的固定提交、可運作隔離場景及其 hash、真實模型憑證、對應的有限付費授權及呼叫前價格快照。沒有這些條件就不派送；不得把本次實作要求、ready-for-agent 或本文件的建議上限當成已批准額度。
+- 尚缺真實模型憑證、適用且有明確剩餘額度的有限付費授權、呼叫前官方價格快照，以及經驗證的真實多輪隔離 runner。產品版本與初始場景 JSON 已固定，不再把兩者列為缺項。沒有必要條件就不派送；不得把本次實作要求、ready-for-agent 或本文件的建議上限當成已批准額度。
 
 私人診斷、完整世界、request/messages 與憑證不複製進 repository。本次新增真實呼叫為 **0**，新增費用 **0**；沒有部署、合併、重置或推進正式世界。
 
 ## 固定初始情境與排程
 
-採 #210 驗收過的**公開合成隔離故事**：咖啡館正常營業、普通供應背景已成立、沒有整體短缺，店主與 Cass 在可合法互動的場所；儲藏室可達，保留耗盡舊餐點、新合法來源及有限來源的身份與限制。角色背景、原有目的、意圖、記憶、已知方法、需求及權利從同一場景副本讀取，不為促成結果修改店主心理或增加職業任務。場景不使用私人正式故事副本。#210 完成後將實際場景與提交 SHA 封存，首次呼叫前記錄 hash，之後不得換場景跑到成功。
+採 #210 `9c76c5fef3bbf759169b3ccf889d0f37ef6305cd` 首完整 API 故事使用的**公開合成隔離初始世界**，由 `tests/fixtures/demand-integration-loop.cjs` 的 `snapshot(seedWorld)` 匯出；只使用初始資料，絕不使用其中控制店主行動的 `model()`／`decision()`。完整 [scene JSON](../../tooling/experiments/autonomous-demand-211.scene.json) 為 5,928 bytes，SHA256：`16e774c4d5e688d5f71378bd6f95deb7b0a3eb2e3f2e96f17d1858144123e17d`。這是程式 fixture 初始資料，不能當真實模型已行動的證據。
+
+場景以 `routinePlaces.confirmedOperations=[food]` 與既有合法備餐方法表示正常營業背景，沒有整體短缺；未逐件建檔的普通原料仍由真正查找／已知方法確認。店主與 Cass 在前台，儲藏室門初始關閉但可由合法活動打開，不強迫第一步移動或搜索。同時保存耗盡舊餐點、一份合法麵包及明確有限香料。店主的 `personality`、`goal`、`intents` 與未改的 `seedWorld()` 逐欄對照相同，`intents=[]`、自主控制模式，沒有預先塞入服務意圖。其餘場景與已知方法如 JSON 明示，不在試驗各輪重設或暗改心理。
+
+封存時已再次從產品 `69dc75e1d6719fb4aaedf87f7bbd16cd479eda60` 的 fixture 匯出，場景 bytes／SHA256 與上述初版完全相同，店主 seed 三欄再次通過相同比對。首次付費前仍須核對實際隔離執行版本與此產品提交一致；場景 hash 或版本不同即停止並事前重新登記，不換場景跑到成功。此世界不來自任何私人正式故事副本。
 
 只有店主的正常決策和需要的既有世界裁定使用真實模型 `gpt-6-luna`；沿現行 adapter 的 `reasoning_effort=none` 與既有輸出容量。關閉外部回想服務，不新增反思、分類、摘要、來源掃描、格式修復或自動重試。若此模型不可用，停止並登記技術中斷，不在同批換模型。
 
@@ -33,9 +37,11 @@ Cass 是**明示受控 NPC transport fixture**：在原有 NPC 模型回覆邊�
 
 ## 窗口、用量與停止
 
-每次最多 **8 次 15 分鐘 advance**（120 分鐘世界時間）；六次合計最多 **48 advance、96 次真實供應商派送、2,000,000 已回報真實 input+output tokens、US$1、首次付費呼叫起 45 分鐘實際時間**，任一先到即停。96 是店主每輪至多一次正常決策和一次既有裁定的外部實驗上限。Cass 的 NPC transport fixture 次數另列，不送往供應商、不計真實付費派送或費用；引擎仍照原有流程記錄 fixture 的 usage 並檢查 slot／玩家預算，不扣除它來製造可用額度，不調高預算、租約或期限。續做等較少呼叫不把省下額度用來延長窗口。每個情境的兩次窗口都保留，不因已有成功就中途選擇性停止；交付後的下一輪仍核對真實結果輸入。
+每次最多 **8 次 15 分鐘 advance**（120 分鐘世界時間）；六次合計最多 **48 advance、96 次真實供應商派送、2,000,000 已回報真實 input+output tokens、US$1、首次付費呼叫起 45 分鐘實際時間**，任一先到即停。96 是全批硬上限，不能推定每輪只用兩次：除了店主 NPC 決策及其裁定，Cass 的 `consent` 等合法提案也可能使用既有世界主持裁定，必須一併計入真實派送與費用，因此可能在 48 次 advance 前先達停止線。
 
-**上述數值是方案上限，尚未批准執行。** 有效上限取本方案、明確授權餘量及玩家既有上限三者最小值，不能為完成樣本調高玩家額度。呼叫前登記有效 calls／tokens／cost／時間餘量與單輪保守預留。calls 餘量須能容納下一完整合法輪；tokens 以本次實際準備 request 的保守輸入上界加既有最大輸出預留，費用以呼叫前官方價格快照按未快取輸入及最大輸出估算。無法建立保守界線、價目缺失、usage 不明或費用不完整即停，不以未知當零。
+Cass 的 **NPC transport fixture** 次數另列，不送往供應商、不計真實付費派送或費用；其世界裁定不是免費 fixture。引擎仍照原有流程記錄 fixture usage 並檢查 slot／玩家預算，不扣除它來製造可用額度，不調高預算、租約或期限。續做等較少呼叫不把省下額度用來延長窗口。每個情境的兩次窗口都保留，不因已有成功就中途選擇性停止；交付後的下一輪仍核對真實結果輸入。
+
+**上述數值是方案上限，尚未批准執行。** 有效上限取本方案、明確授權餘量及玩家既有上限三者最小值，不能為完成樣本調高玩家額度。呼叫前登記有效 calls／tokens／cost／時間餘量與單輪保守預留。calls 餘量須能容納下一完整合法輪的所有角色必要裁定（包括 Cass 的同意），不能只預留店主兩次；tokens 以本次實際準備 request 的保守輸入上界加既有最大輸出預留，費用以呼叫前官方價格快照按未快取輸入及最大輸出估算。無法建立保守界線、價目缺失、usage 不明或費用不完整即停，不以未知當零。
 
 任一技術錯誤、超時、版本／場景不符、身份／來源／知情異常、pending／uncertain 或使用者停止都立即停止新派送；只讀原 ID 和提交結果。不得換 operationId 重跑、重骰、補成功、清 journal 或 reset。到上限但尚未觀察到成果時，保留未到達；停止條件是試驗窗口，不寫成 NPC 必須幾輪供餐的規則。
 
@@ -61,6 +67,20 @@ Cass 是**明示受控 NPC transport fixture**：在原有 NPC 模型回覆邊�
 
 ## 報告與重新登記
 
+可重現的離線材料檢查（從 repository 根目錄）：
+
+```sh
+node tooling/experiments/check-autonomous-demand-211.mjs
+node --test tooling/experiments/check-autonomous-demand-211.test.mjs
+node tooling/experiments/check-autonomous-demand-211.mjs --paid-ready
+```
+
+第一項核對完整場景 bytes／hash、fixture 來源 hash、版本、三情境排程、窗口與上限，以及店主 seed 不變欄位。產品提交填妥後再核對產品工作樹與固定提交、固定提交中的場景 fixture。材料正確可 exit 0，但輸出永遠 `paidReady=false` 並列明缺項；第三項**必須 exit 2 拒絕**，沒有 provider forward、HTTP、憑證讀取或世界寫入。它不是已完成的真實模型 runner，也不會因日後提供 Key 而自行啟動。
+
+本次以既有 no-network preload 離線執行：材料檢查、場景篡改拒絕、版本變更拒絕、`--paid-ready` 拒絕共 **4/4 通過**；匯出另有 owner 三欄相同的實際 assertion。ESLint 與 `git diff --check` 通過。這些只證明材料完整與禁止誤啟動，沒有取得真實模型行為證據。
+
+匯出來源可用既有無網路 temporary-build harness 明示重建：`node tests/run-activities.mjs tooling/experiments/export-autonomous-demand-211.cjs`。此命令會寫入 scene／manifest，只有需要事前重新登記時才執行，不是只讀預檢。匯出同時實際比較 `snapshot(seedWorld)` 店主三欄與原 seed 相同，無真實模型呼叫；重建不同 bytes 應先停止，保留原材料查明，不覆蓋成成功證據。
+
 報告以情境×重複列出各分類、真正準備／取得／交付、下一輪承接、停止和未到達項，另列程式 fixture、真實行為、尚未到達三種證據。零真實呼叫時只報預檢，不報改善；單次成功、合法拒絕或口頭進展不宣稱整體修好。若店主仍只回答，#211 保持未通過，失敗輸入／候選與未推進結果照實保存。
 
-首次付費前須將 #210 提交、場景 SHA256、對應授權引用、有效上限、價格及憑證可用性寫入一份不可變 run manifest。任何變更版／換模型／改窗口或客人回覆政策均另開事前登記，不能與原批混算。母規格 #205 不修改或關閉；本準備材料也不關閉 #211。
+本材料 manifest 已封存 #210 產品提交、場景 SHA256 及觀察設計，`authorizationReference`／`priceSnapshot` 仍為 null，`paidExecutionEnabled=false`。首次付費前仍須將對應授權引用、有效餘額／上限、價格及憑證可用性另存為不可變 run manifest，並具備經驗證的真實多輪隔離 runner。任何變更版／換模型／改窗口或客人回覆政策均另開事前登記，不能與原批混算。母規格 #205 不修改或關閉；本準備材料也不關閉 #211。
