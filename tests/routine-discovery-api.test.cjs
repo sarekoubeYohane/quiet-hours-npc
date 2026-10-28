@@ -24,7 +24,7 @@ test('a synonymous new search reuses the established canonical source even after
 });
 
 test('an unknown but applicable finite ingredient scope constrains authority confirmation without leaking hidden stock reasons',async()=>{
- const s=await scenario({prepare:w=>{initial(w);w.supplies=[{id:'finite-ordinary-materials',label:'普通備餐原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材',reason:'PRIVATE_STOCK_REASON'},stateExposure:{reason:'hidden'},consumable:false}];}});try{
+ const s=await scenario({prepare:w=>{initial(w);w.supplies=[{finiteScope:{version:1,coverage:'region',subject:'食材'},id:'finite-ordinary-materials',label:'普通備餐原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材',reason:'PRIVATE_STOCK_REASON'},stateExposure:{reason:'hidden'},consumable:false}];}});try{
   s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(input=>{assert.ok(input.supplies.some(x=>x.id==='finite-ordinary-materials'));return f.approval([search()],'find-ingredient');});let w=await advance(s);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].id,'finite-ordinary-materials');assert.equal(w.supplies[0].remaining,0);assert.equal(nonPhoneObjects(w).length,0);
   s.choose(rest);await advance(s);assert.equal(JSON.stringify(s.requests.at(-1).messages).includes('PRIVATE_STOCK_REASON'),false);assert.equal(JSON.stringify(s.inputs.at(-1)).includes('缺貨'),false);assert.equal(s.judgments(),1);
  }finally{s.restore();}
@@ -53,7 +53,7 @@ test('operator revocation or a newly applicable finite restriction before the sc
  for(const condition of ['operator','finite']){
   const s=await scenario({prepare:initial});try{
    s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search({minutes:30})],'find-ingredient'));let w=await advance(s);assert.equal(w.supplies[0].pending,true);const pendingId=w.supplies[0].id;
-   if(condition==='operator')w.routinePlaces[0].operators=[];else w.supplies.push({id:'new-finite-limit',label:'原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材'}});load('store').replaceCommittedWorld(w);
+   if(condition==='operator')w.routinePlaces[0].operators=[];else w.supplies.push({finiteScope:{version:1,coverage:'region',subject:'食材'},id:'new-finite-limit',label:'原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材'}});load('store').replaceCommittedWorld(w);
    let rolls=0;Math.random=()=>{rolls++;return .675;};w=await advance(s);assert.equal(w.supplies.some(x=>x.id===pendingId),false);assert.equal(nonPhoneObjects(w).length,0);assert.equal(rolls,0);assert.equal(w.characters[0].observations.some(x=>x.supplyId===pendingId),false);assert.equal(s.judgments(),1);
   }finally{s.restore();}
  }
@@ -119,9 +119,40 @@ test('an applicable finite restriction blocks established ordinary use equally b
  for(const method of ['known-routine','free-materialize']){
   const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];}});try{
    s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const source=w.supplies[0];assert.deepEqual(source.knownTo,['owner']);
-   w.supplies.push({id:'new-finite-limit',label:'原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材',reason:'PRIVATE_FINITE_REASON'},stateExposure:{reason:'hidden'}});load('store').replaceCommittedWorld(w);
+   w.supplies.push({finiteScope:{version:1,coverage:'region',subject:'食材'},id:'new-finite-limit',label:'原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材',reason:'PRIVATE_FINITE_REASON'},stateExposure:{reason:'hidden'}});load('store').replaceCommittedWorld(w);
    if(method==='known-routine'){s.choose(propose(program.methods[0].content,program.methods[0].purpose));s.reply(f.approval([program],'food'));w=await advance(s);assert.equal(s.judgments(),1);}else{s.choose(propose('取一份已看到的材料','取得材料',source.id));s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:source.id,expectedRemaining:1}],check:null});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);w=await s.read();}
    assert.equal(nonPhoneObjects(w).length,0);assert.equal(w.supplies.find(x=>x.id===source.id).background.sequence,0);assert.equal(w.supplies.find(x=>x.id==='new-finite-limit').remaining,0);s.choose(rest);await advance(s);assert.equal(JSON.stringify(s.inputs.at(-1)).includes('PRIVATE_FINITE_REASON'),false);
+  }finally{s.restore();}
+ }
+});
+
+test('an exhausted independent ingredient portion does not prohibit an established ordinary pantry of another subject',async()=>{
+ for(const metadata of [{initialState:{material:'奶酪',category:'乳製品'}},{initialState:{}},{initialState:{material:'奶酪',category:'食材'},label:'這一份食材奶酪已耗盡'},{initialState:{category:'食材'},finiteScope:{version:1,coverage:'region',subject:'奶酪'}}]){
+  const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];}});try{
+   s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const source=w.supplies[0];
+   w.supplies.push({id:'one-cheese-portion',label:'僅這一份特別奶酪已用完',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,quantity:{amount:1,unit:'portion'},...metadata});load('store').replaceCommittedWorld(w);
+   s.choose(propose(program.methods[0].content,program.methods[0].purpose));w=await advance(s);const meal=nonPhoneObjects(w).find(x=>x.kind==='meal');assert.ok(meal);assert.equal(w.supplies.length,2);assert.equal(w.supplies.find(x=>x.id===source.id).background.sequence,1);assert.equal(w.supplies.find(x=>x.id==='one-cheese-portion').remaining,0);assert.equal(s.judgments(),1);
+   s.choose(rest);await advance(s);assert.ok(s.inputs.at(-1).objects.some(x=>x.id===meal.id));assert.ok(JSON.stringify(s.requests.at(-1).messages).includes(meal.id));
+  }finally{s.restore();}
+ }
+});
+
+test('an explicit location-wide ingredient restriction also holds across regions of the same place',async()=>{
+ const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];}});try{
+  s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const source=w.supplies[0];
+  w.supplies.push({id:'whole-place-limit',label:'PRIVATE_OVERALL_LIMIT',kind:'cooking-ingredient',region:'cafe-storeroom',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{},finiteScope:{version:1,coverage:'location',subject:'食材'}});load('store').replaceCommittedWorld(w);
+  s.choose(propose(program.methods[0].content,program.methods[0].purpose));w=await advance(s);assert.equal(nonPhoneObjects(w).length,0);assert.equal(w.supplies.find(x=>x.id===source.id).background.sequence,0);assert.equal(w.supplies.find(x=>x.id==='whole-place-limit').remaining,0);assert.equal(s.judgments(),1);s.choose(rest);await advance(s);assert.equal(JSON.stringify(s.requests.at(-1).messages).includes('PRIVATE_OVERALL_LIMIT'),false);
+  s.choose(propose('取一份已看到的材料','取得材料',source.id));s.reply(input=>{assert.deepEqual(input.finiteRestrictions,[{type:'supply',id:'whole-place-limit',region:'cafe-storeroom',scope:{version:1,coverage:'location',subject:'食材'},readOnly:true}]);assert.equal(JSON.stringify(input).includes('PRIVATE_OVERALL_LIMIT'),false);assert.equal(input.supplies.some(x=>x.id==='whole-place-limit'),false);return {status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:source.id,expectedRemaining:1}],check:null};});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal(nonPhoneObjects(await s.read()).length,0);
+  w=await s.read();const limit=w.supplies.find(x=>x.id==='whole-place-limit');for(let i=0;i<33;i++)w.supplies.push({...limit,id:'bounded-limit-'+i});load('store').replaceCommittedWorld(w);
+  s.choose(propose('再查看目前普通材料','確認材料'));s.reply(input=>{assert.equal(input.finiteRestrictions.length,32);assert.equal(input.explorationScope.restrictionsOmitted,2);assert.equal(input.explorationScope.complete,false);assert.ok(Buffer.byteLength(JSON.stringify({objects:input.objects,supplies:input.supplies,finiteRestrictions:input.finiteRestrictions}))<=65536);return {status:'accepted',completionMinutes:15,effects:[{kind:'discover',version:1,region:'cafe-front',objectIds:[],supplyIds:[]}],check:null};});await advance(s);assert.equal(nonPhoneObjects(await s.read()).length,0);
+ }finally{s.restore();}
+});
+
+test('unknown or malformed finite scope metadata causes technical rollback rather than an invented stock result',async()=>{
+ for(const finiteScope of [{version:2,coverage:'location',subject:'食材'},{version:1,coverage:'world',subject:'食材'},{version:1,coverage:'location',subject:''}]){
+  const s=await scenario({prepare:initial});try{
+   s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const source=w.supplies[0];w.supplies.push({id:'invalid-scope',label:'有限資料',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{},finiteScope});load('store').replaceCommittedWorld(w);const before=load('store').snapshot();
+   s.choose(propose('取一份已看到的材料','取得材料',source.id));s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:source.id,expectedRemaining:1}],check:null});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);w=await s.read();assert.equal(w.supplies.find(x=>x.id===source.id).background.sequence,0);assert.equal(nonPhoneObjects(w).length,0);assert.deepEqual(w.supplies,before.supplies);
   }finally{s.restore();}
  }
 });
@@ -144,6 +175,7 @@ test('a legitimate selected finite source takes priority over ordinary backgroun
  for(const target of ['cafe','available-new']){
   const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];const base={label:'已確認備餐材料',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:['owner'],allowedTo:['owner'],remaining:1,initialState:{category:'食材'},stateExposure:{category:'public'},consumable:false,quantity:{amount:1,unit:'item'}};w.supplies=[{...base,id:'ordinary-first',background:{ruleId:'prior-confirmation',sequence:0,scope:{version:1,role:'material',subject:'食材'}}},{...base,id:'old-empty',remaining:0},{...base,id:'foreign-finite',owner:'cass',allowedTo:['cass']},{...base,id:'not-yet-available',availableAt:w.minute+120},{...base,id:'available-new'}];}});try{
    s.choose(propose(program.methods[0].content,program.methods[0].purpose,target));s.reply(f.approval([program],'food'));const w=await advance(s),meal=nonPhoneObjects(w).find(x=>x.kind==='meal');assert.ok(meal);assert.equal(w.supplies.length,5);assert.equal(w.supplies.find(x=>x.id==='ordinary-first').background.sequence,0);assert.equal(w.supplies.find(x=>x.id==='old-empty').remaining,0);assert.equal(w.supplies.find(x=>x.id==='foreign-finite').remaining,1);assert.equal(w.supplies.find(x=>x.id==='not-yet-available').remaining,1);assert.equal(w.supplies.find(x=>x.id==='available-new').remaining,0);assert.equal(nonPhoneObjects(w).find(x=>x.source==='available-new').lifecycle,'consumed');assert.equal(s.judgments(),0);
+   s.choose(propose(program.methods[0].content,program.methods[0].purpose,'cafe'));const next=await advance(s);assert.equal(nonPhoneObjects(next).filter(x=>x.kind==='meal').length,2);assert.equal(next.supplies.find(x=>x.id==='ordinary-first').background.sequence,1);assert.equal(next.supplies.find(x=>x.id==='available-new').remaining,0);assert.equal(s.judgments(),0);
   }finally{s.restore();}
  }
 });

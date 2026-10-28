@@ -1,5 +1,5 @@
 import type { RoutineBinding } from './routine-world-contract';
-import {hasObjectPermission,type WorldObject,type SceneSupply} from './world-effects';
+import {hasObjectPermission,EffectValidationError,type WorldObject,type SceneSupply} from './world-effects';
 
 // Pure material and utensil qualifications. Callers retain their own visibility,
 // locality, rights, finite availability and pending-output checks.
@@ -24,6 +24,18 @@ export function usableRoutineObject(object:WorldObject,actorId:string,access:'au
 // supplies alike. Legacy food needs its subject because that kind covers meals
 // and ingredients; newer kinds can carry the confirmed source category.
 export type RoutineSourceQualification=Pick<RoutineBinding,'sourceRole'|'sourceSubject'|'kind'>&{background:{kind:string}|null};
+export function finiteSourceScope(source:WorldObject|SceneSupply) {
+ const scope=source.finiteScope;
+ if(scope!==undefined&&(!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).length!==3||scope.version!==1||!['region','location'].includes(scope.coverage)||typeof scope.subject!=='string'||!scope.subject.trim()||new TextEncoder().encode(scope.subject).byteLength>128))throw new EffectValidationError('有限來源範圍資料格式無效。',{reason:'finite_scope_invalid'});
+ return scope;
+}
+// A usable individual portion is not an authority claim about every source of
+// its kind/category. Only explicit coverage can constrain another background.
+export function routineFiniteScopeMatches(source:WorldObject|SceneSupply,binding:RoutineSourceQualification):boolean {
+ if(binding.sourceRole!=='material')return source.kind===binding.background?.kind;
+ const scope=finiteSourceScope(source);
+ return !!scope&&scope.subject===binding.sourceSubject;
+}
 export function routineMaterialSourceMatches(source:WorldObject|SceneSupply,binding:RoutineSourceQualification):boolean {
  if(binding.sourceRole!=='material')return true;
  const state='initialState' in source?source.initialState:source.state;
