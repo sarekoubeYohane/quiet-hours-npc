@@ -10,7 +10,7 @@ import { effectCandidateSchema, effectRules, validObjectKind } from './adjudicat
 import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
 import type { Action, ActivityPlan, Character, World } from './world';
-import { canSee, regionOf, regions, connectingDoor, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources } from './perception';
+import { canSee, regionOf, regions, connectingDoor, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
@@ -31,7 +31,7 @@ export type DiscoverEffect={kind:'discover';version:1;region:string;objectIds:st
 export type Effect=DiscoverEffect|IngestEffect|ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;routineSourceScope?:RoutineSourceScope;requiredTools?:string[]};
+export type ActivityPhase={discoveryMethod?:DiscoveryMethod;afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;routineSourceScope?:RoutineSourceScope;requiredTools?:string[]};
 export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
 // Internal only: a trusted routine binder can identify each current vessel/material
 // attempt without storing model-authored IDs or the first historical die in a rule.
@@ -299,6 +299,8 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
    :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
   recordActionResult(w,c,action,summary,'blocked');return false;
  }
+ const method:DiscoveryMethod|undefined=candidate.activityIdentity?{version:1,kind:'activity',key:candidate.activityIdentity.key}:candidate.trialBinding?{version:1,kind:'routine',key:candidate.trialBinding.operation}:undefined;
+ for(const phase of candidate.stages||[])if(method&&phase.effects.some(effect=>effect.kind==='discover'))phase.discoveryMethod={...method};
  const existingObjects=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
  const validateResultTime=(snapshot:World,afterMinutes:number)=>{
   // Only the routine factory can mark its verified raw-material supplies as
@@ -346,7 +348,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
  recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
- if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects);
+ if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
  return true;
 }
 
@@ -398,16 +400,16 @@ export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,inde
  commitWorldChanges(w,clone);
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  emitExternalConsequences(w,c.id,phase.effects);
- if(!options?.validateOnly)commitDiscoveries(w,c,phase.effects);
+ if(!options?.validateOnly)commitDiscoveries(w,c,phase.effects,phase.discoveryMethod);
  return results;
 }
 
-function commitDiscoveries(w:World,c:Character,effects:Effect[]):void {
+function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:DiscoveryMethod):void {
  const discoveries=effects.filter((effect):effect is DiscoverEffect=>effect.kind==='discover');
  if(!discoveries.length)return;
  const region=regionOf(c);
  record(w,c.id,`${c.name} 實際查探了目前可接觸的範圍。`,'observe',[c.id],{from:c.location,to:c.location,fromRegion:region,toRegion:region,target:region,content:'sight'});
- discoverWorldResources(w,c,w.events.at(-1)!,[...new Set(discoveries.flatMap(effect=>effect.objectIds))],[...new Set(discoveries.flatMap(effect=>effect.supplyIds))]);
+ discoverWorldResources(w,c,w.events.at(-1)!,[...new Set(discoveries.flatMap(effect=>effect.objectIds))],[...new Set(discoveries.flatMap(effect=>effect.supplyIds))],method);
 }
 
 // Only external sensory facts leave the authority batch; reasons stay in receipts.
