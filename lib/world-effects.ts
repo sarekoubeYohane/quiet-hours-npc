@@ -1,5 +1,6 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
 import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { finiteSourceScope } from './routine-materials';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -20,9 +21,10 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number;scope?:{version:1;role:'material'|'equipment';subject:string|null}};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type FiniteSourceScope={version:1;coverage:'region'|'location';subject:string};
+export type SceneSupply={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number;scope?:{version:1;role:'material'|'equipment';subject:string|null}};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type PhysicalHistory={actorId:string;minute:number;operation:string;permitted:boolean;priorHolder:string|null};
-export type WorldObject={stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
+export type WorldObject={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type StateChange={key:string;from:string|null;value:string};
 export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
 export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
@@ -82,15 +84,20 @@ export function authorityForProposal(w:World,c:Character,action?:Action){
  const eligibleObjects=(w.objects||[]).filter(object=>objectIds.has(object.id)||object.lifecycle==='active'&&object.holder===c.id)
   .map(object=>{const copy={...object};delete copy.physicalHistory;delete copy.physicalHistoryDropped;delete copy.unpermittedCount;return copy;});
  const eligibleSupplies=(w.supplies||[]).filter(supply=>supplyIds.has(supply.id)).map(supply=>({...supply,materializedObjectId:supply.remaining>0?materializedObjectId(supply):null}));
+ const eligibleRestrictions=[...(w.supplies||[]).map(source=>({type:'supply' as const,source})),...(w.objects||[]).map(source=>({type:'object' as const,source}))].flatMap(({type,source})=>{
+  const scope=finiteSourceScope(source);
+  return scope?.coverage==='location'&&source.region!==local&&regions.find(region=>region.id===source.region)?.location===c.location?[{type,id:source.id,region:source.region,scope,readOnly:true as const}]:[];
+ });
  // A bounded authority subset is explicit about omissions, never a complete
  // execution snapshot. Prefer the requested identity and actor's own objects.
  eligibleObjects.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target)||Number(b.holder===c.id)-Number(a.holder===c.id));
  eligibleSupplies.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target));
  const objects:WorldObject[]=[],supplies:(SceneSupply&{materializedObjectId:string|null})[]=[];
+ const finiteRestrictions:typeof eligibleRestrictions=[];
  let bytes=32;
  const retain=<T,>(source:T[],target:T[])=>{for(const item of source){const size=new TextEncoder().encode(JSON.stringify(item)).length+2;if(target.length<32&&bytes+size<=64*1024){target.push(item);bytes+=size;}}};
- retain(eligibleObjects,objects);retain(eligibleSupplies,supplies);
- return {explorationScope:{region:local,objectsOmitted:eligibleObjects.length-objects.length,suppliesOmitted:eligibleSupplies.length-supplies.length,complete:eligibleObjects.length===objects.length&&eligibleSupplies.length===supplies.length},external:{bodies:w.characters.filter(person=>regionOf(person)===local&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:local})},objects,supplies,effectContractVersion:'world-effects.v5',effectRules,effectContract:effectCandidateSchema};
+ retain(eligibleRestrictions,finiteRestrictions);retain(eligibleObjects,objects);retain(eligibleSupplies,supplies);
+ return {explorationScope:{region:local,objectsOmitted:eligibleObjects.length-objects.length,suppliesOmitted:eligibleSupplies.length-supplies.length,restrictionsOmitted:eligibleRestrictions.length-finiteRestrictions.length,complete:eligibleObjects.length===objects.length&&eligibleSupplies.length===supplies.length&&eligibleRestrictions.length===finiteRestrictions.length},external:{bodies:w.characters.filter(person=>regionOf(person)===local&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:local})},objects,supplies,finiteRestrictions,effectContractVersion:'world-effects.v5',effectRules,effectContract:effectCandidateSchema};
 }
 function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect|IngestEffect> {
  if(effect.operation==='materialize')return {kind:'materialize',supplyId:effect.supplyId,expectedRemaining:effect.expectedRemaining};
