@@ -1,5 +1,5 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
-import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -97,7 +97,7 @@ function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,Phy
  if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
  return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
 }
-function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number):string[]{
+function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number,routineSourceScope?:RoutineSourceScope):string[]{
  const results:string[]=[];
  const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
  for(const [effectIndex,original] of effects.entries()){
@@ -108,6 +108,8 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
   };
   if(e.kind==='discover'){
+   for(const id of e.supplyIds){const supply=w.supplies?.find(item=>item.id===id);if(supply?.pending){if(!canConfirmRoutineBackground(w,c,routineSourceScope,id))fail('background_discovery_scope','尚未確認的背景來源不能由這次查找建立。');delete supply.pending;}}
+
    const objects=new Set(objectObservationCandidates(w,c,e.objectIds).map(item=>item.objectId)),supplies=new Set(supplyObservationCandidates(w,c,e.supplyIds).map(item=>item.supplyId));
    if(e.region!==regionOf(c)||!canSee(w,c,e.region)||e.objectIds.some(id=>!objects.has(id)||w.objects?.find(object=>object.id===id)?.region!==e.region)||e.supplyIds.some(id=>!supplies.has(id)||w.supplies?.find(supply=>supply.id===id)?.region!==e.region))fail('discovery_scope','查找結果超出目前可接觸的範圍。');
    results.push('已查探目前可接觸的範圍');
@@ -321,7 +323,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   try{
    if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
    predicted.minute=Math.max(predicted.minute,w.minute+phase.afterMinutes);
-   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);validateResultTime(predicted,phase.afterMinutes);
+   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex,undefined,phase.routineSourceScope);validateResultTime(predicted,phase.afterMinutes);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>'target' in p?worldTargetSnapshot(predicted,p.target):predicted.objects?.find(o=>o.id===p.objectId)||null)});
@@ -384,7 +386,7 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
    const phase=phases.stages[index];
    predicted.minute=Math.max(predicted.minute,actor.plan.startedAt+phase.afterMinutes);
    checkPhase(predicted,actor,phase);
-   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes);
+   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes,phase.routineSourceScope);
   }
   return true;
  }catch{return false;}
@@ -394,7 +396,7 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
 export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
- const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined);
+ const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined,phase.routineSourceScope);
  commitWorldChanges(w,clone);
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  emitExternalConsequences(w,c.id,phase.effects);

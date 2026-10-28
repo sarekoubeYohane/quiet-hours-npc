@@ -58,3 +58,16 @@ export function recordCommittedRoutinePremises(world:World,actor:Character,scope
  if(!rule||!program)return;
  for(const reference of scope.refs){const binding=program.bindings.find(item=>item.role===reference.role);if(binding)rememberRoutineSource(rule,program,binding,reference.id,routineSourcePremise(world,actor,binding,reference.id));}
 }
+
+// A pending ordinary source may become an established world fact only through
+// the phase compiled from the same confirmed rule and its actual source role.
+export function canConfirmRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
+ if(!scope)return false;
+ const rule=world.routineRules?.find(item=>item.id===scope.ruleId&&item.version===3&&item.origin===actor.location&&item.knownTo.includes(actor.id));
+ const program=(rule?.programs as RoutineWorldProgram[]|undefined)?.find(item=>item.operation===scope.operation);
+ const reference=scope.refs.find(item=>item.id===id),binding=program?.bindings.find(item=>item.role===reference?.role);
+ const source=world.supplies?.find(item=>item.id===id);
+ return !!rule&&!!program&&!!binding&&binding.type==='supply'&&binding.access==='authorized'&&!!binding.background&&
+  !!source?.pending&&source.background?.ruleId===rule.id&&source.owner===actor.id&&source.allowedTo.includes(actor.id)&&source.region===regionOf(actor)&&
+  !!world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id));
+}

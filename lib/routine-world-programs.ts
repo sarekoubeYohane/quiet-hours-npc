@@ -46,6 +46,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
  const fromRenewableBackground=(object:WorldObject)=>!!w.supplies?.some(source=>source.id===object.source&&source.background);
  const background=(binding:RoutineBinding)=>{
   const bg=binding.background!;
+  const discovering=(program.branches||[{stages:program.stages}]).some(path=>path.stages.some(phase=>phase.effects.some(effect=>effect.kind==='discover'&&effect.supplyIds.includes('$'+binding.role))));
   const explicit=(w.supplies||[]).filter(supply=>!supply.background&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.sourceRole==='material'?matchesMaterialSource(supply,binding):supply.kind==='utensil'||supply.kind===bg.kind));
   if(explicit.length){
    const actual=explicit.find(supply=>supply.remaining>0&&hasObjectPermission(supply,c.id)&&stateMatches(supply.initialState,binding));
@@ -60,7 +61,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   let supply=w.supplies?.find(supply=>supply.background?.ruleId===rule.id&&supply.region===regionOf(c)&&supply.label===bg.label&&supply.kind===bg.kind);
   if(!supply){
    if((w.supplies?.length||0)>=512)throw Error('日常供應已達容量。');
-   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState:Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),stateExposure:Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure])),region:regionOf(c),remaining:1,owner:c.id,knownTo:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0}};
+   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState:Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),stateExposure:Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure])),region:regionOf(c),remaining:1,owner:c.id,knownTo:discovering?[]:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0}};
    (w.supplies??=[]).push(supply);
   }
   return supply;
