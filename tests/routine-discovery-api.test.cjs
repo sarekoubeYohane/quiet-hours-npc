@@ -114,3 +114,14 @@ test('an unknown ordinary source cannot be materialized by an arbitrary free can
   s.choose(propose('試著直接拿一份材料','取得材料'));s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:source.id,expectedRemaining:1}],check:null});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,502);w=await s.read();assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].id,source.id);assert.deepEqual(w.supplies[0].knownTo,[]);assert.equal(w.supplies[0].background.sequence,0);assert.equal(nonPhoneObjects(w).length,0);
  }finally{s.restore();}
 });
+
+test('an applicable finite restriction blocks established ordinary use equally before or after the source became known',async()=>{
+ for(const method of ['known-routine','free-materialize']){
+  const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];}});try{
+   s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const source=w.supplies[0];assert.deepEqual(source.knownTo,['owner']);
+   w.supplies.push({id:'new-finite-limit',label:'原料總來源',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:[],allowedTo:['owner'],remaining:0,initialState:{category:'食材',reason:'PRIVATE_FINITE_REASON'},stateExposure:{reason:'hidden'}});load('store').replaceCommittedWorld(w);
+   if(method==='known-routine'){s.choose(propose(program.methods[0].content,program.methods[0].purpose));s.reply(f.approval([program],'food'));w=await advance(s);assert.equal(s.judgments(),1);}else{s.choose(propose('取一份已看到的材料','取得材料',source.id));s.reply({status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:source.id,expectedRemaining:1}],check:null});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);w=await s.read();}
+   assert.equal(nonPhoneObjects(w).length,0);assert.equal(w.supplies.find(x=>x.id===source.id).background.sequence,0);assert.equal(w.supplies.find(x=>x.id==='new-finite-limit').remaining,0);s.choose(rest);await advance(s);assert.equal(JSON.stringify(s.inputs.at(-1)).includes('PRIVATE_FINITE_REASON'),false);
+  }finally{s.restore();}
+ }
+});

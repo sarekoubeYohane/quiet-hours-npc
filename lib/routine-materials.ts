@@ -23,7 +23,8 @@ export function usableRoutineObject(object:WorldObject,actorId:string,access:'au
 // A material role keeps its confirmed source semantics for concrete objects and
 // supplies alike. Legacy food needs its subject because that kind covers meals
 // and ingredients; newer kinds can carry the confirmed source category.
-export function routineMaterialSourceMatches(source:WorldObject|SceneSupply,binding:RoutineBinding):boolean {
+export type RoutineSourceQualification=Pick<RoutineBinding,'sourceRole'|'sourceSubject'|'kind'>&{background:{kind:string}|null};
+export function routineMaterialSourceMatches(source:WorldObject|SceneSupply,binding:RoutineSourceQualification):boolean {
  if(binding.sourceRole!=='material')return true;
  const state='initialState' in source?source.initialState:source.state;
  const subject=!!binding.sourceSubject&&(source.label.includes(binding.sourceSubject)||['material','category'].some(key=>state[key]===binding.sourceSubject));

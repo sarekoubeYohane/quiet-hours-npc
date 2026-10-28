@@ -1,5 +1,5 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
-import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -140,6 +140,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    results.push('身體外在位置已改變');
   }else if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
+   if(s?.background&&routineBackgroundHasFiniteConflict(w,c,s,routineSourceScope))fail('background_finite_scope','當前適用的有限來源約束不允許普通背景代換。');
    if(s&&!physical&&!s.knownTo.includes(c.id)&&canContactRoutineBackground(w,c,routineSourceScope,s.id))s.knownTo.push(c.id);
    if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&(physical||phaseIndex===null))||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!physical&&!s.allowedTo.includes(c.id)||s.region!==regionOf(c)||physical&&!canSee(w,c,s.region))fail('supply_precondition','裁定供應前提無效。');
    if(!validQuantity(s.quantity??{amount:1,unit:'item'})||s.consumable!==undefined&&typeof s.consumable!=='boolean')fail('quantity_precondition','供應份量或消耗能力無法安全承接。');

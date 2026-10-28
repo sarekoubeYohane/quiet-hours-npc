@@ -1,7 +1,7 @@
-import { routineMaterialSourceMatches } from './routine-materials';
+import { routineMaterialSourceMatches, type RoutineSourceQualification } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
 import { regionOf, canSee } from './perception';
-import { hasObjectPermission, type Effect } from './world-effects';
+import { hasObjectPermission, type Effect, type SceneSupply, type WorldObject } from './world-effects';
 import type { World, Character } from './world';
 import type { RoutineRule } from './routine-rules';
 import type { RoutineBinding, RoutineWorldProgram } from './routine-world-contract';
@@ -72,8 +72,8 @@ function routineBackgroundContext(world:World,actor:Character,scope:RoutineSourc
   !world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id)))return;
  return {rule,binding,source};
 }
-function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineBinding):boolean {
- const matches=(item:import('./world-effects').WorldObject|import('./world-effects').SceneSupply)=>binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind;
+function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineSourceQualification):boolean {
+ const matches=(item:WorldObject|SceneSupply)=>binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind;
  return (world.supplies||[]).some(item=>!item.background&&item.region===regionOf(actor)&&matches(item))||
   (world.objects||[]).some(item=>item.region===regionOf(actor)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&matches(item));
 }
@@ -89,4 +89,12 @@ export function canContactRoutineBackground(world:World,actor:Character,scope:Ro
  return !source.pending&&source.remaining>0&&(source.availableAt===undefined||source.availableAt<=world.minute)&&hasObjectPermission(source,actor.id)&&source.allowedTo.includes(actor.id)&&
   (!binding.kind||source.kind===binding.kind)&&routineMaterialSourceMatches(source,binding)&&
   (!confirmedScope||confirmedScope.version===1&&confirmedScope.role===binding.sourceRole&&confirmedScope.subject===binding.sourceSubject)&&!finiteBackgroundConflict(world,actor,binding);
+}
+
+// The same applicable finite source constrains both known and unknown ordinary
+// backgrounds. Legacy rows without scope use the actual bound method if present.
+export function routineBackgroundHasFiniteConflict(world:World,actor:Character,source:SceneSupply,scope?:RoutineSourceScope):boolean {
+ const confirmed=source.background?.scope;
+ const binding=routineBackgroundContext(world,actor,scope,source.id)?.binding??(confirmed?.version===1?{sourceRole:confirmed.role,sourceSubject:confirmed.subject,kind:source.kind,background:{kind:source.kind}}:undefined);
+ return !!binding&&finiteBackgroundConflict(world,actor,binding);
 }

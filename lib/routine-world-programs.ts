@@ -4,7 +4,7 @@ import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type Rout
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
 import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, discardPendingSupplies, effectSupplyReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject } from './world-effects';
-import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, canContactRoutineBackground, type RoutinePhaseBindings } from './routine-world-bindings';
+import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutinePhaseBindings } from './routine-world-bindings';
 import type { World, Character, Action } from './world';
 import type { RoutineRule, RoutineSelectionObserver } from './routine-rules';
 
@@ -100,7 +100,9 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
    let supply=w.supplies?.find(supply=>{
     const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)||canContactRoutineBackground(w,c,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]},supply.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:supply.id,passed});if(!passed)return false;}return true;
-   });if(!supply&&binding.background)supply=background(binding);if(!supply){
+   });
+   if(supply?.background&&routineBackgroundHasFiniteConflict(w,c,supply,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]}))throw new RoutineUnavailable('普通來源受到當前適用的有限約束，不能繼續使用。');
+   if(!supply&&binding.background)supply=background(binding);if(!supply){
     const relevant=(w.supplies||[]).filter(source=>!source.pending&&source.knownTo.includes(c.id)&&(binding.select==='target'?source.id===action.target:source.region===regionOf(c))&&(!binding.kind||source.kind===binding.kind)&&(!binding.label||source.label.includes(binding.label))&&routineMaterialSourceMatches(source,binding));
     if(relevant.length)rejectPrerequisite(binding,relevant.map(source=>source.id));
     report(binding,{check:'unbound',reason:'no-verified-source-premise'});return;
