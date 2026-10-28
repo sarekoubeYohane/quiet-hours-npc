@@ -46,6 +46,11 @@ export function canSee(world: World, observer: Character, region: string) {
 export type PerceptionTrace = { characterId: string; status: 'direct' | 'uncertain' | 'no-opportunity' | 'noticed' | 'missed'; observations: Observation[]; reason: string; opportunity?: string; resolution?: Resolution; falsePerception?: FalsePerceptionDiagnostic; factors?: { ability: number; attention: number; interference: string } };
 export type PerceptionTrial = { opportunity: string; resolution: Resolution; factors: { ability: number; attention: number; interference: string }; candidates: SensoryCandidate[]; falsePerception?: FalsePerceptionDiagnostic };
 export type SensoryCandidate = { sense: Observation['sense']; kind: Observation['kind']; text: string; clarity: Observation['clarity']; source?: string; objectId?: string; region?: string; urgency?: Observation['urgency']; direct: boolean; interference?: 'weak' | 'medium' | 'strong' };
+// Keep the original tuple for people/sounds so persisted pre-discovery receipts
+// retain their meaning. A resource identity extends only resource candidates.
+function sensoryCandidateIdentity(candidate: SensoryCandidate) {
+  return [candidate.sense, candidate.kind, candidate.text, candidate.source, candidate.region, ...(candidate.objectId ? [{ objectId: candidate.objectId }] : [])];
+}
 export function canHear(world: World, observer: Character, region: string) {
   return regionOf(observer) === region || !!connectingDoor(regionOf(observer), region);
 }
@@ -137,7 +142,7 @@ export function resolvePerception(world: World, character: Character, eventId: s
     (!action.target || action.target === candidate.region || action.target === candidate.source));
   const attention = focused || observing ? 2 : action && ['work', 'attempt', 'reflect'].includes(action.type) ? -2 : 0;
   const modifier = Math.max(-4, Math.min(4, ability + attention)) as Advantage;
-  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(c => [c.sense, c.kind, c.text, c.source, c.objectId, c.region]).sort(), interference, ability, attention]);
+  const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(sensoryCandidateIdentity).sort(), interference, ability, attention]);
   const previous = world.perceptionTrials?.[opportunity];
   if (previous) return previous;
   const resolution = judgeD20(rollD20(), modifier, dc);
@@ -162,7 +167,7 @@ export function saveObservation(world: World, character: Character, observation:
 // persistence; only their observer-facing explanations differ.
 function observationTrace(world: World, character: Character, event: import('./world').WorldEvent, candidates: SensoryCandidate[], trial?: PerceptionTrial, active = false): PerceptionTrace {
   const selected = [...candidates.filter(candidate => candidate.direct), ...(trial?.candidates || [])];
-  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, objectId, region, urgency }, index) => ({ sense, kind, text, clarity, source, ...(objectId ? { objectId } : {}), region, urgency, id: `${event.id}:${character.id}:${objectId || index}`, time: world.minute }));
+  const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, objectId, region, urgency }, index) => ({ sense, kind, text, clarity, source, ...(objectId ? { objectId } : {}), region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
   for (const observation of observations) saveObservation(world, character, observation);
   const status = trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity';
   const reason = active ? trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索' :
@@ -276,7 +281,7 @@ export function probeCurrent(world: World, character: Character, event: import('
 }
 function resolveProbe(world: World, character: Character, event: import('./world').WorldEvent, sense: 'sight' | 'hearing', candidates: SensoryCandidate[], clues: string[]) {
   const here = regionOf(character);
-  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [c.sense, c.kind, c.text, c.source, c.objectId, c.region, c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
+  const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [...sensoryCandidateIdentity(c), c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort()]);
   const previous = world.probeResults?.[probeKey];
   if (previous) { event.perception = [{ ...previous, reason: '相同查探條件，沿用先前結果（不重新擲骰）' }]; return previous; }
   // Keep prior receipts rather than evicting them and allowing reload/rewording

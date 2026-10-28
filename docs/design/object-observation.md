@@ -11,3 +11,7 @@
 保存沿既有 JSON、短期 80 筆／64 KiB／總量限制及世界最多 512 個具體物件；物品列表超限明確拒絕，不截斷執行依據。物品探查新機會達 2048 probe receipts，或保存的兩類 receipt 加本次候選估算超 1 MiB 時拋出 `PerceptionCapacityError`，沿整輪技術失敗回復，保留舊 receipt 而不淘汰重擲；新物件資訊不形成永久無界知識庫。容量錯誤不是世界缺貨或人物拒絕。舊世界缺欄位仍可讀，GET 不補造發現、不觸發模型；無 SQL migration。新資料寫入後回退需保留理解 objectId/object 的讀寫器，不可丟欄位或重置世界。
 
 本票不新增容器、逐物遮蔽規則、供應探索或自由查找裁定；物品可察覺條件沿當前世界已保存的區域／持有／生命週期。後續 #208 使用同一入口接通裁定，本票不宣稱真實模型必然選擇觀察。
+
+## #207 審查相容修正
+
+原版人物／聲音 receipt 的候選 tuple 維持 `sense/kind/text/source/region`，只有資源候選才附加物件身份，不因升級插入空欄而重擲。觀察記憶 ID 沿事件／角色／索引維持有界，完整 objectId 仍留在來源；128-byte 物件身份不會膨脹成超長記憶身份。API 固定原版 receipt JSON（人物／聲音 × probe／trial）重讀0骰；128-byte物件可提交、SQLite重讀後進真正下一次 request/messages。兩反例先red後green；object／active／false perception回歸22/22通過。
