@@ -67,9 +67,9 @@
     "maxNpcInputBytes": 9899,
     "maxRequestBytes": 104976,
     "maxAuthorityBytes": 858,
-    "worldBytes": 20664,
+    "worldBytes": 21202,
     "suppliesBytes": 472,
     "memoryBytes": 3332,
-    "receiptBytes": 3138
+    "receiptBytes": 3591
   }
 }

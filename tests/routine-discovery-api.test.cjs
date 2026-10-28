@@ -132,3 +132,18 @@ test('a known ordinary preparation cannot bypass another owner by replacing a so
   s.choose(propose(program.methods[0].content,program.methods[0].purpose));s.reply(f.approval([program],'food'));const w=await advance(s);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].id,'shared-source');assert.equal(w.supplies[0].owner,'owner');assert.deepEqual(w.supplies[0].allowedTo,['owner']);assert.deepEqual(w.supplies[0].initialState,{category:'食材'});assert.equal(w.supplies[0].background.sequence,3);assert.equal(nonPhoneObjects(w).length,0);assert.equal(s.judgments(),0);
  }finally{s.restore();}
 });
+
+test('a truly different confirmed search method can perceive the same canonical ordinary source after the first method missed',async()=>{
+ const s=await scenario({prepare:initial});try{
+  Math.random=()=>.075;s.choose(propose('查看這裡可用的普通備餐材料','確認可用材料'));s.reply(f.approval([search()],'find-ingredient'));let w=await advance(s);const id=w.supplies[0].id;assert.deepEqual(w.supplies[0].knownTo,[]);
+  const content='逐處對照備餐材料的實際分類';const program=search({content,label:'日常烹飪原料'});program.operation='inspect-ingredient-differently';let rolls=0;Math.random=()=>{rolls++;return .675;};s.choose(propose(content,'確認可用材料'));s.reply(f.approval([program],program.operation));w=await advance(s);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].id,id);assert.deepEqual(w.supplies[0].knownTo,['owner']);assert.equal(rolls,1);assert.equal(w.supplies[0].background.sequence,0);assert.equal(nonPhoneObjects(w).length,0);assert.equal(s.judgments(),2);s.choose(rest);await advance(s);assert.ok(s.inputs.at(-1).supplies.some(x=>x.id===id));
+ }finally{s.restore();}
+});
+
+test('a legitimate selected finite source takes priority over ordinary background without an unavailable finite source blocking it',async()=>{
+ for(const target of ['cafe','available-new']){
+  const program=f.cafePrograms().find(item=>item.operation==='food');const s=await scenario({prepare:w=>{initial(w);w.routineRules=[{id:'known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['owner'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];const base={label:'已確認備餐材料',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:['owner'],allowedTo:['owner'],remaining:1,initialState:{category:'食材'},stateExposure:{category:'public'},consumable:false,quantity:{amount:1,unit:'item'}};w.supplies=[{...base,id:'ordinary-first',background:{ruleId:'prior-confirmation',sequence:0,scope:{version:1,role:'material',subject:'食材'}}},{...base,id:'old-empty',remaining:0},{...base,id:'foreign-finite',owner:'cass',allowedTo:['cass']},{...base,id:'not-yet-available',availableAt:w.minute+120},{...base,id:'available-new'}];}});try{
+   s.choose(propose(program.methods[0].content,program.methods[0].purpose,target));s.reply(f.approval([program],'food'));const w=await advance(s),meal=nonPhoneObjects(w).find(x=>x.kind==='meal');assert.ok(meal);assert.equal(w.supplies.length,5);assert.equal(w.supplies.find(x=>x.id==='ordinary-first').background.sequence,0);assert.equal(w.supplies.find(x=>x.id==='old-empty').remaining,0);assert.equal(w.supplies.find(x=>x.id==='foreign-finite').remaining,1);assert.equal(w.supplies.find(x=>x.id==='not-yet-available').remaining,1);assert.equal(w.supplies.find(x=>x.id==='available-new').remaining,0);assert.equal(nonPhoneObjects(w).find(x=>x.source==='available-new').lifecycle,'consumed');assert.equal(s.judgments(),0);
+  }finally{s.restore();}
+ }
+});
