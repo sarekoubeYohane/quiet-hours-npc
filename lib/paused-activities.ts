@@ -13,6 +13,10 @@ function referencedFacts(world:World,plan:ActivityPlan):PausedActivity['referenc
  const remember=(kind:'object'|'supply'|'body'|'environment',id:string)=>{refs.set(kind+':'+id,{kind,id});};
  const effectReferences=(effect:Effect):void=>{
   switch(effect.kind){
+   case 'discover':
+    effect.objectIds.forEach(id=>remember('object',id));
+    effect.supplyIds.forEach(id=>remember('supply',id));
+    remember('environment',effect.region);return;
    case 'change-state':remember(effect.target.type,effect.target.id);return;
    case 'displace-body':remember('body',effect.targetId);return;
    case 'schedule-natural':

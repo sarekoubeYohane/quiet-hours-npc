@@ -136,7 +136,7 @@ function compilePath(w:World,c:Character,program:RoutineWorldProgram,path:{stage
   const ids=new Set([...effects.flatMap(effectReferenceIds),...preconditions.flatMap(condition=>'target' in condition?[condition.target.id]:[condition.objectId])]);
   const bindings:RoutinePhaseBindings={objects:[...(sim.objects||[])].filter(object=>ids.has(object.id)).map(object=>({id:object.id,region:object.region,holder:object.holder,quantity:structuredClone(object.quantity||{amount:1,unit:'item'}),state:Object.fromEntries([...(stateKeys.get(object.id)||[])].map(key=>[key,Object.hasOwn(object.state,key)?object.state[key]:null]))})),bodies:sim.characters.filter(actor=>ids.has(actor.id)).map(actor=>({id:actor.id,region:regionOf(actor)}))};
   const compiled:ActivityPhase={afterMinutes:phase.afterMinutes,preconditions,effects,routineBindings:bindings,routineSourceScope:{ruleId,operation:program.operation,refs:program.bindings.map(binding=>({role:binding.role,id:refs.get(binding.role)!}))}};
-  sim.minute=w.minute;commitActivityPhase(sim,actor,compiled,stages.length);stages.push(compiled);
+  sim.minute=w.minute;commitActivityPhase(sim,actor,compiled,stages.length,{validateOnly:true});stages.push(compiled);
  }
  return stages;
 }

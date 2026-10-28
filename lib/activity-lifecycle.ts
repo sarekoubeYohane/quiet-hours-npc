@@ -1,9 +1,9 @@
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
 import { invalidateNaturalChanges } from './natural-changes';
-import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
+import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, effectSupplyReferenceIds, EffectValidationError } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
-import { regionOf } from './perception';
+import { regionOf, PerceptionCapacityError } from './perception';
 import type { ActivityDecision } from './activities';
 
 // This module mutates only the current round candidate. Model dispatch, NPC
@@ -30,7 +30,7 @@ function expireOpenPeriod(world:World,character:Character):boolean {
 export function cancelActivity(w:World,c:Character):void {
  const phases=c.plan?.phases;
  if(phases&&w.supplies){
-  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).filter((effect):effect is Extract<Effect,{kind:'materialize'}>=>effect.kind==='materialize').map(effect=>effect.supplyId));
+  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).flatMap(effectSupplyReferenceIds));
   discardPendingSupplies(w,pending);
  }
  delete c.plan;
@@ -45,7 +45,8 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=throughMinute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
   let results:string[];
-  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch{
+  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
+   if(error instanceof PerceptionCapacityError)throw error;
    recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
   }
   phases.cursor++;
@@ -110,7 +111,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(!candidate.branches&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes&&candidate.bodyActivity?.kind!=='sleep'){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
-        if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null});
+        if(candidate.branches)validateResultBranches(validation,actor,candidate);else commitFreeAction(validation,actor,{...candidate,check:null},undefined,{validateOnly:true});
         candidate={status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`這項活動需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`};
       }
     }

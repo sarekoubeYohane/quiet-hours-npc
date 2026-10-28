@@ -19,7 +19,7 @@ export const adjudicationLimits = {
 } as const;
 export const routineOperations:RoutineOperation[]=['tea','coffee','food','drink','wash','return'];
 
-export const effectKinds={ingest:'ingest',form:'form',separate:'separate',materialize:'materialize',consume:'consume',destroy:'destroy',transfer:'transfer',state:'state',grant:'grant',consent:'consent',scheduleNatural:'schedule-natural',changeState:'change-state',displaceBody:'displace-body',physical:'physical'} as const;
+export const effectKinds={discover:'discover',ingest:'ingest',form:'form',separate:'separate',materialize:'materialize',consume:'consume',destroy:'destroy',transfer:'transfer',state:'state',grant:'grant',consent:'consent',scheduleNatural:'schedule-natural',changeState:'change-state',displaceBody:'displace-body',physical:'physical'} as const;
 
 export const physicalEffectLimits = {version:1,objectOperations:['take','place','consume','destroy'],maxHistory:16,maxReasonLength:300} as const;
 
