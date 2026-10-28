@@ -1,6 +1,7 @@
+import { routineMaterialSourceMatches, routineOrdinarySourceMatches, type RoutineSourceQualification } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
-import { regionOf } from './perception';
-import { hasObjectPermission, type Effect } from './world-effects';
+import { regionOf, canSee } from './perception';
+import { hasObjectPermission, type Effect, type SceneSupply, type WorldObject } from './world-effects';
 import type { World, Character } from './world';
 import type { RoutineRule } from './routine-rules';
 import type { RoutineBinding, RoutineWorldProgram } from './routine-world-contract';
@@ -57,4 +58,42 @@ export function recordCommittedRoutinePremises(world:World,actor:Character,scope
  const program=(rule?.programs as RoutineWorldProgram[]|undefined)?.find(item=>item.operation===scope.operation);
  if(!rule||!program)return;
  for(const reference of scope.refs){const binding=program.bindings.find(item=>item.role===reference.role);if(binding)rememberRoutineSource(rule,program,binding,reference.id,routineSourcePremise(world,actor,binding,reference.id));}
+}
+
+// This is authority for contacting an already-established ordinary background,
+// never for giving knowledge or permission during candidate binding.
+function routineBackgroundContext(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string) {
+ if(!scope)return;
+ const rule=world.routineRules?.find(item=>item.id===scope.ruleId&&item.version===3&&item.origin===actor.location&&item.knownTo.includes(actor.id));
+ const program=(rule?.programs as RoutineWorldProgram[]|undefined)?.find(item=>item.operation===scope.operation);
+ const reference=scope.refs.find(item=>item.id===id),binding=program?.bindings.find(item=>item.role===reference?.role);
+ const source=world.supplies?.find(item=>item.id===id);
+ if(!rule||!program||!binding||binding.type!=='supply'||binding.access!=='authorized'||!binding.background||!source?.background||source.region!==regionOf(actor)||!canSee(world,actor,source.region)||
+  !world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id)))return;
+ return {rule,binding,source};
+}
+function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineSourceQualification):boolean {
+ const matches=(item:WorldObject|SceneSupply)=>binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind;
+ return (world.supplies||[]).some(item=>!item.background&&item.region===regionOf(actor)&&matches(item))||
+  (world.objects||[]).some(item=>item.region===regionOf(actor)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&matches(item));
+}
+// Only the server-bound phase from this confirmation can establish a new source.
+export function canConfirmRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
+ const context=routineBackgroundContext(world,actor,scope,id);if(!context)return false;
+ const {rule,binding,source}=context;
+ return !!source.pending&&source.background!.ruleId===rule.id&&source.owner===actor.id&&source.allowedTo.includes(actor.id)&&!finiteBackgroundConflict(world,actor,binding);
+}
+export function canContactRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
+ const context=routineBackgroundContext(world,actor,scope,id);if(!context)return false;
+ const {binding,source}=context;
+ return !source.pending&&source.remaining>0&&(source.availableAt===undefined||source.availableAt<=world.minute)&&hasObjectPermission(source,actor.id)&&source.allowedTo.includes(actor.id)&&
+  routineOrdinarySourceMatches(source,binding)&&!finiteBackgroundConflict(world,actor,binding);
+}
+
+// The same applicable finite source constrains both known and unknown ordinary
+// backgrounds. Legacy rows without scope use the actual bound method if present.
+export function routineBackgroundHasFiniteConflict(world:World,actor:Character,source:SceneSupply,scope?:RoutineSourceScope):boolean {
+ const confirmed=source.background?.scope;
+ const binding=routineBackgroundContext(world,actor,scope,source.id)?.binding??(confirmed?.version===1?{sourceRole:confirmed.role,sourceSubject:confirmed.subject,kind:source.kind,background:{kind:source.kind}}:undefined);
+ return !!binding&&finiteBackgroundConflict(world,actor,binding);
 }

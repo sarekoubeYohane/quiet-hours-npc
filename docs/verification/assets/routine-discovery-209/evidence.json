@@ -1,0 +1,75 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "existingUiAdvances": 4,
+  "npc": 4,
+  "judgments": 2,
+  "rolls": 1,
+  "steps": [
+    {
+      "minute": 1275,
+      "npc": 1,
+      "judgments": 1,
+      "rolls": 1,
+      "sources": 1,
+      "objects": 0,
+      "sequence": 0,
+      "sourceKnown": true
+    },
+    {
+      "minute": 1290,
+      "npc": 2,
+      "judgments": 1,
+      "rolls": 1,
+      "sources": 1,
+      "objects": 0,
+      "sequence": 0,
+      "sourceKnown": true
+    },
+    {
+      "minute": 1305,
+      "npc": 3,
+      "judgments": 2,
+      "rolls": 1,
+      "sources": 1,
+      "objects": 1,
+      "sequence": 1,
+      "sourceKnown": true
+    },
+    {
+      "minute": 1320,
+      "npc": 4,
+      "judgments": 2,
+      "rolls": 1,
+      "sources": 1,
+      "objects": 1,
+      "sequence": 1,
+      "sourceKnown": true
+    }
+  ],
+  "checks": {
+    "actualWorldApp": true,
+    "confirmedOrdinaryBackground": true,
+    "searchNoPhysicalObject": true,
+    "actualSourcePerception": true,
+    "sqliteReload": true,
+    "nextActualMessages": true,
+    "laterMaterialization": true,
+    "continuousSourceIdentity": true,
+    "noImplicitPermission": true,
+    "reloadZeroDispatch": true,
+    "searchAndLastOperationReplayZeroDispatch": true,
+    "desktop1280": true,
+    "mobile390NoOverflow": true,
+    "pageErrors": []
+  },
+  "capacity": {
+    "maxNpcInputBytes": 9899,
+    "maxRequestBytes": 104976,
+    "maxAuthorityBytes": 858,
+    "worldBytes": 21202,
+    "suppliesBytes": 472,
+    "memoryBytes": 3332,
+    "receiptBytes": 3591
+  }
+}

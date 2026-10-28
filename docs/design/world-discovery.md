@@ -24,6 +24,11 @@ discover 可放在正式完成／階段／結果分支。必要時間、未開�
 
 無 SQL migration。舊世界缺 supplyId／supply 欄位可讀，GET 不觸發模型、不補知情、不從 trace 復活遺忘。所有世界與角色知情沿整輪版本／租約／原子保存；較後角色失敗、技術錯誤或保存衝突不留下發現。新 JSON 寫入後回退須保留理解 v5 與新來源欄位的讀寫器，不丟欄位、不重置世界。
 
+
+## 普通背景查找（#209）
+
+供應角色可在查找活動內確認普通背景，正式 discover 階段才成立來源，再沿既有主觀感知取得知情；後續另由角色決定實際取得／準備。不更改供應所有權／使用許可，有限來源約束使用權威世界事實。optional scope、跨規則重用、取消及容量／舊世界政策見[工程契約](routine-discovery.md)。
+
 ## #208 補修：實質不同的已確認查找方法
 
 先前 resource-probe.v1 只按資源與接觸條件保存，讓首次查找漏看後，即使世界確認真正不同的方法仍永久沿用舊失敗。現在沿既有主持 activityIdentity（最多64字語義 key）或已確認 routine operation（最多60字）形成 server-only `DiscoveryMethod {version:1,kind:'activity'|'routine',key}`。即時效果傳入原感知通道；需要查找的活動階段保存 optional discoveryMethod，經 SQLite 續做仍用同一方法。NPC 原句、方法自述、時點、無關世界版本與物件實例 ID 均不作方法身份，沒有新增模型服務。
