@@ -23,7 +23,7 @@
     "maxElapsedMinutesFromFirstPaidCall": 45,
     "effectiveLimit": "minimum of this plan, available authorization, and existing player limits"
   },
-  "customer": {"actor": "cass", "transport": "controlled-world-action", "initialMessages": {
+  "customer": {"actor": "cass", "transport": "controlled-npc-transport-fixture", "execution": "normal advance -> validated say/consent activity -> perception -> commit", "paidProviderCalls": 0, "engineUsageAndBudget": "preserve original accounting and limits; fixture responses do not increase available budget", "initialMessages": {
     "supply-question": "請問現在有什麼可以吃的？",
     "explicit-request": "我現在想吃一份普通簡餐，可以幫我準備嗎？",
     "offer-accepted": "我有點餓，還沒決定要吃什麼。"
