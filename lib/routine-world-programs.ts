@@ -1,8 +1,9 @@
 import { confirmsBodyConsequences } from './needs';
+import { routineMaterialSourceMatches } from './routine-materials';
 import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
-import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject, type SceneSupply } from './world-effects';
+import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, discardPendingSupplies, effectSupplyReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject, type SceneSupply } from './world-effects';
 import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, type RoutinePhaseBindings } from './routine-world-bindings';
 import type { World, Character, Action } from './world';
 import type { RoutineRule, RoutineSelectionObserver } from './routine-rules';
@@ -13,16 +14,7 @@ function audit(w:World,c:Character,rule:RoutineRule,result:'approved'|'reused'|'
  w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:rule.id,result,...(reason?{reason}:{})}].slice(-64);
 }
 const stateMatches=(state:Record<string,string>,binding:RoutineBinding)=>binding.state.every(({key,value})=>(Object.hasOwn(state,key)?state[key]:null)===value);
-// A material role keeps its confirmed source semantics for concrete objects and
-// supplies alike. Legacy food needs its subject because that kind covers meals
-// and ingredients; newer kinds can carry the confirmed source category.
-function matchesMaterialSource(source:WorldObject|SceneSupply,binding:RoutineBinding):boolean {
- if(binding.sourceRole!=='material')return true;
- const state='initialState' in source?source.initialState:source.state;
- const subject=!!binding.sourceSubject&&(source.label.includes(binding.sourceSubject)||['material','category'].some(key=>state[key]===binding.sourceSubject));
- const kind=binding.background?.kind??binding.kind;
- return source.kind==='food'||kind==='food'||!kind?subject:source.kind===kind||source.kind===binding.kind;
-}
+const sameEntries=(left:Record<string,string>,right:Record<string,string>)=>Object.keys(left).length===Object.keys(right).length&&Object.entries(left).every(([key,value])=>right[key]===value);
 class RoutineUnavailable extends Error {}
 function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram,rule:RoutineRule,observe?:RoutineSelectionObserver,confirming=false):Map<string,string>|undefined {
  const refs=new Map<string,string>([['actor',c.id],['here',regionOf(c)]]);
@@ -47,21 +39,27 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
  const background=(binding:RoutineBinding)=>{
   const bg=binding.background!;
   const discovering=(program.branches||[{stages:program.stages}]).some(path=>path.stages.some(phase=>phase.effects.some(effect=>effect.kind==='discover'&&effect.supplyIds.includes('$'+binding.role))));
-  const explicit=(w.supplies||[]).filter(supply=>!supply.background&&supply.region===regionOf(c)&&supply.knownTo.includes(c.id)&&(binding.sourceRole==='material'?matchesMaterialSource(supply,binding):supply.kind==='utensil'||supply.kind===bg.kind));
+  const explicit=(w.supplies||[]).filter(supply=>!supply.background&&supply.region===regionOf(c)&&(discovering||supply.knownTo.includes(c.id))&&(binding.sourceRole==='material'?routineMaterialSourceMatches(supply,binding):supply.kind==='utensil'||supply.kind===bg.kind));
   if(explicit.length){
-   const actual=explicit.find(supply=>supply.remaining>0&&hasObjectPermission(supply,c.id)&&stateMatches(supply.initialState,binding));
+   const actual=explicit.find(supply=>stateMatches(supply.initialState,binding)&&(discovering||supply.remaining>0&&hasObjectPermission(supply,c.id)));
    report(binding,{check:'finite-background-source',candidates:explicit.map(source=>({id:source.id,remaining:source.remaining})),selected:actual?.id??null});
    if(!actual)throw new RoutineUnavailable('目前已知的有限材料或器具不能使用，尚未完成；日常背景不會補回。');
    return actual;
   }
   const finite=currentRule.finiteSourceBindings?.some(entry=>entry.operation===program.operation&&entry.roles.includes(binding.role));
-  const concrete=(w.objects||[]).some(object=>object.knownTo.includes(c.id)&&regions.some(region=>region.id===object.region&&region.location===c.location)&&!fromRenewableBackground(object)&&(binding.sourceRole==='material'?matchesMaterialSource(object,binding):object.kind===bg.kind||object.kind===binding.kind));
+  const concrete=(w.objects||[]).some(object=>(discovering||object.knownTo.includes(c.id))&&regions.some(region=>region.id===object.region&&region.location===c.location)&&!fromRenewableBackground(object)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(object,binding):object.kind===bg.kind||object.kind===binding.kind));
   report(binding,{check:'background-substitution',finite:!!finite,concrete,allowed:!finite&&!concrete});
   if(finite||concrete)throw new RoutineUnavailable('已知具體材料或器具已耗盡、損毀、移走或無法操作；日常背景不會補回。');
-  let supply=w.supplies?.find(supply=>supply.background?.ruleId===rule.id&&supply.region===regionOf(c)&&supply.label===bg.label&&supply.kind===bg.kind);
+  const initialState=Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),exposure=Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure]));
+  // Canonical source semantics survive new method wording and display labels.
+  // Legacy rows retain their original rule/label scope without backfilling it.
+  const canonical=(w.supplies||[]).filter(source=>source.region===regionOf(c)&&source.kind===bg.kind&&
+   (source.background?.scope?source.background.scope.version===1&&source.background.scope.role===binding.sourceRole&&source.background.scope.subject===binding.sourceSubject&&source.consumable===bg.consumable&&source.quantity?.amount===bg.quantity.amount&&source.quantity.unit===bg.quantity.unit&&sameEntries(source.initialState,initialState)&&sameEntries(source.stateExposure||{},exposure):source.background?.ruleId===rule.id&&source.label===bg.label));
+  let supply=canonical.find(source=>hasObjectPermission(source,c.id))||canonical[0];
+  if(supply&&!discovering&&!hasObjectPermission(supply,c.id))throw new RoutineUnavailable('既有普通來源的使用條件不成立，不能另建替代供應。');
   if(!supply){
    if((w.supplies?.length||0)>=512)throw Error('日常供應已達容量。');
-   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState:Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),stateExposure:Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure])),region:regionOf(c),remaining:1,owner:c.id,knownTo:discovering?[]:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0}};
+   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState:Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),stateExposure:Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure])),region:regionOf(c),remaining:1,owner:c.id,knownTo:discovering?[]:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0,scope:{version:1,role:binding.sourceRole!,subject:binding.sourceSubject}}};
    (w.supplies??=[]).push(supply);
   }
   return supply;
@@ -71,7 +69,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   if(binding.type==='object'){
    const reachable=(w.objects||[]).filter(object=>{const reach=canPhysicallyReachObject(w,c,object),permission=reach?(binding.access==='physical'||hasObjectPermission(object,c.id)&&(object.holder===null||object.holder===c.id)):undefined;report(binding,{check:'object-access',id:object.id,reach,permission:permission??'not-evaluated',access:binding.access});return reach&&permission;});
    const candidates=reachable.filter(object=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||(binding.link.direction==='from-role'?w.objects?.find(source=>source.id===refs.get(binding.link!.role))?.state[binding.link.key]===object.id:object.state[binding.link.key]===refs.get(binding.link.role))},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'target',run:()=>binding.select!=='target'||object.id===action.target},{name:'kind',run:()=>!binding.kind||object.kind===binding.kind},{name:'label',run:()=>!binding.label||object.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(object,binding)},{name:'state',run:()=>stateMatches(object.state,binding)},{name:'link',run:()=>!binding.link||(binding.link.direction==='from-role'?w.objects?.find(source=>source.id===refs.get(binding.link!.role))?.state[binding.link.key]===object.id:object.state[binding.link.key]===refs.get(binding.link.role))},{name:'quantity',run:()=>!binding.quantity||(object.quantity||{amount:1,unit:'item'}).unit===binding.quantity.unit&&(object.quantity?.amount||1)>=binding.quantity.amount}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:object.id,passed});if(!passed)return false;}return true;
    });
    if(binding.select==='linked'&&candidates.length>1){report(binding,{check:'unbound',reason:'ambiguous-linked-objects',candidates:candidates.map(object=>object.id)});return;}
@@ -82,13 +80,13 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
     // prove this method's physical prerequisite failed. Missing or
     // contradictory links, wrong kinds and ambiguous selectors remain an
     // exception; they are not evidence for a world prohibition.
-    const target=binding.select==='target'&&!binding.link?w.objects?.find(object=>object.id===action.target&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)):undefined;
+    const target=binding.select==='target'&&!binding.link?w.objects?.find(object=>object.id===action.target&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&routineMaterialSourceMatches(object,binding)):undefined;
     if(target)rejectPrerequisite(binding,[target.id]);
-    const local=binding.select==='local'&&!binding.link&&(binding.kind||binding.label)?(w.objects||[]).filter(object=>object.region===regionOf(c)&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)):[];
+    const local=binding.select==='local'&&!binding.link&&(binding.kind||binding.label)?(w.objects||[]).filter(object=>object.region===regionOf(c)&&object.knownTo.includes(c.id)&&(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&routineMaterialSourceMatches(object,binding)):[];
     if(local.length)rejectPrerequisite(binding,local.map(object=>object.id));
     report(binding,{check:'unbound',reason:'no-verified-object-premise'});return;
    }
-   if(binding.select==='target'&&w.objects?.some(object=>object.id===action.target)||reachable.some(object=>(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&matchesMaterialSource(object,binding)))throw new RoutineUnavailable('指定或現有物件條件不成立，不能用日常背景代換。');
+   if(binding.select==='target'&&w.objects?.some(object=>object.id===action.target)||reachable.some(object=>(!binding.kind||object.kind===binding.kind)&&(!binding.label||object.label.includes(binding.label))&&routineMaterialSourceMatches(object,binding)))throw new RoutineUnavailable('指定或現有物件條件不成立，不能用日常背景代換。');
    const supply=background(binding);if(!supply.background)finiteSource(binding);refs.set(binding.role,`${supply.id}:${supply.background?.sequence??supply.remaining}`);refs.set(binding.role+'-supply',supply.id);
   }else if(binding.type==='environment'){
    const snapshot=worldTargetSnapshot(w,{type:'environment',id:regionOf(c)}),matches=!!snapshot&&stateMatches(snapshot.state,binding);report(binding,{check:'environment-state',id:regionOf(c),snapshot:!!snapshot,passed:matches});if(!matches){if(snapshot&&binding.state.length)rejectPrerequisite(binding,[regionOf(c)]);return;}rememberSource(binding,regionOf(c));refs.set(binding.role,regionOf(c));
@@ -100,10 +98,10 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
    }report(binding,{check:'bound',id:actor.id});rememberSource(binding,actor.id);refs.set(binding.role,actor.id);
   }else{
    let supply=w.supplies?.find(supply=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>matchesMaterialSource(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:supply.id,passed});if(!passed)return false;}return true;
    });if(!supply&&binding.background)supply=background(binding);if(!supply){
-    const relevant=(w.supplies||[]).filter(source=>!source.pending&&source.knownTo.includes(c.id)&&(binding.select==='target'?source.id===action.target:source.region===regionOf(c))&&(!binding.kind||source.kind===binding.kind)&&(!binding.label||source.label.includes(binding.label))&&matchesMaterialSource(source,binding));
+    const relevant=(w.supplies||[]).filter(source=>!source.pending&&source.knownTo.includes(c.id)&&(binding.select==='target'?source.id===action.target:source.region===regionOf(c))&&(!binding.kind||source.kind===binding.kind)&&(!binding.label||source.label.includes(binding.label))&&routineMaterialSourceMatches(source,binding));
     if(relevant.length)rejectPrerequisite(binding,relevant.map(source=>source.id));
     report(binding,{check:'unbound',reason:'no-verified-source-premise'});return;
    }report(binding,{check:'bound',id:supply.id});rememberSource(binding,supply.id);
@@ -169,7 +167,11 @@ function bindWorldRoutineRule(w:World,c:Character,action:Action,approval?:Routin
  if(!rule||!program){observeSelection(observe,{source:'program-check',ruleId,branch:'adjudication-required',reason:'no-matching-program'});return;}
  const duration=rule.worldTimings!.find(time=>time.operation===program.operation)!.minutes,confirmedDurationMinutes=Math.ceil(duration/15)*15;
  if(maxMinutes!==null&&confirmedDurationMinutes>maxMinutes){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,check:'time-limit',confirmedDurationMinutes,maxMinutes,passed:false});return {status:'denied',effects:[],stages:[],check:null,knownBlockedReason:`完成這項活動需要 ${confirmedDurationMinutes} 分鐘，超過本次明確投入上限 ${maxMinutes} 分鐘；尚未啟動。`};}
- const prepared=structuredClone(w);let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule,observe,!!approval);}catch(error){if(error instanceof RoutineUnavailable){copyConfirmedSources(rule,prepared);observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'blocked',reason:error.message});audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
+ // A new choice replaces its prior activity. Bind against the same pending
+ // cleanup that startActivity will perform, without mutating committed facts.
+ const prepared=structuredClone(w);
+ if(c.plan?.phases)discardPendingSupplies(prepared,new Set(c.plan.phases.stages.slice(c.plan.phases.cursor).flatMap(phase=>phase.effects).flatMap(effectSupplyReferenceIds)));
+ let refs:Map<string,string>|undefined;try{refs=bindRoles(prepared,c,action,program,rule,observe,!!approval);}catch(error){if(error instanceof RoutineUnavailable){copyConfirmedSources(rule,prepared);observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'blocked',reason:error.message});audit(w,c,rule,'blocked',error.message);return denied(error.message);}throw error;}
  if(!refs){observeSelection(observe,{source:'program-check',ruleId:rule.id,version:rule.version,branch:'adjudication-required',reason:'role-binding-failed'});audit(w,c,rule,'exception');if(approval)return denied('目前已知物件或外在條件不能承接這次方法，尚未完成。');return;}
  if(!approval)audit(w,c,rule,'reused');
  let branches:{outcomes:string[];effects:Effect[];stages:ActivityPhase[]}[];

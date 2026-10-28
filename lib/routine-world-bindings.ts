@@ -1,3 +1,4 @@
+import { routineMaterialSourceMatches } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
 import { regionOf } from './perception';
 import { hasObjectPermission, type Effect } from './world-effects';
@@ -69,5 +70,7 @@ export function canConfirmRoutineBackground(world:World,actor:Character,scope:Ro
  const source=world.supplies?.find(item=>item.id===id);
  return !!rule&&!!program&&!!binding&&binding.type==='supply'&&binding.access==='authorized'&&!!binding.background&&
   !!source?.pending&&source.background?.ruleId===rule.id&&source.owner===actor.id&&source.allowedTo.includes(actor.id)&&source.region===regionOf(actor)&&
-  !!world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id));
+  !!world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id))&&
+  !(world.supplies||[]).some(item=>!item.background&&item.region===regionOf(actor)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind))&&
+  !(world.objects||[]).some(item=>item.region===regionOf(actor)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind));
 }
