@@ -1,6 +1,6 @@
 import { routineMaterialSourceMatches } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
-import { regionOf } from './perception';
+import { regionOf, canSee } from './perception';
 import { hasObjectPermission, type Effect } from './world-effects';
 import type { World, Character } from './world';
 import type { RoutineRule } from './routine-rules';
@@ -60,17 +60,33 @@ export function recordCommittedRoutinePremises(world:World,actor:Character,scope
  for(const reference of scope.refs){const binding=program.bindings.find(item=>item.role===reference.role);if(binding)rememberRoutineSource(rule,program,binding,reference.id,routineSourcePremise(world,actor,binding,reference.id));}
 }
 
-// A pending ordinary source may become an established world fact only through
-// the phase compiled from the same confirmed rule and its actual source role.
-export function canConfirmRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
- if(!scope)return false;
+// This is authority for contacting an already-established ordinary background,
+// never for giving knowledge or permission during candidate binding.
+function routineBackgroundContext(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string) {
+ if(!scope)return;
  const rule=world.routineRules?.find(item=>item.id===scope.ruleId&&item.version===3&&item.origin===actor.location&&item.knownTo.includes(actor.id));
  const program=(rule?.programs as RoutineWorldProgram[]|undefined)?.find(item=>item.operation===scope.operation);
  const reference=scope.refs.find(item=>item.id===id),binding=program?.bindings.find(item=>item.role===reference?.role);
  const source=world.supplies?.find(item=>item.id===id);
- return !!rule&&!!program&&!!binding&&binding.type==='supply'&&binding.access==='authorized'&&!!binding.background&&
-  !!source?.pending&&source.background?.ruleId===rule.id&&source.owner===actor.id&&source.allowedTo.includes(actor.id)&&source.region===regionOf(actor)&&
-  !!world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id))&&
-  !(world.supplies||[]).some(item=>!item.background&&item.region===regionOf(actor)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind))&&
-  !(world.objects||[]).some(item=>item.region===regionOf(actor)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind));
+ if(!rule||!program||!binding||binding.type!=='supply'||binding.access!=='authorized'||!binding.background||!source?.background||source.region!==regionOf(actor)||!canSee(world,actor,source.region)||
+  !world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id)))return;
+ return {rule,binding,source};
+}
+function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineBinding):boolean {
+ const matches=(item:import('./world-effects').WorldObject|import('./world-effects').SceneSupply)=>binding.sourceRole==='material'?routineMaterialSourceMatches(item,binding):item.kind===binding.background!.kind;
+ return (world.supplies||[]).some(item=>!item.background&&item.region===regionOf(actor)&&matches(item))||
+  (world.objects||[]).some(item=>item.region===regionOf(actor)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&matches(item));
+}
+// Only the server-bound phase from this confirmation can establish a new source.
+export function canConfirmRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
+ const context=routineBackgroundContext(world,actor,scope,id);if(!context)return false;
+ const {rule,binding,source}=context;
+ return !!source.pending&&source.background!.ruleId===rule.id&&source.owner===actor.id&&source.allowedTo.includes(actor.id)&&!finiteBackgroundConflict(world,actor,binding);
+}
+export function canContactRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
+ const context=routineBackgroundContext(world,actor,scope,id);if(!context)return false;
+ const {binding,source}=context,confirmedScope=source.background!.scope;
+ return !source.pending&&source.remaining>0&&(source.availableAt===undefined||source.availableAt<=world.minute)&&hasObjectPermission(source,actor.id)&&source.allowedTo.includes(actor.id)&&
+  (!binding.kind||source.kind===binding.kind)&&routineMaterialSourceMatches(source,binding)&&
+  (!confirmedScope||confirmedScope.version===1&&confirmedScope.role===binding.sourceRole&&confirmedScope.subject===binding.sourceSubject)&&!finiteBackgroundConflict(world,actor,binding);
 }

@@ -3,8 +3,8 @@ import { routineMaterialSourceMatches } from './routine-materials';
 import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
-import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, discardPendingSupplies, effectSupplyReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject, type SceneSupply } from './world-effects';
-import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, type RoutinePhaseBindings } from './routine-world-bindings';
+import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, discardPendingSupplies, effectSupplyReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject } from './world-effects';
+import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, canContactRoutineBackground, type RoutinePhaseBindings } from './routine-world-bindings';
 import type { World, Character, Action } from './world';
 import type { RoutineRule, RoutineSelectionObserver } from './routine-rules';
 
@@ -98,7 +98,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
    }report(binding,{check:'bound',id:actor.id});rememberSource(binding,actor.id);refs.set(binding.role,actor.id);
   }else{
    let supply=w.supplies?.find(supply=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)||canContactRoutineBackground(w,c,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]},supply.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:supply.id,passed});if(!passed)return false;}return true;
    });if(!supply&&binding.background)supply=background(binding);if(!supply){
     const relevant=(w.supplies||[]).filter(source=>!source.pending&&source.knownTo.includes(c.id)&&(binding.select==='target'?source.id===action.target:source.region===regionOf(c))&&(!binding.kind||source.kind===binding.kind)&&(!binding.label||source.label.includes(binding.label))&&routineMaterialSourceMatches(source,binding));
