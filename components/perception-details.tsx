@@ -18,7 +18,7 @@ export default function PerceptionDetails({ event, world }: { event: WorldEvent;
       </p>}
       {trace.observations.map(observation => <p key={observation.id}>
         {observation.sense === 'sight' ? '視覺線索' : observation.sense==='touch'?'身體感知':'聽覺線索'} · {observation.text}
-        <small>觀察時間：D{Math.floor(observation.time/1440)+1} {timeLabel(observation.time)} · 來源：{observation.source ? world.characters.find(c => c.id === observation.source)?.name : '未知'} · {observation.clarity === 'clear' ? '清楚' : '模糊'}</small>
+        <small>觀察時間：D{Math.floor(observation.time/1440)+1} {timeLabel(observation.time)} · 來源：{observation.objectId ? world.objects?.find(object => object.id === observation.objectId)?.label || observation.objectId : observation.source ? world.characters.find(c => c.id === observation.source)?.name : '未知'} · {observation.clarity === 'clear' ? '清楚' : '模糊'}</small>
       </p>)}
     </div>)}
   </details>;
