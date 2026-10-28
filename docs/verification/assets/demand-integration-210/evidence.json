@@ -55,7 +55,7 @@
           "rolls": 1,
           "sources": 4,
           "meal": {
-            "id": "formed:b2796d48-4d36-48e7-8395-f199d8f0ab66",
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -74,7 +74,7 @@
           "rolls": 1,
           "sources": 4,
           "meal": {
-            "id": "formed:b2796d48-4d36-48e7-8395-f199d8f0ab66",
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -94,7 +94,7 @@
           "rolls": 1,
           "sources": 4,
           "meal": {
-            "id": "formed:b2796d48-4d36-48e7-8395-f199d8f0ab66",
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -116,7 +116,7 @@
           "rolls": 1,
           "sources": 4,
           "meal": {
-            "id": "formed:b2796d48-4d36-48e7-8395-f199d8f0ab66",
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
             "holder": "cass",
             "owner": "owner",
             "revision": 2,
@@ -136,7 +136,7 @@
           "rolls": 1,
           "sources": 4,
           "meal": {
-            "id": "formed:b2796d48-4d36-48e7-8395-f199d8f0ab66",
+            "id": "formed:10afd378-0bd6-4ce5-9d0c-ee4951359358",
             "holder": "cass",
             "owner": "owner",
             "revision": 2,
@@ -170,8 +170,8 @@
       },
       "capacity": {
         "maxNpcInputBytes": 18642,
-        "maxRequestBytes": 107255,
-        "maxTraceBytes": 394244,
+        "maxRequestBytes": 107463,
+        "maxTraceBytes": 394460,
         "worldBytes": 73810,
         "sourcesBytes": 1286,
         "rulesBytes": 4023,
@@ -222,7 +222,7 @@
           "rolls": 0,
           "sources": 3,
           "meal": {
-            "id": "formed:78483ef8-5808-4975-9d6e-820fb93dbd31",
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -241,7 +241,7 @@
           "rolls": 0,
           "sources": 3,
           "meal": {
-            "id": "formed:78483ef8-5808-4975-9d6e-820fb93dbd31",
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -261,7 +261,7 @@
           "rolls": 0,
           "sources": 3,
           "meal": {
-            "id": "formed:78483ef8-5808-4975-9d6e-820fb93dbd31",
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
             "holder": "owner",
             "owner": "owner",
             "revision": 1,
@@ -283,7 +283,7 @@
           "rolls": 0,
           "sources": 3,
           "meal": {
-            "id": "formed:78483ef8-5808-4975-9d6e-820fb93dbd31",
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
             "holder": "cass",
             "owner": "owner",
             "revision": 2,
@@ -303,7 +303,7 @@
           "rolls": 0,
           "sources": 3,
           "meal": {
-            "id": "formed:78483ef8-5808-4975-9d6e-820fb93dbd31",
+            "id": "formed:103d6fb2-b538-48d7-a407-3a0187a5a5e1",
             "holder": "cass",
             "owner": "owner",
             "revision": 2,
@@ -337,8 +337,8 @@
       },
       "capacity": {
         "maxNpcInputBytes": 15432,
-        "maxRequestBytes": 106531,
-        "maxTraceBytes": 364552,
+        "maxRequestBytes": 106739,
+        "maxTraceBytes": 364768,
         "worldBytes": 57532,
         "sourcesBytes": 815,
         "rulesBytes": 2660,

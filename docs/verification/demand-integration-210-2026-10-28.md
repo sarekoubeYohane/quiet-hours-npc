@@ -39,4 +39,6 @@ UI 共17輪，explore／direct 同上述計數；1280px 與390px檢查無水平�
 - [手機分析](assets/demand-integration-210/explore-mobile-analysis.png)
 - [最終 UI 計數／容量／hash](assets/demand-integration-210/evidence.json)
 
-API 隱藏對照代表量測為 request107215 bytes、NPC input15015 bytes、trace369025 bytes、world59018 bytes、receipts3591 bytes、2規則、短期經歷最大7821 bytes／17條；UI各輪量測見 evidence.json。沒有無界需求佇列或額外保存索引。未推進正式世界、部署、合併 main 或修改／關閉 #205。完整 repository 回歸由整合分支最終統一執行；本票局部結果另列後續最終驗證紀錄。
+API 隱藏對照代表量測為 request107423 bytes、NPC input15015 bytes、trace369241 bytes、world59018 bytes、receipts3591 bytes、2規則、短期經歷最大7821 bytes／17條；UI各輪量測見 evidence.json。沒有無界需求佇列或額外保存索引。未推進正式世界、部署、合併 main 或修改／關閉 #205。
+
+最終合入來源範圍修補 `82a3b3c` 後，本票11條加來源、普通背景、方法機會及方法承接相關局部 **50/50** 通過，0失敗／略過／取消；包含上述同 kind 奶酪反例 red→green。真WorldApp雙路也在該產品重跑通過，主要來源／授權／直接準備／手機圖已目視。Typecheck、變更檔 ESLint、diffcheck 通過。完整 repository 回歸由整合分支最終統一執行，不把本票局部稱為全repo驗證。
