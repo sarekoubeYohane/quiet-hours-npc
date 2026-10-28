@@ -84,3 +84,24 @@ test('old-world reads do not invent discovery; receipt capacity fails visibly wi
   s.choose({type:'observe',target:'cafe-storeroom',content:'sight'});let rolls=0;Math.random=()=>{rolls++;return .675;};const r=await post({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna'});assert.equal(r.status,502);assert.match(await r.clone().text(),/保存容量/);assert.equal(rolls,0);const saved=await read();assert.deepEqual(saved.objects[0].knownTo,[]);assert.equal(Object.keys(saved.probeResults).length,2048);
  });
 });
+
+test('original-version person and sound receipt JSON survives SQLite reload without reroll at unchanged conditions',async()=>{
+ for(const sense of ['sight','hearing'])for(const receipt of ['probe','trial']){
+  const w=scene();w.objects=[];const other=seedWorld().characters.find(c=>c.id==='cass');other.location='cafe';other.region='cafe-storeroom';other.control={mode:'taken-over',active:true};other.plan={action:{type:'work',target:'tidy'},startedAt:w.minute,until:w.minute+120,modelKey:'openai:gpt-6-luna',attention:''};w.characters.push(other);w.characters[0].abilityTags=[];w.scene.occluded=['cafe-storeroom'];w.scene.noise['cafe-front']='quiet';
+  w.currentSensory={presence:{owner:{region:'cafe-front',clue:'owner-original'},cass:{region:'cafe-storeroom',clue:'person-original'}},activities:{cass:{region:'cafe-storeroom',clue:'work-original',action:{type:'work',target:'tidy'}}}};
+  // Literal v1 persisted tuple shapes from main 9bd0e56; no new object slot.
+  const clue=sense==='sight'?'person-original':'work-original',text=sense==='sight'?'遮擋處有人影晃動。':'附近傳來做事的動靜。',kind=sense==='sight'?'person':'sound';
+  const opportunity=JSON.stringify([JSON.stringify(['probe',clue]),'owner','cafe-front',[[sense,kind,text,null,null]],'medium',0,2]);
+  const result={roll:2,modifier:2,dc:12,total:-8,outcome:'failure'},factors={ability:0,attention:2,interference:'medium'};
+  const originalTrial={opportunity,resolution:result,factors,candidates:[]};
+  const originalProbeKey=JSON.stringify(['owner','cafe-front',sense,[clue],[[sense,kind,text,null,null,false,'medium']],sense==='hearing'?'quiet':'',[]]);
+  if(receipt==='probe')w.probeResults={[originalProbeKey]:{characterId:'owner',status:'missed',observations:[],reason:'主動查探沒有取得新線索',opportunity,resolution:result,factors}};
+  w.perceptionTrials={[opportunity]:originalTrial};
+  await run(w,async s=>{let rolls=0;Math.random=()=>{rolls++;return .975;};s.choose({type:'observe',target:'cafe-storeroom',content:sense});const saved=await s.advance();assert.equal(rolls,0,sense+' '+receipt+' must reuse original-version result');assert.equal(saved.characters[0].observations.length,0);assert.deepEqual(saved.perceptionTrials[opportunity],originalTrial);const observed=saved.events.findLast(e=>e.kind==='observe').perception[0];assert.equal(observed.resolution.roll,2);assert.equal(observed.status,'missed');});
+ }
+});
+
+test('a 128-byte object identity commits an observation and appears in the next actual request without oversized memory identity',async()=>{
+ const w=scene(),objectId='x'.repeat(128);w.objects[0].id=objectId;assert.equal(Buffer.byteLength(objectId),128);
+ await run(w,async s=>{s.choose({type:'observe',target:'cafe-storeroom',content:'sight'});let saved=await s.advance();assert.deepEqual(saved.objects[0].knownTo,['owner']);const observation=saved.characters[0].observations.find(o=>o.objectId===objectId);assert.ok(observation);assert.ok(Buffer.byteLength(observation.id)<=128);assert.equal(saved.characters[0].shortTerm.find(m=>m.id===observation.id).source.object,objectId);s.choose(rest);await s.advance();assert.ok(s.inputs.at(-1).objects.some(o=>o.id===objectId));assert.match(JSON.stringify(s.messages.at(-1)),new RegExp(objectId));assert.equal(JSON.stringify(s.messages.at(-1)).includes('PRIVATE_STATE'),false);});
+});
