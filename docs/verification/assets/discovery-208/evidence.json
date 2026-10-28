@@ -58,8 +58,8 @@
     "pageErrors": []
   },
   "capacity": {
-    "maxNpcInputBytes": 9796,
+    "maxNpcInputBytes": 9739,
     "authorityBytes": 898,
-    "worldBytes": 17771
+    "worldBytes": 19523
   }
 }
