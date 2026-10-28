@@ -44,3 +44,11 @@
 本票17條 API 案例覆蓋以上完整路徑（含參數對照）；核心修正各有獨立red→green。承接 #208 已確認方法修正後，相關跨模組 **111/111** 通過（當時本票16條，另含方法4條、#206、#208、替代食物、world changes、sharing、verified obstacles）。最後有限來源優先排序反例 red→green 後，針對本票17條＋#206來源11條＋替代食物8條再驗 **36/36** 通過，0失敗／略過／取消。Typecheck、變更檔ESLint及diffcheck通過；完整全repo suite由 #210整合後統一執行，不將本票局部回歸稱作全repo測試。
 
 沒有新增SQL migration或無界canonical索引，來源≤512、規則≤32及既有感知／記憶／預算上限保持；新scope有版本且舊資料不補造，取消／原子性／回退見[工程契約](../design/routine-discovery.md)。同次世界裁定仍可能語義誤判普通／特殊範圍；本票不藉固定物品白名單取代它。固定回覆證明程式能力，不證明真實NPC已會自主接手需求；跨角色多輪閉環交由 #210、真實自主性交由 #211。未合併main、部署、推進或重置正式世界，未改／關閉 #205。
+
+## 整合 Spec 審查修正：獨立單份與整體範圍
+
+API 反例先 red：查找已成立的普通食材背景後，加入 kind 同為 cooking-ingredient、僅一份且耗盡的奶酪來源，已知製餐竟未生成 meal。原因是合法原料 eligibility 被當成跨來源的整體限制。新增 optional、有版本的 finiteScope 明示 region／location coverage 與 subject；分類、名稱與單份數量不推定它。原有整體負例改明示真正範圍，不以改字修掉行為；來源自身及 finiteSourceBindings 約束保持。
+
+新增三條 API 案（本票共20條）：獨立單份四組對照（material/category、缺分類、label含食材且category食材、不同subject明示範圍）皆沿既存來源實際製餐，sequence 0→1，獨立耗盡來源仍0；SQLite重讀後，下一實際 request/messages 有 meal 身份。同場所儲藏室的 location-wide 未知限制阻止前廳普通來源使用，沒有新實物／消耗，私有 label 不進 NPC；真主持請求只有唯讀限制投影，遠端庫存與 label 不整包輸入。34個遠端限制保留32個、omitted=2、complete=false，與當地資料合計不超64KiB。未知版本／錯誤coverage／空subject均502並回復來源與實物，而非保存缺貨敘述。
+
+本票＋#206＋替代食物回歸39/39通過；主持投影最後修改後，跨區域／格式兩案另重驗2/2，並執行原 #208 discovery API 回歸13/13。最後來源／scope矩陣再驗7/7通過。有限來源先用完後，另有既存合法普通背景的下一輪仍可使用它，有限來源保持0；沒有把 historical finiteSourceBindings 變成對既存獨立來源的整體禁令。Typecheck、變更檔 ESLint、diffcheck通過。此修正沿既有資料與畫面，不新增UI；先前UI證據不冒稱包含新finiteScope矩陣。固定回覆仍只證明程式流程，真實自主性另由 #211判定。
