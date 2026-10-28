@@ -30,7 +30,7 @@ test('the actual schema prompt parser and receipt expose the same bounded new st
   const raw=JSON.stringify(reply),before=await s.read(),parsed=load('adjudication-contract').parseAdjudicationCandidate(raw);
   assert.equal(parsed.candidate.effects[0].kind,'change-state');const afterParse=await s.read();before.aiUsage.windowStartedAt=afterParse.aiUsage.windowStartedAt;assert.deepEqual(afterParse,before);
   const r=await s.post({operation:'advance',minutes:15}),body=await r.json();assert.equal(r.status,200,body.error);
-  const {input,request}=s.inputs.find(item=>item.input.contractVersion==='world-adjudication.v1');assert.match(input.effectRules.join(' '),/change-state version=1/);assert.equal(input.effectContractVersion,'world-effects.v4');
+  const {input,request}=s.inputs.find(item=>item.input.contractVersion==='world-adjudication.v1');assert.match(input.effectRules.join(' '),/change-state version=1/);assert.equal(input.effectContractVersion,'world-effects.v5');
   const schema=request.response_format.json_schema.schema.$defs.effect.anyOf.find(item=>item.properties.kind.const==='change-state');assert.equal(schema.properties.changes.maxItems,4);assert.deepEqual(schema.properties.access.enum,['authorized','physical']);
   const e=body.operationEvidence;assert.deepEqual(e.dispatches[1].candidate.value,reply);assert.ok(e.result.objects[0].stateEntries.some(item=>item.key==='surface'&&item.value==='茶漬'));assert.deepEqual(e.result.beforeObjects[0].stateEntries,[{key:'contents',value:'empty'}]);assert.equal(e.truncated,false);assert.ok(Buffer.byteLength(JSON.stringify(e))<=65536);
   assert.doesNotMatch(body.world.characters[0].activity,/布料擦拭後|裁定理由/);
