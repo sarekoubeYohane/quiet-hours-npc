@@ -23,3 +23,7 @@
 discover 可放在正式完成／階段／結果分支。必要時間、未開始、完成、續做與中斷沿原生命週期。`effectReferenceIds`／`effectSupplyReferenceIds` 對 discover 收集兩類來源，用於完整驗證、分支選中來源、取消尚未執行 pending 資料及暫停引用；日常 symbolic schema／解析承接 objectIds／supplyIds 的 $role，拒絕歷史固定 ID。#209 再沿既有日常背景接通 pending 確認，沒有在本票預先核准。
 
 無 SQL migration。舊世界缺 supplyId／supply 欄位可讀，GET 不觸發模型、不補知情、不從 trace 復活遺忘。所有世界與角色知情沿整輪版本／租約／原子保存；較後角色失敗、技術錯誤或保存衝突不留下發現。新 JSON 寫入後回退須保留理解 v5 與新來源欄位的讀寫器，不丟欄位、不重置世界。
+
+## 普通背景查找（#209）
+
+供應角色可在查找活動內確認普通背景，正式 discover 階段才成立來源，再沿既有主觀感知取得知情；後續另由角色決定實際取得／準備。不更改供應所有權／使用許可，有限來源約束使用權威世界事實。optional scope、跨規則重用、取消及容量／舊世界政策見[工程契約](routine-discovery.md)。

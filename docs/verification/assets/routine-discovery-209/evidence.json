@@ -65,10 +65,10 @@
   },
   "capacity": {
     "maxNpcInputBytes": 9899,
-    "maxRequestBytes": 104436,
-    "maxAuthorityBytes": 799,
-    "worldBytes": 20605,
-    "suppliesBytes": 413,
+    "maxRequestBytes": 104976,
+    "maxAuthorityBytes": 858,
+    "worldBytes": 20664,
+    "suppliesBytes": 472,
     "memoryBytes": 3332,
     "receiptBytes": 3138
   }
