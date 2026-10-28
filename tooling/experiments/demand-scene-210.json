@@ -1,0 +1,424 @@
+{
+  "version": "demand-integration.v1",
+  "sha256": "16e774c4d5e688d5f71378bd6f95deb7b0a3eb2e3f2e96f17d1858144123e17d",
+  "world": {
+    "routinePlaces": [
+      {
+        "location": "cafe",
+        "purpose": "cafe",
+        "operators": [
+          "owner"
+        ],
+        "confirmedOperations": [
+          "food"
+        ]
+      }
+    ],
+    "minute": 1260,
+    "turn": 0,
+    "lastMode": "demo",
+    "characters": [
+      {
+        "id": "cass",
+        "intents": [],
+        "name": "Cass",
+        "color": "#eb9e79",
+        "location": "cafe",
+        "mood": "疲憊",
+        "personality": "努力保持冷靜；害怕被留下，但也想保有自己的選擇。",
+        "abilityTags": [
+          "不擅長髮飾設計"
+        ],
+        "goal": "先安頓自己，慢慢想清楚接下來的生活。",
+        "activity": "坐在客廳，捧著一杯溫水。",
+        "relationships": {
+          "vera": "在乎她，也需要幾天空間。",
+          "kris": "暫時借住；信任她務實的支持。"
+        },
+        "memories": [
+          {
+            "id": "legacy:cass:memory:0:1260",
+            "time": 1260,
+            "text": "與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。"
+          }
+        ],
+        "attentionConditions": [],
+        "observationCursor": 0,
+        "region": "cafe-front",
+        "observations": [],
+        "shortTerm": [
+          {
+            "id": "legacy:cass:memory:0:1260",
+            "characterId": "cass",
+            "version": 1,
+            "time": 1260,
+            "text": "與 Vera 約好暫時分開幾天。Kris 讓我先住下，接下來由我自己決定。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          }
+        ],
+        "longTerm": []
+      },
+      {
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "在吧台整理杯子。",
+        "relationships": {},
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          }
+        ],
+        "intents": [],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observationCursor": 0,
+        "region": "cafe-front",
+        "observations": [],
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "characterId": "owner",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          }
+        ],
+        "longTerm": []
+      }
+    ],
+    "events": [
+      {
+        "id": "opening",
+        "time": 1260,
+        "actor": "world",
+        "text": "雨已經停了。Cass 暫住在 Kris 家；Vera 留在自己的房間。今晚還沒有新的聯絡。",
+        "kind": "opening",
+        "audience": [
+          "cass",
+          "kris"
+        ]
+      }
+    ],
+    "perceptionTrials": {},
+    "probeResults": {},
+    "currentSensory": {
+      "presence": {
+        "cass": {
+          "region": "cafe-front",
+          "clue": "initial:cass:cafe-front"
+        },
+        "owner": {
+          "region": "cafe-front",
+          "clue": "initial:owner:cafe-front"
+        }
+      },
+      "activities": {}
+    },
+    "scene": {
+      "doors": {
+        "cafe-door": "closed"
+      },
+      "noise": {},
+      "occluded": []
+    },
+    "contextId": "demand-integration-v1",
+    "adjudication": {
+      "provider": "openai",
+      "model": "gpt-6-luna"
+    },
+    "supplies": [
+      {
+        "id": "old-finished-meal",
+        "label": "已耗盡的舊餐點",
+        "kind": "food",
+        "remaining": 0,
+        "initialState": {
+          "category": "既有成品"
+        },
+        "region": "cafe-front",
+        "owner": "owner",
+        "knownTo": [
+          "owner",
+          "cass"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "consumable": true,
+        "quantity": {
+          "amount": 1,
+          "unit": "item"
+        }
+      },
+      {
+        "id": "bread-stock",
+        "label": "另有一份合法麵包",
+        "kind": "food",
+        "remaining": 1,
+        "initialState": {
+          "material": "麵包"
+        },
+        "region": "cafe-front",
+        "owner": "owner",
+        "knownTo": [
+          "owner",
+          "cass"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "consumable": false,
+        "quantity": {
+          "amount": 1,
+          "unit": "item"
+        }
+      },
+      {
+        "id": "special-stock",
+        "label": "明確有限的珍稀香料",
+        "kind": "food",
+        "remaining": 0,
+        "initialState": {
+          "material": "珍稀香料"
+        },
+        "region": "cafe-front",
+        "owner": "owner",
+        "knownTo": [
+          "owner",
+          "cass"
+        ],
+        "allowedTo": [
+          "owner"
+        ],
+        "consumable": false,
+        "quantity": {
+          "amount": 1,
+          "unit": "item"
+        }
+      }
+    ],
+    "objects": [
+      {
+        "id": "old-finished-meal:1",
+        "source": "old-finished-meal",
+        "label": "已吃完的舊餐點",
+        "region": "cafe-front",
+        "holder": null,
+        "owner": "owner",
+        "revision": 2,
+        "state": {
+          "category": "既有成品"
+        },
+        "lifecycle": "consumed",
+        "kind": "food",
+        "knownTo": [
+          "owner",
+          "cass"
+        ],
+        "allowedTo": [
+          "owner",
+          "cass"
+        ],
+        "consumable": true,
+        "quantity": {
+          "amount": 0,
+          "unit": "item"
+        }
+      }
+    ],
+    "routineRules": [
+      {
+        "id": "known-meal-methods",
+        "version": 3,
+        "family": "cafe-service",
+        "origin": "cafe",
+        "knownTo": [
+          "owner"
+        ],
+        "operations": [
+          "food",
+          "prepare-bread-meal"
+        ],
+        "programs": [
+          {
+            "operation": "food",
+            "methods": [
+              {
+                "content": "準備一份簡餐",
+                "purpose": "用餐"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "raw",
+                "type": "supply",
+                "select": "local",
+                "kind": "cooking-ingredient",
+                "label": null,
+                "state": [],
+                "access": "authorized",
+                "link": null,
+                "background": {
+                  "label": "普通食材",
+                  "kind": "cooking-ingredient",
+                  "consumable": false,
+                  "quantity": {
+                    "amount": 1,
+                    "unit": "item"
+                  },
+                  "initialState": []
+                },
+                "quantity": null,
+                "sourceRole": "material",
+                "sourceSubject": "食材"
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$raw",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "$raw-object",
+                        "expectedRevision": 0,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "$product",
+                        "label": "一份簡餐",
+                        "kind": "meal",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": []
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          },
+          {
+            "operation": "prepare-bread-meal",
+            "methods": [
+              {
+                "content": "用現有麵包準備一份餐點",
+                "purpose": "準備餐點"
+              }
+            ],
+            "bindings": [
+              {
+                "role": "raw",
+                "type": "supply",
+                "select": "target",
+                "kind": "food",
+                "label": null,
+                "state": [],
+                "access": "authorized",
+                "link": null,
+                "background": null,
+                "quantity": null,
+                "sourceRole": "material",
+                "sourceSubject": "麵包"
+              }
+            ],
+            "effects": [],
+            "stages": [
+              {
+                "afterMinutes": 15,
+                "effects": [
+                  {
+                    "kind": "materialize",
+                    "supplyId": "$raw",
+                    "expectedRemaining": 0
+                  },
+                  {
+                    "kind": "form",
+                    "version": 1,
+                    "access": "authorized",
+                    "operation": "transform",
+                    "inputs": [
+                      {
+                        "objectId": "$raw-object",
+                        "expectedRevision": 0,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "item"
+                        },
+                        "disposition": "consumed"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "id": "$product",
+                        "label": "一份麵包餐",
+                        "kind": "meal",
+                        "consumable": true,
+                        "quantity": {
+                          "amount": 1,
+                          "unit": "serving"
+                        },
+                        "state": []
+                      }
+                    ],
+                    "reason": "取得的真實原料形成新的可追蹤產物。"
+                  }
+                ],
+                "preconditions": []
+              }
+            ],
+            "check": null,
+            "branches": null
+          }
+        ],
+        "worldTimings": [
+          {
+            "operation": "food",
+            "minutes": 15
+          },
+          {
+            "operation": "prepare-bread-meal",
+            "minutes": 15
+          }
+        ]
+      }
+    ]
+  }
+}
