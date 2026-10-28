@@ -1,0 +1,65 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "existingUiAdvances": 4,
+  "npc": 3,
+  "adjudication": 2,
+  "rolls": 1,
+  "steps": [
+    {
+      "minute": 1275,
+      "npc": 1,
+      "adjudication": 1,
+      "rolls": 0,
+      "knownTo": [],
+      "remaining": 2
+    },
+    {
+      "minute": 1290,
+      "npc": 1,
+      "adjudication": 1,
+      "rolls": 1,
+      "knownTo": [
+        "owner"
+      ],
+      "remaining": 2
+    },
+    {
+      "minute": 1305,
+      "npc": 2,
+      "adjudication": 2,
+      "rolls": 1,
+      "knownTo": [
+        "owner"
+      ],
+      "remaining": 1
+    },
+    {
+      "minute": 1320,
+      "npc": 3,
+      "adjudication": 2,
+      "rolls": 1,
+      "knownTo": [
+        "owner"
+      ],
+      "remaining": 1
+    }
+  ],
+  "checks": {
+    "actualWorldApp": true,
+    "sqliteReload": true,
+    "nextActualMessages": true,
+    "sourceUse": true,
+    "discoveryNotPossession": true,
+    "hiddenNeverInNpc": true,
+    "reloadZeroDispatch": true,
+    "replayZeroDispatch": true,
+    "mobileNoOverflow": true,
+    "pageErrors": []
+  },
+  "capacity": {
+    "maxNpcInputBytes": 9796,
+    "authorityBytes": 898,
+    "worldBytes": 17771
+  }
+}

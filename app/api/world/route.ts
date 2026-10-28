@@ -460,7 +460,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-              const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
+              const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c,decision.action),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
               const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});

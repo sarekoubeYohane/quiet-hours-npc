@@ -4,7 +4,7 @@ import { validateCognition, projectRelationships, relationshipsProjection, type 
 import type { Character } from './world';
 import type { Observation } from './perception';
 
-export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; object?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
+export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; object?: string; supply?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
 export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; consumed?: boolean; controlled?: boolean };
 export type MemoryRef = { id: string; version: number };
 export type RememberedSource = MemoryRef & { source: MemorySource };
@@ -25,7 +25,7 @@ function validRefs(value: unknown): value is MemoryRef[] {
   return Array.isArray(value) && value.length <= 8 && value.every(validRef) && new Set(value.map(item => `${item.id}:${item.version}`)).size === value.length;
 }
 function observationSource(observation: Observation): MemorySource {
-  return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.objectId ? { object: observation.objectId } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
+  return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.objectId ? { object: observation.objectId } : {}), ...(observation.supplyId ? { supply: observation.supplyId } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
 }
 function validateShort(item: ShortMemory) {
   if (textBytes(item.text) > 4096) throw new MemoryValidationError('短期經歷超過 4096 bytes；保留原資料，未截斷文字。');
@@ -134,7 +134,7 @@ export function memoryProjection(c: Character) {
   return (c.shortTerm || []).map(({ id, version, time, text, source, controlled }) => ({ id, version, time, text, source, ...(controlled ? { controlled: true } : {}) }));
 }
 function sourceProjection(source: MemorySource): MemorySource {
-  return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.object ? { object: source.object } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
+  return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.object ? { object: source.object } : {}), ...(source.supply ? { supply: source.supply } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
 }
 function rememberedSources(item: LongMemory): RememberedSource[] {
   return item.rememberedSources ?? [{ id: item.id, version: item.version, source: item.source }];
@@ -312,12 +312,12 @@ export function validateMemoryState(c: Character) {
   validateCognition(c);
   validatePreferences(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
-  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'object', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.object === undefined || boundedId(source.object)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
+  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'object', 'supply', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.object === undefined || boundedId(source.object)) && (source.supply === undefined || boundedId(source.supply)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   const shortIds = new Set<string>();
   for (const item of c.shortTerm || []) {
     if (shortIds.has(item.id)) throw new MemoryValidationError('短期記憶身份重複');
     shortIds.add(item.id);
-    if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.objectId !== item.source.object || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
+    if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.objectId !== item.source.object || item.observation.supplyId !== item.source.supply || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
     if (!boundedId(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || (item.eventId && !boundedId(item.eventId))) throw new MemoryValidationError('短期記憶身份或來源無效');
     validateShort(item);
   }

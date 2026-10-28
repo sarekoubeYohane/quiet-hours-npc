@@ -167,7 +167,7 @@ test('failure input projects static contract fields and truncates large dynamic 
   try {
     const response = await post(advance), body = await response.json(); assert.equal(response.status, 502);
     const receipt = body.adjudicationFailure, input = JSON.parse(receipt.input);
-    assert.equal(input.contractVersion, 'world-adjudication.v1'); assert.equal(input.effectContractVersion, 'world-effects.v4');
+    assert.equal(input.contractVersion, 'world-adjudication.v1'); assert.equal(input.effectContractVersion, 'world-effects.v5');
     assert.deepEqual(input.inputProjection, { version: 1, omittedStaticFields: ['rules', 'effectRules', 'effectContract'] });
     assert.equal(input.effectContract, undefined); assert.equal(input.actor.id, 'owner');
     assert.equal(input.objects.find(object => object.id === 'acceptance-cup').revision, 1);

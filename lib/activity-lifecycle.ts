@@ -1,9 +1,9 @@
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
 import { invalidateNaturalChanges } from './natural-changes';
-import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, EffectValidationError, type Effect } from './world-effects';
+import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, effectSupplyReferenceIds, EffectValidationError } from './world-effects';
 import { record, resolve, type Character, type World } from './world';
-import { regionOf } from './perception';
+import { regionOf, PerceptionCapacityError } from './perception';
 import type { ActivityDecision } from './activities';
 
 // This module mutates only the current round candidate. Model dispatch, NPC
@@ -30,7 +30,7 @@ function expireOpenPeriod(world:World,character:Character):boolean {
 export function cancelActivity(w:World,c:Character):void {
  const phases=c.plan?.phases;
  if(phases&&w.supplies){
-  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).filter((effect):effect is Extract<Effect,{kind:'materialize'}>=>effect.kind==='materialize').map(effect=>effect.supplyId));
+  const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).flatMap(effectSupplyReferenceIds));
   discardPendingSupplies(w,pending);
  }
  delete c.plan;
@@ -45,7 +45,8 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=throughMinute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
   let results:string[];
-  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch{
+  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
+   if(error instanceof PerceptionCapacityError)throw error;
    recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
   }
   phases.cursor++;
