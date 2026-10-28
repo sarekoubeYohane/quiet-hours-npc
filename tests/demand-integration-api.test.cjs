@@ -124,3 +124,10 @@ test('hidden authority changes do not alter the next actual known-context reques
  }
  assert.deepEqual(inputs[0],inputs[1]);console.log('DEMAND_210_CAPACITY '+JSON.stringify({fixture:true,measurements:capacity}));
 });
+
+test('an unrelated finite exhausted ingredient of the same kind cannot veto the composed ordinary pantry source',async()=>{
+ const checkpoint=await checkpointBeforeGrant(),sourceId=checkpoint.supplies.find(source=>source.background).id,priorMeals=checkpoint.objects.filter(object=>object.kind==='meal').length;
+ const s=await scenario({checkpoint,prepare:w=>{w.supplies.push({id:'one-independent-ingredient',label:'獨立的一份奶酪',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:['owner'],allowedTo:['owner'],remaining:0,initialState:{material:'奶酪',category:'乳製品'},consumable:false,quantity:{amount:1,unit:'item'}});}});try{
+  const result=await step(s,'prepare');assert.equal(result.world.objects.filter(object=>object.kind==='meal').length,priorMeals+1);assert.equal(result.world.supplies.find(source=>source.id===sourceId).background.sequence,2);assert.equal(result.world.supplies.find(source=>source.id==='one-independent-ingredient').remaining,0);assert.equal(result.world.supplies.find(source=>source.id==='old-finished-meal').remaining,0);assert.equal(result.world.objects.find(object=>object.id==='old-finished-meal:1').lifecycle,'consumed');assert.equal(result.world.supplies.filter(source=>source.background).length,1);assert.equal(s.transport.counts().judgments,0);
+ }finally{s.restore();}
+});
