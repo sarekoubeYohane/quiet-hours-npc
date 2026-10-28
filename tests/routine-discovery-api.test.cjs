@@ -125,3 +125,10 @@ test('an applicable finite restriction blocks established ordinary use equally b
   }finally{s.restore();}
  }
 });
+
+test('a known ordinary preparation cannot bypass another owner by replacing a source whose true state extends the method background',async()=>{
+ const program=f.cafePrograms().find(item=>item.operation==='food');assert.deepEqual(program.bindings[0].background.initialState,[]);
+ const s=await scenario({actorId:'cass',prepare:w=>{initial(w);w.routinePlaces[0].operators.push('cass');w.routineRules=[{id:'cass-known-food',version:3,family:'cafe-service',origin:'cafe',knownTo:['cass'],operations:['food'],programs:[program],worldTimings:[{operation:'food',minutes:15}]}];w.supplies=[{id:'shared-source',label:'已確認普通食材',kind:'cooking-ingredient',region:'cafe-front',owner:'owner',knownTo:['cass'],allowedTo:['owner'],remaining:1,initialState:{category:'食材'},stateExposure:{category:'public'},consumable:false,quantity:{amount:1,unit:'item'},background:{ruleId:'prior-confirmation',sequence:3,scope:{version:1,role:'material',subject:'食材'}}}];}});try{
+  s.choose(propose(program.methods[0].content,program.methods[0].purpose));s.reply(f.approval([program],'food'));const w=await advance(s);assert.equal(w.supplies.length,1);assert.equal(w.supplies[0].id,'shared-source');assert.equal(w.supplies[0].owner,'owner');assert.deepEqual(w.supplies[0].allowedTo,['owner']);assert.deepEqual(w.supplies[0].initialState,{category:'食材'});assert.equal(w.supplies[0].background.sequence,3);assert.equal(nonPhoneObjects(w).length,0);assert.equal(s.judgments(),0);
+ }finally{s.restore();}
+});

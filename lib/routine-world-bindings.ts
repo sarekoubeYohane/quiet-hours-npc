@@ -1,4 +1,4 @@
-import { routineMaterialSourceMatches, type RoutineSourceQualification } from './routine-materials';
+import { routineMaterialSourceMatches, routineOrdinarySourceMatches, type RoutineSourceQualification } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
 import { regionOf, canSee } from './perception';
 import { hasObjectPermission, type Effect, type SceneSupply, type WorldObject } from './world-effects';
@@ -85,10 +85,9 @@ export function canConfirmRoutineBackground(world:World,actor:Character,scope:Ro
 }
 export function canContactRoutineBackground(world:World,actor:Character,scope:RoutineSourceScope|undefined,id:string):boolean {
  const context=routineBackgroundContext(world,actor,scope,id);if(!context)return false;
- const {binding,source}=context,confirmedScope=source.background!.scope;
+ const {binding,source}=context;
  return !source.pending&&source.remaining>0&&(source.availableAt===undefined||source.availableAt<=world.minute)&&hasObjectPermission(source,actor.id)&&source.allowedTo.includes(actor.id)&&
-  (!binding.kind||source.kind===binding.kind)&&routineMaterialSourceMatches(source,binding)&&
-  (!confirmedScope||confirmedScope.version===1&&confirmedScope.role===binding.sourceRole&&confirmedScope.subject===binding.sourceSubject)&&!finiteBackgroundConflict(world,actor,binding);
+  routineOrdinarySourceMatches(source,binding)&&!finiteBackgroundConflict(world,actor,binding);
 }
 
 // The same applicable finite source constrains both known and unknown ordinary

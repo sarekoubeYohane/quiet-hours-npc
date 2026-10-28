@@ -1,5 +1,5 @@
 import { confirmsBodyConsequences } from './needs';
-import { routineMaterialSourceMatches } from './routine-materials';
+import { routineMaterialSourceMatches, routineOrdinarySourceMatches } from './routine-materials';
 import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
 import { regionOf, canSee, regions } from './perception';
 import { worldTargetSnapshot } from './world-state';
@@ -14,7 +14,6 @@ function audit(w:World,c:Character,rule:RoutineRule,result:'approved'|'reused'|'
  w.routineAudit=[...(w.routineAudit||[]),{turn:w.turn,actorId:c.id,location:c.location,ruleId:rule.id,result,...(reason?{reason}:{})}].slice(-64);
 }
 const stateMatches=(state:Record<string,string>,binding:RoutineBinding)=>binding.state.every(({key,value})=>(Object.hasOwn(state,key)?state[key]:null)===value);
-const sameEntries=(left:Record<string,string>,right:Record<string,string>)=>Object.keys(left).length===Object.keys(right).length&&Object.entries(left).every(([key,value])=>right[key]===value);
 class RoutineUnavailable extends Error {}
 function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram,rule:RoutineRule,observe?:RoutineSelectionObserver,confirming=false):Map<string,string>|undefined {
  const refs=new Map<string,string>([['actor',c.id],['here',regionOf(c)]]);
@@ -51,15 +50,15 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
   report(binding,{check:'background-substitution',finite:!!finite,concrete,allowed:!finite&&!concrete});
   if(finite||concrete)throw new RoutineUnavailable('已知具體材料或器具已耗盡、損毀、移走或無法操作；日常背景不會補回。');
   const initialState=Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),exposure=Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure]));
-  // Canonical source semantics survive new method wording and display labels.
-  // Legacy rows retain their original rule/label scope without backfilling it.
-  const canonical=(w.supplies||[]).filter(source=>source.region===regionOf(c)&&source.kind===bg.kind&&
-   (source.background?.scope?source.background.scope.version===1&&source.background.scope.role===binding.sourceRole&&source.background.scope.subject===binding.sourceSubject&&source.consumable===bg.consumable&&source.quantity?.amount===bg.quantity.amount&&source.quantity.unit===bg.quantity.unit&&sameEntries(source.initialState,initialState)&&sameEntries(source.stateExposure||{},exposure):source.background?.ruleId===rule.id&&source.label===bg.label));
-  let supply=canonical.find(source=>hasObjectPermission(source,c.id))||canonical[0];
+  // Existing confirmed scope is authoritative; a method's empty prospective
+  // background state cannot erase extra actual state or another owner's rights.
+  const canonical=(w.supplies||[]).filter(source=>source.region===regionOf(c)&&source.kind===bg.kind&&routineOrdinarySourceMatches(source,binding));
+  let supply=canonical.find(source=>hasObjectPermission(source,c.id)&&stateMatches(source.initialState,binding))||canonical.find(source=>stateMatches(source.initialState,binding));
+  if(canonical.length&&!supply)throw new RoutineUnavailable('既有普通來源不符合本次方法的必要條件，不能以背景修復或替換。');
   if(supply&&!discovering&&!hasObjectPermission(supply,c.id))throw new RoutineUnavailable('既有普通來源的使用條件不成立，不能另建替代供應。');
   if(!supply){
    if((w.supplies?.length||0)>=512)throw Error('日常供應已達容量。');
-   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState:Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),stateExposure:Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure])),region:regionOf(c),remaining:1,owner:c.id,knownTo:discovering?[]:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0,scope:{version:1,role:binding.sourceRole!,subject:binding.sourceSubject}}};
+   supply={id:`supply:${crypto.randomUUID()}`,label:bg.label,kind:bg.kind,consumable:bg.consumable,quantity:structuredClone(bg.quantity),initialState,stateExposure:exposure,region:regionOf(c),remaining:1,owner:c.id,knownTo:discovering?[]:[c.id],allowedTo:[c.id],pending:true,background:{ruleId:rule.id,sequence:0,scope:{version:1,role:binding.sourceRole!,subject:binding.sourceSubject}}};
    (w.supplies??=[]).push(supply);
   }
   return supply;
@@ -98,7 +97,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
    }report(binding,{check:'bound',id:actor.id});rememberSource(binding,actor.id);refs.set(binding.role,actor.id);
   }else{
    let supply=w.supplies?.find(supply=>{
-    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)||canContactRoutineBackground(w,c,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]},supply.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
+    const checks:{name:string;run:()=>boolean}[]=[{name:'pending',run:()=>!supply.pending},{name:'remaining',run:()=>supply.remaining>0},{name:'location',run:()=>supply.region===regionOf(c)},{name:'known',run:()=>supply.knownTo.includes(c.id)||canContactRoutineBackground(w,c,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]},supply.id)},{name:'permission',run:()=>binding.access==='physical'||hasObjectPermission(supply,c.id)},{name:'target',run:()=>binding.select!=='target'||supply.id===action.target},{name:'kind',run:()=>!binding.kind||supply.kind===binding.kind},{name:'label',run:()=>!binding.label||supply.label.includes(binding.label)},{name:'material',run:()=>routineMaterialSourceMatches(supply,binding)},{name:'ordinary-scope',run:()=>!supply.background||routineOrdinarySourceMatches(supply,binding)},{name:'state',run:()=>stateMatches(supply.initialState,binding)}];
     for(const check of checks){const passed=check.run();report(binding,{check:check.name,id:supply.id,passed});if(!passed)return false;}return true;
    });
    if(supply?.background&&routineBackgroundHasFiniteConflict(w,c,supply,{ruleId:rule.id,operation:program.operation,refs:[{role:binding.role,id:supply.id}]}))throw new RoutineUnavailable('普通來源受到當前適用的有限約束，不能繼續使用。');

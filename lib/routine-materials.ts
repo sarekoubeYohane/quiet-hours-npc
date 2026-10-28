@@ -31,3 +31,9 @@ export function routineMaterialSourceMatches(source:WorldObject|SceneSupply,bind
  const kind=binding.background?.kind??binding.kind;
  return source.kind==='food'||kind==='food'||!kind?subject:source.kind===kind||source.kind===binding.kind;
 }
+
+export function routineOrdinarySourceMatches(source:SceneSupply,binding:RoutineSourceQualification):boolean {
+ const scope=source.background?.scope;
+ return !!source.background&&(!binding.kind||source.kind===binding.kind)&&routineMaterialSourceMatches(source,binding)&&
+  (!scope||scope.version===1&&scope.role===binding.sourceRole&&scope.subject===binding.sourceSubject);
+}
