@@ -95,8 +95,11 @@ export async function enterAcceptanceScene(previous: World): Promise<World> {
     character.memoryTrace = []; character.observations = []; character.observationCursor = 0;
     character.activity = '在咖啡館前台，看看今天想做什麼。';
   }
-  world.characters.find(c => c.id === 'cass')!.intents = [{ id: 'acceptance-food', content: '吃點東西，照顧自己的肚子', intensity: 'high', importance: 'high', urgency: 'medium', context: '前台有一份已獲准給我的驗收餐點；是否現在吃由我決定。' }];
-  world.characters.find(c => c.id === 'vera')!.intents = [{ id: 'acceptance-tea', content: '泡一杯茶，享受一點自己的時間', intensity: 'medium', importance: 'medium', urgency: 'low', context: '前台有熱水、茶包與茶具可用；杯子屬於店主，使用前要先徵得同意。' }];
+  // This pre-existing demonstration scene has explicit synthetic pursuits. They
+  // are native v3 nodes alongside seed directions, never L1-L5 preregistration.
+  const cass=world.characters.find(c=>c.id==='cass')!,vera=world.characters.find(c=>c.id==='vera')!;
+  cass.intents!.push({id:'cass:acceptance-food',content:'吃點東西，照顧自己的肚子',intensity:'high',importance:'high',urgency:'medium',context:'前台有一份已獲准給我的驗收餐點；是否現在吃由我決定。',version:1,kind:'intent',scope:'選擇是否取得並吃這份餐點',satisfaction:'本人覺得這次已吃足夠',parents:[{id:'cass:direction',version:1}],references:[],status:'active',reason:'既有日常驗收場景的合成起點'});
+  vera.intents!.push({id:'vera:acceptance-tea',content:'泡一杯茶，享受一點自己的時間',intensity:'medium',importance:'medium',urgency:'low',context:'前台有熱水、茶包與茶具可用；杯子屬於店主，使用前要先徵得同意。',version:1,kind:'intent',scope:'自己選擇是否徵求借杯並泡茶',satisfaction:'本人認為這次已享受到泡茶的時間',parents:[{id:'vera:direction',version:1}],references:[],status:'active',reason:'既有日常驗收場景的合成起點'});
   const people = world.characters.map(c => c.id);
   world.supplies = [{ id: 'acceptance-meal', label: '驗收餐點', region: 'cafe-front', remaining: 1, owner: 'owner', knownTo: people, allowedTo: ['cass'], kind: 'food', initialState: {} }];
   world.objects = [

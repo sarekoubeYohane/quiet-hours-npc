@@ -1,3 +1,4 @@
+import { pursuitLimits } from './pursuits';
 import { boundPhoneNotifications } from './phone-notifications';
 import type { Character, World } from './world';
 import { perception } from './world';
@@ -12,8 +13,9 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
  const resumable=canResumeActivity(w,c,modelKey);
  const perceived=perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined});
  perceived.self.cognition=cognitionForDecision(c,perceived.contacts,perceived.visiblePeople);
+ const self=Object.assign(perceived.self,{pursuitCapacity:{nodes:pursuitLimits.nodes,remaining:pursuitLimits.nodes-(c.intents?.length||0),omitted:0},focusIntentId:c.focusIntentId??null});
  perceived.self.relationships=relationshipsProjection(perceived.self.cognition.relationshipTags);
- const input=budgetMemoryInput({contractVersion:'npc-decision.v2',...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
+ const input=budgetMemoryInput({contractVersion:'npc-decision.v3',pursuitContext:w.pursuitContext,...perceived,self,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
  return finalizeDecisionInput(w,c,input);
 }
 
