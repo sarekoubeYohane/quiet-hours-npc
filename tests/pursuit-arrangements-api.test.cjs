@@ -97,3 +97,34 @@ test('takeover suspends linked opportunities and return offers one known normal 
  const initial=await setup();let stage=0;
  await transport(input=>{const v=decision(input);if(stage===0){accept(input,v);v.arrangementUpdates=[arrangement(input,initial.minute+30)];}else {assert.equal(input.self.arrangementCues.length,1);existing(input,v);}return v;},async frames=>{assert.equal((await advance()).status,200);stage=1;await post({operation:'takeover'});for(let i=0;i<3;i++)assert.equal((await advance()).status,200);assert.equal(frames.length,1);const waiting=(await read()).characters[0];assert.equal(waiting.arrangements.items[0].cue,undefined);await read();assert.equal(frames.length,1);await post({operation:'return-control'});assert.equal((await advance()).status,200);assert.equal(frames.length,2);assert.equal((await read()).characters[0].arrangements.items[0].status,'active');});
 });
+
+test('explicit waiting and deferred assessments retain the same pursuit while a linked opportunity remains optional',async()=>{
+ const initial=await setup();let stage=0;
+ await transport(input=>{const v=decision(input);if(stage===0){accept(input,v);v.arrangementUpdates=[arrangement(input,initial.minute+30)];}
+  else {const p=input.self.intents.find(n=>n.id==='owner:tea');if(stage===1){assert.equal(input.self.arrangementCues.length,1);v.pursuitUpdates=[{operation:'assess',id:p.id,version:p.version,node:{status:'active',progress:'waiting',basis:{kind:'subjective',text:'我還想做，只是先等一等'}},references:[],reason:'目前仍願意等待'}];}
+   else {assert.equal(p.progress,'waiting');v.pursuitUpdates=[{operation:'assess',id:p.id,version:p.version,node:{status:'active',progress:'deferred',basis:{kind:'subjective',text:'沒有可靠新條件，先留待日後正常決策'}},references:[],reason:'我現在想先做別的事'}];}
+  }return v;
+ },async frames=>{assert.equal((await advance()).status,200);stage=1;assert.equal((await advance()).status,200);const waiting=(await read()).characters[0];assert.equal(waiting.intents.find(n=>n.id==='owner:tea').progress,'waiting');assert.equal(waiting.arrangements.items[0].status,'active');stage=2;assert.equal((await advance()).status,200);const deferred=(await read()).characters[0];assert.equal(deferred.intents.find(n=>n.id==='owner:tea').progress,'deferred');assert.equal(deferred.intents.find(n=>n.id==='owner:tea').id,waiting.intents.find(n=>n.id==='owner:tea').id);assert.equal(frames.length,3);});
+});
+
+test('completing an arrangement is independent of whether its linked pursuit is satisfied',async()=>{
+ const initial=await setup();let stage=0;
+ await transport(input=>{const v=decision(input);if(stage===0){accept(input,v);v.arrangementUpdates=[arrangement(input,initial.minute+30)];}
+  else {const saved=input.self.arrangements.items[0];v.arrangementUpdates=[{...arrangement(input,saved.condition.minute,saved.id,saved.pursuit),version:saved.version,operation:'complete',text:saved.text,reason:'這次已重新考慮，安排可完成，但追求仍在'}];existing(input,v);v.durationMinutes=120;}
+  return v;
+ },async frames=>{assert.equal((await advance()).status,200);stage=1;assert.equal((await advance()).status,200);const saved=(await read()).characters[0];assert.equal(saved.arrangements.items[0].status,'completed');assert.equal(saved.intents.find(i=>i.id==='owner:tea').status,'active');assert.equal((await advance()).status,200);assert.equal(frames.length,2);});
+});
+
+test('a known contextual opportunity uses the existing matcher once and never requires a model per pursuit level',async()=>{
+ await setup();let stage=0;
+ await transport(input=>{const v=decision(input);if(stage===0){accept(input,v);v.durationMinutes=120;v.arrangementUpdates=[{...arrangement(input,0),condition:{kind:'context',region:input.self.region}}];}
+  else {assert.equal(input.self.arrangementCues.length,1);continuing(input,v);}return v;
+ },async frames=>{assert.equal((await advance()).status,200);stage=1;assert.equal((await advance()).status,200);assert.equal((await advance()).status,200);assert.equal(frames.length,2);});
+});
+
+test('real confirmed sleep is not awakened by a linked time arrangement and does not add reconsideration dispatches',async()=>{
+ const initial=await setup(),c=initial.characters[0];c.needs={version:1,activatedAt:initial.minute,updatedAt:initial.minute,values:{hunger:20,thirst:20,fatigue:70,sleep:80},assessed:{hunger:0,thirst:0,fatigue:2,sleep:2},history:[],dropped:0};store.install(initial);await post({operation:'set-model-key',key:'fixture-key'});
+ await transport(input=>{if(input.contractVersion==='world-adjudication.v1')return {status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:480,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}};
+  const v=decision(input);accept(input,v);v.action={type:'propose',target:'cafe',content:'在角落睡一覺',purpose:'恢復睡眠'};v.methodAssessment.selectedAction={type:'propose',target:'cafe'};v.timeIntent={kind:'completion',maxMinutes:null};v.arrangementUpdates=[arrangement(input,initial.minute+30)];return v;
+ },async frames=>{for(let i=0;i<5;i++){const response=await advance();assert.equal(response.status,200,await response.clone().text());}const saved=(await read()).characters[0];assert.equal(saved.plan.bodyActivity.kind,'sleep');assert.equal(saved.arrangements.items[0].cue,undefined);assert.equal(saved.arrangements.items[0].status,'active');assert.equal(frames.filter(input=>input.contractVersion==='npc-decision.v3').length,1);assert.equal(frames.filter(input=>input.contractVersion==='world-adjudication.v1').length,1);});
+});

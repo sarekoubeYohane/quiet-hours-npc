@@ -1,0 +1,12 @@
+{
+  "result": "PASS",
+  "realPaidDispatches": 0,
+  "fixtureNpcDispatches": 3,
+  "sqliteReload": true,
+  "nextActualRequest": true,
+  "linkedVersion": 1,
+  "currentVersion": 2,
+  "progress": "deferred",
+  "unchangedActivity": true,
+  "handledCueNotRearmed": true
+}

@@ -30,4 +30,14 @@ Character.arrangements 的 schemaVersion=1；最多16筆、24 KiB（含完成／
 
 同次最多展示4個 cue，共用一次正常決策；self.arrangementCueGap 明示尚未展示數量，未展示項目不標已處理。這是工程輸入界線，不是重要性排序；保留記錄順序，意圖仍由角色自排。有效安排 core 保持24 KiB；每個 cue 保留至多1 KiB，合計狀態40 KiB，並繼續計入原208 KiB角色記憶總量。此預留避免合法安排接近容量後，僅到期增加必要游標便阻塞後續正常決策。
 
+## #226：追求關聯不代替安排知情
+
+`arrangementUpdates.pursuit` 為 null（獨立安排）或 `{id,version}`。upsert 連到本人的當次有效追求版本，新同批建立使用版本 0；引擎在同一候選驗證完成後保存最終端點版本。舊未帶欄位的獨立安排保持原義，不回填追求。新版 strict schema 明示此 nullable 欄位；舊測試 fixture 的相容轉寫只留在測試作者層，不成為新意願或自動待辦。
+
+保存的 `pursuit.version` 是最後一次明示連結時的版本，不是持續更新的端點鎖。實際可知安排投影的 `pursuitState` 另呈現 active／ended／missing 及 currentVersion。只有 active 的連結會提供追求再考慮 cue，無關 assess／reorder 升版不刷新條件；已結束／缺失不復活，也不自動 complete／drop 另一套安排。keep／complete／drop／archive 必須保留原關聯，失效仍有合法結束／整理路徑；upsert 可以 null 明示解開關聯。更新版號、本人與有效端點驗證沿當次真正輸入及原整輪提交，沒有新增呼叫。
+
+完整安排經歷仍須包含原安排與關聯身份，才能從記憶展示正文；追求節點不保存安排原文或永久提醒索引。已忘安排正文時，仍有效追求及服務端關聯 ID 不會使其回到提示、Embedding 或 cue。未知文字條件只作主觀背景，不能藉此訂閱隱藏生理真值。手機精確正文仍必須真正 list／read，關聯不改原閱讀邊界。
+
+receipt 另核對同一關聯身份，避免在同輪轉接安排後，把原追求已展示的機會算到另一個新追求。原條件語義鍵、觀察序號與 gap 沿用：同條件／改措辭／無關版本／continue 不重喚起；明示延期改條件或實際可知條件變化才可有新機會。睡眠、接管及未展示項目不提前消耗。驗證見[#226](../verification/pursuit-arrangements-226.md)。
+
 手機記錄引用與安排提示沿共同88 KiB輸入包絡：先依實際展示記憶重建手機handles，再將可選引用／cue納入有界輸入，明示 phoneReferenceGap／arrangementCueGap；裝置身份及列表操作仍可用。省略引用不能修改或標已讀，即使服務端保有來源。回想完成後重建同一投影及範圍，不新增回想輪數。初次未展示、回想才取得的 cue 由最終實際派送receipt隨故事提交，不能提前消耗。
