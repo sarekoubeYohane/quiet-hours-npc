@@ -17,7 +17,7 @@ function clock(){
  },restore(){Date.now=now;AbortSignal.timeout=timeout;}};
 }
 const envelope=(body,_fixtureInput)=>JSON.stringify({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(_fixtureInput,body))}}]});
-function actors(w,count=4){const first=w.characters[0];w.characters=Array.from({length:count},(_,i)=>({...structuredClone(first),id:i?'actor-'+i:'owner',name:'Synthetic '+i,shortTerm:[],longTerm:[],memories:[],memoryTrace:[],observations:[],control:{mode:'autonomous'}}));w.playerBudget={calls:null,tokens:null};}
+function actors(w,count=4){const first=w.characters[0];w.characters=Array.from({length:count},(_,i)=>({...structuredClone(first),id:i?'actor-'+i:'owner',intents:first.intents.map(node=>({...node,id:(i?'actor-'+i:'owner')+':direction'})),name:'Synthetic '+i,shortTerm:[],longTerm:[],memories:[],memoryTrace:[],observations:[],control:{mode:'autonomous'}}));w.playerBudget={calls:null,tokens:null};}
 async function replay(s,operation,response,body,sent){
  const before=sent();const again=await s.post(operation);assert.equal(again.status,response.status);assert.deepEqual(await again.json(),body);assert.equal(sent(),before,'same ID is never a second dispatch');
  const saved=await query(operation.operationId);assert.equal(saved.operation.state,body.operationUncertain?'uncertain':'settled');return saved;
@@ -46,7 +46,7 @@ for(const config of [
   assert.equal(response.status,200,body.error);assert.equal(sent,config.recall?12:8);assert.equal(embedding,config.recall?4:0);assert.equal(searches,config.recall?4:0);
   store.onNextTraceWrite(()=>{});store.onStorage(undefined);const saved=await replay(s,operation,response,body,()=>sent);
   assert.equal(saved.world.turn,before.turn+1);assert.equal(saved.world.minute,before.minute+15);assert.equal(saved.world.aiUsage.totalCalls,sent);assert.equal(saved.world.aiUsage.totalInputTokens,sent*30);assert.equal(saved.world.aiUsage.totalUnknownCalls,0);
-  for(const actor of saved.world.characters){assert.equal(actor.intents[0].id,'purpose');assert.ok(actor.shortTerm.length>0,'normal denied result is persisted as feedback');}
+  for(const actor of saved.world.characters){assert.ok(actor.intents.some(node=>node.id===actor.id+':purpose'));assert.ok(actor.shortTerm.length>0,'normal denied result is persisted as feedback');}
   const trace=saved.decisionTrace;assert.equal(trace.outcome,'committed');assert.equal(trace.dispatches.length,sent);
   const timing=trace.steps.find(x=>x.kind==='time-policy').data;
   assert.equal(timing.workDeadline-timing.leaseCreatedAt,400000);assert.equal(timing.leaseDeadline-timing.leaseCreatedAt,430000);assert.equal(timing.clientMs,445000);
