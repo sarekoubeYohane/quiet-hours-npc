@@ -14,11 +14,22 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
  perceived.self.cognition=cognitionForDecision(c,perceived.contacts,perceived.visiblePeople);
  perceived.self.relationships=relationshipsProjection(perceived.self.cognition.relationshipTags);
  const input=budgetMemoryInput({contractVersion:'npc-decision.v2',...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
- const phoneReferenceGap=boundPhoneInput(w,c,input);
- const allCues=arrangementCuesForDecision(w,c,input),arrangementCues=allCues.slice(0,4);
- while(arrangementCues.length&&memoryBytes({input,arrangementCues})>88*1024-1024)arrangementCues.pop();
- const final={...input,phoneReferenceGap,self:{...input.self,arrangementCues,arrangementCueGap:allCues.length-arrangementCues.length,noticeOpportunities:[] as {id:string;observationIds:string[]}[],noticeOpportunityGap:0}};
- boundPhoneNotifications(w,c,final);return final;
+ return finalizeDecisionInput(w,c,input);
+}
+
+
+// Memory selection remains with its normal/recall caller. Both paths then use
+// this identical derived view and byte reservation before binding references.
+export function finalizeDecisionInput<T extends {phones:ReturnType<typeof phoneForActor>;self:Pick<ReturnType<typeof perception>['self'],'shortTerm'|'longTerm'|'arrangements'|'observations'>}>(w:World,c:Character,input:T,recalledMemories?:{id:string;version:number}[]){
+ const final=Object.assign(input,{phoneReferenceGap:0,self:{...input.self,arrangementCues:[] as ReturnType<typeof arrangementCuesForDecision>,arrangementCueGap:0,noticeOpportunities:[] as {id:string;observationIds:string[]}[],noticeOpportunityGap:0}});
+ const extra=recalledMemories===undefined?undefined:{recalledMemories};
+ final.phoneReferenceGap=boundPhoneInput(w,c,final,extra);
+ const allCues=arrangementCuesForDecision(w,c,final);
+ final.self.arrangementCues=allCues.slice(0,4);
+ while(final.self.arrangementCues.length&&memoryBytes({input:final,...extra})>88*1024-1024)final.self.arrangementCues.pop();
+ final.self.arrangementCueGap=allCues.length-final.self.arrangementCues.length;
+ boundPhoneNotifications(w,c,final,extra);
+ return final;
 }
 
 // Device identity and the ability to list remain available even when optional

@@ -84,7 +84,7 @@ try {
   allTests.push('tests/method-reassessment-integration-api.test.cjs');
   allTests.push('tests/phone-memos-api.test.cjs','tests/phone-inbox-api.test.cjs','tests/arrangements-api.test.cjs','tests/arrangement-cues-api.test.cjs');
   allTests.push('tests/phone-notifications-api.test.cjs');
-  allTests.push('tests/phone-calendar-api.test.cjs');
+  allTests.push('tests/phone-calendar-api.test.cjs','tests/flexible-life-review-api.test.cjs');
   allTests.push('tests/flexible-life-integration-api.test.cjs');
   allTests.push('tests/object-observation-api.test.cjs', 'tests/source-scope-api.test.cjs');
   allTests.push('tests/discovery-api.test.cjs');

@@ -5,7 +5,7 @@ import type { Character } from './world';
 import type { Observation } from './perception';
 
 export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; object?: string; supply?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
-export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; consumed?: boolean; controlled?: boolean };
+export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; observationSequence?: number; consumed?: boolean; controlled?: boolean };
 export type MemoryRef = { id: string; version: number };
 export type RememberedSource = MemoryRef & { source: MemorySource };
 export type MemoryTraceOperation = 'merge' | 'rewrite' | 'forget' | 'forget-source' | 'keep';
@@ -74,11 +74,27 @@ export function normalizeMemory(c: Character) {
   projectRelationships(c);
   boundShort(c);
 }
+// Local sensory order is operational metadata, independent of whether the
+// experience is later selected, rewritten, forgotten, or evicted by FIFO.
+// Never called by GET normalization; activation belongs to a writable candidate.
+export function initializeObservationOrder(c:Character){
+ let sequence=c.observationSequence??0;
+ if(!Number.isSafeInteger(sequence)||sequence<0)throw new MemoryValidationError('感知順序高水位無效');
+ for(const item of c.shortTerm||[])if(item.observationSequence!==undefined)sequence=Math.max(sequence,item.observationSequence);
+ for(const item of c.shortTerm||[])if(item.observation&&item.observationSequence===undefined){
+  if(sequence>=Number.MAX_SAFE_INTEGER)throw new MemoryValidationError('感知順序已達工程上界');
+  item.observationSequence=++sequence;
+ }
+ if(sequence>0||c.observationSequence!==undefined)c.observationSequence=sequence;
+ // Metadata uses the same FIFO and total capacity as every short experience.
+ if(c.shortTerm)boundShort(c);
+}
 export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string }) {
   normalizeMemory(c);
   const id = observation?.id || crypto.randomUUID();
   if (c.shortTerm!.some(item => item.id === id)) return;
-  const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? observationSource(observation) : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
+  if(observation){initializeObservationOrder(c);if((c.observationSequence??0)>=Number.MAX_SAFE_INTEGER)throw new MemoryValidationError('感知順序已達工程上界');c.observationSequence=(c.observationSequence??0)+1;}
+  const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? observationSource(observation) : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation,observationSequence:c.observationSequence } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
   validateShort(item);
   c.shortTerm!.push(item); boundShort(c);
 }
@@ -313,10 +329,12 @@ export function validateMemoryState(c: Character) {
   validatePreferences(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
   const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'object', 'supply', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.object === undefined || boundedId(source.object)) && (source.supply === undefined || boundedId(source.supply)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
-  const shortIds = new Set<string>();
+  if(c.observationSequence!==undefined&&(!Number.isSafeInteger(c.observationSequence)||c.observationSequence<0))throw new MemoryValidationError('感知順序高水位無效');
+  const shortIds = new Set<string>(),observationSequences=new Set<number>();
   for (const item of c.shortTerm || []) {
     if (shortIds.has(item.id)) throw new MemoryValidationError('短期記憶身份重複');
     shortIds.add(item.id);
+    if(item.observationSequence!==undefined){if(!item.observation||!Number.isSafeInteger(item.observationSequence)||item.observationSequence<1||observationSequences.has(item.observationSequence)||c.observationSequence!==undefined&&item.observationSequence>c.observationSequence)throw new MemoryValidationError('感知順序無效或重複');observationSequences.add(item.observationSequence);}
     if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.objectId !== item.source.object || item.observation.supplyId !== item.source.supply || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
     if (!boundedId(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || (item.eventId && !boundedId(item.eventId))) throw new MemoryValidationError('短期記憶身份或來源無效');
     validateShort(item);
@@ -340,6 +358,6 @@ export function validateMemoryState(c: Character) {
   if (memoryStateBytes(c) > 208 * 1024) throw new MemoryValidationError('角色記憶總量超過 208 KiB，未截斷資料');
 }
 export function memoryStateBytes(c: Character) {
-  const state = { arrangements:c.arrangements, preferences:c.preferences, shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
+  const state = { arrangements:c.arrangements, preferences:c.preferences, shortTerm: c.shortTerm, longTerm: c.longTerm, memoryTrace: c.memoryTrace, cognition: (c as Character & CognitiveMemoryReferences).cognition, memories: c.memories, observations: c.observations, observationSequence:c.observationSequence, observationCursor: c.observationCursor, controlExperiences: c.control?.experiences, relationships: c.relationships };
   return memoryBytes(state);
 }

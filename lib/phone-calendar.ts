@@ -51,7 +51,7 @@ function candidates(w:World){
    // only actual known input while the awake owner can access this device.
    const hasInput=reminder.condition.kind==='time'||!isSleeping(actor)&&!!reachablePhone(w,actor,device.objectId);
    const input=hasInput&&reminder.condition.kind!=='time'?normalDecisionInput(w,actor,actor.plan?.modelKey||'demo'):undefined;
-   const signal=hasInput?knownConditionSignal(w,actor,reminder.condition,{observations:input?.self.observations||[]},reminder.conditionSince):undefined;
+   const signal=hasInput?knownConditionSignal(w,actor,reminder.condition,{observations:input?.self.observations||[],memoryIds:input?.self.shortTerm.map(m=>m.id)||[]},reminder.conditionSince,reminder.cue?.observationCursor):undefined;
    const cue=nextConditionCue(reminder.cue,reminder.condition,signal,w.minute);
    return {device,record,reminder,cue};
   });
