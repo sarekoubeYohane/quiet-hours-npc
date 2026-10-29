@@ -26,6 +26,8 @@ node --import ./tooling/verification/no-network.mjs tests/run-activities.mjs tes
 
 T1 原生回覆 fixture 明示新增候選／承接及既有焦點版本；沒有在 transport 攔截器偷偷修復非法契約。T1 舊版本拒絕、較後角色失敗、保存故障、接管／交還、同 ID、舊世界與既有驗收場景回歸一併保留。全 repository 舊 fixture 遷移、完整最大圖／四角色壓力、兩軸 code review 由整合分支接續，不以本票局部49項冒稱全 repo 通過。
 
+合併 T3 與當時回歸整合後，T2的25項再跑 **25/25** 通過，typecheck／變更ESLint／diffcheck亦通過。四角色代表實際input為3734–4520 bytes、完整request（含system/schema）50210–51363 bytes；每人4個短候選635–639 bytes、收斂116–117 bytes、完整回覆1533–1540 bytes。這是代表短候選量測，不能當最大圖量測；候選／收斂上界另由精確bytes反例驗證，完整圖與記憶滿載由 #227 負責。
+
 ## 畫面重載
 
 本機 Chromium 相容 Edge 跑真正 WorldApp／世界 API／SQLite：
