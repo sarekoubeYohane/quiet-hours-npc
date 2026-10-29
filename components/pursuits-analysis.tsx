@@ -13,6 +13,10 @@ export default function PursuitsAnalysis({character}:{character:Character}){
   <h3>分層追求 <span>由角色明示承接與調整</span></h3>
   <p className="hint">{nodes.some(n=>n.kind)?`當前方向：${currentDirections(character)||'目前沒有保留的持續方向'}`:'舊版平面意圖；需明示重置測試世界才能使用新版推進。'}</p>
   <p className="hint">{nodes.length}/{pursuitLimits.nodes} 個追求；未提及保持原狀。主觀範圍與滿足標準是角色自述，實際結果沿活動與世界紀錄核對。</p>
+  {[{kind:'進行中',plan:character.plan},{kind:'已暫停',plan:character.pausedActivity?.plan}].filter(item=>item.plan).map(({kind,plan})=><div className="hint" key={kind}>
+   <p>同一份{kind}活動的目前追求：{plan!.pursuitIds?.join('、')||'目前沒有連結追求'}；原方法：{plan!.action.content||plan!.action.type}。</p>
+   <p>{plan!.pursuitOrigin?`開始時的歷史追求（世界分鐘 ${plan!.pursuitOrigin.at}）：${plan!.pursuitOrigin.pursuits.map(reference=>`${reference.id} v${reference.version}`).join('、')||'當時沒有連結追求'}。目前轉接不改寫這份來源；原範圍依有界變更痕跡核對，缺失不補造。`:'這份活動缺少開始時的追求來源，不能從目前關聯倒推歷史動機。'}</p>
+  </div>)}
   {nodes.some(node=>node.kind)&&<details className="system-trace" open><summary>各層順序與共享關係</summary>
    <p className="hint">各層由角色局部排序；排序不代表必須先做，也不取代實際世界前提。共享項目仍只有下方一份追求與活動進度。</p>
    <p>根追求順序：{orderedPursuits(nodes,null).map(node=>node.content).join(' → ')||'目前無有效根追求'}</p>
@@ -31,6 +35,10 @@ export default function PursuitsAnalysis({character}:{character:Character}){
    {character.plan?.pursuitIds?.includes(node.id)&&<p>連結目前活動：{character.plan.action.content||character.activity}（沿用同一份活動進度）</p>}
   </li>)}</ol>
   {!nodes.length&&<p className="hint">目前沒有保留的追求。</p>}
-  <details className="system-trace"><summary>追求變更痕跡（觀察者）</summary><p className="hint">有限模型自述與程式保存紀錄，不送入角色提示。已釋放 {character.pursuitTraceDropped||0} 筆；不是完整心理歷史。</p>{[...(character.pursuitTrace||[])].reverse().map((trace,index)=><article key={`${trace.id}:${index}`}><h4>{trace.operation} · {trace.id}</h4><p>{trace.reason}</p><p>{trace.before?`v${trace.before.version} ${trace.before.scope}`:'新承接'} → {trace.after?`v${trace.after.version} ${trace.after.scope}`:'明示放下'}</p></article>)}</details>
+  <details className="system-trace"><summary>追求變更痕跡（觀察者）</summary><p className="hint">有限模型自述與程式保存紀錄，不送入角色提示。已釋放 {character.pursuitTraceDropped||0} 筆；不是完整心理歷史。</p>{[...(character.pursuitTrace||[])].reverse().map((trace,index)=><article key={`${trace.id}:${index}`}>
+   <h4>{trace.operation} · {trace.id}</h4><p>{trace.reason}</p>
+   <p>{trace.before?`v${trace.before.version} ${trace.before.scope}`:'新承接'} → {trace.after?`v${trace.after.version} ${trace.after.scope}`:'明示放下'}{trace.after?.status==='satisfied'?'（本人認為已滿足）':trace.after?.status==='dropped'?'（已明示放下）':''}</p>
+   {trace.before&&<p className="hint">支援上層身份：{trace.before.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'} → {trace.after?.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'}；這段歷史不因目前轉接而回寫。</p>}
+  </article>)}</details>
  </section>;
 }
