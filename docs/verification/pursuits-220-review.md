@@ -1,6 +1,6 @@
 # #220 最終兩軸 review 修正
 
-審查基準 `f9493c7...144bcea`。Standards初審提出1項P3，複查補充詞彙表工程細節1項P3；Spec提出P1一項／P2兩項。以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原reviewer仍需在修正合入後複核。
+審查基準 `f9493c7...144bcea`。Standards初審提出1項P3，複查補充詞彙表工程細節1項P3；Spec初審提出P1一項／P2兩項，複查補充assessment綁定回歸及paired-ended新綁定逃逸各1項P2。以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原兩位reviewer已對最終功能基準完成複查，結果見文末。
 
 ## Standards
 
@@ -26,6 +26,10 @@
 
 ![歷史父版與當前版分開](assets/pursuit-review-220/history/historical-parent-gap.png)
 
+**複查P2 保留綁定後仍能正常評估進度。** 父priority升版、未提及active child保留原父版之後，原驗證錯把後續assess當新綁定而整輪拒絕。現在只有真正upsert才檢查當次父版本；assess的既有關係保留，實質父scope變更仍要求明示upsert或結束處置，沒有全面放寬關係驗證。新增waiting／deferred／known-result三條世界API→SQLite→真正下一派送旅程，皆先RED再GREEN；known-result引用當次真實可見記憶。每條也驗證新upsert若沿用舊父版仍拒絕且整輪不改，合法評估的before／after保留原父版。
+
+**複查P2 同批結束不能跳過新綁定驗證。** 原先只驗最終active節點，upsert後同批assess satisfied能偷渡新關係。現在最終active與本輪upsert都驗端點、有效父版；循環／深度亦涵蓋本輪新綁定，即使本輪結束。未改的ended歷史保持原狀；原有效父同輪合法結束仍能保留歷史支援。七條最高API／SQLite／真正下一請求旅程包含stale、不存在、跨角色、雙節點皆同輪結束的循環、跨worldcontext拒絕，以及合法配對／父同輪退出兩正例；四種關係逃逸先RED再GREEN，跨context原有拒絕仍成立。拒絕時完整characters不變，下一次真正輸入仍承接原資料。
+
 **P2 L5只在人工確認相關餐點承接後提供改變。** 原本任意active非direction工作都會觸發撤餐，無關整理也耗掉唯一機會。現在預登記採外部controller明確讀證據確認，綁run、trial、真正已提交operationId、pursuitId/version、相同scope與人工reference；不從職業、關鍵字或任意工作猜承接，不新增付費classifier。未確認／錯誤綁定保持not-reached，不消耗變化機會。
 
 五輪真世界API／SQLite／下一派送旅程先RED：無關整理、資訊only、拒絕不撤餐；不存在身份、錯operation、過期version、scope不符都不觸發；其後真正餐點承接經明確controller確認，才由Cass的下一個正常say活動產生可知改變，再進焦點角色真正input，最後自主放下。controller只決定事前登記的partner台詞，沒有注入焦點追求／記憶或強制其退出；相關性仍是人工判讀責任，不冒稱機械語義驗證。
@@ -34,17 +38,17 @@
 
 原節點／邊／深度、四更新／8KiB、88KiB input、164000bytes完整provider body、輸出tokens、回合工作／租約與玩家政策均保留。加入最小prompt綁定說明後，80來源測得完整body162394bytes；quote-heavy完整圖與原80來源壓力保留，沒有放寬閾值、縮短來源或移除schema斷言。原T7文件中的精確量測是其記錄版本，不能當作本修正版的所有實測值。
 
-固定功能提交`69d1716`的末次指定驗證：
+前一功能提交`7b8f25b`已驗90項native與18項runner（121625ms）；下列為追加paired-ended修正`f2b6c07`的指定驗證：
 
 | 檢查 | 實際結果 |
 | --- | --- |
-| `node --test tooling/experiments/pursuit-runner-228.test.mjs` | 18/18通過、0fail，153882ms；含跨output／新grant同payer及官方price host新反例 |
-| review API＋graph＋exit＋lifecycle＋capacity＋memory-selection | 87/87通過、0fail，51255ms；含新增5個最高API旅程、原capacity14與memory-selection4 |
+| `node --test tooling/experiments/pursuit-runner-228.test.mjs` | 18/18通過、0fail，115303ms；含跨output／新grant同payer及官方price host新反例 |
+| review API＋graph＋exit＋lifecycle＋capacity＋memory-selection | 97/97通過、0fail，35865ms；含新增15個最高API旅程、原capacity14與memory-selection4 |
 | 受控正向完整批次 | 10trial／80advance、17受控forward（含裁定）、64partner fixture、81原引擎用量；max完整body106004bytes，真付費0 |
 | 原player policy | 原12calls／30000tokens可首forward並到限停止，沒有set-budget或刷新窗口；完整80advance另明示用合成既有100calls／1,000,000tokens payer |
 | UI | archive dropped／satisfied各2次fixture、history版本差異3次fixture；真WorldApp／SQLite重載、文字缺口、390px及原ID零新增派送通過 |
 | typecheck／本輪ESLint／diff check | 通過；沒有提高原輸出、期限或預算上限 |
 
-整合後完整預設回歸與原兩reviewer複核由整合PR記錄。預設suite把18項runner放在獨立第四組，先完成Workers／migration／#211 checker；source-pin反例不與其他來源讀取者並行。
+原兩位reviewer已對固定功能基準`f2b6c07`完成最終複查：Standards原2項P3、Spec原1項P1及4項P2全部修正，共7項finding，0未解、0新增code smell。初審及中途複查歷史保留於上文，不把新修正覆寫成初審零問題。整合後完整預設回歸由整合PR記錄。預設suite把18項runner放在獨立第四組，先完成Workers／migration／#211 checker；source-pin反例不與其他來源讀取者並行。
 
 #229仍未執行。2026-10-29只補官方模型文件來源預檢，公開去識別metadata含來源hash，完整原文留私有；Standard短context價目與其他tier條件尚未構成本批已封存適用價格。需要最終review版本／runner指紋、相關人工controller、實際account/tier、有限人類授權與有效憑證後才可另行派送；default仍未paid-ready。
