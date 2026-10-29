@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /* Synthetic controls; real route / serialization / isolated SQLite. */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));

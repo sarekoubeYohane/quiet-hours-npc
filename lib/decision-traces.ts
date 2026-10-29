@@ -40,6 +40,7 @@ export function omitDecisionTraceContent(trace: DecisionTrace, reason: string, u
       if (typeof item === 'number' || typeof item === 'string' && item.length <= 256) receipt[key] = item;
     }
     if(dispatch.signal&&typeof dispatch.signal==='object')receipt.signal=dispatch.signal;
+    if(!unknownCredentials&&dispatch.price&&typeof dispatch.price==='object')receipt.price=dispatch.price;
     for(const usageKind of ['usage','lateUsage'] as const)if (dispatch[usageKind] && typeof dispatch[usageKind] === 'object') {
       receipt[usageKind] = Object.fromEntries(Object.entries(dispatch[usageKind]).filter(([key, value]) =>
         ['inputTokens', 'outputTokens', 'cachedInputTokens'].includes(key) && typeof value === 'number' && Number.isFinite(value) && value >= 0));
@@ -53,7 +54,7 @@ export function omitDecisionTraceContent(trace: DecisionTrace, reason: string, u
     contextId: unknownCredentials?undefined:trace.contextId, operation: trace.operation, baseVersion: trace.baseVersion,
     resultVersion: trace.resultVersion, outcome: trace.outcome, lastKnownStage: trace.lastKnownStage,
     dispatches: receipts, dispatchCount: trace.dispatches.length,
-    gap: reason, gaps: [reason,...(Array.isArray(trace.gaps)?trace.gaps.filter((gap):gap is string=>typeof gap==='string'&&gap.length<=256).slice(0,16):[])], steps: [], redacted: unknownCredentials||trace.redacted === true, omittedOriginalBytes: originalBytes,acceptedAt:trace.acceptedAt,checkpoints:trace.checkpoints,timePolicy:trace.timePolicy,
+    gap: reason, gaps: [reason,...(Array.isArray(trace.gaps)?trace.gaps.filter((gap):gap is string=>typeof gap==='string'&&gap.length<=256).slice(0,16):[])], steps: [], redacted: unknownCredentials||trace.redacted === true, omittedOriginalBytes: originalBytes,acceptedAt:trace.acceptedAt,checkpoints:trace.checkpoints,timePolicy:trace.timePolicy,accounting:trace.accounting,
   };
 }
 

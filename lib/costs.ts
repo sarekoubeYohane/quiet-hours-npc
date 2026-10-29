@@ -16,10 +16,10 @@ export function savePrice(world: World, input: PriceInput) {
   const price: ModelPrice = { provider: input.provider, model: input.model.trim(), input: input.input, output: input.output, ...(input.cachedInput === undefined ? {} : {cachedInput:input.cachedInput}), source: input.source.trim(), date:input.date, id:crypto.randomUUID(),custom:true,savedAt:Date.now() };
   world.modelPrices = [...(world.modelPrices || []).filter(p => p.provider !== price.provider || p.model !== price.model), price];
 }
-export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined, task:'npc'|'adjudication'='npc') {
+export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined, task:'npc'|'adjudication'='npc',dispatchAt=Date.now()) {
   usage.costs ??= {total:{},hour:{}};
   const key = `${task}:${price?.id || `unknown:${encodeURIComponent(provider)}:${encodeURIComponent(model)}`}`;
-  const now = Date.now();
+  const now = dispatchAt;
   for (const group of [usage.costs.total,usage.costs.hour]) {
     const c = group[key] ??= {task,provider,model,price:price ? {...price} : null,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0,lastDispatchAt:now};
     if(typeof c.knownUsd!=='number'||!Number.isFinite(c.knownUsd)||c.knownUsd<0){c.knownUsd=0;c.unknownCalls=c.calls;}

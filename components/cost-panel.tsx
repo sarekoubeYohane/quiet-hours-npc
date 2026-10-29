@@ -2,12 +2,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { costSummary, validPrice, type ModelPrice, type PriceInput, type CostEstimate } from '@/lib/costs';
+import { UnresolvedUsageNotice } from '@/components/usage-recovery-status';
 import type { AIUsage } from '@/lib/world';
 const usd=(value:number)=>`USD ${value.toLocaleString('en-US',{maximumSignificantDigits:8})}`;
-function Estimate({label,value}:{label:string;value:CostEstimate}) {
-  return <p>{label}：{value.complete?`估算 ${usd(value.knownUsd)}`:value.knownUsd>0?`部分估算：已知小計 ${usd(value.knownUsd)}`:'無法完整估算'}{!value.complete&&`；${value.unknownCalls} 次價格、快取單價或用量不完整`}</p>;
+function Estimate({label,value,unresolved=false}:{label:string;value:CostEstimate;unresolved?:boolean}) {
+  return <p>{label}：{value.complete&&!unresolved?`估算 ${usd(value.knownUsd)}`:value.knownUsd>0?`部分估算：已知小計 ${usd(value.knownUsd)}`:'無法完整估算'}{!value.complete&&`；${value.unknownCalls} 次價格、快取單價或用量不完整`}</p>;
 }
-export default function CostPanel({usage,prices,provider,model,disabled,onApply,view='all'}:{view?:'all'|'settings'|'analysis';usage:AIUsage;prices:ModelPrice[];provider:'openai'|'openrouter';model:string;disabled:boolean;onApply:(price:PriceInput)=>Promise<boolean>}){
+export default function CostPanel({usage,prices,provider,model,disabled,onApply,unresolvedUsageRecovery=false,view='all'}:{unresolvedUsageRecovery?:boolean;view?:'all'|'settings'|'analysis';usage:AIUsage;prices:ModelPrice[];provider:'openai'|'openrouter';model:string;disabled:boolean;onApply:(price:PriceInput)=>Promise<boolean>}){
   const existing=prices.find(p=>p.provider===provider&&p.model===model);
   const defaults=()=>({provider,model,input:existing?String(existing.input):'',output:existing?String(existing.output):'',cachedInput:existing?.cachedInput===undefined?'':String(existing.cachedInput),source:existing?.source||'',date:existing?.date||new Date().toISOString().slice(0,10)});
   const [draft,setDraft]=useState(defaults),[error,setError]=useState('');
@@ -20,7 +21,7 @@ export default function CostPanel({usage,prices,provider,model,disabled,onApply,
   };
   const summary=costSummary(usage);
   return <section className="panel automation" aria-label="已發生費用估算">
-    <div hidden={view==='settings'}><h2>已發生費用估算</h2><Estimate label="玩家本小時已發生" value={summary.hour}/><Estimate label="玩家累計已發生" value={summary.total}/>
+    <div hidden={view==='settings'}><h2>已發生費用估算</h2>{unresolvedUsageRecovery&&<UnresolvedUsageNotice/>}<Estimate unresolved={unresolvedUsageRecovery} label="玩家本小時已發生" value={summary.hour}/><Estimate unresolved={unresolvedUsageRecovery} label="玩家累計已發生" value={summary.total}/>
     <p className="usage-note">NPC 決策與世界裁定共用玩家預算，明細分開列出。這是本站已記錄聊天請求的 USD 估算，並非供應商完整帳單；不扣款，也不增加金額限制。站主共用服務另外計量：費用未知，請見站主用量。未回報快取拆分時按已回報輸入估算，可能未反映折扣；可辨識的快取若未填單價，僅顯示已知小計。</p>
     </div><details hidden={view==='analysis'} open={view==='settings'}><summary>自訂模型單價（USD／每百萬 tokens）</summary>
       <p>由你提供價格與來源，不會自動查價；儲存後只適用新請求，歷史價格保留。</p>
