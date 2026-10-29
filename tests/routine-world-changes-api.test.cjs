@@ -77,7 +77,7 @@ test('hidden-only changes do not leak authority revisions or add and remove know
   await advance();s.choose({...s.method('cup-b'),content:'保留一個不可知的內部標記',purpose:'外在處理'});s.reply({status:'accepted',completionMinutes:15,stages:[],branches:null,check:null,routine:null,effects:[{kind:'change-state',version:1,access:'authorized',target:{type:'object',id:'cup-b'},expectedRevision:1,exposure:'hidden',changes:[{key:'內部標記',from:null,value:'secret-v3-condition'}],reason:'observer-only private reason'}]});
   let w=await advance();assert.equal(w.objects[1].revision,2);assert.equal(w.objects[1].state.內部標記,'secret-v3-condition');
   s.choose({type:'rest',target:'',content:'休息',purpose:'',mood:'平靜',durationMinutes:15,intents:[]});await advance();
-  const prompts=s.inputs.filter(input=>input.contractVersion==='npc-decision.v2'),before=prompts[1],after=prompts[2];assert.ok(before.knownMethods.some(method=>method.content===s.method('cup-a').content));assert.deepEqual(after.knownMethods,before.knownMethods);assert.deepEqual(after.objects.find(object=>object.id==='cup-b'),before.objects.find(object=>object.id==='cup-b'));assert.equal(Object.hasOwn(after.objects[1],'revision'),false);assert.equal(JSON.stringify(after).includes('secret-v3-condition'),false);assert.equal(JSON.stringify(after).includes('observer-only private reason'),false);
+  const prompts=s.inputs.filter(input=>input.contractVersion==='npc-decision.v3'),before=prompts[1],after=prompts[2];assert.ok(before.knownMethods.some(method=>method.content===s.method('cup-a').content));assert.deepEqual(after.knownMethods,before.knownMethods);assert.deepEqual(after.objects.find(object=>object.id==='cup-b'),before.objects.find(object=>object.id==='cup-b'));assert.equal(Object.hasOwn(after.objects[1],'revision'),false);assert.equal(JSON.stringify(after).includes('secret-v3-condition'),false);assert.equal(JSON.stringify(after).includes('observer-only private reason'),false);
  }finally{s.restore();}
 });
 test('v3 wire rejects missing required binding fields, trusted metadata, historical identities and revisions before any world change',async()=>{
@@ -260,7 +260,7 @@ test('confirmed method alias pairs rebind current objects after SQLite reload wi
   w=await advance({...proposal('cup-c'),purpose:'清潔'});
   assert.equal(w.objects.find(o=>o.id==='cup-c').state.茶漬,'無');
   assert.deepEqual(s.counts(),{npc:3,adjudication:1});
-  const input=s.inputs.filter(x=>x.contractVersion==='npc-decision.v2').at(-1);
+  const input=s.inputs.filter(x=>x.contractVersion==='npc-decision.v3').at(-1);
   assert.ok(input.knownMethods.some(method=>method.content==='洗淨這個杯子'&&method.purpose==='清潔杯子'));
   assert.equal(w.objects.find(o=>o.id==='cup-a').revision,2,'reusing another target must not replay the old effect');
  }finally{s.restore();}
@@ -278,7 +278,7 @@ test('same drink wording with confirmed 飲用 or 喝茶 purposes consumes the n
   assert.deepEqual(s.counts(),{npc:2,adjudication:1});
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};
   s.choose({...proposal('cup-c'),content:'飲用這杯茶',purpose:'解渴'});assert.equal((await s.post(op)).status,200);const saved=await s.read();assert.equal(saved.objects.find(o=>o.id==='tea-c').lifecycle,'consumed');assert.equal((await s.post(op)).status,200);assert.deepEqual(s.counts(),{npc:3,adjudication:1});assert.deepEqual((await s.read()).objects,saved.objects);
-  assert.equal(s.inputs.filter(x=>x.contractVersion==='npc-decision.v2').at(-1).objects.some(o=>o.id==='tea-a'),false);
+  assert.equal(s.inputs.filter(x=>x.contractVersion==='npc-decision.v3').at(-1).objects.some(o=>o.id==='tea-a'),false);
  }finally{s.restore();}
 });
 
@@ -293,7 +293,7 @@ test('alias purpose pairs do not cross-expand and old methods do not gain new sc
    s.choose({...proposal('cup-b'),purpose:'泡茶'});const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(op)).status,200);assert.equal((await s.read()).objects.find(o=>o.id==='cup-b').state.茶漬,'有');assert.deepEqual(s.counts(),{npc:3,adjudication:3});
    const detail=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json();
    assert.ok(detail.decisionTrace.steps.some(step=>step.kind==='rule-selection'&&step.data.check==='method'&&step.data.wording===true&&step.data.purpose===false),'contradictory purpose must retain a method mismatch in observer trace');
-   assert.ok(s.inputs.filter(input=>input.contractVersion==='npc-decision.v2').every(input=>!JSON.stringify(input).includes('rule-selection')));
+   assert.ok(s.inputs.filter(input=>input.contractVersion==='npc-decision.v3').every(input=>!JSON.stringify(input).includes('rule-selection')));
   }finally{s.restore();}
  }
 });
@@ -304,3 +304,4 @@ test('invalid or oversized alias scopes roll back instead of broadening a known 
   try{const before=await s.read(),r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,502);const w=await s.read();assert.deepEqual(w.objects,before.objects);assert.equal(w.routineRules,undefined);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}finally{s.restore();}
  }
 });
+

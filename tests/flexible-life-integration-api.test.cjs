@@ -25,7 +25,9 @@ test('真API一次Vector Recall使初次省略的安排可見；合法forget後�
  const s=await setup(initial);try{
   s.transport.choose(input=>fixture.action('reflect',{arrangementUpdates:[{operation:'upsert',id:'recall-plan',version:0,text:'ONLY_RECALLABLE_ARRANGEMENT '+'想'.repeat(156),condition:{kind:'time',minute:10000},references:[{kind:'short',id:input.self.shortTerm[0].id,version:input.self.shortTerm[0].version}],reason:'我想保留未來打算'}]}));await s.advance();
   let anchor;s.transport.choose(input=>{anchor=input.self.shortTerm.find(m=>m.text.includes('我的柔性安排 recall-plan'));assert.ok(anchor);return fixture.action('reflect',{memorySelections:[{id:anchor.id,version:anchor.version,reason:'我想記住這個打算'}]});});await s.advance();
-  for(let i=0;i<82;i++)await s.intervene(`後來的可知經歷 ${i}：`+'新'.repeat(460));
+  // Keep the original source outside short-term memory and the initial input,
+  // while reserving room for the new pursuit graph and the recalled arrangement.
+  for(let i=0;i<82;i++)await s.intervene(`後來的可知經歷 ${i}：`+'新'.repeat(458));
   const before=await read(),memory=fixture.actor(before).longTerm.find(m=>m.origin.id===anchor.id);assert.ok(memory);assert.equal(fixture.actor(before).shortTerm.some(m=>m.text.includes('ONLY_RECALLABLE_ARRANGEMENT')),false);
   await withRecall(s,async recall=>{
    let chat=0,forget=false;s.transport.choose(input=>{

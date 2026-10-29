@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario:legacyScenario,proposal,advance}=require('./routine-program-fixture.cjs'),f=require('./routine-world-programs-fixture.cjs');
 const {wire}=require('./method-assessment-fixture.cjs');
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 async function scenario(options){return legacyScenario(options);}
 
 const action=(target='last-food',alias=false)=>({...proposal,target,content:alias?'拿取這份點心':'取用這份點心',purpose:alias?'食用':'用餐'});

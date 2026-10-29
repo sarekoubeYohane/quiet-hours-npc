@@ -40,7 +40,9 @@ test('integration recall can ground belief and memory maintenance without exposi
 });
 test('integration recalled summaries outrank optional input and expose only actual subjective provenance',async()=>{
   const w=fixture(),c=w.characters[0];c.memories=[];
-  c.shortTerm=Array.from({length:80},(_,i)=>({id:`s-${i}`,characterId:c.id,version:1,time:i,text:'甲'.repeat(160),source:{kind:'experience'}}));
+  // Preserve all 80 sources and initial omission while leaving the existing
+  // derived last-known view room alongside the new pursuit state.
+  c.shortTerm=Array.from({length:80},(_,i)=>({id:`s-${i}`,characterId:c.id,version:1,time:i,text:'甲'.repeat(159),source:{kind:'experience'}}));
   const refs=Array.from({length:8},(_,i)=>({id:`source-${i}`+'i'.repeat(110),version:1,source:{kind:'observation',person:'p'.repeat(128),region:'r'.repeat(128),sense:'hearing',clarity:'vague'}}));
   const target={...c.longTerm[0],id:'omitted',kind:'summary',text:'乙'.repeat(280),rememberedSources:refs,unresolved:[{id:refs[0].id,version:1}]};
   c.longTerm=[...Array.from({length:9},(_,i)=>({...c.longTerm[0],id:`filler-${i}`,text:'丙'.repeat(1200),origin:{id:`origin-${i}`,version:1}})),target];
