@@ -103,6 +103,7 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
     await operation({operation:'set-price',price:{provider:plan.provider,model:plan.model,input:priceSnapshot.input,output:priceSnapshot.output,cachedInput:priceSnapshot.input,source:priceSnapshot.source,date:priceSnapshot.date}});
     globalThis.fetch=async(url,init)=>{
       await stop();
+      if(state.unknownUsage)throw Error('unknown-usage-or-cost');
       if(String(url)!=='https://api.openai.com/v1/chat/completions'||init?.method!=='POST'||init.redirect!=='manual'||typeof init.body!=='string')throw Error('request-boundary');
       const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content),isNpc=!!input.self;
       if(body.model!==plan.model||body.store!==false||body.reasoning_effort!=='none'||Buffer.byteLength(init.body)>=164000||body.max_completion_tokens>(isNpc?2048:12000))throw Error('request-model-parameters');
@@ -128,7 +129,11 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
       const parsed=JSON.parse(responseBody),usageResult=parsed.usage;
       if(!response.ok||!usageResult||![usageResult.prompt_tokens,usageResult.completion_tokens].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('unknown-usage-or-transport');
       const used=usageResult.prompt_tokens+usageResult.completion_tokens;roundTokens+=used;
-      if(forwarded){state.tokens+=used;state.usd+=(usageResult.prompt_tokens*priceSnapshot.input+usageResult.completion_tokens*priceSnapshot.output)/1e6;delete state.unresolvedDispatch;await save();if(state.tokens>limits.tokens||state.usd>limits.usd)throw Error('actual-usage-limit');}
+      if(forwarded){state.tokens+=used;state.usd+=(usageResult.prompt_tokens*priceSnapshot.input+usageResult.completion_tokens*priceSnapshot.output)/1e6;
+        const cached=usageResult.prompt_tokens_details?.cached_tokens;
+        if(cached!==undefined&&(!Number.isFinite(cached)||cached<0||cached>usageResult.prompt_tokens))state.unknownUsage='invalid-cached-tokens';
+        else delete state.unresolvedDispatch;
+        await save();if(!state.unknownUsage&&(state.tokens>limits.tokens||state.usd>limits.usd))throw Error('actual-usage-limit');}
       return response;
     };
     for(let index=0;index<state.trials.length;index++) {
