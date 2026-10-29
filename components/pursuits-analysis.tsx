@@ -27,6 +27,7 @@ export default function PursuitsAnalysis({character}:{character:Character}){
    {node.assessment&&<div className="hint"><p>本人短評（{node.assessment.kind==='known-result'?'依當時可知結果':'主觀感受／理解'}）：{node.assessment.text}</p><p>評估世界時間：{node.assessment.time}；依據身份 {node.assessment.references.length} 項；目前保存來源缺口 {node.assessment.references.filter(reference=>!referenceAvailable(reference)).length} 項。短評不等同已提交的世界成果，原文是否仍可知須沿記憶核對。</p></div>}
    <p className="hint">{node.status==='active'?'上層':'歷史支援上層'}：{node.parents?.length?node.parents.map(parent=>{const position=orderedPursuits(nodes,parent.id).findIndex(item=>item.id===node.id);return `${nodes.find(n=>n.id===parent.id)?.content||`關係缺口（${parent.id}）`}${position>=0?`（本層第 ${position+1} 位）`:'（歷史關係，不列當前順序）'}`;}).join('、'):'無上層／獨立追求'}{(node.parents?.length||0)>1?' · 共享同一工作':''}</p>
    {!!node.references?.length&&<p className="hint">形成來源身份：{node.references.map(r=>`${r.kind}:${r.id} v${r.version}`).join('、')}。引用不保證原文仍可知，未讀或已忘內容不從追求恢復。</p>}
+   {(character.arrangements?.items||[]).some(item=>item.pursuit?.id===node.id)&&<p className="hint">再考慮安排：{(character.arrangements?.items||[]).filter(item=>item.pursuit?.id===node.id).map(item=>`${item.id}（${item.status==='active'?'安排仍保留':'安排另有結束狀態'}）`).join('、')}；條件只提供正常決策機會，完整安排內容仍沿本人記憶。</p>}
    {character.plan?.pursuitIds?.includes(node.id)&&<p>連結目前活動：{character.plan.action.content||character.activity}（沿用同一份活動進度）</p>}
   </li>)}</ol>
   {!nodes.length&&<p className="hint">目前沒有保留的追求。</p>}
