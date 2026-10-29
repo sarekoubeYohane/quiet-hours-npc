@@ -125,16 +125,16 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
    if(!disposition||remaining?.status==='active'&&!disposition.has('upsert'))fail('上層變更缺少受影響下層的明示關係處置');
   }
  }
- for(const node of next.filter(i=>i.status==='active')){
+ for(const node of next.filter(i=>i.status==='active'||operations.get(i.id)?.has('upsert'))){
   for(const parent of node.parents||[]){
    if(!text(parent.id,64,true)||parent.id===node.id||!Number.isSafeInteger(parent.version)||parent.order!==undefined&&(!Number.isSafeInteger(parent.order)||(parent.order??-1)<0)||Object.keys(parent).some(key=>!['id','version','order'].includes(key)))fail('追求關係無效');
    const original=c.intents?.find(i=>i.id===parent.id),endpoint=next.find(i=>i.id===parent.id);
-   if(!endpoint||endpoint.status!=='active'||!parent.id.startsWith(c.id+':'))fail('追求上層不存在');
+   if(!endpoint||!parent.id.startsWith(c.id+':')||(node.status==='active'?endpoint.status!=='active':original?.status!=='active'&&!operations.get(parent.id)?.has('upsert')))fail('追求上層不存在');
    if(operations.get(node.id)?.has('upsert')&&(original?original.version!==parent.version:parent.version!==0))fail('追求上層版本失效');
   }
  }
  for(const item of updates.filter(update=>update.operation==='reorder'))applyPursuitOrder(c,next,item,visible,trace,w.minute);
- const visit=(id:string,path:string[]):number=>{if(path.includes(id))return fail('追求關係循環');const node=next.find(i=>i.id===id)!;if(!node||node.status!=='active')return 0;return 1+Math.max(0,...(node.parents||[]).map(p=>visit(p.id,[...path,id])));};
+ const visit=(id:string,path:string[]):number=>{if(path.includes(id))return fail('追求關係循環');const node=next.find(i=>i.id===id)!;if(!node||node.status!=='active'&&!operations.get(id)?.has('upsert'))return 0;return 1+Math.max(0,...(node.parents||[]).map(p=>visit(p.id,[...path,id])));};
  // A relation records the endpoint version when the actor explicitly binds it.
  // A parent's later priority/assessment version cannot rewrite an omitted
  // child's history (or change an active child without its own version/trace).

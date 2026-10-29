@@ -6,6 +6,21 @@ const {createPartner}=require('../tooling/experiments/pursuit-partner-228.cjs');
 const {load}=require('./pursuit-graph-fixture.cjs');
 const demand=require('./fixtures/demand-integration-loop.cjs');
 
+for(const invalid of ['stale','nonexistent','foreign','cycle','world-context','valid','parent-exit'])test(`paired upsert and satisfaction validates new binding even when ended (${invalid})`,async()=>{
+ let round=0;const inputs=[];const s=await scenario(input=>{
+  inputs.push(input);if(round===0)return decision(input,{updates:[upsert('owner:parent',[],{kind:'direction'}),upsert('owner:child',[{id:'owner:parent',version:0}])]});
+  if(round===1)return decision(input,{updates:[edit(input,'owner:parent',{importance:'high'})]});
+  if(round!==2)return decision(input);
+  const parents=[{id:invalid==='nonexistent'?'owner:missing':invalid==='foreign'?'vera:direction':'owner:parent',version:invalid==='stale'?1:2}];
+  const updates=[edit(input,'owner:child',{parents}),assess(input,'owner:child','satisfied','ready')];if(invalid==='parent-exit')updates.push(drop(input,'owner:parent'));if(invalid==='cycle')updates.push(edit(input,'owner:parent',{parents:[{id:'owner:child',version:1}]}),assess(input,'owner:parent','satisfied','ready'));
+  const value=decision(input,{updates});if(invalid==='world-context')value.pursuitContext='foreign-world-context';return value;
+ },ownerOnly);
+ try{for(round=0;round<2;round++)assert.equal((await s.advance()).status,200);const before=await s.read();const allowed=['valid','parent-exit'].includes(invalid),response=await s.advance();assert.equal(response.status,allowed?200:502,await response.clone().text());
+  const saved=await s.read();if(!allowed)assert.deepEqual(saved.characters,before.characters);else{const child=owner(saved).intents.find(n=>n.id==='owner:child');assert.equal(child.status,'satisfied');assert.equal(child.version,3);assert.equal(child.parents[0].version,invalid==='parent-exit'?3:2);}
+  round=3;assert.equal((await s.advance()).status,200);const nextChild=inputs.at(-1).self.intents.find(n=>n.id==='owner:child'),savedChild=owner(saved).intents.find(n=>n.id==='owner:child');assert.equal(nextChild.status,savedChild.status);assert.equal(nextChild.version,savedChild.version);assert.deepEqual(nextChild.parents,savedChild.parents);
+ }finally{s.restore();}
+});
+
 for(const mode of ['waiting','deferred','known-result'])test(`an omitted active binding permits later ${mode} assessment while a new stale upsert still fails`,async()=>{
  let round=0;const inputs=[];
  const s=await scenario(input=>{
