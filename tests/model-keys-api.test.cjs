@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Tests use a temporary transpiled Worker. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { fixtureDecision } = require('./pursuit-fixture.cjs');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const root = process.env.QUIET_HOURS_AUTH_BUILD;
@@ -39,7 +40,7 @@ const save = async (cookie, mode = 'openai', key = fakeKey) => {
   return response;
 };
 const advance = cookie => post(cookie, { operation: 'advance', mode: 'openai', minutes: 15, model: 'gpt-6-luna' });
-const modelReply = () => Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '休息一下', mood: '平靜', durationMinutes: 60, intents: [] }) } }] });
+const modelReply = init => Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content), { type: 'rest', target: '', content: '休息一下', mood: '平靜', durationMinutes: 60, intents: [] })) } }] });
 
 test('a key saved in one login is usable in a second login of the same account without transmitting the key again', async () => {
   reset();
@@ -55,7 +56,7 @@ test('a key saved in one login is usable in a second login of the same account w
     assert.equal(url, 'https://api.openai.com/v1/chat/completions');
     assert.equal(init.headers.Authorization, 'Bearer ' + fakeKey);
     assert.ok(!init.body.includes(fakeKey));
-    return modelReply();
+    return modelReply(init);
   };
   try { assert.equal((await advance(second)).status, 200); }
   finally { global.fetch = original; }
@@ -69,7 +70,7 @@ test('logout revokes only that login; another login can use the key until an exp
   assert.equal((await post(first, { operation: 'clear-model-key', mode: 'openai' })).status, 401);
   assert.equal((await status(second)).modelKeys.openai.configured, true);
   const original = global.fetch;
-  global.fetch = async () => modelReply();
+  global.fetch = async (_url, init) => modelReply(init);
   try { assert.equal((await advance(second)).status, 200); }
   finally { global.fetch = original; }
   assert.equal((await post(second, { operation: 'clear-model-key', mode: 'openai' })).status, 200);
@@ -154,10 +155,10 @@ test('provider exceptions cannot disclose the key in errors, world state or logs
 test('clearing a key during a round stops later dispatches and retains only already-sent usage', async () => {
   reset(); const cookie = await signIn(); await save(cookie);
   const original = global.fetch; let calls = 0;
-  global.fetch = async () => {
+  global.fetch = async (_url, init) => {
     calls++;
     assert.equal((await post(cookie, { operation: 'clear-model-key', mode: 'openai' })).status, 200);
-    return modelReply();
+    return modelReply(init);
   };
   try {
     const response = await advance(cookie);
@@ -190,7 +191,7 @@ test('replacement starts a new 24-hour lifetime and OpenRouter uses its own save
     global.fetch = async (url, init) => {
       assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
       assert.equal(init.headers.Authorization, 'Bearer router-fake-key');
-      return modelReply();
+      return modelReply(init);
     };
     try { assert.equal((await post(cookie, { operation: 'advance', mode: 'ai', minutes: 15, model: 'fixture/model' })).status, 200); }
     finally { global.fetch = original; }
@@ -204,7 +205,7 @@ test('expiry between provider dispatches stops new calls without counting an uns
     const cookie = await signIn(); await save(cookie);
     Date.now = () => base + 3600000;
     const newerLogin = await signIn(); let calls = 0;
-    global.fetch = async () => { calls++; Date.now = () => base + 86400000; return modelReply(); };
+    global.fetch = async (_url, init) => { calls++; Date.now = () => base + 86400000; return modelReply(init); };
     const response = await advance(newerLogin);
     assert.equal(response.status, 502);
     const body = await status(newerLogin);
@@ -215,9 +216,10 @@ test('expiry between provider dispatches stops new calls without counting an uns
 
 test('provider JSON errors and sensitive model output never enter responses or world records', async () => {
   const sensitive = JSON.stringify({ type: 'rest', content: fakeKey, target: '', mood: '', durationMinutes: 60, intents: [] });
-  for (const reply of [() => new Response(fakeKey + ' invalid JSON'), () => Response.json({ choices: [{ message: { content: sensitive } }] }), () => Response.json({ choices: [{ message: { content: sensitive.replace('test-', '\\u0074est-') } }] })]) {
+  const nativeSensitive = init => JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content), JSON.parse(sensitive)));
+  for (const reply of [() => new Response(fakeKey + ' invalid JSON'), init => Response.json({ choices: [{ message: { content: nativeSensitive(init) } }] }), init => Response.json({ choices: [{ message: { content: nativeSensitive(init).replace('test-', '\\u0074est-') } }] })]) {
     reset(); const cookie = await signIn(); await save(cookie);
-    const original = global.fetch; global.fetch = async () => reply();
+    const original = global.fetch; global.fetch = async (_url, init) => reply(init);
     try {
       const response = await advance(cookie);
       assert.equal(response.status, 502);

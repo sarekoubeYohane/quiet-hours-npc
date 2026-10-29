@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
 const modules = [];
+modules.push({type:'ESModule',path:'pursuit-fixture.js',contents:(await readFile('tests/pursuit-fixture.cjs','utf8')).replace(/module\.exports\s*=[^;]+;/,'')+'\nexport {fixtureDecision};'});
 // Load the same top-level runtime library modules as the application. Keeping a
 // second hand-written import graph here lets a real runtime dependency go missing.
 const libraryModules = (await readdir('lib')).filter(name => name.endsWith('.ts')).sort().map(name => name.slice(0, -3));
@@ -27,6 +28,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     modules: [{ type: 'ESModule', path: 'worker.js', contents: `
       import { startGitHubLogin, finishGitHubLogin } from './auth.js';
       import { GET, POST } from './world-api.js';
+      import { fixtureDecision } from './pursuit-fixture.js';
       export default { async fetch(request) {
         globalThis.requestHeaders = request.headers;
         globalThis.fetch = async (input, init) => {
@@ -34,7 +36,8 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
           if (upstream.url.includes('/login/oauth/access_token')) return Response.json({ access_token: 'fake-github-token' });
           if (upstream.url === 'https://api.github.com/user') return Response.json({ id: 123, login: 'fixture-user' });
           if (upstream.redirect !== 'manual') throw Error('Provider redirects must not be followed');
-          return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] }) } }] });
+          const inputData = JSON.parse(JSON.parse(init.body).messages[1].content);
+          return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(inputData,{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] })) } }] });
         };
         const path = new URL(request.url).pathname;
         if (path === '/api/auth/github') return startGitHubLogin(request);
