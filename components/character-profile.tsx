@@ -1,4 +1,5 @@
 'use client';
+import PursuitsAnalysis from './pursuits-analysis';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { assetsForCharacter } from '@/lib/character-assets';
@@ -15,6 +16,7 @@ export default function CharacterProfile({character,onBack,onInteract,onAnalysis
    <p>{asset&&!failed?'角色主視覺':'人物圖暫不可用；以名字辨識角色。'}</p>
   </div><div className="profile-content"><h1 style={{color:character.color}}>{character.name}</h1><h2>簡介</h2><p>{character.personality}</p>
    <h2>當前狀態</h2><p>{locations.find(l=>l.id===character.location)?.name||character.location} · {regions.find(r=>r.id===regionOf(character))?.name||regionOf(character)}</p><p>{character.activity}</p><p>心情：{character.mood}</p>{character.physical&&<div aria-label="身體外在狀況"><h3>身體外在狀況</h3>{Object.entries(character.physical.state).map(([key,value])=><p key={key}>{key}：{value}</p>)}</div>}
+   <PursuitsAnalysis character={character}/>
    <div className="profile-actions"><Button onClick={onInteract}>互動</Button><Button variant="outline" onClick={onAnalysis}>查看角色分析</Button></div>
    <p className="hint">{character.id==='owner'?'可進行單次指定、暫時接管與交還控制權。':'你的介入只提供角色知情事件；角色會自行判斷如何回應。'}</p>
   </div></div>

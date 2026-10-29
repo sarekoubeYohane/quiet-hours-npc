@@ -291,7 +291,7 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ arrangements:input.self.arrangements, lastKnownState:input.self.lastKnownState, learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ intents:input.self.intents, arrangements:input.self.arrangements, lastKnownState:input.self.lastKnownState, learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];

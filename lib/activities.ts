@@ -20,7 +20,7 @@ import { PerceptionCapacityError } from './perception';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
 export type MethodAssessment = { purpose:string; knownResults:{kind:'short'|'long';id:string;version:number}[]; choice:'new'|'retry'|'continue'|'wait'|'switch'|'drop'; method:string; change:{kind:'none'|'source'|'target'|'preparation'|'operation'|'condition'|'not-applicable';detail:string}; reason:string; selectedAction:{type:Action['type']|'continue';target:string}; intentIds:string[] };
-export type ActivityDecision = { phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; methodAssessment?:MethodAssessment; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = { pursuitTrace?:import('./pursuits').PursuitTrace[];pursuitTraceDropped?:number;focusIntentId?:string|null; phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; methodAssessment?:MethodAssessment; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 export type BudgetLimits = { calls: number | null; tokens: number | null };
 export const defaultLimits: BudgetLimits = { calls: 12, tokens: 30000 };
@@ -166,6 +166,8 @@ export async function advanceActivities(world: World, options: {
     if (decision.shortTerm) character.shortTerm = decision.shortTerm;
     if (decision.memoryTrace) character.memoryTrace = decision.memoryTrace;
     if (decision.cognition) { character.cognition = decision.cognition; projectRelationships(character); }
+    if(decision.pursuitTrace){character.pursuitTrace=decision.pursuitTrace;character.pursuitTraceDropped=decision.pursuitTraceDropped;}
+    if(decision.focusIntentId!==undefined)character.focusIntentId=decision.focusIntentId;
     if (decision.arrangements) character.arrangements = decision.arrangements;
     acknowledgeArrangementCues(character,decision.arrangementCueReceipts,world.minute);
     if (decision.preferences) character.preferences = decision.preferences;
@@ -184,12 +186,14 @@ export async function advanceActivities(world: World, options: {
       if (decision.intents) character.intents = decision.intents;
       if (typeof decision.action.mood === 'string') character.mood = decision.action.mood;
       character.plan!.attention = attentionMarker(world, character);
+      character.plan!.pursuitIds=decision.focusIntentId?[decision.focusIntentId]:[];
       progressActivity(world,character,'chosen');
       continue;
     }
     if (decision.intents) character.intents = decision.intents;
     try {
       if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai,bodyMinutes:bodyMinutes.get(character.id),bodyBase:bodyBases.get(character.id)}))continue;
+      if(character.plan&&!controlledDecision&&ai)character.plan.pursuitIds=decision.focusIntentId?[decision.focusIntentId]:[];
       if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from, decision.freeCandidate);
       if(controlledDecision&&character.plan)control!.active=true;
     } catch (error) {
