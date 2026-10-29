@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -20,15 +21,15 @@ const mealFixture=()=>{
  const w=seedWorld();w.characters=[w.characters[0],w.characters.find(c=>c.id==='owner')];w.characters[1].control={mode:'taken-over'};w.adjudication={provider:'openai',model:'gpt-6-luna'};
  w.supplies=[{id:'meal',label:'測試餐點',region:'kris-home-main',remaining:1,owner:'cass',knownTo:['cass'],allowedTo:['cass'],kind:'food',initialState:{}}];return w;
 };
-const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const proposal=target=>({type:'propose',target,content:'用手拿起並享用這份餐點',purpose:'吃飯',mood:'平靜',durationMinutes:15,intents:[]});
-const accepted=effects=>({status:'accepted',effects,check:null});
+const accepted=effects=>({status:'accepted',completionMinutes:15,effects,check:null});
 test('free meal proposals persist finite materialization and consumption without replacing the same meal',async()=>{
  const w=mealFixture();store.install(w);await POST(req({operation:'set-model-key',mode:'openai',key:'fixture-key'}));
  let chats=0,judgments=0;const original=global.fetch;
  global.fetch=async(_url,init)=>{const p=JSON.parse(init.body),input=JSON.parse(p.messages[1].content);
-  if(input.contractVersion==='world-adjudication.v1'){judgments++;assert.equal(input.action.purpose,'吃飯');assert.equal(input.actor.personality,undefined);assert.equal(input.actor.memories,undefined);return completion(accepted(judgments===1?[{kind:'materialize',supplyId:'meal',expectedRemaining:1}]:[{kind:'consume',objectId:'meal:1',expectedRevision:1}]));}
-  chats++;return completion(proposal(chats===1?'meal':'meal:1'));
+  if(input.contractVersion==='world-adjudication.v1'){judgments++;assert.equal(input.action.purpose,'吃飯');assert.equal(input.actor.personality,undefined);assert.equal(input.actor.memories,undefined);return completion(accepted(judgments===1?[{kind:'materialize',supplyId:'meal',expectedRemaining:1}]:[{kind:'consume',objectId:'meal:1',expectedRevision:1}]),JSON.parse(JSON.parse(init.body).messages[1].content));}
+  chats++;return completion(proposal(chats===1?'meal':'meal:1'),JSON.parse(JSON.parse(init.body).messages[1].content));
  };
  try{
   const advance=()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna'}));
@@ -40,7 +41,7 @@ test('free meal proposals persist finite materialization and consumption without
 });
 const configure=async world=>{store.install(world);await POST(req({operation:'set-model-key',mode:'openai',key:'fixture-key'}));};
 const aiBody=()=>({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna'});
-const transport=judgment=>{let calls=0;return {get calls(){return calls;},fetch:async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?judgment:proposal('meal'));}};};
+const transport=judgment=>{let calls=0;return {get calls(){return calls;},fetch:async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?judgment:proposal('meal'),input);}};};
 test('ordinary denial and unsupported method commit feedback without fabricated supplies',async()=>{
  for(const status of ['denied','unsupported']){
   await configure(mealFixture());const t=transport({status,effects:[],check:null}),old=global.fetch;global.fetch=t.fetch;
@@ -86,7 +87,7 @@ const cupFixture=()=>{
 test('the same borrowed cup keeps identity and ownership through carrying washing and returning',async()=>{
  await configure(cupFixture());const old=global.fetch;let step=0;
  const effects=[[{kind:'materialize',supplyId:'cup',expectedRemaining:1}],null,[{kind:'state',objectId:'cup:1',expectedRevision:2,key:'clean',value:'yes'}],null,[{kind:'transfer',objectId:'cup:1',expectedRevision:4,toHolder:null,toRegion:'kris-home-main'}]];
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion(accepted(effects[step-1]));step++;return completion((step===2||step===4)?{type:'move',target:step===2?'cafe':'kris-home',content:'',mood:'',durationMinutes:15,intents:[]}:proposal(step===1?'cup':'cup:1'));};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion(accepted(effects[step-1]),JSON.parse(JSON.parse(init.body).messages[1].content));step++;return completion((step===2||step===4)?{type:'move',target:step===2?'cafe':'kris-home',content:'',mood:'',durationMinutes:15,intents:[]}:proposal(step===1?'cup':'cup:1'),JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{
   for(let n=0;n<5;n++){const r=await POST(req(aiBody()));assert.equal(r.status,200,await r.clone().text());const w=await read();assert.equal(nonPhoneObjects(w).length,1);assert.equal(nonPhoneObjects(w)[0].id,'cup:1');assert.equal(nonPhoneObjects(w)[0].owner,'owner');}
   const w=await read();assert.equal(nonPhoneObjects(w)[0].region,'kris-home-main');assert.equal(nonPhoneObjects(w)[0].holder,null);assert.equal(nonPhoneObjects(w)[0].state.clean,'yes');assert.equal(w.aiUsage.totalCalls,8);
@@ -94,7 +95,7 @@ test('the same borrowed cup keeps identity and ownership through carrying washin
 });
 test('ownership grant is an owner NPC choice and cannot be invented by borrower adjudication',async()=>{
  const w=cupFixture();w.supplies[0].allowedTo=[];w.characters[0].control={mode:'taken-over'};w.characters[1].control={mode:'autonomous'};await configure(w);
- const old=global.fetch;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?accepted([{kind:'grant',targetId:'cup',recipient:'cass'}]):proposal('cup'));};
+ const old=global.fetch;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?accepted([{kind:'grant',targetId:'cup',recipient:'cass'}]):proposal('cup'),JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{
   assert.equal((await POST(req(aiBody()))).status,200);let saved=await read();assert.deepEqual(saved.supplies[0].allowedTo,['cass']);assert.deepEqual(nonPhoneObjects(saved),[]);
   saved.characters[0].control={mode:'autonomous'};saved.characters[1].control={mode:'taken-over'};store.replaceCommittedWorld(saved);
@@ -119,22 +120,22 @@ test('authorized receiving is separately consented by that NPC and preserves own
 const stagedFixture=()=>{
  const w=cupFixture();w.supplies[0].remaining=0;w.objects=[{id:'cup:1',source:'cup',label:'測試杯子',region:'kris-home-main',holder:null,owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['cass','owner'],allowedTo:['cass','owner'],stateTransitions:{contents:['empty','water','tea']}}];return w;
 };
-const teaCandidate=()=>({...accepted([]),stages:[{afterMinutes:30,preconditions:[{objectId:'cup:1',revision:1,region:'kris-home-main',holder:null,state:{contents:'empty'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:1,key:'contents',value:'water'}]},{afterMinutes:60,preconditions:[{objectId:'cup:1',revision:2,region:'kris-home-main',holder:null,state:{contents:'water'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:2,key:'contents',value:'tea'}]}]});
+const teaCandidate=()=>({...accepted([]),completionMinutes:60,stages:[{afterMinutes:30,preconditions:[{objectId:'cup:1',revision:1,region:'kris-home-main',holder:null,state:{contents:'empty'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:1,key:'contents',value:'water'}]},{afterMinutes:60,preconditions:[{objectId:'cup:1',revision:2,region:'kris-home-main',holder:null,state:{contents:'water'}}],effects:[{kind:'state',objectId:'cup:1',expectedRevision:2,key:'contents',value:'tea'}]}]});
 test('activity phases commit only when due and continue without additional model calls or dice',async()=>{
- await configure(stagedFixture());const old=global.fetch,random=Math.random;let calls=0,rolls=0;Math.random=()=>{rolls++;return .8;};global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?teaCandidate():{...proposal('cup:1'),durationMinutes:60});};
+ await configure(stagedFixture());const old=global.fetch,random=Math.random;let calls=0,rolls=0;Math.random=()=>{rolls++;return .8;};global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?teaCandidate():{...proposal('cup:1'),durationMinutes:60},JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{
   const advance=()=>POST(req(aiBody()));assert.equal((await advance()).status,200);let w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'empty');assert.equal(w.characters[0].plan.phases.cursor,0);
   assert.equal((await advance()).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(w.characters[0].plan.phases.cursor,1);
   assert.equal((await advance()).status,200);assert.equal((await advance()).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(nonPhoneObjects(w)[0].revision,3);assert.equal(calls,2);assert.equal(rolls,0);assert.equal(w.characters[0].plan,undefined);
  }finally{global.fetch=old;Math.random=random;}
 });
-const teaTransport=()=>{let calls=0;return{get calls(){return calls;},fetch:async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?teaCandidate():{...proposal('cup:1'),durationMinutes:60});}};};
+const teaTransport=()=>{let calls=0;return{get calls(){return calls;},fetch:async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?teaCandidate():{...proposal('cup:1'),durationMinutes:60},input);}};};
 test('an explicit continue retains the original phase clock and committed cursor across reload and replay',async()=>{
  await configure(stagedFixture());const t=teaTransport(),old=global.fetch;global.fetch=t.fetch;
  try{
   await POST(req(aiBody()));await POST(req(aiBody()));const before=await read();
   await POST(req({operation:'intervene',target:'cass',text:'需要你留意一下這邊。'}));
-  global.fetch=async()=>completion({type:'continue',target:'',content:'',mood:'',durationMinutes:60,intents:[]});
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>completion({type:'continue',target:'',content:'',mood:'',durationMinutes:60,intents:[]},JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
   const b={...aiBody(),operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await POST(req(b))).status,200);assert.equal((await POST(req(b))).status,200);let w=await read();assert.equal(nonPhoneObjects(w)[0].revision,2);assert.equal(w.characters[0].plan.startedAt,before.characters[0].plan.startedAt);assert.equal(w.characters[0].plan.phases.cursor,1);
   assert.equal((await POST(req(aiBody()))).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].revision,3);assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(w.aiUsage.totalCalls,3);
  }finally{global.fetch=old;}
@@ -143,7 +144,7 @@ test('NPC interruption preserves the water already committed and never completes
  await configure(stagedFixture());const t=teaTransport(),old=global.fetch;global.fetch=t.fetch;
  try{
   await POST(req(aiBody()));await POST(req(aiBody()));await POST(req({operation:'intervene',target:'cass',text:'可以現在過來說說話嗎？'}));
-  global.fetch=async()=>completion({type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[]});
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>completion({type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[]},JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
   assert.equal((await POST(req(aiBody()))).status,200);assert.equal((await POST(req(aiBody()))).status,200);
   const w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(nonPhoneObjects(w)[0].revision,2);assert.equal(w.characters[0].plan.phases,undefined);assert.equal(w.aiUsage.totalCalls,3);
  }finally{global.fetch=old;}
@@ -162,34 +163,34 @@ test('another informed NPC can handle the intermediate cup and stale phases reve
   await POST(req(aiBody()));await POST(req(aiBody()));assert.equal((await read()).objects[0].state.contents,'water');
   await POST(req({operation:'return-control',target:'owner'}));
   global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);
-   if(input.contractVersion==='world-adjudication.v1')return completion(accepted([{kind:'transfer',objectId:'cup:1',expectedRevision:2,toHolder:'owner',toRegion:'kris-home-main'}]));
-   return completion(proposal('cup:1'));
+   if(input.contractVersion==='world-adjudication.v1')return completion(accepted([{kind:'transfer',objectId:'cup:1',expectedRevision:2,toHolder:'owner',toRegion:'kris-home-main'}]),JSON.parse(JSON.parse(init.body).messages[1].content));
+   return completion(proposal('cup:1'),JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   assert.equal((await POST(req(aiBody()))).status,200);let w=await read();assert.equal(nonPhoneObjects(w)[0].holder,'owner');assert.equal(nonPhoneObjects(w)[0].state.contents,'water');
-  global.fetch=async()=>completion({type:'move',target:'cafe',content:'',mood:'',durationMinutes:15,intents:[]});
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>completion({type:'move',target:'cafe',content:'',mood:'',durationMinutes:15,intents:[]},JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
   assert.equal((await POST(req(aiBody()))).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].region,'cafe-front');assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(w.characters.find(c=>c.id==='cass').plan,undefined);
   let cassInput;
-  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self.id==='cass')cassInput=input;return completion({type:'rest',target:'',content:'',mood:'',durationMinutes:60,intents:[]});};
+  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self.id==='cass')cassInput=input;return completion({type:'rest',target:'',content:'',mood:'',durationMinutes:60,intents:[]},JSON.parse(JSON.parse(init.body).messages[1].content));};
   assert.equal((await POST(req(aiBody()))).status,200);assert.ok(cassInput);assert.deepEqual(nonPhoneObjects(cassInput),[]);assert.doesNotMatch(cassInput.self.activity,/cafe|owner|店主|咖啡/);
  }finally{global.fetch=old;}
 });
 test('rephrasing the same physical method cannot reroll unchanged authority conditions',async()=>{
  await configure(mealFixture());const old=global.fetch,random=Math.random;let rolls=0,decisions=0;Math.random=()=>{rolls++;return 0;};
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion({...accepted([{kind:'materialize',supplyId:'meal',expectedRemaining:1}]),check:{difficulty:12,ability:'拿取'}});decisions++;return completion({...proposal('meal'),content:decisions===1?'拿起食物':'伸手取得餐點'});};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion({...accepted([{kind:'materialize',supplyId:'meal',expectedRemaining:1}]),check:{difficulty:12,ability:'拿取'}},JSON.parse(JSON.parse(init.body).messages[1].content));decisions++;return completion({...proposal('meal'),content:decisions===1?'拿起食物':'伸手取得餐點'},JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{await POST(req(aiBody()));await POST(req(aiBody()));assert.equal(rolls,1);assert.equal((await read()).supplies[0].remaining,1);}finally{global.fetch=old;Math.random=random;}
 });
 test('adjudication wire schema uses closed object shapes and accepts bounded phase state entries',async()=>{
  await configure(stagedFixture());const old=global.fetch;
  global.fetch=async(_url,init)=>{const p=JSON.parse(init.body),input=JSON.parse(p.messages[1].content);
-  if(input.contractVersion!=='world-adjudication.v1')return completion({...proposal('cup:1'),durationMinutes:60});
+  if(input.contractVersion!=='world-adjudication.v1')return completion({...proposal('cup:1'),durationMinutes:60},JSON.parse(JSON.parse(init.body).messages[1].content));
   const inspect=s=>{if(s&&typeof s==='object'){if(s.type==='object')assert.equal(s.additionalProperties,false);for(const v of Object.values(s))if(v&&typeof v==='object'){if(Array.isArray(v))v.forEach(inspect);else inspect(v);}}};inspect(p.response_format.json_schema.schema);
-  const candidate=teaCandidate();for(const stage of candidate.stages)for(const condition of stage.preconditions)condition.state=Object.entries(condition.state).map(([key,value])=>({key,value}));return completion(candidate);
+  const candidate=teaCandidate();for(const stage of candidate.stages)for(const condition of stage.preconditions)condition.state=Object.entries(condition.state).map(([key,value])=>({key,value}));return completion(candidate,JSON.parse(JSON.parse(init.body).messages[1].content));
  };
  try{assert.equal((await POST(req(aiBody()))).status,200);assert.equal((await POST(req(aiBody()))).status,200);assert.equal((await read()).objects[0].state.contents,'water');}finally{global.fetch=old;}
 });
 test('recipient NPC chooses its own consent before another NPC can transfer possession',async()=>{
  const w=stagedFixture();nonPhoneObjects(w)[0].holder='cass';w.characters[0].control={mode:'taken-over'};w.characters[1].control={mode:'autonomous'};await configure(w);const old=global.fetch;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?accepted([{kind:'consent',objectId:'cup:1'}]):proposal('cup:1'));};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?accepted([{kind:'consent',objectId:'cup:1'}]):proposal('cup:1'),JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{
   assert.equal((await POST(req(aiBody()))).status,200);let saved=await read();assert.deepEqual(nonPhoneObjects(saved)[0].acceptedBy,['owner']);assert.equal(nonPhoneObjects(saved)[0].holder,'cass');
   saved.characters[0].control={mode:'autonomous'};saved.characters[1].control={mode:'taken-over'};store.replaceCommittedWorld(saved);global.fetch=transport(accepted([{kind:'transfer',objectId:'cup:1',expectedRevision:1,toHolder:'owner',toRegion:'kris-home-main'}])).fetch;
@@ -211,19 +212,22 @@ test('thrown saves preserve known paid usage exactly once for both before and af
   }finally{global.fetch=old;}
  }
 });
-test('15 and 30 minute advances apply all already-due phases while retaining later future work',async()=>{
+test('15 and 30 minute advances apply all due phases and retain only unfinished activity',async()=>{
  for(const minutes of [15,30]){
-  await configure(stagedFixture());const old=global.fetch;const candidate=teaCandidate();candidate.stages[0].afterMinutes=15;candidate.stages[1].afterMinutes=30;
-  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?candidate:{...proposal('cup:1'),durationMinutes:60});};
+  await configure(stagedFixture());const old=global.fetch;const candidate=teaCandidate();candidate.completionMinutes=30;candidate.stages[0].afterMinutes=15;candidate.stages[1].afterMinutes=30;
+  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return completion(input.contractVersion==='world-adjudication.v1'?candidate:{...proposal('cup:1'),durationMinutes:60},input);};
   try{
-   assert.equal((await POST(req({...aiBody(),minutes}))).status,200);let w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,minutes===15?'water':'tea');assert.equal(w.characters[0].plan.phases.cursor,minutes===15?1:2);assert.equal(w.aiUsage.totalCalls,2);
-   assert.equal((await POST(req({...aiBody(),minutes}))).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(nonPhoneObjects(w)[0].revision,3);assert.equal(w.aiUsage.totalCalls,2);
+   assert.equal((await POST(req({...aiBody(),minutes}))).status,200);let w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,minutes===15?'water':'tea');if(minutes===15){assert.equal(w.characters[0].plan.phases.cursor,1);assert.equal(w.characters[0].plan.until-w.minute,15);}else assert.equal(w.characters[0].plan,undefined);assert.equal(w.aiUsage.totalCalls,2);
+   // A completed goal gets a fresh normal choice; an unfinished goal progresses
+   // without dispatch. Neither path replays the already-committed tea phases.
+   if(minutes===30)global.fetch=async(_url,init)=>completion({type:'rest',target:'',content:'休息',mood:'平靜',durationMinutes:60,intents:[]},JSON.parse(JSON.parse(init.body).messages[1].content));
+   assert.equal((await POST(req({...aiBody(),minutes}))).status,200);w=await read();assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(nonPhoneObjects(w)[0].revision,3);assert.equal(w.aiUsage.totalCalls,minutes===15?2:3);
   }finally{global.fetch=old;}
  }
 });
 test('ownership does not reveal an unknown supply or authorize a hidden-object grant',async()=>{
  const w=cupFixture();w.supplies[0].knownTo=['cass'];w.characters[0].control={mode:'taken-over'};w.characters[1].control={mode:'autonomous'};await configure(w);const old=global.fetch;let ownerInput;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion(accepted([{kind:'grant',targetId:'cup',recipient:'cass'}]));ownerInput=input;return completion(proposal('cup'));};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return completion(accepted([{kind:'grant',targetId:'cup',recipient:'cass'}]),JSON.parse(JSON.parse(init.body).messages[1].content));ownerInput=input;return completion(proposal('cup'),JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{assert.equal((await POST(req(aiBody()))).status,502);assert.deepEqual(ownerInput.supplies,[]);assert.equal((await read()).turn,0);}finally{global.fetch=old;}
 });
 
@@ -233,6 +237,6 @@ test('an accepted candidate with no effect is invalid and never fabricates compl
 });
 test('uncertain staged plans bind their actual target prerequisites rather than sharing an empty-effect trial',async()=>{
  const w=stagedFixture();w.objects.push({...structuredClone(nonPhoneObjects(w)[0]),id:'cup:2'});await configure(w);const old=global.fetch,random=Math.random;let turns=0,rolls=0;Math.random=()=>{rolls++;return 0;};
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion!=='world-adjudication.v1'){turns++;return completion({...proposal('cup:'+turns),durationMinutes:60});}const candidate=teaCandidate();candidate.check={difficulty:12,ability:'泡茶'};for(const stage of candidate.stages){stage.preconditions[0].objectId='cup:'+turns;stage.effects[0].objectId='cup:'+turns;}return completion(candidate);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion!=='world-adjudication.v1'){turns++;return completion({...proposal('cup:'+turns),durationMinutes:60},JSON.parse(JSON.parse(init.body).messages[1].content));}const candidate=teaCandidate();candidate.check={difficulty:12,ability:'泡茶'};for(const stage of candidate.stages){stage.preconditions[0].objectId='cup:'+turns;stage.effects[0].objectId='cup:'+turns;}return completion(candidate,JSON.parse(JSON.parse(init.body).messages[1].content));};
  try{await POST(req(aiBody()));await POST(req(aiBody()));assert.equal(rolls,2);assert.equal((await read()).objects[0].state.contents,'empty');}finally{global.fetch=old;Math.random=random;}
 });
