@@ -27,3 +27,11 @@
 最新序號修正後：追加回想 API **34／34 GREEN**；`pnpm typecheck`、8 個變更程式／測試的 ESLint、`git diff --check` 通過。既有真 Chromium 旅程再次 **PASS**（22 次 advance／510 分鐘、9 NPC＋1 裁定 fixture、0頁面錯誤）；fixture 結果不宣稱真實 NPC 或正式站驗收。
 
 最後將序號啟用納入原短期 FIFO／總 bytes 收斂後，重跑安排、共同手機 matcher、review、memory／maintenance／recall 六檔 **95／95 GREEN**；最終 typecheck／ESLint／diffcheck 與 Chromium 旅程再次通過。
+
+## 2026-10-29：PR #204 承接最新 main
+
+合併 main `328165e`，保留本票 observationSequence／cue 高水位與共用 finalizeDecisionInput，並保留 main 的 object／supply 主觀來源驗證及 npc-decision.v2 契約。產品 tree `a9280f87e7ccd3bbfcbccd81b395f76d8bce8123`，提交 `f8319bf45449c0967772215c0d1f91222b0fd211`。
+
+完整產品 API／UI 866／866、登入／Key 32／32 通過，typecheck、13 個變更程式／測試檔 ESLint 及 production build 通過，產物名稱 quiet-hours-npc／APP_ENV production 正確。最後14項 workerd／migration／離線材料檢查中，13項通過，僅 #211 的 checkout-product-matches-pinned-commit 因材料仍固定整合前程式而拒絕；將 implementationCommit 重新固定至上述已驗證產品提交，保留原場景 hash、版本、預算、授權缺口與 paidExecutionEnabled=false，再重跑該14項。沒有付費呼叫、正式世界操作、合併 main 或部署。
+
+材料重新固定後，上述14項重跑 **14／14 通過**；最終合計 **912／912**，0失敗／略過。產品程式與完整回歸版本一致，只另更新離線材料固定提交及此紀錄。
