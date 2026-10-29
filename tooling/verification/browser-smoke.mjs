@@ -5,6 +5,8 @@ let browser;
 try {
  browser=await launchBrowser();
  const page=await browser.newPage();await page.addInitScript(()=>{Date.now=()=>Date.parse('2026-10-15T16:00:00Z');});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const asset=await page.request.get(`${url}/characters/owner/avatar.webp`);
+ assert.equal(asset.headers()['content-type'],'image/webp','the real character asset must be served instead of the SPA');
  await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();
  await page.getByRole('button',{name:'下一回合',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');

@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import http from 'node:http';
 const repo=resolve(process.env.FIXTURE_REPO||process.cwd());
 process.chdir(repo);
@@ -108,7 +108,8 @@ const server=http.createServer(async(req,res)=>{
  }
  if(url.pathname.startsWith('/__font/')&&fontDirectory){const file=url.pathname.slice('/__font/'.length);if(!/^[a-zA-Z0-9_.-]+$/.test(file))throw Error('invalid font path');res.setHeader('Content-Type','font/woff2');res.end(await readFile(join(fontDirectory,'files',file)));return;}
  const publicFile=resolve(repo,'public',`.${url.pathname}`);
- if(publicFile.startsWith(join(repo,'public')+'/')){try{const asset=await readFile(publicFile);res.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.webp')?'image/webp':url.pathname.endsWith('.json')?'application/json':url.pathname.endsWith('.html')?'text/html':'application/octet-stream');res.end(asset);return;}catch{ /* fall through for SPA */ }}
+ const publicRelative=relative(join(repo,'public'),publicFile);
+ if(publicRelative&&!isAbsolute(publicRelative)&&publicRelative!=='..'&&!publicRelative.startsWith('..'+sep)){try{const asset=await readFile(publicFile);res.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.webp')?'image/webp':url.pathname.endsWith('.json')?'application/json':url.pathname.endsWith('.html')?'text/html':'application/octet-stream');res.end(asset);return;}catch{ /* fall through for SPA */ }}
  if(url.pathname==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(js);return;}
  if(url.pathname==='/app.css'){res.setHeader('Content-Type','text/css');res.end(css);return;}
  res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
