@@ -47,3 +47,9 @@ node --import ./tooling/verification/no-network.mjs tooling/verification/browser
 - [篩選後機械結果](assets/pursuits-222/summary.json)
 
 Typecheck、變更檔 ESLint、`git diff --check` 通過。獨立整合審查及 #229 真實行為仍有各自責任；未記錄的心理因果保持未知，程式不以合法引用冒稱理解正確。
+
+## 與共享圖的整合核對
+
+#222 與 #223、既有回歸 fixture 整合後，T1／T2／T3 原生 API 共 **62/62** 通過，typecheck 及 diffcheck 通過。T3 的明示 fixture factory 現在為本次新增追求逐項提供候選及承接映射；既有焦點引用真正輸入版本，圖與排序反例仍保留，不在 transport 全域修復非法回覆。
+
+`browser-pursuit-graph-223.mjs` 在此契約重跑通過：三次 fixture 決策、零付費派送、一個共享節點、一份實際設計成果；原活動起點1260／截止1320不變。分析／人物檔案重載、390px及下一次真正輸入7702 UTF-8 bytes均已核對，0 pageerror。原始本機紀錄保留於 ignored `outputs/merge-222-*`；這仍是受控程式證據。
