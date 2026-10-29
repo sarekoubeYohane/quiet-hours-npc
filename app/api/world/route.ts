@@ -1,4 +1,4 @@
-import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, type UsageReceipt } from '@/lib/usage-recovery';
+import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, boundUsageReceipts, type UsageReceipt } from '@/lib/usage-recovery';
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
@@ -128,7 +128,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key,value])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -149,6 +149,10 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
     delete journal.results[id];
     if(journal.usage)delete journal.usage[id];
   }
+  // A confirmed conflict can retain paid usage after its HTTP journal was
+  // lost. Keep those finalized orphan markers within the same existing cap;
+  // absent-journal requests use the archive guard, never recovery or dispatch.
+  boundUsageReceipts(journal,maxResults);
 }
 
 
@@ -222,7 +226,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     traceWorld(trace, 'journal-read');
     const issuedAt = Number(operationId.split(':')[0]);
     if (issuedAt > Date.now() + 60000) return reply({ error: '裝置時間不正確，請校正時間後重試。' }, 400);
-    const stored = await database().prepare('SELECT operations, locked_until FROM worlds WHERE owner = ?').bind(id).first<{operations:string;locked_until:number}>();
+    const stored = await database().prepare('SELECT operations, locked_until, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;locked_until:number;state:string;version:number}>();
     const serializedJournal = stored!.operations;
     journal = JSON.parse(serializedJournal);
     const previous = journal.results[operationId];
@@ -248,6 +252,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         return reply({...uncertainResult.body,decisionTraceStatus:{status:'saved',gap:'journal-receipt-unavailable'}},uncertainResult.status);
       }
     }catch{return reply({error:'暫時無法確認此操作先前是否已受理，已停止派送。請稍後以同一操作重新讀取。',operationUncertain:true,decisionTraceStatus:{status:'read-failed',gap:'prior-acceptance-unavailable',lastKnownStage:'before-acceptance'}},503);}
+    // Usage-only recovery deliberately does not change the story version.
+    // A row loaded before that recovery must not acquire a newer journal and
+    // later commit its stale accounting. Compare the original snapshot before
+    // normalization; the lease CAS below also protects this exact stored row.
+    if(stored!.version!==version||JSON.stringify(JSON.parse(stored!.state))!==JSON.stringify(world))return waiting();
     if(b.operation==='advance'&&b.mode!=='demo'&&request.headers.get(timePolicyHeader)!==roundTimePolicy.version)return reply({error:'回合等待政策已更新，請重新載入觀察室後以原操作識別碼繼續。',clientUpdateRequired:true},426);
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
     if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
@@ -291,7 +300,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     journal.results[operationId] = { pending: lease };
     if(b.operation==='advance'&&b.mode!=='demo'){journal.usage??={};journal.usage[operationId]=emptyUsageReceipt(currentUsage(world).windowStartedAt);}
     const pendingJournal = JSON.stringify(journal);
-    const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
+    const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ? AND state = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal,stored!.state).run();
     if (!acquired.meta.changes) { traceWorld(trace, 'lease-wait', { outcome: 'contended' }); return waiting(); }
     locked = true;
     responseSignal?.throwIfAborted();workSignal.throwIfAborted();

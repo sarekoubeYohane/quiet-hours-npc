@@ -127,4 +127,6 @@ NPC 的解析／驗證邊界另傳遞可選的封閉 `failure.reason`：`json-pa
 
 舊操作沒有去重回條時，僅在 trace.baseVersion 與當前 world version 完全相同才可恢復：舊世界提交及舊 retainPaidUsage 都會增加 version，因此這個有限證據可證明尚未入帳。版本已變時，無法可靠判定是否已收尾，顯示 `legacy-unverifiable`，不猜算。儲存不可讀／不可寫、trace 缺失／淘汰，保留 pending／unavailable 與未知範圍。這不是從累計總數猜原操作差額，也不掃描加總 archive。
 
-核對回條與 results 共同遵守既有最多八筆及 journal bytes 淘汰政策；被淘汰的未定案核對只留下有界計數 `unresolvedUsageEvicted`，保留費用不完整警示，不保留新增私有內容。floor 防止淘汰 ID／遲到 worker 再次補算。所有權仍取登入 owner，trace 遮蔽與容量原則不變，不需要新 migration。這個切片沒有完成 #91／#92 的其餘驗收；正式站最初中斷與 HTTP 讀取失敗仍由 #77 分開查證。
+核對回條與 results 共同遵守既有最多八筆及 journal bytes 淘汰政策；確定 CAS 衝突且原 HTTP journal 已遺失時的 finalized 孤立 marker 亦在同一筆數界限內清理，該 ID 仍由 archive guard 阻止重新派送；被淘汰的未定案核對只留下有界計數 `unresolvedUsageEvicted`，保留費用不完整警示，不保留新增私有內容。floor 防止淘汰 ID／遲到 worker 再次補算。所有權仍取登入 owner，trace 遮蔽與容量原則不變，不需要新 migration。這個切片沒有完成 #91／#92 的其餘驗收；正式站最初中斷與 HTTP 讀取失敗仍由 #77 分開查證。
+
+恢復入帳不提高故事 version，因此新操作受理時同時核對載入的故事／用量快照與最新 journal row，lease CAS 亦包含原 state。若其他操作已入帳，舊快照須等待重新載入，不能只因 story version 相等而覆蓋帳務。原 worker 完整收尾會沿 prior／desired cohort 聯集扣補該操作尚未定案的差額，包含移除暫時 unknown-price cohort，但不改其他歷史貢獻或已 finalized 費用。

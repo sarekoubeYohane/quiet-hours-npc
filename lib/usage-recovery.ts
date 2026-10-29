@@ -1,5 +1,5 @@
 import type { AIUsage, World } from './world';
-import { beginCost, type CostCohort } from './costs';
+import { beginCost, validPrice, type CostCohort } from './costs';
 import { readDecisionTrace, type DecisionTrace } from './decision-traces';
 
 export type UsageRecovery = {status:'accounted'|'pending'|'unavailable'|'legacy-unverifiable';knownCalls:number;unknownRange:boolean};
@@ -30,13 +30,16 @@ function mergePaid(world:World,desired:AIUsage,applied:AIUsage|undefined) {
     if(sameWindow||usage.windowStartedAt===window)usage[hour]+=difference;
   }
   usage.costs??={total:{},hour:{}};
-  for(const [key,cohort] of Object.entries(desired.costs?.total||{}))for(const group of ['total','hour'] as const){
+  const keys=new Set([...Object.keys(desired.costs?.total||{}),...Object.keys(applied?.costs?.total||{})]);
+  for(const key of keys)for(const group of ['total','hour'] as const){
     if(group==='hour'&&usage.windowStartedAt!==window)continue;
-    const previous=applied?.costs?.total[key];
-    const target=usage.costs[group][key]??={...cohort,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0};
-    for(const field of fields)target[field]+=cohort[field]-(previous?.[field]||0);
-    target.lastDispatchAt=Math.max(target.lastDispatchAt,cohort.lastDispatchAt);
-    if(!Number.isFinite(target.knownUsd)){target.knownUsd=0;target.unknownCalls=Math.max(1,target.calls);}
+    const cohort=desired.costs?.total[key],previous=applied?.costs?.total[key];
+    const basis=cohort??previous!;
+    const target=usage.costs[group][key]??={...basis,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0};
+    for(const field of fields)target[field]+=(cohort?.[field]||0)-(previous?.[field]||0);
+    target.lastDispatchAt=Math.max(target.lastDispatchAt,cohort?.lastDispatchAt||0);
+    if(target.calls===0&&fields.every(field=>target[field]===0))delete usage.costs[group][key];
+    else if(!Number.isFinite(target.knownUsd)){target.knownUsd=0;target.unknownCalls=Math.max(1,target.calls);}
   }
 }
 function usageFromTrace(trace:DecisionTrace,storedWindow?:number):AIUsage|null {
@@ -51,14 +54,15 @@ function usageFromTrace(trace:DecisionTrace,storedWindow?:number):AIUsage|null {
     // A prepared checkpoint is not proof of a fetch. Once dispatch/response
     // is durable, the attempt is known even when its token usage is missing.
     const known=!!tokens&&['inputTokens','outputTokens'].every(k=>typeof tokens[k as keyof typeof tokens]==='number'&&Number.isFinite(tokens[k as keyof typeof tokens])&&Number(tokens[k as keyof typeof tokens])>=0);
-    if(!known&&d.stage==='dispatch-prepared'&&!d.fetchStartedAt)continue;
+    const dispatched=typeof d.fetchStartedAt==='number'||typeof d.httpStatus==='number'||['dispatched','received','response-headers','candidate-received','late-discarded'].includes(String(d.stage));
+    if(!known&&!dispatched)continue;
     result.calls++;result.totalCalls++;
     if(known){result.inputTokens+=tokens!.inputTokens;result.totalInputTokens+=tokens!.inputTokens;result.outputTokens+=tokens!.outputTokens;result.totalOutputTokens+=tokens!.outputTokens;}
     else{result.unknownCalls++;result.totalUnknownCalls++;}
-    const price=d.price as CostCohort['price']|undefined;
-    const report=beginCost(result,typeof d.provider==='string'?d.provider:'unknown',typeof d.model==='string'?d.model:'unknown',price??undefined,d.task==='adjudication'?'adjudication':'npc');if(known)report(tokens!);
-    const cohortKey=`${d.task==='adjudication'?'adjudication':'npc'}:${price?.id||`unknown:${encodeURIComponent(typeof d.provider==='string'?d.provider:'unknown')}:${encodeURIComponent(typeof d.model==='string'?d.model:'unknown')}`}`;
-    for(const group of [result.costs!.total,result.costs!.hour])group[cohortKey].lastDispatchAt=typeof d.startedAt==='number'?d.startedAt:window;
+    const candidate=d.price as CostCohort['price']|undefined;
+    const price=validPrice(candidate)&&typeof candidate.id==='string'&&candidate.id.length>0&&candidate.id.length<=256&&candidate.provider===d.provider&&candidate.model===d.model?candidate:undefined;
+    const report=beginCost(result,typeof d.provider==='string'?d.provider:'unknown',typeof d.model==='string'?d.model:'unknown',price??undefined,d.task==='adjudication'?'adjudication':'npc',typeof d.startedAt==='number'?d.startedAt:window);
+    if(known)report(tokens!);
   }
   return result;
 }
@@ -67,7 +71,21 @@ export function recoveryStatus(journal:UsageJournal,operationId:string,trace:Dec
   const result=journal.results[operationId] as {body?:{operationUncertain?:boolean};pending?:number}|undefined;
   if(receipt?.finalized)return {status:'accounted',knownCalls:receipt.applied.totalCalls-receipt.applied.totalUnknownCalls,unknownRange:false};
   if(!receipt&&!result?.body?.operationUncertain&&!(result?.pending!==undefined&&result.pending<=Date.now()))return undefined;
-  return {status:unavailable?'unavailable':!trace||result?.pending!==undefined&&result.pending>Date.now()||receipt&&receipt.applied.totalCalls===0?'pending':receipt?'accounted':'legacy-unverifiable',knownCalls:receipt?receipt.applied.totalCalls-receipt.applied.totalUnknownCalls:0,unknownRange:true};
+  let status:UsageRecovery['status']='legacy-unverifiable';
+  const active=result?.pending!==undefined&&result.pending>Date.now();
+  const awaitingEvidence=!trace||active||receipt?.applied.totalCalls===0;
+  if(unavailable)status='unavailable';
+  else if(awaitingEvidence)status='pending';
+  else if(receipt)status='accounted';
+  return {status,knownCalls:receipt?receipt.applied.totalCalls-receipt.applied.totalUnknownCalls:0,unknownRange:true};
+}
+export function boundUsageReceipts(journal:UsageJournal,maxResults:number) {
+  if(!journal.usage)return;
+  let count=Object.keys(journal.usage).length;
+  for(const id of Object.keys(journal.usage)){
+    if(count<=maxResults)break;
+    if(!journal.results[id]&&journal.usage[id].finalized){delete journal.usage[id];count--;}
+  }
 }
 export async function recoverPaidUsage(db:Pick<D1Database,'prepare'>,owner:string,operationId:string,desired?:AIUsage,finalized=false) {
   for(let attempt=0;attempt<4;attempt++){
@@ -91,6 +109,7 @@ export async function recoverPaidUsage(db:Pick<D1Database,'prepare'>,owner:strin
     const world=JSON.parse(row.state) as World;
     mergePaid(world,paid,previous?.applied);
     journal.usage??={};journal.usage[operationId]={applied:paid,finalized};
+    boundUsageReceipts(journal,8);
     const saved=await db.prepare('UPDATE worlds SET state = ?, operations = ?, version = version + ? WHERE owner = ? AND state = ? AND operations = ? AND version = ?')
       .bind(JSON.stringify(world),JSON.stringify(journal),finalized&&!previous?1:0,owner,row.state,row.operations,row.version).run();
     if(saved.meta.changes)return;

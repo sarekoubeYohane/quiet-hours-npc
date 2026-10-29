@@ -6,12 +6,43 @@ import { resolve, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { checkMaterials } from './check-autonomous-demand-211.mjs';
 
-test('valid public material remains explicitly unready for paid execution', () => {
-  const report = checkMaterials();
-  assert.equal(report.materialsValid, true, JSON.stringify(report.errors));
-  assert.equal(report.paidReady, false);
-  assert.equal(report.realProviderCalls, 0);
-  assert.ok(report.missing.includes('applicable-finite-paid-authorization-and-remaining-balance'));
+// The material contract pins a product commit. Validate its positive case in
+// that checkout, not whichever later product happens to run this test suite.
+function withPinnedMaterials(run) {
+  const directory = mkdtempSync(join(tmpdir(), 'demand-pinned-review-'));
+  const root = join(directory, 'checkout');
+  const planPath = resolve('tooling/experiments/autonomous-demand-211.json');
+  const plan = JSON.parse(readFileSync(planPath, 'utf8'));
+  try {
+    const checkout = spawnSync('git', ['worktree', 'add', '--detach', root, plan.implementationCommit], { encoding: 'utf8', windowsHide: true });
+    assert.equal(checkout.status, 0, checkout.stderr);
+    run({ root, planPath });
+  } finally {
+    spawnSync('git', ['worktree', 'remove', '--force', root], { encoding: 'utf8', windowsHide: true });
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test('valid pinned public material remains explicitly unready for paid execution', () => {
+  withPinnedMaterials(options => {
+    const report = checkMaterials(options);
+    assert.equal(report.materialsValid, true, JSON.stringify(report.errors));
+    assert.equal(report.paidReady, false);
+    assert.equal(report.realProviderCalls, 0);
+    assert.ok(report.missing.includes('applicable-finite-paid-authorization-and-remaining-balance'));
+  });
+});
+
+test('a changed product checkout cannot reuse otherwise valid pinned materials', () => {
+  withPinnedMaterials(options => {
+    const product = resolve(options.root, 'lib/world.ts');
+    writeFileSync(product, readFileSync(product, 'utf8') + '\n// synthetic changed-product fixture\n');
+    const report = checkMaterials(options);
+    assert.equal(report.materialsValid, false);
+    assert.ok(report.errors.includes('checkout-product-matches-pinned-commit'));
+    assert.equal(report.paidReady, false);
+    assert.equal(report.realProviderCalls, 0);
+  });
 });
 
 test('changing the scene bytes without registration fails exact hash verification', () => {
