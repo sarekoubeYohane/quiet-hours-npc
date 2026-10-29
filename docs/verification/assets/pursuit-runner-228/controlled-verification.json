@@ -1,0 +1,9 @@
+{
+  "fixture": true,
+  "realPaidDispatches": 0,
+  "runnerTests": {"passed":15,"failed":0,"durationMs":121693},
+  "positive": {"trials":10,"advances":80,"forwardedControlledProviderCalls":17,"partnerFixtureCalls":64,"engineCalls":81,"sqliteReopened":true,"wallClockUnmodified":true,"perceptionDie":0.675,"maxBodyBytes":106004,"syntheticOriginalPlayerLimit":{"calls":100,"tokens":1000000}},
+  "defaultPlayer": {"calls":12,"tokens":30000,"firstForwardPermitted":true,"laterLimitStops":true,"setBudget":false,"hourWindowRefreshed":false},
+  "behaviorAcceptance": "not-run; all L1-L5 classifications remain unassessed",
+  "integrationCodeReview": "pending final root review"
+}

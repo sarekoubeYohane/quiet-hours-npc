@@ -1,0 +1,14 @@
+{
+  "result": "PASS",
+  "fileSQLite": true,
+  "realWorldApp": true,
+  "reloadedAnalysis": true,
+  "reloadedProfile": true,
+  "mobile390NoOverflow": true,
+  "worldUnchanged": true,
+  "advanceForbidden": true,
+  "paidProviderCalls": 0,
+  "turn": 8,
+  "totalEngineCalls": 16,
+  "actualMealObjects": 1
+}

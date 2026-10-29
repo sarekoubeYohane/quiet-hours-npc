@@ -67,7 +67,14 @@ for (const [source,output] of sources) {
 const load=name=>require(join(directory,`${name}.cjs`));
 const store=load('store'); store.install(load('world').seedWorld());
 const {GET,POST}=load('route');
-let now=Date.parse('2026-10-15T16:00:00Z'); Date.now=()=>now;
+// Optional read-only view of an already executed private experiment file.
+// This never imports a key, forwards a model request or exposes fixture mutation.
+let experimentReadback;
+if(process.env.EXPERIMENT_SQLITE){
+ const {createRuntime}=await import('../experiments/pursuit-runtime-228.mjs');
+ experimentReadback=await createRuntime({root:repo,databasePath:process.env.EXPERIMENT_SQLITE,readonly:true});
+}
+let now=Date.parse('2026-10-15T16:00:00Z'); if(!experimentReadback)Date.now=()=>now;
 let modelCalls=0, modelFault=null, modelResponder; const requests=[], modelRequests=[], transportFrames=[];
 // Local-only transport boundary: acceptance runners select replies and inspect
 // task inputs while the real application, API handlers and SQLite still execute.
@@ -94,6 +101,7 @@ const server=http.createServer(async(req,res)=>{
  const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=Buffer.concat(chunks).toString();
  const origin=`http://127.0.0.1:${server.address().port}`;const url=new URL(req.url,origin);
  if(url.pathname==='/__fixture'){
+  if(experimentReadback){res.writeHead(403);res.end('Readback only');return;}
   const data=body?JSON.parse(body):{};
   if(data.advanceMs)now+=data.advanceMs;
   if('modelFault' in data)modelFault=data.modelFault;
@@ -101,6 +109,7 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({now,modelCalls,requests,world:store.snapshot()}));return;
  }
  if(url.pathname==='/api/world'){
+  if(experimentReadback){const response=req.method==='GET'?await experimentReadback.get(url.searchParams.get('operationId')):new Response('Readback only',{status:403});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;}
   if(req.method==='POST')requests.push(JSON.parse(body));
   const request=new Request(url,{method:req.method,headers:{origin,...req.headers},...(req.method==='POST'?{body}:{})});
   const response=await (req.method==='POST'?POST(request):GET(request));
@@ -116,6 +125,7 @@ const server=http.createServer(async(req,res)=>{
  }catch(error){console.error(error);res.writeHead(500);res.end(String(error));}
 });
 await new Promise(resolve=>server.listen(Number(process.env.FIXTURE_PORT||0),'127.0.0.1',resolve));
+server.on('close',()=>{void experimentReadback?.close();});
 const url=`http://127.0.0.1:${server.address().port}`; console.log(`BROWSER_FIXTURE_URL=${url}`);
 export {url,server,store,load,requests,modelRequests,transportFrames,setModelResponder};
 process.on('SIGTERM',()=>server.close());

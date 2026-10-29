@@ -1,6 +1,6 @@
 # 分層追求工程契約
 
-來源為 #220；本文件先記錄 #221 最小切片。後續 #222–#228 仍須擴充候選、共享排序、主觀滿足、複雜退出、喚起與滿載旅程，不能以本切片視為整體完成或真實行為改善。
+來源為 #220；下文按 #221 起的切片保存工程決策及當時限制，後續小節明示取代的部分以最新節為準。#221–#228 已接通候選、共享排序、主觀滿足、複雜退出、喚起、滿載與隔離 runner，完整程式證據見 [C1–C30 整合驗證](../verification/pursuits-220-integration.md)。真實模型行為仍須 #229 的獨立有限授權與證據，不能由受控程式通過推定改善。
 
 世界以 `pursuitVersion:1` 與隨新世界建立的 `pursuitContext` 辨識。`Character.intents` 是唯一追求權威：既有 identity、content、三種程度及簡短 context，增加 version、kind（direction／intent／task）、scope、satisfaction（可 null）、parents、references、status、reason。新世界每人只有設定提供的一個方向，沒有自動拆出的供餐或創作任務。保存的 `goal` 是原始設定，正常輸入的 `self.goal` 從當前有效 direction 導出，角色放下方向後不重新注入原設定。
 
@@ -74,4 +74,4 @@ basis.kind=known-result 時必須至少一個當次有效可見 short／long／b
 
 ## #227 滿載與遺忘下的完整可知投影
 
-目前已加入完整 normal／recall 輸入與實際 provider body 守門、完整追求圖優先、有界 ended 歸檔與來源缺口，並驗證精確滿額狀態仍可明示結束／整理。取代上文交由 #227 接續的最小限制；不改原輸出、時限、心理／追求及候選額度。工程契約見 [滿載與來源缺口](pursuit-capacity.md)，受控 API／SQLite／派送／畫面證據見 [#227 驗證](../verification/pursuit-capacity-227.md)。#228 完整 runner 與 #229 真實行為仍是各自驗收，不由本票推定完成。
+目前已加入完整 normal／recall 輸入與實際 provider body 守門、完整追求圖優先、有界 ended 歸檔與來源缺口，並驗證精確滿額狀態仍可明示結束／整理。取代上文交由 #227 接續的最小限制；不改原輸出、時限、心理／追求及候選額度。工程契約見 [滿載與來源缺口](pursuit-capacity.md)，受控 API／SQLite／派送／畫面證據見 [#227 驗證](../verification/pursuit-capacity-227.md)。#228 的[隔離 runner](../verification/pursuit-runner-228.md)以真正 provider forwarding 邊界及零真實派送驗證準備；#229 真實行為仍須另行驗收。

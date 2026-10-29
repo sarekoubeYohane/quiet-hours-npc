@@ -19,7 +19,7 @@
 
 新版使用 `npc-decision.v3`。舊世界保持可讀，不相容推進在付費前停止；導入須使用既有明示重置入口，保留用量，不自動重置或完整遷移舊意圖。資料寫入後的回退須保留理解新版語義的執行器。詳見[分層追求契約](docs/design/layered-pursuits.md)、[候選與收斂](docs/design/pursuit-selection.md)及[柔性安排](docs/design/flexible-arrangements.md)。
 
-各切片已用受控 transport 驗證世界 API、真實活動／感知／效果、SQLite、下一次真正 request/messages 與既有角色／分析畫面；這不等於真實 NPC 行為改善。滿載與完整輸入預留、C1–C30 整合覆蓋及隔離多輪 runner 仍由 #227–#228 接續。#229 的 L1–L5 真實行為驗收尚未執行，本輪不授權付費模型測試、正式世界推進、合併或部署。下方有日期的工作快照保留原背景，以最新整合驗證為準。
+各切片已用受控 transport 驗證世界 API、真實活動／感知／效果、SQLite、下一次真正 request/messages 與既有角色／分析畫面；滿載、完整輸入預留與合法維護已接通。完整 [C1–C30 覆蓋與整合驗證](docs/verification/pursuits-220-integration.md)及[可執行隔離多輪 runner](docs/verification/pursuit-runner-228.md)另驗證實體 SQLite 關閉重開、同 payer 跨 trial 用量與原 ID 讀回；受控 provider 正向走同一 forwarding 支線，真實付費呼叫為零。這些程式結果不等於真實 NPC 行為改善。[L1–L5 獨立預登記](docs/verification/pursuits-220-preregistration.md)已備妥，#229 尚缺明確有限授權、最終封存版本／官方價目及有效憑證確認，保持未完成。本輪不推進正式世界、合併或部署。下方有日期的工作快照保留原背景，以最新整合驗證為準。
 
 ## 自主生活循環（#172，2026-10-27）
 
