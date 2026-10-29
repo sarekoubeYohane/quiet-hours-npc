@@ -20,4 +20,8 @@
 
 **跨票待驗的明確缺口：** 新承接的同一決策就明示 waiting／deferred，需要 T5 共用 upsert＋assess 同 ID 擴充。已交可執行的 `tests/pursuit-new-waiting-api.test.cjs`，包含 upsert 在前／assess 在前兩種排列：同批 create＋assess(waiting version 0)＋arrangement link(version 0)，期望保存及下一次輸入皆為 node v2/link v2。T5 擴充前 **2/2 RED**，未納入本票 33/33 或 default list；T5／merger 整合後必須補 GREEN 並納入 default list，才能宣稱新形成即等待的完整契約完成。沒有用安排條件自動推論 NPC 的 waiting 意願。
 
+## 共用擴充整合結果
+
+#225 已在 `2118806` 合入上述擴充：兩種新承接等待排列 **2/2 GREEN**，並已加入預設測試清單。七個原生 suites 為 **131/131**，加既有安排／喚起回歸共 **148/148**；整合 typecheck 與 diffcheck 通過。前段 RED 記錄保留作導入證據，這項跨票缺口已接通；完整容量及來源投影仍由 #227 驗證。
+
 #220／#229 的真實多輪形成、有效推進與退出仍未驗收。受控回覆只能證明程式可承接。
