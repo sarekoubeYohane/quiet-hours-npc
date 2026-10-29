@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "turn": 4,
+  "fixtureCalls": 4,
+  "realPaidCalls": 0,
+  "reload": true,
+  "mobileNoOverflow": true,
+  "originalAndFinalScopeVisible": true,
+  "unadoptedAbsentFromNextActualRequest": true,
+  "sameIdNoDispatch": true,
+  "uncommittedSeparated": true,
+  "noDecisionSeparatedFromEmpty": true
+}

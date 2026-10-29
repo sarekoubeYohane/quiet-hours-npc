@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import UsageRecoveryStatus from '@/components/usage-recovery-status';
+import PursuitSelectionDetails from '@/components/pursuit-selection-details';
 import type { UsageRecoveryView } from '@/lib/usage-recovery';
 import type { CandidateFailureReason } from '@/lib/model-adapter';
 import { Button } from '@/components/ui/button';
@@ -107,7 +108,8 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
         {dispatch.usage!==undefined&&<JsonDetails label="供應商已知用量" value={dispatch.usage}/>}{dispatch.lateUsage!==undefined&&<JsonDetails label="遲到回覆中的供應商用量（未改寫原定案）" value={dispatch.lateUsage}/>}
       </article>)}
       <h3>規則、驗證、執行與回饋</h3>
-      {(shown.steps??[]).map((step,i)=><div key={i}><p>{sources[step.source]||step.source} · {step.kind}{step.actorId?` · ${step.actorId}`:''}</p><JsonDetails label={step.kind==='npc-method-assessment'?'本次目的、方法評估、意圖與行動（主觀自述，非成果證據）':`查看 ${step.kind}`} value={step.data}/></div>)}
+      {!shown.steps.some(step=>step.kind==='npc-pursuit-selection')&&<p>沒有已保存且通過驗證的候選／收斂紀錄；可能是舊操作、未決策、驗證失敗或保存缺口，不能視為明示空候選。</p>}
+      {(shown.steps??[]).map((step,i)=><div key={i}><p>{sources[step.source]||step.source} · {step.kind}{step.actorId?` · ${step.actorId}`:''}</p>{step.kind==='npc-pursuit-selection'&&<PursuitSelectionDetails value={step.data} outcome={shown.outcome}/>}<JsonDetails label={step.kind==='npc-method-assessment'?'本次目的、方法評估、意圖與行動（主觀自述，非成果證據）':`查看 ${step.kind}`} value={step.data}/></div>)}
       <p>模型說明只代表當次自述；未記錄的理由保持未知。下一次上下文僅在下一次真正派送且仍在保存範圍內時可於其請求本文核對。</p>
       {shown.result!==undefined&&<JsonDetails label="本操作世界結果" value={shown.result}/>}
       <JsonDetails label="查看完整決策實錄" value={shown}/>

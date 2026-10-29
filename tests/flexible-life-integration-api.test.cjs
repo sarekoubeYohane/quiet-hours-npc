@@ -82,7 +82,7 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
    if(fault==='save-unknown')store.onStorage(async sql=>{if(sql.startsWith('UPDATE worlds SET state = ?')){store.onStorage(undefined);store.throwAfterNextSave();store.failNextOperationRead();}});
    const operationId=`${Date.now()}:${crypto.randomUUID()}`,response=await s.post({operation:'advance',minutes:15,operationId}),body=await response.json(),after=await read(),calls=s.transport.counts();
    const committed=['save-after','save-unknown'].includes(fault);
-   if(committed){assert.equal(fixture.actor(after).arrangements.items[0].version,2);assert.equal(fixture.actor(after).intents[0].id,'after-new-info');assert.ok(fixture.device(after).notifications.length);if(operation==='read')assert.equal(fixture.device(after).calendar[0].readers[0].actorId,'owner');else assert.equal(after.phones.devices.find(d=>after.objects.find(o=>o.id===d.objectId).owner==='cass').inbox.length,1);}
+   if(committed){assert.equal(fixture.actor(after).arrangements.items[0].version,2);assert.ok(fixture.actor(after).intents.some(node=>node.id==='owner:after-new-info'));assert.ok(fixture.device(after).notifications.length);if(operation==='read')assert.equal(fixture.device(after).calendar[0].readers[0].actorId,'owner');else assert.equal(after.phones.devices.find(d=>after.objects.find(o=>o.id===d.objectId).owner==='cass').inbox.length,1);}
    else assert.deepEqual(story(after),story(before),`${operation}/${fault} story must roll back together`);
    assert.ok(after.aiUsage.totalCalls>=before.aiUsage.totalCalls+1,`${fault} retains known dispatch usage`);
    if(fault==='save-unknown'){assert.equal(response.status,502);assert.equal(body.operationUncertain,true);const queried=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(operationId)))).json();assert.equal(queried.operation.state,'settled');}
@@ -122,7 +122,7 @@ test('相同真送達與閱讀正文可由正常決策相信、存疑、拒絕�
   });
    for(stage=0;stage<3;stage++){const w=await s.advance();messageId=fixture.device(w).inbox[0].id;assert.equal(JSON.stringify(s.transport.inputs.findLast(i=>i.self?.id==='owner')).includes(raw),false);}
    let w=await read();assert.equal(w.events.filter(e=>e.kind==='message').length,1);assert.deepEqual(fixture.actor(w).intents.filter(node=>node.kind!=='direction'),[]);assert.equal(fixture.actor(w).cognition?.beliefs.length||0,0);assert.equal(fixture.actor(w).arrangements,undefined);
-   w=await s.advance();assert.equal(fixture.device(w).inbox[0].readers[0].actorId,'owner');assert.equal(w.events.filter(e=>e.kind==='message').length,variant==='believe'?2:1);assert.equal(fixture.actor(w).arrangements,undefined);if(variant==='defer')assert.equal(fixture.actor(w).intents[0].id,'evaluate-later');if(variant==='doubt')assert.equal(fixture.actor(w).cognition.beliefs[0].conviction,'doubtful');assert.equal(s.transport.inputs.filter(i=>i.self?.id==='cass').some(i=>JSON.stringify(i).includes('readers')),false);
+   w=await s.advance();assert.equal(fixture.device(w).inbox[0].readers[0].actorId,'owner');assert.equal(w.events.filter(e=>e.kind==='message').length,variant==='believe'?2:1);assert.equal(fixture.actor(w).arrangements,undefined);if(variant==='defer')assert.ok(fixture.actor(w).intents.some(node=>node.id==='owner:evaluate-later'));if(variant==='doubt')assert.equal(fixture.actor(w).cognition.beliefs[0].conviction,'doubtful');assert.equal(s.transport.inputs.filter(i=>i.self?.id==='cass').some(i=>JSON.stringify(i).includes('readers')),false);
   }finally{s.restore();}
  }
 });

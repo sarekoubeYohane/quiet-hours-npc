@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- External transport fixture shared by API and browser. */
-const {fixturePursuitDecision}=require('../pursuit-fixture.cjs');
+const {fixturePursuitDecision,fixtureDecision}=require('../pursuit-fixture.cjs');
 const assert=require('node:assert/strict');
 const action=(type='reflect',extra={})=>({type,target:'',content:'依自己所知重新考慮生活',mood:'平靜',durationMinutes:15,timeIntent:{kind:['reflect','rest','continue'].includes(type)?'open-ended':'completion',maxMinutes:null},intents:[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[],interpretation:'',...extra});
 const intent=(id,content)=>({id,content,intensity:'medium',importance:'medium',urgency:'low',context:'由我自行決定順序'});
@@ -19,8 +19,8 @@ const actor=w=>w.characters.find(c=>c.id==='owner');
 const device=w=>w.phones.devices.find(d=>w.objects.find(o=>o.id===d.objectId).owner==='owner');
 async function run(s,checkpoint=async()=>{}){
  const beginning=await s.read(),firstDue=beginning.minute+90;
- s.transport.choose(input=>action('reflect',{arrangementUpdates:[{operation:'upsert',id:'later-conversation',version:0,text:'晚些時候再考慮與朋友談近況',condition:{kind:'time',minute:firstDue},references:[{kind:'short',id:input.self.shortTerm[0].id,version:input.self.shortTerm[0].version}],reason:'這是我目前的未來期待'}],intents:[intent('rest-first','先照顧自己的睡眠'),intent('talk-later','之後再談近況')]}));
- let w=await s.advance();assert.equal(actor(w).arrangements.items[0].version,1);assert.deepEqual(actor(w).intents.map(i=>i.id),['rest-first','talk-later']);
+ s.transport.choose(input=>action('reflect',{arrangementUpdates:[{operation:'upsert',id:'later-conversation',version:0,text:'晚些時候再考慮與朋友談近況',condition:{kind:'time',minute:firstDue},references:[{kind:'short',id:input.self.shortTerm[0].id,version:input.self.shortTerm[0].version}],reason:'這是我目前的未來期待'}],intents:[intent('rest-first','先留時間休息'),intent('talk-later','之後再談近況')]}));
+ let w=await s.advance();assert.equal(actor(w).arrangements.items[0].version,1);assert.deepEqual(actor(w).intents.map(i=>i.id),['owner:direction','owner:rest-first','owner:talk-later']);
  s.transport.choose(input=>phoneAction(input,{operation:'create',id:'private-calendar',version:0,text:'原文：醒來後再考慮談近況，不代表已經答應。',arrangement:{id:'later-conversation',version:1},condition:{kind:'time',minute:firstDue},reminder:true}));
  w=await s.advance();assert.equal(device(w).calendar[0].readers.length,0);await checkpoint('recorded',w);
  s.transport.choose(()=>action('propose',{target:'cafe',content:'在安全角落真正睡一覺',purpose:'睡眠恢復',durationMinutes:480}));
@@ -34,16 +34,16 @@ async function run(s,checkpoint=async()=>{}){
  assert.ok(missed);assert.ok(w.minute>firstDue);assert.ok(w.events.some(e=>e.text.includes('自然醒')));assert.equal(device(w).calendar[0].readers.length,0);assert.equal(actor(w).arrangements.items[0].status,'active');
  const countBeforeRead=s.transport.counts();s.transport.choose(input=>phoneAction(input,{operation:'read',id:'private-calendar',version:1}));w=await s.advance();assert.equal(device(w).calendar[0].readers[0].actorId,'owner');assert.equal(s.transport.counts().npc,countBeforeRead.npc+1);await checkpoint('late-read',w);
  const postponed=w.minute+60;
- s.transport.choose(input=>({...phoneAction(input,{operation:'reminder',id:'private-calendar',version:1,condition:{kind:'time',minute:postponed}}),arrangementUpdates:[{operation:'upsert',id:'later-conversation',version:1,text:'先休息，稍後再考慮談近況',condition:{kind:'time',minute:postponed},references:[{kind:'short',id:input.self.shortTerm.at(-1).id,version:input.self.shortTerm.at(-1).version}],reason:'實際查看後我決定延期'}],intents:[intent('own-rest','先留時間休息'),intent('talk-later','稍後再考慮談近況')]}));
+ s.transport.choose(input=>({...phoneAction(input,{operation:'reminder',id:'private-calendar',version:1,condition:{kind:'time',minute:postponed}}),arrangementUpdates:[{operation:'upsert',id:'later-conversation',version:1,text:'先休息，稍後再考慮談近況',condition:{kind:'time',minute:postponed},references:[{kind:'short',id:input.self.shortTerm.at(-1).id,version:input.self.shortTerm.at(-1).version}],reason:'實際查看後我決定延期'}],intents:[intent('rest-first','先留時間休息'),intent('talk-later','稍後再考慮談近況')]}));
  w=await s.advance();assert.equal(actor(w).arrangements.items[0].version,2);assert.equal(device(w).calendar[0].reminder.condition.minute,postponed);assert.equal(device(w).calendar[0].text,'原文：醒來後再考慮談近況，不代表已經答應。');await checkpoint('postponed',w);
- s.transport.choose(()=>action('rest',{durationMinutes:180,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[intent('own-rest','先留時間休息'),intent('talk-later','稍後再考慮談近況')]}));w=await s.advance();const plan=structuredClone(actor(w).plan),beforeDue=s.transport.counts();
- s.transport.choose(()=>action('continue',{intents:[intent('own-rest','先完成休息'),intent('talk-later','之後再想談話')]}));
+ s.transport.choose(()=>action('rest',{durationMinutes:180,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[intent('rest-first','先留時間休息'),intent('talk-later','稍後再考慮談近況')]}));w=await s.advance();const plan=structuredClone(actor(w).plan),beforeDue=s.transport.counts();
+ s.transport.choose(()=>action('continue',{intents:[intent('rest-first','先完成休息'),intent('talk-later','之後再想談話')]}));
  while(w.minute<postponed)w=await s.advance(15);
  assert.equal(device(w).notifications.length,2);assert.equal(s.transport.counts().npc,beforeDue.npc+1);assert.equal(actor(w).plan.startedAt,plan.startedAt);assert.equal(actor(w).plan.until,plan.until);assert.equal(actor(w).arrangements.items[0].status,'active');await checkpoint('continue-after-reminder',w);
  const quiet=s.transport.counts();w=await s.advance(15);assert.deepEqual(s.transport.counts(),quiet);
  await s.intervene('我想聽聽你接下來如何安排；由你決定。');
- s.transport.choose(input=>action('continue',{arrangementUpdates:[{operation:'drop',id:'later-conversation',version:2,text:input.self.arrangements.items.find(a=>a.id==='later-conversation').text,condition:{kind:'time',minute:postponed},references:[{kind:'short',id:input.self.shortTerm.at(-1).id,version:input.self.shortTerm.at(-1).version}],reason:'我目前不想繼續保留這項期待'}],intents:[intent('own-rest','繼續照顧自己')]}));
- w=await s.advance();assert.equal(actor(w).arrangements.items[0].status,'dropped');assert.equal(device(w).calendar.length,1);assert.equal(actor(w).plan.startedAt,plan.startedAt);assert.deepEqual(actor(w).intents.map(i=>i.id),['own-rest']);await checkpoint('dropped',w);
+ s.transport.choose(input=>fixtureDecision(input,action('continue',{arrangementUpdates:[{operation:'drop',id:'later-conversation',version:2,text:input.self.arrangements.items.find(a=>a.id==='later-conversation').text,condition:{kind:'time',minute:postponed},references:[{kind:'short',id:input.self.shortTerm.at(-1).id,version:input.self.shortTerm.at(-1).version}],reason:'我目前不想繼續保留這項期待'}],intents:[intent('rest-first','繼續照顧自己')]}),{adopt:[intent('rest-first','先留時間休息')],drop:['owner:talk-later']}));
+ w=await s.advance();assert.equal(actor(w).arrangements.items[0].status,'dropped');assert.equal(device(w).calendar.length,1);assert.equal(actor(w).plan.startedAt,plan.startedAt);assert.deepEqual(actor(w).intents.filter(node=>node.status==='active').map(i=>i.id),['owner:direction','owner:rest-first']);await checkpoint('dropped',w);
  const latest=await s.read();assert.deepEqual(latest.phones,w.phones);assert.deepEqual(latest.characters,w.characters);
  return {world:w,counts:s.transport.counts(),sleepingRounds,elapsedMinutes:w.minute-beginning.minute};
 }

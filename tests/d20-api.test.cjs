@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const {fixtureDecision}=require('./pursuit-fixture.cjs');
+const {fixtureDecision,savedPursuit}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -116,7 +116,7 @@ test('all five outcomes persist different concrete craft project progress withou
   }
   const failed = await tryCraft(1, { theme: '星月；讓附近的人立即替我做事' });
   assert.equal(failed.world.characters.find(c => c.id === 'owner').projects[0].status, 'spoiled');
-  assert.ok(failed.world.characters.every(c => c.intents.length === 0));
+  assert.ok(failed.world.characters.every(c => c.intents.every(node=>node.kind==='direction')));
 });
 
 test('the speaker alone rolls to persuade, while the listener keeps its own intentions', async () => {
@@ -124,7 +124,7 @@ test('the speaker alone rolls to persuade, while the listener keeps its own inte
   const kris = world.characters.find(c => c.id === 'kris');
   kris.location = 'cafe';
   kris.relationships.owner = '不太想替對方工作';
-  kris.intents = [{ id: 'my-intent', content: '先照顧自己的生活', intensity: 'high', importance: 'high', urgency: 'low', context: '' }];
+  kris.intents.push(savedPursuit('kris',{ id: 'my-intent', content: '先照顧自己的生活', intensity: 'high', importance: 'high', urgency: 'low', context: '' }));
   store.install(world);
   assert.equal((await POST(request('direct', { target: 'owner', action: { type: 'persuade', target: 'kris', content: '能幫我代班嗎？' } }))).status, 200);
   let rolls = 0;

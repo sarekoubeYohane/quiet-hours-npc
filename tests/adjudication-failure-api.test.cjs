@@ -146,7 +146,7 @@ test('malformed or oversized candidates are bounded contract failures, while tra
 test('future phase rejection identifies the phase without applying earlier previewed effects', async () => {
   const { post, advance } = await setup('owner'); const previous = global.fetch;
   global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
-    ? { ...accepted([]), stages: [
+    ? { ...accepted([]), completionMinutes:60, stages: [
       { afterMinutes: 30, preconditions: [], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 1, key: 'contents', value: 'water' }] },
       { afterMinutes: 60, preconditions: [], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 1, key: 'contents', value: 'tea' }] },
     ] } : { ...proposal, target: 'acceptance-cup', durationMinutes: 60 },JSON.parse(JSON.parse(init.body).messages[1].content));
