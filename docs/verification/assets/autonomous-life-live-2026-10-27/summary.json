@@ -1,0 +1,296 @@
+{
+  "deployment": "148a75d",
+  "startedAt": "2026-10-27T06:46:55.928000+00:00",
+  "endedAt": "2026-10-27T07:17:36.011000+00:00",
+  "durationMinutes": 30.668,
+  "worldStartMinute": 795,
+  "worldEndMinute": 1110,
+  "totals": {
+    "totalCalls": 81,
+    "totalInputTokens": 1399160,
+    "totalOutputTokens": 25054
+  },
+  "totalKnownTokens": 1424214,
+  "unknownUsageAdded": 0,
+  "demoRound": 2,
+  "rounds": [
+    {
+      "round": 1,
+      "operationId": "1793083615985:230ad0b6-dce5-453e-8476-1c6c3f8981c7",
+      "baseVersion": 335,
+      "resultVersion": 336,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 810,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 116001,
+      "traceGaps": [],
+      "commitSeconds": 86.2,
+      "failures": []
+    },
+    {
+      "round": 2,
+      "operationId": "1793083834714:14131e88-179f-4cc6-bac0-f327bb100ec3",
+      "baseVersion": 336,
+      "resultVersion": 337,
+      "mode": "demo",
+      "outcome": "committed",
+      "resultMinute": 840,
+      "npcCalls": 0,
+      "adjudicationCalls": 0,
+      "knownTokens": 0,
+      "traceGaps": [],
+      "commitSeconds": 2.365,
+      "failures": []
+    },
+    {
+      "round": 3,
+      "operationId": "1793083902831:3dc13b34-62e7-4036-a923-9e1d791f6359",
+      "baseVersion": 337,
+      "resultVersion": 338,
+      "mode": "openai",
+      "outcome": "rolled-back",
+      "resultMinute": 840,
+      "npcCalls": 2,
+      "adjudicationCalls": 1,
+      "knownTokens": 52023,
+      "traceGaps": [],
+      "commitSeconds": 33.553,
+      "failures": [
+        {
+          "kind": "candidate-validation",
+          "stage": "npc-candidate-validation",
+          "reason": "field-format"
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "operationId": "1793083988855:e7c5b967-2037-4ba9-afa5-54b1e9b0ce46",
+      "baseVersion": 338,
+      "resultVersion": 339,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 870,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 118769,
+      "traceGaps": [],
+      "commitSeconds": 83.508,
+      "failures": []
+    },
+    {
+      "round": 5,
+      "operationId": "1793084105032:420fa88d-d5e7-48a1-8cb1-3e616243e8c2",
+      "baseVersion": 339,
+      "resultVersion": 340,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 900,
+      "npcCalls": 4,
+      "adjudicationCalls": 1,
+      "knownTokens": 78715,
+      "traceGaps": [],
+      "commitSeconds": 48.01,
+      "failures": []
+    },
+    {
+      "round": 6,
+      "operationId": "1793084196662:31dd4082-f56c-41b4-ac81-57e15191d102",
+      "baseVersion": 340,
+      "resultVersion": 341,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 930,
+      "npcCalls": 4,
+      "adjudicationCalls": 2,
+      "knownTokens": 99391,
+      "traceGaps": [],
+      "commitSeconds": 64.695,
+      "failures": []
+    },
+    {
+      "round": 7,
+      "operationId": "1793084290092:0ea17cbb-1448-4841-9aac-57c12a7a8922",
+      "baseVersion": 341,
+      "resultVersion": 342,
+      "mode": "openai",
+      "outcome": "rolled-back",
+      "resultMinute": 930,
+      "npcCalls": 3,
+      "adjudicationCalls": 2,
+      "knownTokens": 89035,
+      "traceGaps": [],
+      "commitSeconds": 52.583,
+      "failures": [
+        {
+          "kind": "candidate-validation",
+          "stage": "npc-candidate-validation",
+          "reason": "field-format"
+        }
+      ]
+    },
+    {
+      "round": 8,
+      "operationId": "1793084392553:486a1de9-a9a2-4244-ac3b-c093a09f47d2",
+      "baseVersion": 342,
+      "resultVersion": 343,
+      "mode": "openai",
+      "outcome": "rolled-back",
+      "resultMinute": 930,
+      "npcCalls": 3,
+      "adjudicationCalls": 2,
+      "knownTokens": 89010,
+      "traceGaps": [],
+      "commitSeconds": 58.284,
+      "failures": [
+        {
+          "kind": "candidate-validation",
+          "stage": "npc-candidate-validation",
+          "reason": "field-format"
+        }
+      ]
+    },
+    {
+      "round": 9,
+      "operationId": "1793084518627:fcbc94b3-17f4-46b3-ae89-48a6c28015a7",
+      "baseVersion": 343,
+      "resultVersion": 344,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 960,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 122419,
+      "traceGaps": [],
+      "commitSeconds": 90.456,
+      "failures": []
+    },
+    {
+      "round": 10,
+      "operationId": "1793084668272:82c198fc-dcdf-4f23-905e-0befdd97e399",
+      "baseVersion": 344,
+      "resultVersion": 345,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 990,
+      "npcCalls": 4,
+      "adjudicationCalls": 2,
+      "knownTokens": 101702,
+      "traceGaps": [],
+      "commitSeconds": 62.27,
+      "failures": []
+    },
+    {
+      "round": 11,
+      "operationId": "1793084767772:5c44a0cc-3d0f-4d91-985a-9b1f92b9cc93",
+      "baseVersion": 345,
+      "resultVersion": 346,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 1020,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 125566,
+      "traceGaps": [],
+      "commitSeconds": 90.235,
+      "failures": []
+    },
+    {
+      "round": 12,
+      "operationId": "1793084942784:626bda29-40ce-4d06-b934-1f683dbf3434",
+      "baseVersion": 346,
+      "resultVersion": 347,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 1050,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 127815,
+      "traceGaps": [],
+      "commitSeconds": 80.563,
+      "failures": []
+    },
+    {
+      "round": 13,
+      "operationId": "1793085053955:2a9beb50-4fa6-47e7-bae8-c1b21a7c2c9c",
+      "baseVersion": 347,
+      "resultVersion": 348,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 1080,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 129477,
+      "traceGaps": [],
+      "commitSeconds": 99.081,
+      "failures": []
+    },
+    {
+      "round": 14,
+      "operationId": "1793085223536:ac7d17c1-361d-47a9-9a49-c6cd7d499f1d",
+      "baseVersion": 348,
+      "resultVersion": 349,
+      "mode": "openai",
+      "outcome": "rolled-back",
+      "resultMinute": 1080,
+      "npcCalls": 1,
+      "adjudicationCalls": 1,
+      "knownTokens": 43124,
+      "traceGaps": [],
+      "commitSeconds": 39.462,
+      "failures": []
+    },
+    {
+      "round": 15,
+      "operationId": "1793085333145:e56baf02-22fb-4b4d-aae1-f5695de3a8d9",
+      "baseVersion": 349,
+      "resultVersion": 350,
+      "mode": "openai",
+      "outcome": "committed",
+      "resultMinute": 1110,
+      "npcCalls": 4,
+      "adjudicationCalls": 3,
+      "knownTokens": 131167,
+      "traceGaps": [
+        "single-record-limit"
+      ],
+      "commitSeconds": null,
+      "failures": []
+    }
+  ],
+  "replayChecks": {
+    "version": true,
+    "story": true,
+    "calls": true,
+    "tokens": true,
+    "originalEvidence": true
+  },
+  "finalNeeds": {
+    "cass": {
+      "hunger": 35.75,
+      "thirst": 51.5,
+      "fatigue": 11.25,
+      "sleep": 41
+    },
+    "vera": {
+      "hunger": 35.75,
+      "thirst": 51.5,
+      "fatigue": 0,
+      "sleep": 41
+    },
+    "kris": {
+      "hunger": 35.75,
+      "thirst": 51.5,
+      "fatigue": 20.25,
+      "sleep": 41
+    },
+    "owner": {
+      "hunger": 35.75,
+      "thirst": 51.5,
+      "fatigue": 21.75,
+      "sleep": 41
+    }
+  }
+}
