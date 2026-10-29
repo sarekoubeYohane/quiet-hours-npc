@@ -37,8 +37,9 @@ async function scenario({ hiddenTarget = false } = {}) {
     }
     prompts.push({ input, system: messages[0].content });
     const saved = report.first.dispatches.find(d => d.task === 'npc' && d.actorId === input.self.id);
+    const captured=structuredClone(saved.candidate.value);delete captured.contractVersion;
     return completion(['vera', 'kris'].includes(input.self.id)
-      ? { ...saved.candidate.value, ...(hiddenTarget ? { target: 'hidden-object' } : {}), mood: '平靜', intents: [] }
+      ? { ...captured, ...(hiddenTarget ? { target: 'hidden-object' } : {}), mood: '平靜', intents: [] }
       : { type: 'rest', target: '', content: '安靜休息', mood: '平靜', durationMinutes: 15, intents: [] },JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   return {

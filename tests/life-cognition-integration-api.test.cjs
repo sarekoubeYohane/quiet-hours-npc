@@ -17,14 +17,15 @@ async function setup(initial=seedWorld()){
  return {post,inputs,bodies,choose:fn=>{choose=fn;},restore:()=>{global.fetch=original;},advance:async(body={})=>{const response=await post({operation:'advance',...body});assert.equal(response.status,200,await response.clone().text());return read();}};
 }
 const memoryPayload=input=>({preferences:input.self.preferences,cognition:input.self.cognition,shortTerm:input.self.shortTerm,longTerm:input.self.longTerm,memoryReview:input.self.memoryReview,memories:input.self.memories,observations:input.self.observations,relationships:input.self.relationships,knownControlExperiences:input.knownControlExperiences,pendingInterventions:input.pendingInterventions,learnedHabits:input.learnedHabits});
-async function performedPair(s){s.choose(()=>action({type:'work',target:'tidy',content:'整理桌面'}));await s.advance();s.choose(()=>action({intents:combined({}).intents}));const w=await s.advance(),evidence=actor(w).habitEvidence;return{trigger:evidence.at(-2).memory,action:evidence.at(-1).memory};}
+const workPursuits=[{id:'work-first',content:'先處理手上工作',intensity:'medium',importance:'high',urgency:'low',context:'雖然我喜歡休息'},{id:'rest-later',content:'等會兒再休息',intensity:'high',importance:'medium',urgency:'low',context:'仍由我選擇時機'}];
+async function performedPair(s){s.choose(()=>action({type:'work',target:'tidy',content:'整理桌面'}));await s.advance();s.choose(()=>action({intents:workPursuits}));const w=await s.advance(),evidence=actor(w).habitEvidence;return{trigger:evidence.at(-2).memory,action:evidence.at(-1).memory};}
 const ref=pair=>({kind:'short',...pair.action});
 function combined(pair){return action({
  type:'work',target:'tidy',content:'先把手上的工作做好',
  preferenceUpdates:[{operation:'upsert',id:'rest-choice',version:0,topic:'休息',context:'工作之後',text:'我喜歡停下來休息，但現在仍想先整理。',references:[ref(pair)],reason:'剛才的經歷對我有意義。'}],
  habitCandidates:[pair],memorySelections:[{...pair.action,reason:'我選擇保留這段休息經驗。'}],
  cognitiveUpdates:[{kind:'belief',operation:'upsert',id:'work-pace',version:0,topic:'工作節奏',text:'適時停一下可能幫助我整理思緒。',conviction:'leaning',references:[ref(pair)],contradictions:[],reason:'這次是我自己的體會，並非必然規則。'}],
- intents:[{id:'work-first',content:'先處理手上工作',intensity:'medium',importance:'high',urgency:'low',context:'雖然我喜歡休息'},{id:'rest-later',content:'等會兒再休息',intensity:'high',importance:'medium',urgency:'low',context:'仍由我選擇時機'}],
+ intents:workPursuits,
 });}
 
 test('one normal decision commits four kinds of subjective maintenance with autonomous intentions and exact operation replay',async()=>{
