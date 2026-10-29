@@ -23,3 +23,7 @@ status: accepted
 ## #207 物品觀察補充
 
 主動查看沿同一主觀感知／短期經歷加入既有未知物品，清晰察覺才承接既有 knownTo；移動、模糊線索、漏看不授予身份。optional objectId／來源 object 與人物來源分開，發現不取得持有或許可。沒有新增模型或 SQL migration；容量與舊世界／回退見[工程契約](../design/object-observation.md)，本機 API／SQLite／真正下一請求與既有畫面證據見[#207 驗證](../verification/object-observation-207-2026-10-28.md)，不代表真實 NPC 自主行為已改善。
+
+## #208 自由查找補充
+
+`world-effects.v5` 的受限 discover v1 將本次世界確認與角色實際感知分開。權威當地候選可含未知物品／供應，角色輸入仍只用本人可知投影。clone、分支、日常編譯及完成上限預檢不感知；真正活動提交後沿既有觀察／經歷承接。供應新增 optional supplyId／來源 supply，不直接曝光庫存或授予持有／許可。容量、同條件去重、相容及回退見[工程契約](../design/world-discovery.md)；本票程式與既有畫面證據見[#208 驗證](../verification/world-discovery-208-2026-10-28.md)。

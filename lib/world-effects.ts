@@ -1,5 +1,6 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
-import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { finiteSourceScope } from './routine-materials';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -10,7 +11,7 @@ import { effectCandidateSchema, effectRules, validObjectKind } from './adjudicat
 import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
 import type { Action, ActivityPlan, Character, World } from './world';
-import { canSee, regionOf, regions, connectingDoor } from './perception';
+import { canSee, regionOf, regions, connectingDoor, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
@@ -20,17 +21,19 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type FiniteSourceScope={version:1;coverage:'region'|'location';subject:string};
+export type SceneSupply={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number;scope?:{version:1;role:'material'|'equipment';subject:string|null}};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type PhysicalHistory={actorId:string;minute:number;operation:string;permitted:boolean;priorHolder:string|null};
-export type WorldObject={stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
+export type WorldObject={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type StateChange={key:string;from:string|null;value:string};
 export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
 export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
 export type PhysicalEffect={kind:'physical';version:1;reason:string}&({operation:'materialize';supplyId:string;expectedRemaining:number}|{operation:'take'|'place'|'consume'|'destroy';objectId:string;expectedRevision:number});
-export type Effect=IngestEffect|ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
+export type DiscoverEffect={kind:'discover';version:1;region:string;objectIds:string[];supplyIds:string[]};
+export type Effect=DiscoverEffect|IngestEffect|ScheduleNaturalEffect|FormationEffect|PhysicalEffect|DisplaceBodyEffect|ChangeStateEffect|{kind:'materialize';supplyId:string;expectedRemaining:number}|{kind:'consume';objectId:string;expectedRevision:number}|{kind:'destroy';objectId:string;expectedRevision:number}|{kind:'transfer';objectId:string;expectedRevision:number;toHolder:string|null;toRegion:string}|{kind:'state';objectId:string;expectedRevision:number;key:string;value:string}|{kind:'grant';targetId:string;recipient:string}|{kind:'consent';objectId:string};
 export type LegacyPhaseCondition={objectId:string;revision:number;region:string;holder:string|null;state:Record<string,string>};
 export type PhaseCondition=LegacyPhaseCondition|StateCondition;
-export type ActivityPhase={afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;routineSourceScope?:RoutineSourceScope;requiredTools?:string[]};
+export type ActivityPhase={discoveryMethod?:DiscoveryMethod;afterMinutes:number;preconditions:PhaseCondition[];effects:Effect[];routineBindings?:RoutinePhaseBindings;routineSourceScope?:RoutineSourceScope;requiredTools?:string[]};
 export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPhase[]};
 // Internal only: a trusted routine binder can identify each current vessel/material
 // attempt without storing model-authored IDs or the first historical die in a rule.
@@ -52,11 +55,12 @@ export function retainPhysicalHistory(object:WorldObject,c:Character,minute:numb
  if(!permitted)object.unpermittedCount=(object.unpermittedCount||0)+1;
 }
 export function effectReferenceId(effect:Effect):string {
- return effect.kind==='schedule-natural'?effect.effects[0].target.id:effect.kind==='form'?effect.inputs[0].objectId:effect.kind==='change-state'?effect.target.id:'objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId;
+ return effect.kind==='discover'?effect.objectIds[0]||effect.supplyIds[0]||effect.region:effect.kind==='schedule-natural'?effect.effects[0].target.id:effect.kind==='form'?effect.inputs[0].objectId:effect.kind==='change-state'?effect.target.id:'objectId' in effect?effect.objectId:'supplyId' in effect?effect.supplyId:effect.targetId;
 }
 export function effectReferenceIds(effect:Effect):string[] {
- return effect.kind==='schedule-natural'?[...new Set([...effect.conditions.map(condition=>condition.target.id),...effect.effects.map(change=>change.target.id)])]:effect.kind==='form'?effect.inputs.map(input=>input.objectId):[effectReferenceId(effect)];
+ return effect.kind==='discover'?[...effect.objectIds,...effect.supplyIds]:effect.kind==='schedule-natural'?[...new Set([...effect.conditions.map(condition=>condition.target.id),...effect.effects.map(change=>change.target.id)])]:effect.kind==='form'?effect.inputs.map(input=>input.objectId):[effectReferenceId(effect)];
 }
+export function effectSupplyReferenceIds(effect:Effect):string[]{return effect.kind==='discover'?effect.supplyIds:'supplyId' in effect?[effect.supplyId]:[];}
 export class EffectValidationError extends Error {
  constructor(message:string, public readonly details:Record<string,unknown>) { super(message); }
 }
@@ -75,17 +79,32 @@ export function knownWorldObjects(w:World,c:Character){
 export function knownWorldSupplies(w:World,c:Character){
  return (w.supplies||[]).filter(s=>!s.pending&&(s.availableAt===undefined||w.minute>=s.availableAt)&&s.knownTo.includes(c.id)&&canSee(w,c,s.region)).map(s=>({id:s.id,label:s.label,region:s.region,kind:s.kind,availability:'unknown' as const}));
 }
-export function authorityForProposal(w:World,c:Character){
- const objects=knownWorldObjects(w,c).map(o=>w.objects!.find(full=>full.id===o.id)!);
- const supplies=knownWorldSupplies(w,c).map(s=>w.supplies!.find(full=>full.id===s.id)!);
- return {external:{bodies:w.characters.filter(person=>regionOf(person)===regionOf(c)&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:regionOf(c)})},objects,supplies:supplies.map(s=>({...s,materializedObjectId:s.remaining>0?materializedObjectId(s):null})),effectContractVersion:'world-effects.v4',effectRules,effectContract:effectCandidateSchema};
+export function authorityForProposal(w:World,c:Character,action?:Action){
+ const local=regionOf(c),objectIds=new Set(objectObservationCandidates(w,c).filter(item=>item.region===local).map(item=>item.objectId)),supplyIds=new Set(supplyObservationCandidates(w,c).filter(item=>item.region===local).map(item=>item.supplyId));
+ const eligibleObjects=(w.objects||[]).filter(object=>objectIds.has(object.id)||object.lifecycle==='active'&&object.holder===c.id)
+  .map(object=>{const copy={...object};delete copy.physicalHistory;delete copy.physicalHistoryDropped;delete copy.unpermittedCount;return copy;});
+ const eligibleSupplies=(w.supplies||[]).filter(supply=>supplyIds.has(supply.id)).map(supply=>({...supply,materializedObjectId:supply.remaining>0?materializedObjectId(supply):null}));
+ const eligibleRestrictions=[...(w.supplies||[]).map(source=>({type:'supply' as const,source})),...(w.objects||[]).map(source=>({type:'object' as const,source}))].flatMap(({type,source})=>{
+  const scope=finiteSourceScope(source);
+  return scope?.coverage==='location'&&source.region!==local&&regions.find(region=>region.id===source.region)?.location===c.location?[{type,id:source.id,region:source.region,scope,readOnly:true as const}]:[];
+ });
+ // A bounded authority subset is explicit about omissions, never a complete
+ // execution snapshot. Prefer the requested identity and actor's own objects.
+ eligibleObjects.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target)||Number(b.holder===c.id)-Number(a.holder===c.id));
+ eligibleSupplies.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target));
+ const objects:WorldObject[]=[],supplies:(SceneSupply&{materializedObjectId:string|null})[]=[];
+ const finiteRestrictions:typeof eligibleRestrictions=[];
+ let bytes=32;
+ const retain=<T,>(source:T[],target:T[])=>{for(const item of source){const size=new TextEncoder().encode(JSON.stringify(item)).length+2;if(target.length<32&&bytes+size<=64*1024){target.push(item);bytes+=size;}}};
+ retain(eligibleRestrictions,finiteRestrictions);retain(eligibleObjects,objects);retain(eligibleSupplies,supplies);
+ return {explorationScope:{region:local,objectsOmitted:eligibleObjects.length-objects.length,suppliesOmitted:eligibleSupplies.length-supplies.length,restrictionsOmitted:eligibleRestrictions.length-finiteRestrictions.length,complete:eligibleObjects.length===objects.length&&eligibleSupplies.length===supplies.length&&eligibleRestrictions.length===finiteRestrictions.length},external:{bodies:w.characters.filter(person=>regionOf(person)===local&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:local})},objects,supplies,finiteRestrictions,effectContractVersion:'world-effects.v5',effectRules,effectContract:effectCandidateSchema};
 }
 function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect|IngestEffect> {
  if(effect.operation==='materialize')return {kind:'materialize',supplyId:effect.supplyId,expectedRemaining:effect.expectedRemaining};
  if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
  return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
 }
-function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number):string[]{
+function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number,routineSourceScope?:RoutineSourceScope):string[]{
  const results:string[]=[];
  const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
  for(const [effectIndex,original] of effects.entries()){
@@ -95,7 +114,13 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    const id=effectReferenceId(e);
    throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
   };
-  if(e.kind==='schedule-natural'){
+  if(e.kind==='discover'){
+   for(const id of e.supplyIds){const supply=w.supplies?.find(item=>item.id===id);if(supply?.pending){if(!canConfirmRoutineBackground(w,c,routineSourceScope,id))fail('background_discovery_scope','尚未確認的背景來源不能由這次查找建立。');delete supply.pending;}}
+
+   const objects=new Set(objectObservationCandidates(w,c,e.objectIds).map(item=>item.objectId)),supplies=new Set(supplyObservationCandidates(w,c,e.supplyIds).map(item=>item.supplyId));
+   if(e.region!==regionOf(c)||!canSee(w,c,e.region)||e.objectIds.some(id=>!objects.has(id)||w.objects?.find(object=>object.id===id)?.region!==e.region)||e.supplyIds.some(id=>!supplies.has(id)||w.supplies?.find(supply=>supply.id===id)?.region!==e.region))fail('discovery_scope','查找結果超出目前可接觸的範圍。');
+   results.push('已查探目前可接觸的範圍');
+  }else if(e.kind==='schedule-natural'){
    try{scheduleNaturalChange(w,c,e,nominalDueAt);}catch(error){fail('natural_precondition',error instanceof Error?error.message:'自然變化前提無效。');}
    results.push('已確認自然後續');
   }else if(e.kind==='form'||e.kind==='separate'){
@@ -122,6 +147,8 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    results.push('身體外在位置已改變');
   }else if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
+   if(s?.background&&routineBackgroundHasFiniteConflict(w,c,s,routineSourceScope))fail('background_finite_scope','當前適用的有限來源約束不允許普通背景代換。');
+   if(s&&!physical&&!s.knownTo.includes(c.id)&&canContactRoutineBackground(w,c,routineSourceScope,s.id))s.knownTo.push(c.id);
    if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&(physical||phaseIndex===null))||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!physical&&!s.allowedTo.includes(c.id)||s.region!==regionOf(c)||physical&&!canSee(w,c,s.region))fail('supply_precondition','裁定供應前提無效。');
    if(!validQuantity(s.quantity??{amount:1,unit:'item'})||s.consumable!==undefined&&typeof s.consumable!=='boolean')fail('quantity_precondition','供應份量或消耗能力無法安全承接。');
    if(!validObjectKind(s.kind))fail('object_kind','物件種類超出有界資料契約。');
@@ -231,7 +258,7 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
  return result;
 }
 export function validateResultBranches(w:World,c:Character,candidate:EffectCandidate):void {
- for(const branch of candidate.branches||[]){const clone=structuredClone(w),actor=clone.characters.find(actor=>actor.id===c.id)!;commitFreeAction(clone,actor,{...candidate,branches:undefined,check:null,effects:branch.effects,stages:branch.stages});}
+ for(const branch of candidate.branches||[]){const clone=structuredClone(w),actor=clone.characters.find(actor=>actor.id===c.id)!;commitFreeAction(clone,actor,{...candidate,branches:undefined,check:null,effects:branch.effects,stages:branch.stages},undefined,{validateOnly:true});}
 }
 // Generated feedback is an explicit excerpt, never truncation of an existing
 // memory. Preserve the original event's public summary and mechanical evidence.
@@ -260,7 +287,7 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  const text=feedbackExcerpt(`${c.name} 行動回饋（原提案，非已發生成果：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
  record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text);
 }
-export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt:number}):boolean{
+export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean}):boolean{
  if(candidate.branches){
   validateResultBranches(w,c,candidate);
   if(!action)throw Error('結果分支缺少活動對象。');
@@ -269,7 +296,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   const branch=candidate.branches[branchIndex];
   candidate.selectedResult={outcome:resolution?.outcome||null,...(resolution?{resolution}:{}),branch:branchIndex};
   candidate.effects=branch.effects;candidate.stages=branch.stages;candidate.check=null;
-  const used=new Set([...branch.effects,...branch.stages.flatMap(stage=>stage.effects)].flatMap(effect=>effect.kind==='materialize'?[effect.supplyId]:[]));
+  const used=new Set([...branch.effects,...branch.stages.flatMap(stage=>stage.effects)].flatMap(effectSupplyReferenceIds));
   const unselected=new Set((candidate.pendingResultSupplies||[]).filter(id=>!used.has(id)));
   discardPendingSupplies(w,unselected);
   delete candidate.branches;
@@ -283,6 +310,8 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
    :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
   recordActionResult(w,c,action,summary,'blocked');return false;
  }
+ const method:DiscoveryMethod|undefined=candidate.activityIdentity?{version:1,kind:'activity',key:candidate.activityIdentity.key}:candidate.trialBinding?{version:1,kind:'routine',key:candidate.trialBinding.operation}:undefined;
+ for(const phase of candidate.stages||[])if(method&&phase.effects.some(effect=>effect.kind==='discover'))phase.discoveryMethod={...method};
  const existingObjects=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
  const validateResultTime=(snapshot:World,afterMinutes:number)=>{
   // Only the routine factory can mark its verified raw-material supplies as
@@ -305,7 +334,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   try{
    if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
    predicted.minute=Math.max(predicted.minute,w.minute+phase.afterMinutes);
-   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);validateResultTime(predicted,phase.afterMinutes);
+   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex,undefined,phase.routineSourceScope);validateResultTime(predicted,phase.afterMinutes);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>'target' in p?worldTargetSnapshot(predicted,p.target):predicted.objects?.find(o=>o.id===p.objectId)||null)});
@@ -330,6 +359,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
  recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
+ if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
  return true;
 }
 
@@ -367,21 +397,30 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
    const phase=phases.stages[index];
    predicted.minute=Math.max(predicted.minute,actor.plan.startedAt+phase.afterMinutes);
    checkPhase(predicted,actor,phase);
-   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes);
+   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes,phase.routineSourceScope);
   }
   return true;
  }catch{return false;}
 }
 
 // Validate and commit one phase as a batch; lifecycle owns the phase cursor.
-export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number):string[] {
+export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
- const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined);
+ const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined,phase.routineSourceScope);
  commitWorldChanges(w,clone);
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  emitExternalConsequences(w,c.id,phase.effects);
+ if(!options?.validateOnly)commitDiscoveries(w,c,phase.effects,phase.discoveryMethod);
  return results;
+}
+
+function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:DiscoveryMethod):void {
+ const discoveries=effects.filter((effect):effect is DiscoverEffect=>effect.kind==='discover');
+ if(!discoveries.length)return;
+ const region=regionOf(c);
+ record(w,c.id,`${c.name} 實際查探了目前可接觸的範圍。`,'observe',[c.id],{from:c.location,to:c.location,fromRegion:region,toRegion:region,target:region,content:'sight'});
+ discoverWorldResources(w,c,w.events.at(-1)!,[...new Set(discoveries.flatMap(effect=>effect.objectIds))],[...new Set(discoveries.flatMap(effect=>effect.supplyIds))],method);
 }
 
 // Only external sensory facts leave the authority batch; reasons stay in receipts.
