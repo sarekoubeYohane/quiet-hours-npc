@@ -7,16 +7,18 @@ const denied={status:'denied',completionMinutes:null,effects:[],stages:[],check:
 const intent={id:'eat',content:'想吃點東西',context:'方法可以改變',intensity:'medium',importance:'medium',urgency:'medium'};
 const rest={type:'rest',target:'',content:'自行決定先休息',purpose:'',mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[intent]};
 const {wire}=require('./method-assessment-fixture.cjs');
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
+const active=c=>c.intents.filter(node=>node.kind!=='direction'&&node.status==='active');
 async function trace(id){return (await(await load('route').GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;}
 
 test('one actual decision connects sourced results, chosen purpose, intentions and action in saved observer trace',async()=>{
  const s=await scenario({decision:wire({...proposal,intents:[intent]},{choice:'switch',change:{kind:'source',detail:'改用另一份來源'}}),reply:denied});
  try{
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};const response=await s.post(op);assert.equal(response.status,200,await response.clone().text());
-  const receipt=await response.clone().json();assert.equal(receipt.operationEvidence.dispatches[0].candidate.value.action.target,'tools');assert.equal(receipt.operationEvidence.dispatches[0].candidate.value.methodAssessment,undefined);const first=await s.read();assert.deepEqual(first.characters[0].intents,[intent]);assert.equal(first.characters[0].methodAssessment,undefined,'assessment is not a permanent knowledge side channel');
-  const saved=await trace(op.operationId),step=saved.steps.find(x=>x.kind==='npc-method-assessment');assert.deepEqual(step.data.methodAssessment,wire({...proposal,intents:[intent]},{choice:'switch',change:{kind:'source',detail:'改用另一份來源'}}).methodAssessment);assert.equal(step.source,'model-self-report');assert.equal(step.data.action.target,'tools');assert.deepEqual(step.data.intents,[intent]);assert.equal(saved.outcome,'committed');
+  const receipt=await response.clone().json();assert.equal(receipt.operationEvidence.dispatches[0].candidate.value.action.target,'tools');assert.equal(receipt.operationEvidence.dispatches[0].candidate.value.methodAssessment,undefined);const first=await s.read();assert.equal(active(first.characters[0])[0].id,'owner:eat');assert.equal(active(first.characters[0])[0].scope,intent.content);assert.equal(first.characters[0].methodAssessment,undefined,'assessment is not a permanent knowledge side channel');
+  const saved=await trace(op.operationId),step=saved.steps.find(x=>x.kind==='npc-method-assessment');assert.deepEqual(step.data.methodAssessment,{...wire({...proposal,intents:[intent]},{choice:'switch',change:{kind:'source',detail:'改用另一份來源'}}).methodAssessment,intentIds:['owner:eat']});assert.equal(step.source,'model-self-report');assert.equal(step.data.action.target,'tools');assert.equal(active(step.data)[0].id,'owner:eat');assert.equal(saved.outcome,'committed');
   const before=s.counts();await s.post(op);assert.deepEqual(s.counts(),before);
-  s.choose(wire(rest));await advance(s);const next=s.inputs.filter(x=>x.input.self).at(-1),input=JSON.parse(next.request.messages[1].content);assert.ok(input.self.lastKnownState.entries.some(x=>/行動回饋/.test(x.text)));assert.match(next.request.messages[0].content,/methodAssessment/);assert.deepEqual(input.self.intents,[intent]);assert.equal(s.counts().npc,2);assert.equal(s.counts().judgments,1);
+  s.choose(wire(rest));await advance(s);const next=s.inputs.filter(x=>x.input.self).at(-1),input=JSON.parse(next.request.messages[1].content);assert.ok(input.self.lastKnownState.entries.some(x=>/行動回饋/.test(x.text)));assert.match(next.request.messages[0].content,/methodAssessment/);assert.equal(active(input.self)[0].id,'owner:eat');assert.equal(s.counts().npc,2);assert.equal(s.counts().judgments,1);
  }finally{s.restore();}
 });
 
@@ -24,9 +26,9 @@ test('the actual supported discriminated wire schema rejects blank propose field
  const s=await scenario({decision:wire(rest)});
  try{
   await advance(s);const body=s.inputs.find(x=>x.input.self).request,schema=body.response_format.json_schema.schema,validate=new Ajv().compile(schema);
-  assert.equal(validate(wire(rest)),true,JSON.stringify(validate.errors));
-  for(const [field,value] of [['purpose',''],['purpose','   '],['content',''],['content','\n']]){const candidate=wire(proposal);candidate.action[field]=value;assert.equal(validate(candidate),false,field);}
-  assert.equal(validate(wire(proposal)),true,JSON.stringify(validate.errors));assert.ok(!('if' in schema));assert.equal(schema.type,'object');assert.equal(schema.anyOf,undefined);
+  assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,wire(rest))),true,JSON.stringify(validate.errors));
+  for(const [field,value] of [['purpose',''],['purpose','   '],['content',''],['content','\n']]){const candidate=wire(proposal);candidate.action[field]=value;assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,candidate)),false,field);}
+  assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,wire(proposal))),true,JSON.stringify(validate.errors));assert.ok(!('if' in schema));assert.equal(schema.type,'object');assert.equal(schema.anyOf,undefined);
  }finally{s.restore();}
 });
 
@@ -39,7 +41,7 @@ test('autonomous retry wait switch and drop remain legal with same-call source r
    const change=choice==='switch'?{kind:'source',detail:'改向場所詢問新的來源'}:{kind:'none',detail:''};
    s.choose(wire(next,{choice,knownResults:[{kind:'short',id:source.id,version:source.version}],change}));
    const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(op)).status,200);
-   const saved=await s.read();assert.deepEqual(saved.characters[0].intents,next.intents);const step=(await trace(op.operationId)).steps.find(x=>x.kind==='npc-method-assessment');assert.equal(step.data.methodAssessment.choice,choice);assert.equal(step.data.action.content,next.content);assert.deepEqual(step.data.methodAssessment.knownResults,[{kind:'short',id:source.id,version:source.version}]);
+   const saved=await s.read();assert.deepEqual(active(saved.characters[0]).map(node=>node.content),next.intents.map(node=>node.content));const step=(await trace(op.operationId)).steps.find(x=>x.kind==='npc-method-assessment');assert.equal(step.data.methodAssessment.choice,choice);assert.equal(step.data.action.content,next.content);assert.deepEqual(step.data.methodAssessment.knownResults,[{kind:'short',id:source.id,version:source.version}]);
    assert.equal(s.counts().npc,2);assert.equal(s.counts().judgments,['retry','switch'].includes(choice)?2:1);
   }finally{s.restore();}
  }
@@ -52,7 +54,7 @@ test('chosen continuation is assessed once but automatic progress does not manuf
   await s.post({operation:'intervene',target:'owner',text:'你想繼續嗎？'});
   const next={...rest,type:'continue',content:'',durationMinutes:15};s.choose(wire(next,{choice:'continue',method:'繼續原先休息',change:{kind:'none',detail:''}}));
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(op)).status,200);assert.ok((await trace(op.operationId)).steps.some(x=>x.kind==='npc-method-assessment'));assert.equal((await s.read()).characters[0].plan.startedAt,plan.startedAt);
-  const automatic={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(automatic)).status,200);assert.ok(!(await trace(automatic.operationId)).steps.some(x=>x.kind==='npc-method-assessment'));assert.equal(s.counts().npc,2);assert.deepEqual((await s.read()).characters[0].intents,[intent]);
+  const automatic={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(automatic)).status,200);assert.ok(!(await trace(automatic.operationId)).steps.some(x=>x.kind==='npc-method-assessment'));assert.equal(s.counts().npc,2);assert.equal(active((await s.read()).characters[0])[0].id,'owner:eat');
  }finally{s.restore();}
 });
 
@@ -84,11 +86,11 @@ test('later NPC errors and save conflict keep assessment candidate trace separat
 test('the disclosed assessment UTF-8 byte boundary accepts 2048 and rejects 2049 without another dispatch',async()=>{
  for(const bytes of [2048,2049]){
   const candidate=wire(rest,{purpose:'目'.repeat(250),method:'法'.repeat(240),reason:'',change:{kind:'none',detail:'界'.repeat(70)}});
-  const padding=bytes-Buffer.byteLength(JSON.stringify(candidate.methodAssessment));assert.ok(padding>=0&&padding<=256);candidate.methodAssessment.reason='r'.repeat(padding);assert.equal(Buffer.byteLength(JSON.stringify(candidate.methodAssessment)),bytes);
+  candidate.methodAssessment.intentIds=['owner:eat'];const padding=bytes-Buffer.byteLength(JSON.stringify(candidate.methodAssessment));assert.ok(padding>=0&&padding<=256);candidate.methodAssessment.reason='r'.repeat(padding);assert.equal(Buffer.byteLength(JSON.stringify(candidate.methodAssessment)),bytes);
   const s=await scenario({decision:candidate});
   try{
    const before=await s.read(),op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(op)).status,bytes===2048?200:502);
-   const request=s.inputs.find(x=>x.input.self).request;assert.match(request.messages[0].content,/methodAssessment.*2048 bytes/);const validate=new Ajv().compile(request.response_format.json_schema.schema);assert.equal(validate(candidate),true,JSON.stringify(validate.errors));
+   const request=s.inputs.find(x=>x.input.self).request;assert.match(request.messages[0].content,/methodAssessment.*2048 bytes/);const validate=new Ajv().compile(request.response_format.json_schema.schema);assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,candidate)),true,JSON.stringify(validate.errors));
    if(bytes===2049)assert.deepEqual((await s.read()).characters,before.characters);assert.equal(s.counts().npc,1);assert.equal(s.counts().judgments,0);const counts=s.counts();await s.post(op);assert.deepEqual(s.counts(),counts);
   }finally{s.restore();}
  }
@@ -107,8 +109,8 @@ test('v2 phone action and sourced arrangement share one assessed decision and at
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};
   const response=await s.post(op);assert.equal(response.status,200,await response.clone().text());
   const actual=s.inputs.filter(x=>x.input.self).at(-1),schema=actual.request.response_format.json_schema.schema;
-  assert.equal(actual.input.contractVersion,'npc-decision.v2');assert.ok(actual.input.self.lastKnownState.entries.some(x=>x.reference.id===source.id));
-  const validate=new Ajv().compile(schema);assert.equal(validate(candidate),true,JSON.stringify(validate.errors));
+  assert.equal(actual.input.contractVersion,'npc-decision.v3');assert.ok(actual.input.self.lastKnownState.entries.some(x=>x.reference.id===source.id));
+  const validate=new Ajv().compile(schema);assert.equal(validate(fixturePursuitDecision(actual.input,candidate)),true,JSON.stringify(validate.errors));
   const saved=await s.read();assert.equal(saved.phones.devices[0].memos[0].text,'稍後改用另一種方法。');assert.equal(saved.characters[0].arrangements.items[0].text,'稍後重試');assert.equal(saved.minute,before.minute+15);
   assert.ok((await trace(op.operationId)).steps.some(x=>x.kind==='npc-method-assessment'&&x.data.methodAssessment.selectedAction.type==='phone'));
   const counts=s.counts();await s.post(op);assert.deepEqual(s.counts(),counts);assert.equal(counts.npc,2);assert.equal(counts.judgments,0);

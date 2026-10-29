@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario,proposal}=require('./routine-program-fixture.cjs');
@@ -47,7 +48,7 @@ for(const task of ['npc','adjudication'])for(const kind of ['provider-body','can
 
 test('a later actor failure preserves earlier execution candidates but rolls back the entire world',async()=>{
  const s=await scenario({modify:w=>{const second=structuredClone(w.characters[0]);second.id='second';second.shortTerm=[];second.longTerm=[];second.memories=[];second.memoryTrace=[];second.observations=[];delete second.cognition;delete second.control;w.characters.push(second);}}),op=operation(),before=store.snapshot();
- let calls=0;global.fetch=async()=>{if(++calls===2)throw Error('second actor failure');return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify({...proposal,type:'move',target:'kris-home',content:'移動',purpose:'',timeIntent:{kind:'completion',maxMinutes:null}})}}]});};
+ let calls=0;global.fetch=async(_fixtureUrl,_fixtureInit)=>{if(++calls===2)throw Error('second actor failure');return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{...proposal,type:'move',target:'kris-home',content:'移動',purpose:'',timeIntent:{kind:'completion',maxMinutes:null}}))}}]});};
  try{
   assert.equal((await s.post(op)).status,502);const data=await lookup(op.operationId),t=data.decisionTrace;
   assert.equal(t.dispatches.length,2);assert.equal(t.outcome,'rolled-back');assert.equal(t.dispatches[1].worldSnapshot.actors.find(a=>a.id==='owner').location,'kris-home');
@@ -85,7 +86,7 @@ for(const task of ['npc','adjudication'])test(`${task} timeout records no answer
  AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
  global.fetch=async(url,init)=>{
   calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if((input.contractVersion==='world-adjudication.v1')!==(task==='adjudication'))return original(url,init);
-  entered();await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:JSON.stringify(proposal)}}]});
+  entered();await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),proposal))}}]});
  };
  let running;
  try{
@@ -101,7 +102,7 @@ for(const task of ['npc','adjudication'])test(`${task} timeout records no answer
 test('an expired lease discards the received candidate and preserves trace identity after uncertain replay',async()=>{
  const s=await scenario(),op=operation(),clock=Date.now;let now=clock(),entered,release;Date.now=()=>now;
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let sent=0;
- global.fetch=async()=>{sent++;entered();await gate;return Response.json({usage:{prompt_tokens:6,completion_tokens:2},choices:[{message:{content:JSON.stringify({...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null}})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;entered();await gate;return Response.json({usage:{prompt_tokens:6,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null}}))}}]});};
  let running;
  try{
   running=s.post(op);await ready;now+=440000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);

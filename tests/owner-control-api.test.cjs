@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node test fixtures load the temporary CommonJS build. */
+const {fixtureDecision,savedPursuit}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -27,14 +28,14 @@ const withModel = async run => {
   const original = global.fetch; const called = [];
   global.fetch = async (_url, init) => {
     const data = JSON.parse(JSON.parse(init.body).messages[1].content); called.push(data.self.id);
-    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: data.self.intents }) } }] });
+    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: [] })) } }] });
   };
   try { await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}})); await run(called); } finally { global.fetch = original; }
 };
 
 test('single designated action survives reload, replaces autonomous activity, preserves intents and resumes autonomous control', async () => {
   const world = worldWithAdjudication(); const owner = world.characters.find(c => c.id === 'owner');
-  const queue = [{ id: 'care', content: '照顧咖啡館', intensity: 'high', importance: 'medium', urgency: 'low', context: '晚點再整理' }];
+  const queue = [{ id: 'care', content: '照顧咖啡館', intensity: 'high', importance: 'medium', urgency: 'low', context: '晚點再整理' }].map(item=>savedPursuit('owner',item));
   owner.intents = queue; owner.plan = { action: { type: 'rest' }, startedAt: 1245, until: 1335, attention: '', modelKey: 'openai:gpt-6-luna' };
   store.install(world);
   assert.equal((await POST(request({ operation: 'direct', action: { type: 'rest' } }))).status, 200);

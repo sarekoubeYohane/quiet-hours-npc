@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {scenario,proposal,advance,vessel}=require('./routine-program-fixture.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -81,7 +82,7 @@ test('real meal ingestion commits its known result into next messages and later 
    w.characters[0].shortTerm=[];w.characters[0].memories=[];
    if(fail){const peer=structuredClone(w.characters[0]);peer.id='peer';peer.name='另一人';delete peer.control;w.characters.push(peer);}
   }}),transport=global.fetch;
-  global.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self?.id==='peer')return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify({invalid:'later actor'})}}]});return transport(url,init);};
+  global.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self?.id==='peer')return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{invalid:'later actor'}))}}]});return transport(url,init);};
   try{
    const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};const response=await s.post(op);assert.equal(response.status,fail?502:200);
    const saved=await s.read(),meal=saved.objects.find(x=>x.id==='meal');assert.equal(meal.lifecycle,fail?'active':'consumed');

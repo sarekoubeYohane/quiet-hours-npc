@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public adjudication contract boundary. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
@@ -28,9 +29,9 @@ test('the world API sends the centralized free contract and executes only after 
   const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);
   if(input.contractVersion==='world-adjudication.v1'){
    captured={input,schema:body.response_format.json_schema.schema};
-   return Response.json({usage:{prompt_tokens:10,completion_tokens:2},choices:[{message:{content:JSON.stringify({...accepted,routine:null})}}]});
+   return Response.json({usage:{prompt_tokens:10,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{...accepted,routine:null}))}}]});
   }
-  return Response.json({usage:{prompt_tokens:10,completion_tokens:2},choices:[{message:{content:JSON.stringify({type:'propose',target:'meal',content:'拿這份餐點',purpose:'吃飯',mood:'平靜',durationMinutes:15,intents:[]})}}]});
+  return Response.json({usage:{prompt_tokens:10,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'propose',target:'meal',content:'拿這份餐點',purpose:'吃飯',mood:'平靜',durationMinutes:15,intents:[]}))}}]});
  };
  try{
   await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));

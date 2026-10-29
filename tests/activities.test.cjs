@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Tests load a temporary transpiled build. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -73,7 +74,7 @@ test('budget prevents new requests, survives a reload, and resets its hourly win
 
 test('API failure rolls back a partial round but persists attempts and reported tokens', async () => {
   const world = worldWithAdjudication(); store.install(world); const originalFetch = global.fetch; let calls = 0;
-  global.fetch = async () => ++calls === 1 ? Response.json({ usage: { prompt_tokens: 100, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] }) } }] }) : new Response('', { status: 429 });
+  global.fetch = async (_fixtureUrl,_fixtureInit) => ++calls === 1 ? Response.json({ usage: { prompt_tokens: 100, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] })) } }] }) : new Response('', { status: 429 });
   try {
     await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
     const response = await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna' }) }));
@@ -89,7 +90,7 @@ test('API failure rolls back a partial round but persists attempts and reported 
 
 test('API persists a completed round and rejects origin mismatch before requesting AI', async () => {
   store.install(worldWithAdjudication()); const originalFetch = global.fetch; let calls = 0;
-  global.fetch = async () => { calls++; return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] }) } }] }); };
+  global.fetch = async (_fixtureUrl,_fixtureInit) => { calls++; return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] })) } }] }); };
   const request = origin => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6-luna', limits: { calls: 4, tokens: 30000 } }) });
   try {
     await POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' }) }));
@@ -161,7 +162,7 @@ test('model receives only its own established habits, without raw statistics or 
     learnStartedHabit(world, vera, { type: 'work', target: 'craft' }, vera.location);
   }
   let payload;
-  const fakeFetch = async (url, init) => { payload = JSON.parse(init.body); return Response.json({ choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] }) } }] }); };
+  const fakeFetch = async (url, init) => { payload = JSON.parse(init.body); return Response.json({ choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] })) } }] }); };
   await aiDecision(world, cass, 'unit-test-key', 'gpt-6-luna', 'openai', fakeFetch);
   const data = JSON.parse(payload.messages[1].content);
   assert.equal(data.learnedHabits.length, 1);

@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API transport fixture. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${n}.cjs`));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
 const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
 const read=async()=>(await(await GET()).json()).world;
-async function withModel(choose,run){const old=global.fetch,inputs=[];global.fetch=async(_u,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(input.contractVersion==='world-adjudication.v1'?choose(input):{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)})}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:100,tokens:1000000}}));await run(inputs,b=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,...b})));}finally{global.fetch=old;}}
-const op=(input,p)=>({type:'phone',target:input.phones.find(d=>d.owner===input.self.id)?.objectId,content:JSON.stringify({collection:'inbox',...p})});
+async function withModel(choose,run){const old=global.fetch,inputs=[];global.fetch=async(_u,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),input.contractVersion==='world-adjudication.v1'?choose(input):{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)}))}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:100,tokens:1000000}}));await run(inputs,b=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,...b})));}finally{global.fetch=old;}}
+const op=(input,p)=>({type:'phone',target:input.phones.find(d=>d.owner===input.self.id)?.objectId,content:JSON.stringify(fixtureDecision(input,{collection:'inbox',...p}))});
 test('message delivers unread to a real device without revealing body or forcing an extra recipient decision',async()=>{
  const w=seedWorld();w.adjudication={provider:'openai',model:'gpt-6-luna'};store.install(w);
  await withModel(input=>input.self.id==='cass'?{type:'message',target:'vera',content:'PRIVATE_BODY_ONLY_AFTER_READ'}:{},async(inputs,advance)=>{
@@ -27,7 +28,7 @@ test('active inbox list preserves unread and specified reading creates only actu
    assert.equal(device.inbox.length,1);assert.equal(device.inbox[0].readers.length,stage<2?0:1);
    if(stage<3)assert.equal(JSON.stringify(inputs.findLast(i=>i.self.id==='vera')).includes('INBOX_BODY_KEEP_EXACT'),false);
    else assert.equal(JSON.stringify(inputs.findLast(i=>i.self.id==='vera')).includes('INBOX_BODY_KEEP_EXACT'),true);
-   assert.equal(saved.characters.find(c=>c.id==='vera').cognition?.beliefs?.length||0,0);assert.deepEqual(saved.characters.find(c=>c.id==='vera').intents,[]);
+   assert.equal(saved.characters.find(c=>c.id==='vera').cognition?.beliefs?.length||0,0);assert.deepEqual(saved.characters.find(c=>c.id==='vera').intents.filter(node=>node.kind!=='direction'),[]);
   }
   assert.equal(inputs.length,20);assert.equal(inputs.filter(i=>i.self.id==='kris').some(i=>JSON.stringify(i).includes('INBOX_BODY_KEEP_EXACT')),false);
   const saved=await read();assert.equal(saved.events.filter(e=>e.kind==='message').length,1);assert.equal(saved.characters.find(c=>c.id==='cass').shortTerm.some(m=>m.text.includes('INBOX_BODY_KEEP_EXACT')),true);
@@ -50,7 +51,7 @@ test('physical phone movement retains inbox identity; holding, ownership and pri
   if(input.self.id==='cass'&&stage===0)return {type:'message',target:'vera',content:'MOVE_WITH_DEVICE_BODY'};
   if(input.self.id==='vera'&&stage===1)return {type:'propose',target:phoneId,content:'把自己的手機放在桌上',purpose:'暫時放下手機'};
   if(input.self.id==='cass'&&stage===2)return {type:'propose',target:phoneId,content:'拿起桌上的手機',purpose:'拿起附近手機'};
-  if(input.self.id==='cass'&&stage===3)return {type:'phone',target:phoneId,content:JSON.stringify({collection:'inbox',operation:'list'})};
+  if(input.self.id==='cass'&&stage===3)return {type:'phone',target:phoneId,content:JSON.stringify(fixtureDecision(input,{collection:'inbox',operation:'list'}))};
   return {};
  },async(inputs,advance)=>{
   for(stage=0;stage<4;stage++){
@@ -61,7 +62,7 @@ test('physical phone movement retains inbox identity; holding, ownership and pri
 });
 test('an owner whose phone is held by somebody else cannot list its hidden inbox or memo records',async()=>{
  const w=seedWorld();w.adjudication={provider:'openai',model:'gpt-6-luna'};store.install(w);let stage=0,phoneId;
- await withModel(input=>input.self.id==='cass'&&stage===0?{type:'message',target:'vera',content:'HIDDEN_HELD_PHONE_BODY'}:input.self.id==='vera'&&stage===1?{type:'phone',target:phoneId,content:JSON.stringify({collection:'inbox',operation:'list'})}:{},async(inputs,advance)=>{
+ await withModel(input=>input.self.id==='cass'&&stage===0?{type:'message',target:'vera',content:'HIDDEN_HELD_PHONE_BODY'}:input.self.id==='vera'&&stage===1?{type:'phone',target:phoneId,content:JSON.stringify(fixtureDecision(input,{collection:'inbox',operation:'list'}))}:{},async(inputs,advance)=>{
   assert.equal((await advance()).status,200);const setup=await read(),d=setup.phones.devices.find(d=>setup.objects.find(o=>o.id===d.objectId).owner==='vera');phoneId=d.objectId;const o=setup.objects.find(o=>o.id===phoneId),cass=setup.characters.find(c=>c.id==='cass'),vera=setup.characters.find(c=>c.id==='vera');cass.location=vera.location;cass.region=vera.region;o.holder='cass';store.replaceCommittedWorld(setup);stage=1;
   assert.equal((await advance()).status,200);const saved=await read();assert.equal(saved.characters.find(c=>c.id==='vera').shortTerm.some(m=>m.text.includes(d.inbox[0].id)),false);assert.equal(saved.phones.devices.find(d=>d.objectId===phoneId).inbox[0].readers.length,0);
  });
@@ -96,7 +97,7 @@ test('a third person can actually read one displayed message without marking the
   if(input.self.id==='cass'&&stage===0)return {type:'message',target:'vera',content:'FINITE_SCREEN_MESSAGE_BODY'};
   if(input.self.id==='vera'&&stage===1)return op(input,{operation:'list'});
   if(input.self.id==='vera'&&stage===2)return op(input,{operation:'display',id,version:1});
-  if(input.self.id==='kris'&&(stage===3||stage===4))return {type:'phone',target:phoneId,content:JSON.stringify({collection:'inbox',operation:stage===3?'list':'read',...(stage===4?{id,version:1}:{})})};
+  if(input.self.id==='kris'&&(stage===3||stage===4))return {type:'phone',target:phoneId,content:JSON.stringify(fixtureDecision(input,{collection:'inbox',operation:stage===3?'list':'read',...(stage===4?{id,version:1}:{})}))};
   return {};
  },async(inputs,advance)=>{
   for(stage=0;stage<5;stage++){assert.equal((await advance()).status,200);const saved=await read(),d=saved.phones.devices.find(d=>saved.objects.find(o=>o.id===d.objectId).owner==='vera');phoneId=d.objectId;id=d.inbox[0].id;assert.equal(d.inbox[0].readers.some(r=>r.actorId==='vera'),false);}

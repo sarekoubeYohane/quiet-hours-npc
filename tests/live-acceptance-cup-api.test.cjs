@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -37,7 +38,7 @@ async function setup({ oldCapabilities = false, version = 2 } = {}) {
     const judgment = input.contractVersion === 'world-adjudication.v1';
     if (judgment) judgments++; else npc++;
     const value = judgment ? reply : input.self.id === 'owner' ? decision : { type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] };
-    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
+    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),value)) } }] });
   };
   return { post, choose: value => { decision = value; }, counts: () => ({ npc, judgments }), restore: () => { global.fetch = previous; } };
 }
