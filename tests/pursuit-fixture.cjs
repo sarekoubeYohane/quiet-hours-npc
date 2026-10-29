@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- Explicit provider fixture authoring; never installed in production or as a fetch interceptor. */
+/* Explicit provider fixture authoring; never installed in production or as a fetch interceptor. */
 // Non-pursuit regression cases use an explicit empty increment. This builder
 // never derives exits from a missing entry in an old complete array.
 function fixtureDecision(input, candidate, { adopt = [], drop = [] } = {}) {

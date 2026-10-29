@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const {fixtureDecision}=require('../pursuit-fixture.cjs');
+const {fixturePursuitDecision}=require('../pursuit-fixture.cjs');
 const assert=require('node:assert/strict');
 const choose=(type,overrides={})=>({type,target:'',content:'按自己的想法安排',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[],...overrides});
 const refs=input=>input.self.shortTerm.map(({id,version})=>({id,version}));
@@ -26,7 +26,7 @@ function model(){
  return {judge:value=>{judgeReply=value;},choose:value=>{current=value;},failLater:value=>{laterFailure=value;},counts:()=>({npc,adjudication}),inputs,
  respond:request=>{const input=JSON.parse(request.messages[1].content);inputs.push(input);let value;
   if(input.contractVersion==='world-adjudication.v1'){adjudication++;value=judgeReply(input);}else{npc++;assert.equal(input.self.needs,undefined);assert.equal(input.self.habitEvidence,undefined);assert.ok(input.self.bodyFeelings);value=input.self.id==='owner'?(typeof current==='function'?current(input):current):laterFailure?{type:'invalid-later-actor'}:reflect(15);}
-  return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
+  return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(JSON.parse(request.messages[1].content),value))}}]});
  }};
 }
 module.exports={initialWorld,model,choose,work,ingest,sleep,rest,reflect,refs};
