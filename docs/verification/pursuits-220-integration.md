@@ -63,4 +63,4 @@ T8正向完整80advance是**合成既有100calls／1,000,000tokens payer**的plu
 
 ## 最終review與修正
 
-兩軸審查對`f9493c7...144bcea`提出Standards P3一項、Spec P1一項／P2兩項，均已在唯一review-fix分支處理，詳見[分軸修正與RED→GREEN證據](pursuits-220-review.md)。修正涵蓋歸檔用語、跨output持久payer／一次性授權、未提及與歷史綁定版、L5人工相關承接確認；另完成真官方price host allowlist反例與來源預檢。新增5個API旅程與3個runner反例接入預設套件；runner獨立第四組執行，避免source-pin反例與Workers／migration讀取來源競態。末次必要測試數與原reviewer複核在修正報告及整合PR記錄，不能把舊版精確body量測冒稱新head實測。
+兩軸審查對`f9493c7...144bcea`提出Standards P3一項、Spec P1一項／P2兩項，均已在唯一review-fix分支處理，詳見[分軸修正與RED→GREEN證據](pursuits-220-review.md)。修正涵蓋歸檔用語、跨output持久payer／一次性授權、未提及與歷史綁定版、L5人工相關承接確認；另完成真官方price host allowlist反例與來源預檢。新增5個API旅程與3個runner反例接入預設套件；末次指定runner18/18、必要native87/87，0fail、0真實付費。runner獨立第四組執行，避免source-pin反例與Workers／migration讀取來源競態。整合後完整回歸及原reviewer複核由整合PR記錄，不能把舊版精確body量測冒稱新head實測。
