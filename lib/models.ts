@@ -112,7 +112,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const attention = parseAttention(world, character, data.attentionConditions);
   if (data.interpretation !== undefined && (!text(data.interpretation, 256) || new TextEncoder().encode(data.interpretation as string).length > 256)) throw Error();
   const cognition = updateCognition(character, data.cognitiveUpdates, world.minute, context);
-  const arrangement = updateArrangements(world,character,data.arrangementUpdates,context.visible);
+  const arrangement = updateArrangements(world,character,data.arrangementUpdates,context.visible,intents);
   const memoryCandidate=evaluateMemories({ ...character, ...(cognition ? {cognition} : {}) },data.memorySelections,data.memoryOperations,context.visible.longTerm as Parameters<typeof evaluateMemories>[3],context.memoryReview,context.visible.shortTerm||[]);
   if(arrangement.experiences.length)memoryCandidate.shortTerm=[...(memoryCandidate.shortTerm||character.shortTerm||[]),...arrangement.experiences];
   const preferences = updatePreferences(character, data.preferenceUpdates, world.minute, context.visible);

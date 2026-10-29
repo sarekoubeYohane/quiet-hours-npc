@@ -1,11 +1,11 @@
 import type { Character, World } from './world';
-import type { Arrangement, ArrangementCondition } from './arrangements';
+import { arrangementPursuitState, type Arrangement, type ArrangementCondition } from './arrangements';
 import { isSleeping } from './needs';
 import { initializeObservationOrder } from './memory';
 import { regionOf, type Observation } from './perception';
 export type KnownObservationCursor={id:string;time:number;sequence?:number};
 export type ArrangementCueState={conditionKey:string;lastMatch:string|null;epoch:number;observationCursor?:KnownObservationCursor;trigger?:{key:string;at:number;handledAt?:number}};
-export type ArrangementCueReceipt={id:string;version:number;key:string;state:ArrangementCueState};
+export type ArrangementCueReceipt={pursuitId?:string;id:string;version:number;key:string;state:ArrangementCueState};
 export type KnownConditionInput={observations:Pick<Observation,'kind'|'source'|'region'|'time'>[];memoryIds:string[]};
 export const conditionKey=(condition:ArrangementCondition)=>condition.kind==='time'?`time:${condition.minute}`:condition.kind==='context'?`context:${condition.region}`:`event:${condition.clueKind}:${condition.source}:${condition.region}`;
 // Only an actor's submitted time and actual known sensory input participate.
@@ -59,24 +59,24 @@ export function nextConditionCue(previous:ArrangementCueState|undefined,conditio
 type CueInput={self:{arrangements:{items:Arrangement[]};observations:KnownConditionInput['observations'];shortTerm:{id:string}[]}};
 export function arrangementCuesForDecision(world:World,actor:Character,input:CueInput){
  if(isSleeping(actor))return [];
- return input.self.arrangements.items.filter(item=>item.status==='active').flatMap(item=>{
+ return input.self.arrangements.items.filter(item=>item.status==='active'&&(!item.pursuit||arrangementPursuitState(actor,item)?.status==='active')).flatMap(item=>{
   const prior=actor.arrangements?.items.find(i=>i.id===item.id&&i.version===item.version);
   const state=nextConditionCue(prior?.cue,item.condition,knownConditionSignal(world,actor,item.condition,{observations:input.self.observations,memoryIds:input.self.shortTerm.map(m=>m.id)},prior?.conditionSince??item.time,prior?.cue?.observationCursor),world.minute);
-  return state.trigger?.handledAt===undefined&&state.trigger?[{id:item.id,version:item.version,key:state.trigger.key,triggeredAt:state.trigger.at}]:[];
+  return state.trigger?.handledAt===undefined&&state.trigger?[{id:item.id,version:item.version,key:state.trigger.key,triggeredAt:state.trigger.at,...(item.pursuit?{pursuit:{id:item.pursuit.id,version:arrangementPursuitState(actor,item)!.currentVersion}}:{})}]:[];
  });
 }
 export function refreshArrangementCues(world:World,actor:Character,input:CueInput){
  if(isSleeping(actor))return;
  for(const visible of input.self.arrangements.items){
-  const item=actor.arrangements?.items.find(i=>i.id===visible.id&&i.version===visible.version);if(!item||item.status!=='active')continue;
+  const item=actor.arrangements?.items.find(i=>i.id===visible.id&&i.version===visible.version);if(!item||item.status!=='active'||item.pursuit&&arrangementPursuitState(actor,item)?.status!=='active')continue;
   item.cue=nextConditionCue(item.cue,item.condition,knownConditionSignal(world,actor,item.condition,{observations:input.self.observations,memoryIds:input.self.shortTerm.map(m=>m.id)},item.conditionSince??item.time,item.cue?.observationCursor),world.minute);
  }
 }
 export function arrangementCueReceipts(world:World,actor:Character,input:CueInput & {self:{arrangementCues:{id:string;version:number;key:string}[]}}):ArrangementCueReceipt[]{
- return input.self.arrangementCues.map(handle=>{const item=actor.arrangements!.items.find(i=>i.id===handle.id&&i.version===handle.version)!;return {...handle,state:nextConditionCue(item.cue,item.condition,knownConditionSignal(world,actor,item.condition,{observations:input.self.observations,memoryIds:input.self.shortTerm.map(m=>m.id)},item.conditionSince??item.time,item.cue?.observationCursor),world.minute)};});
+ return input.self.arrangementCues.map(handle=>{const item=actor.arrangements!.items.find(i=>i.id===handle.id&&i.version===handle.version)!;return {...handle,pursuitId:item.pursuit?.id,state:nextConditionCue(item.cue,item.condition,knownConditionSignal(world,actor,item.condition,{observations:input.self.observations,memoryIds:input.self.shortTerm.map(m=>m.id)},item.conditionSince??item.time,item.cue?.observationCursor),world.minute)};});
 }
 export function acknowledgeArrangementCues(actor:Character,receipts:ArrangementCueReceipt[]|undefined,minute:number){
- for(const receipt of receipts||[]){const item=actor.arrangements?.items.find(i=>i.id===receipt.id);if(!item||item.version<receipt.version||conditionKey(item.condition)!==receipt.state.conditionKey)continue;
+ for(const receipt of receipts||[]){const item=actor.arrangements?.items.find(i=>i.id===receipt.id);if(!item||item.version<receipt.version||conditionKey(item.condition)!==receipt.state.conditionKey||item.pursuit?.id!==receipt.pursuitId)continue;
   if(!item.cue||item.cue.epoch<=receipt.state.epoch)item.cue=structuredClone(receipt.state);
   if(item.cue.trigger?.key===receipt.key&&item.cue.trigger.handledAt===undefined)item.cue.trigger.handledAt=minute;}
 }
