@@ -44,3 +44,5 @@
 | C22／C30 | 滿圖／缺口／歸檔 desktop／mobile 真重載 | T2 候選／承接／未提交畫面與有界 observer trace |
 
 此表是整合覆蓋的接點，不表示單一本票測試重現所有交叉組合；完整 C1–C30 對照與隔離多輪 runner 由 #228 統整。真實 L1–L5 行為仍另待 #229。
+
+八組既有 memory-selection／recall／flexible-life／phone-memos／phone-calendar／phone-notifications／cognition／arrangement-cues 回歸共 103 例，初次 102 通過；唯一失敗是舊 synthetic 壓力不再足以省略 belief。保留原全部斷言並重建合法壓力，最新產品指定單一 case 重跑 1/1 通過：short 65461/65536 bytes、belief 16229/16384 bytes，20 個 short 全展示，完整 input 88246 bytes，24 belief 展示 22、可行整理後保存 23。此支援調整不削弱來源、維護或 88 KiB 斷言。
