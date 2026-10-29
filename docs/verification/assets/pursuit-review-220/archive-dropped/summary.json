@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "fixtureCalls": 2,
+  "realPaidCalls": 0,
+  "fullGraphReload": true,
+  "sourceGapVisible": true,
+  "archiveReload": true,
+  "archiveDoesNotInventDropOrIndependent": true,
+  "mobileNoOverflow": true,
+  "sameIdNoDispatch": true,
+  "inputs": [
+    7867,
+    8473
+  ],
+  "requests": [
+    59555,
+    60490
+  ]
+}

@@ -2,7 +2,7 @@ import '../../tooling/verification/no-network.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { preflight, runExperiment, runnerDigest, digest, readback } from './pursuit-runner-228.mjs';
-import { mkdtemp, rm, readFile, writeFile, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRuntime } from './pursuit-runtime-228.mjs';
@@ -17,15 +17,16 @@ async function registration(directory,mutate=()=>{}) {
   const plan=JSON.parse(await readFile('tooling/experiments/pursuits-220.json','utf8'));
   plan.implementationCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).trim();
   plan.runnerSha256=await runnerDigest();
-  const authorization={approved:true,reference:'synthetic-test-authorization-only',runId:crypto.randomUUID(),scope:'isolated-pursuit-220',payer:'pursuit-experiment-payer',expiresAt:Date.now()+600000,remaining:{calls:160,tokens:2000000,usd:1,elapsedMs:2700000}};
+  const authorization={approved:true,reference:'synthetic-test-authorization-'+crypto.randomUUID(),runId:crypto.randomUUID(),scope:'isolated-pursuit-220',payer:'pursuit-experiment-payer',expiresAt:Date.now()+600000,remaining:{calls:160,tokens:2000000,usd:1,elapsedMs:2700000}};
   const priceSnapshot={provider:'openai',model:'gpt-6-luna',source:'https://openai.com/api/pricing/',evidenceSha256:digest('SYNTHETIC TEST PRICE ONLY'),date:'2026-10-29',input:.0001,output:.0002};
   mutate({plan,authorization,priceSnapshot});authorization.planSha256=digest(JSON.stringify(plan));authorization.priceSha256=digest(JSON.stringify(priceSnapshot));
   const planPath=join(directory,'plan.json');await writeFile(planPath,JSON.stringify(plan));
-  return {mode:'live',runDirectory:directory,planPath,authorization,priceSnapshot,controlledTransport:true,credential:async()=>'synthetic-credential-228'};
+  return {mode:'live',runDirectory:directory,accountDirectory:join(directory,'account'),planPath,authorization,priceSnapshot,controlledTransport:true,credential:async()=>'synthetic-credential-228'};
 }
 
 async function existingPayer(directory) {
-  const runtime=await createRuntime({databasePath:join(directory,'world.sqlite')});
+  await mkdir(join(directory,'account'),{recursive:true});
+  const runtime=await createRuntime({databasePath:join(directory,'account','account.sqlite')});
   const before=await(await runtime.get()).json();
   const result=await runtime.post({operation:'set-budget',mode:'openai',worldContext:before.world.contextId,operationId:Date.now()+':'+crypto.randomUUID(),limits:{calls:100,tokens:1000000}});
   assert.equal(result.status,200);await runtime.close();
@@ -37,6 +38,47 @@ test('default preflight reports missing finite authorization without reading cre
   assert.ok(result.missing.includes('finite-authorization'));
   assert.ok(result.missing.includes('official-price-snapshot'));
   assert.equal(result.realProviderCalls, 0);
+});
+
+test('price preflight recognizes exact official HTTPS hosts and rejects lookalike subdomains',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pursuit-official-price-hosts-'));
+ try{
+  for(const source of ['https://openai.com/api/pricing/','https://www.openai.com/api/pricing/','https://developers.openai.com/api/docs/models/gpt-6-luna','https://platform.openai.com/docs/models/gpt-6-luna']){
+   const options=await registration(directory,({priceSnapshot})=>{priceSnapshot.source=source;});assert.equal((await preflight(options)).errors.includes('official-price-snapshot'),false,source);
+  }
+  for(const source of ['https://openai.com.evil.invalid/pricing','https://developers.openai.com.evil.invalid/model','http://developers.openai.com/model','https://platform.openai.com@evil.invalid/model','https://evil.invalid@openai.com/prices']){
+   const options=await registration(directory,({priceSnapshot})=>{priceSnapshot.source=source;});assert.equal((await preflight(options)).errors.includes('official-price-snapshot'),true,source);
+  }
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('one finite authorization cannot be claimed again by changing output, and an unresolved payer blocks a fresh grant',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pursuit-shared-grant-'));
+ try{
+  const options=await registration(directory,({authorization})=>{authorization.remaining.calls=1;});options.accountDirectory=join(directory,'account');
+  let forwards=0,credentials=0;const providerFetch=async()=>{forwards++;throw Error('synthetic interrupted provider');};
+  const first=await runExperiment({...options,runDirectory:join(directory,'output-a'),credential:async()=>{credentials++;return 'synthetic-credential-228';},providerFetch});
+  assert.equal(first.providerInvocations,1);assert.equal(forwards,1);
+  await assert.rejects(runExperiment({...options,runDirectory:join(directory,'output-b'),credential:async()=>{credentials++;return 'not-to-be-read';},providerFetch}),/authorization-already-claimed/);
+  const fresh=await registration(directory);fresh.accountDirectory=options.accountDirectory;
+  await assert.rejects(runExperiment({...fresh,runDirectory:join(directory,'output-c'),credential:async()=>{credentials++;return 'not-to-be-read';},providerFetch}),/payer-has-unresolved-run/);
+  assert.equal(forwards,1);assert.equal(credentials,1);
+  const original=await readback({runDirectory:join(directory,'output-a')});assert.equal(original.state.pendingOperationId,first.pendingOperationId);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('a genuinely new grant and output retain the same payer SQL usage, original hour window and limits',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pursuit-shared-payer-'));
+ try{
+  const views=[];
+  for(const name of ['first','second']){
+   const options=await registration(directory,({authorization})=>{authorization.reference='synthetic-separate-grant-'+name;});let forwarded=0;
+   const result=await runExperiment({...options,runDirectory:join(directory,name),accountDirectory:join(directory,'account'),stopRequested:async()=>forwarded>0,providerFetch:async(_url,init)=>{forwarded++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(decision(input,{duration:120}))}}]});}});
+   assert.equal(result.stopped,'user-stop');assert.equal(result.pendingOperationId,null);views.push(await readback({runDirectory:join(directory,name)}));
+  }
+  assert.equal(views[0].world.aiUsage.totalCalls,2);assert.equal(views[1].world.aiUsage.totalCalls,4);assert.equal(views[1].world.aiUsage.calls,4);
+  assert.equal(views[1].world.aiUsage.windowStartedAt,views[0].world.aiUsage.windowStartedAt);assert.equal(views[1].world.playerBudget,undefined);assert.equal(views[1].state.accountDatabasePath,views[0].state.accountDatabasePath);
+ }finally{await rm(directory,{recursive:true,force:true});}
 });
 
 test('default 12-call/30000-token payer can forward and stops at its original cumulative limit without refreshing its window',async()=>{

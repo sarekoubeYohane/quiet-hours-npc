@@ -2,6 +2,7 @@
   "version": 1,
   "issue": 220,
   "status": "registered-live-blocked",
+  "l5ChangePolicy": "explicit-bound-controller-confirmation",
   "implementationCommit": null,
   "runnerSha256": null,
   "provider": "openai",

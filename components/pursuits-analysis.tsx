@@ -1,10 +1,11 @@
 import type { Character } from '@/lib/world';
-import { currentDirections, orderedPursuits, pursuitLimits, type PursuitReference } from '@/lib/pursuits';
+import { currentDirections, orderedPursuits, pursuitLimits, type PursuitReference, type PursuitParent } from '@/lib/pursuits';
 
 export default function PursuitsAnalysis({character}:{character:Character}){
  const nodes=character.intents||[];
  const names={direction:'持續方向',intent:'意圖',task:'任務'};
  const progressNames={ready:'可重新取捨',waiting:'等待',deferred:'延期',blocked:'受阻',enough:'暫時足夠'};
+ const parentLabel=(reference:PursuitParent)=>{const parent=nodes.find(node=>node.id===reference.id);return !parent?`關係缺口（${reference.id} v${reference.version}）`:parent.version!==reference.version?`關係版本缺口（${reference.id} v${reference.version}；當前 v${parent.version}）`:parent.content;};
  const referenceAvailable=(reference:PursuitReference)=>{
   const sources=reference.kind==='short'?character.shortTerm:reference.kind==='long'?character.longTerm:reference.kind==='belief'?character.cognition?.beliefs:character.cognition?.relationshipTags;
   return !!sources?.some(source=>source.id===reference.id&&source.version===reference.version&&source.characterId===character.id&&(!('state'in source)||!source.state||source.state==='active'));
@@ -31,7 +32,7 @@ export default function PursuitsAnalysis({character}:{character:Character}){
    {node.scope&&<p>承接範圍：{node.scope}</p>}
    {node.kind&&<p>主觀滿足標準：{node.satisfaction??'開放，尚無固定終點'}</p>}
    {node.assessment&&<div className="hint"><p>本人短評（{node.assessment.kind==='known-result'?'依當時可知結果':'主觀感受／理解'}）：{node.assessment.text}</p><p>評估世界時間：{node.assessment.time}；依據身份 {node.assessment.references.length} 項；目前保存來源缺口 {node.assessment.references.filter(reference=>!referenceAvailable(reference)).length} 項。短評不等同已提交的世界成果，原文是否仍可知須沿記憶核對。</p></div>}
-   <p className="hint">{node.status==='active'?'上層':'歷史支援上層'}：{node.parents?.length?node.parents.map(parent=>{const position=orderedPursuits(nodes,parent.id).findIndex(item=>item.id===node.id);return `${nodes.find(n=>n.id===parent.id)?.content||`關係缺口（${parent.id}）`}${position>=0?`（本層第 ${position+1} 位）`:'（歷史關係，不列當前順序）'}`;}).join('、'):'無上層／獨立追求'}{(node.parents?.length||0)>1?' · 共享同一工作':''}</p>
+   <p className="hint">{node.status==='active'?'上層':'歷史支援上層'}：{node.parents?.length?node.parents.map(parent=>{const position=orderedPursuits(nodes,parent.id).findIndex(item=>item.id===node.id);return `${parentLabel(parent)}${position>=0?`（本層第 ${position+1} 位）`:'（歷史關係，不列當前順序）'}`;}).join('、'):'無上層／獨立追求'}{(node.parents?.length||0)>1?' · 共享同一工作':''}</p>
    {!!node.references?.length&&<p className="hint">形成來源身份：{node.references.map(r=>`${r.kind}:${r.id} v${r.version}`).join('、')}。引用不保證原文仍可知，未讀或已忘內容不從追求恢復。</p>}
    {!!node.references?.filter(reference=>!referenceAvailable(reference)).length&&<p className="hint">形成依據的保存來源缺口：{node.references.filter(reference=>!referenceAvailable(reference)).length}。角色仍可保留自己的當前範圍；形成理由及過去短評不從追求回灌。當次因容量未展示的額外缺口須核對真正輸入。</p>}
    {(character.arrangements?.items||[]).some(item=>item.pursuit?.id===node.id)&&<p className="hint">再考慮安排：{(character.arrangements?.items||[]).filter(item=>item.pursuit?.id===node.id).map(item=>`${item.id}（${item.status==='active'?'安排仍保留':'安排另有結束狀態'}）`).join('、')}；條件只提供正常決策機會，完整安排內容仍沿本人記憶。</p>}
@@ -40,8 +41,8 @@ export default function PursuitsAnalysis({character}:{character:Character}){
   {!nodes.length&&<p className="hint">目前沒有保留的追求。</p>}
   <details className="system-trace"><summary>追求變更痕跡（觀察者）</summary><p className="hint">有限模型自述與程式保存紀錄，不送入角色提示。已釋放 {character.pursuitTraceDropped||0} 筆；不是完整心理歷史。</p>{[...(character.pursuitTrace||[])].reverse().map((trace,index)=><article key={`${trace.id}:${index}`}>
    <h4>{trace.operation} · {trace.id}</h4><p>{trace.reason}</p>
-   <p>{trace.before?`v${trace.before.version} ${trace.before.scope}`:'新承接'} → {trace.after?`v${trace.after.version} ${trace.after.scope}`:'明示放下'}{trace.after?.status==='satisfied'?'（本人認為已滿足）':trace.after?.status==='dropped'?'（已明示放下）':''}</p>
-   {trace.before&&<p className="hint">支援上層身份：{trace.before.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'} → {trace.after?.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'}；這段歷史不因目前轉接而回寫。</p>}
+   <p>{trace.before?`v${trace.before.version} ${trace.before.scope}`:'新承接'} → {trace.operation==='archive'?`已歸檔（${trace.before?.status==='satisfied'?'原本人認為已滿足':trace.before?.status==='dropped'?'原已明示放下':'原結束狀態缺口'}）`:trace.after?`v${trace.after.version} ${trace.after.scope}`:trace.operation==='drop'?'明示放下':'變更後資料缺口'}{trace.after?.status==='satisfied'?'（本人認為已滿足）':trace.after?.status==='dropped'?'（已明示放下）':''}</p>
+   {trace.before&&<p className="hint">{trace.operation==='archive'?'歷史支援上層身份':'支援上層身份'}：{trace.before.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'}{trace.after&&<> → {trace.after.parents?.map(parent=>`${parent.id} v${parent.version}`).join('、')||'獨立'}</>}；{trace.operation==='archive'?'移出當前圖，歸檔不新增放下或關係變更。':'這段歷史不因目前轉接而回寫。'}</p>}
   </article>)}</details>
  </section>;
 }
