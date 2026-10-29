@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const read=async()=> (await (await GET()).json()).world;
 const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({mode:'openai',model:'gpt-6-luna',operationId:Date.now()+':'+crypto.randomUUID(),...body})});
-const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const proposal=(target='cake')=>({type:'propose',target,content:'將這個蛋糕切成四份，先保留作一組',purpose:'整理食物',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]});
 const accepted=effects=>({status:'accepted',effects,stages:[],branches:null,check:null,completionMinutes:15,routine:null});
 const fixture=()=>{
@@ -17,7 +18,7 @@ const partition=()=>({kind:'form',version:1,access:'authorized',operation:'parti
 async function setup(world=fixture()){
  store.install(world);assert.equal((await POST(req({operation:'set-model-key',key:'fixture-key'}))).status,200);
  const requests=[];let candidate=accepted([partition()]),decision=proposal(),npc=0,adjudication=0;const previous=global.fetch;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);requests.push(input);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion(candidate);}npc++;return completion(decision);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);requests.push(input);if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion(candidate,JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {requests,choose:(next,action=proposal())=>{candidate=next;decision=action;},counts:()=>({npc,adjudication}),restore:()=>{global.fetch=previous;}};
 }
 async function advance(extra={}){const response=await POST(req({operation:'advance',minutes:15,...extra}));assert.equal(response.status,200,await response.clone().text());return read();}

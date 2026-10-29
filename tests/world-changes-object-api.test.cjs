@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const proposal={type:'propose',target:'cup',content:'把杯子外側擦乾並檢查殘留痕跡',purpose:'整理物件',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]};
 const accepted=effects=>({status:'accepted',completionMinutes:15,effects,stages:[],branches:null,check:null,routine:null});
 const change=(value='茶漬',revision=1)=>({kind:'change-state',exposure:'public',version:1,access:'authorized',target:{type:'object',id:'cup'},expectedRevision:revision,changes:[{key:'surface',from:null,value}],reason:'布料擦拭後杯子表面留下可辨識的痕跡。'});
@@ -12,7 +13,7 @@ async function scenario({reply=accepted([change()]),decision=proposal,die=12,mut
  w.objects=[{id:'cup',source:'original-cup',label:'原杯子',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea']}}];mutate(w);store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const oldFetch=global.fetch,oldRandom=Math.random;let npc=0,adjudication=0,dice=0;const inputs=[];
- global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);inputs.push({input,request});if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion(reply);}npc++;return completion(decision);};Math.random=()=>{dice++;return (die-.5)/20;};
+ global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);inputs.push({input,request});if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion(reply,JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(decision,JSON.parse(JSON.parse(init.body).messages[1].content));};Math.random=()=>{dice++;return (die-.5)/20;};
  return {post,read:async()=>(await(await GET()).json()).world,choose:value=>{decision=value;},reply:value=>{reply=value;},counts:()=>({npc,adjudication,dice}),inputs,restore:()=>{global.fetch=oldFetch;Math.random=oldRandom;}};
 }
 const advance=async(s,extra={})=>{const r=await s.post({operation:'advance',minutes:15,...extra});assert.equal(r.status,200,await r.clone().text());return s.read();};

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- API fixtures. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
@@ -30,7 +31,7 @@ test('cafe region and door operations persist and a closed door blocks movement 
 });
 const withModel=async(actions,run)=>{
  const old=global.fetch,inputs=[];
- global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]})}}]});};
+ global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]}))}}]});};
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs,()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits:{calls:120,tokens:500000}})));}finally{global.fetch=old;}
 };
 test('quiet speech remains clear under visual occlusion without identifying its speaker or rolling dice',async()=>{
@@ -111,7 +112,7 @@ test('old-world migration and free text cannot fabricate door state or replay hi
 test('scene and subjective observations roll back with a failed round or conflicting save',async()=>{
  const w=worldWithAdjudication();w.turn=3;store.install(w);
  const old=global.fetch;let calls=0;
- global.fetch=async()=>{if(++calls===2)throw Error('provider unavailable');return Response.json({choices:[{message:{content:JSON.stringify({type:'door',target:'cafe-door',content:'close',mood:'',durationMinutes:15,intents:[]})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{if(++calls===2)throw Error('provider unavailable');return Response.json({choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'door',target:'cafe-door',content:'close',mood:'',durationMinutes:15,intents:[]}))}}]});};
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));assert.equal((await POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna'}))).status,502);}finally{global.fetch=old;}
  let saved=await read();assert.deepEqual(saved.scene,w.scene);assert.deepEqual(saved.characters,w.characters);assert.deepEqual(saved.events,w.events);
  await POST(req({operation:'direct',action:{type:'door',target:'cafe-door',content:'close'}}));const before=await read();store.conflictOnNextSave();

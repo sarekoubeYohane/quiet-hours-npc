@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -157,9 +158,9 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
    rejectedCalls++;
    const task=JSON.parse(JSON.parse(options.body).messages[1].content);
    const value=task.contractVersion==='world-adjudication.v1'
-    ?{status:'accepted',effects:[{kind:'consume',objectId:'acceptance-cup',expectedRevision:1}],check:null,stages:[]}
+    ?{status:'accepted',completionMinutes:15,effects:[{kind:'consume',objectId:'acceptance-cup',expectedRevision:1}],check:null,stages:[]}
     :{type:'propose',target:'acceptance-cup',content:'喝點茶',purpose:'休息',mood:'平靜',durationMinutes:15,intents:[]};
-   return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+   return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(options.body).messages[1].content),value))}}]});
   };
   try{
    const rejected=await send({operation:'advance',minutes:15,mode:'openai',model:'gpt-6.1-sol',worldContext:scene.contextId});assert.equal(rejected.status,502);const rejectedBody=await rejected.json();assert.ok(rejectedBody.adjudicationFailure,JSON.stringify(rejectedBody));

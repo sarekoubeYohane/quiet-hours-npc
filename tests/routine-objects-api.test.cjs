@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const vessel=(id='ordinary-vessel',state='empty')=>({id,source:'scene',label:'普通杯子',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:state},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea','coffee','dirty']}});
 const tool=()=>({id:'shared-brewing-tools',source:'scene',label:'共用茶具',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{condition:'sound'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{condition:['sound','broken']}});
 const proposal={type:'propose',target:'shared-brewing-tools',content:'我想用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶',purpose:'飲用',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]};
@@ -11,7 +12,7 @@ async function scenario({objects=[tool()],supplies,minutes=5,modify=()=>{}}={}){
  const world=seedWorld();world.contextId=crypto.randomUUID();world.adjudication={provider:'openai',model:'fixture-adjudicator'};world.objects=objects;if(supplies)world.supplies=supplies;world.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});modify(world);store.install(world);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch,inputs=[];let decision=proposal;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return completion(input.contractVersion==='world-adjudication.v1'?{status:'accepted',completionMinutes:null,effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,operation:'tea',subject:'茶',timings:input.routineOffer.operations.map(operation=>({operation,minutes}))}}:decision);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return completion(input.contractVersion==='world-adjudication.v1'?{status:'accepted',completionMinutes:null,effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,operation:'tea',subject:'茶',timings:input.routineOffer.operations.map(operation=>({operation,minutes}))}}:decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,decision:value=>{decision=value;},inputs,restore:()=>{global.fetch=previous;}};
 }
 async function advance(s,extra={}){const r=await s.post({operation:'advance',minutes:15,...extra});assert.equal(r.status,200,JSON.stringify(await r.clone().json()));return s.read();}

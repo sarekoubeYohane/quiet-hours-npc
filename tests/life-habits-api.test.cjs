@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const response=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
+const response=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,v))}}]});
 const action=(overrides={})=>({type:'rest',target:'',content:'稍微休息',mood:'平靜',durationMinutes:15,intents:[],...overrides});
 async function setup(reply={status:'denied',effects:[],stages:[],check:null},choice=action({type:'propose',target:'cafe',purpose:'飲用',content:'泡一杯茶'})){
  const w=seedWorld();w.contextId='life-habits';w.adjudication={provider:'openai',model:'fixture-judge'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});const old=global.fetch;let calls=0,inputs=[];
- global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return response(input.contractVersion==='world-adjudication.v1'?reply:typeof choice==='function'?choice(input):choice);};
+ global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return response(input.contractVersion==='world-adjudication.v1'?reply:typeof choice==='function'?choice(input):choice,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=old;},setChoice:v=>{choice=v;},setReply:v=>{reply=v;},calls:()=>calls,inputs};
 }
 const owner=w=>w.characters.find(c=>c.id==='owner');
@@ -62,13 +63,13 @@ test('normal decisions propose event associations from visible starts; three dif
 
 test('event candidates reject unavailable versions, nonautonomous, reversed and distant sources atomically',async()=>{
  for(const mutate of [p=>({...p,trigger:{id:'foreign-secret',version:1}}),p=>({...p,trigger:{...p.trigger,version:99}}),p=>({trigger:p.action,action:p.trigger})]){
- const s=await setup(undefined,action());try{const w=await performedPair(s);s.setChoice(action({habitCandidates:[mutate(pair(w))]}));const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,502);assert.equal(owner(await s.read()).eventHabits,undefined);assert.equal((await s.read()).turn,w.turn);}finally{s.restore();}
+ const s=await setup(undefined,action());try{const w=await performedPair(s);s.setChoice(action({habitCandidates:[mutate(pair(w))]}));const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,502);assert.equal(owner(await s.read()).eventHabits?.length||0,0);assert.equal((await s.read()).turn,w.turn);}finally{s.restore();}
  }
- const s=await setup(undefined,action());try{let w=await performedPair(s);const candidate=pair(w);owner(w).habitEvidence[0].time-=180;store.replaceCommittedWorld(w);s.setChoice(action({habitCandidates:[candidate]}));assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal(owner(await s.read()).eventHabits,undefined);}finally{s.restore();}
+ const s=await setup(undefined,action());try{let w=await performedPair(s);const candidate=pair(w);owner(w).habitEvidence[0].time-=180;store.replaceCommittedWorld(w);s.setChoice(action({habitCandidates:[candidate]}));assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal(owner(await s.read()).eventHabits?.length||0,0);}finally{s.restore();}
 });
 
 test('a failed event-candidate save leaves no association and replay never repeats its model dispatch',async()=>{
- const s=await setup(undefined,action());try{const before=await performedPair(s);s.setChoice(action({habitCandidates:[pair(before)]}));store.throwBeforeNextSave();const body={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(body)).status,502);const failed=await s.read();assert.equal(owner(failed).eventHabits,undefined);assert.deepEqual(owner(failed).habitEvidence,owner(before).habitEvidence);const calls=s.calls();assert.equal((await s.post(body)).status,502);assert.equal(s.calls(),calls);}finally{s.restore();}
+ const s=await setup(undefined,action());try{const before=await performedPair(s);s.setChoice(action({habitCandidates:[pair(before)]}));store.throwBeforeNextSave();const body={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(body)).status,502);const failed=await s.read();assert.equal(owner(failed).eventHabits?.length||0,0);assert.deepEqual(owner(failed).habitEvidence,owner(before).habitEvidence);const calls=s.calls();assert.equal((await s.post(body)).status,502);assert.equal(s.calls(),calls);}finally{s.restore();}
 });
 
 test('generic world-confirmed activity identities survive wording and target changes without merging distinct methods',async()=>{
@@ -90,7 +91,7 @@ test('a perceived event can precede an autonomous activity without borrowing hid
 });
 
 test('habit candidates share the existing four-update envelope instead of gaining an independent model budget',async()=>{
- const s=await setup(undefined,action());try{const before=await performedPair(s),refs=owner(before).shortTerm.slice(0,3).map(({id,version})=>({id,version,reason:'保留經歷'}));assert.equal(refs.length,3);s.setChoice(action({memorySelections:refs,habitCandidates:[pair(before),pair(before)]}));assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal(owner(await s.read()).eventHabits,undefined);}finally{s.restore();}
+ const s=await setup(undefined,action());try{const before=await performedPair(s),refs=owner(before).shortTerm.slice(0,3).map(({id,version})=>({id,version,reason:'保留經歷'}));assert.equal(refs.length,3);s.setChoice(action({memorySelections:refs,habitCandidates:[pair(before),pair(before)]}));assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.equal(owner(await s.read()).eventHabits?.length||0,0);}finally{s.restore();}
 });
 
 test('a generic adjudication preserves activity identity, body consequences and resumability together through the routine-offer route',async()=>{

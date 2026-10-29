@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -28,7 +29,7 @@ test('scene switches are replayable, reject stale other-tab operations, and neve
   assert.equal((await act({ operation: 'reset' })).status, 400);
   assert.equal((await act({ operation: 'enter-acceptance' })).status, 400);
   const before = await read(), previous = global.fetch;
-  global.fetch = async () => completion({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] });
+  global.fetch = async (_fixtureUrl,_fixtureInit) => completion({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] },JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
   try {
     assert.equal((await act({ operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6.1-sol' })).status, 429);
     const failed = await read();
@@ -152,7 +153,7 @@ test('a scene saved by the previous release can still return to its uncompressed
 });
 
 const act = async body => POST(request({ worldContext: (await read()).contextId, ...body }));
-const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
+const completion = (value,_fixtureInput)=> Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 const rest = { type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] };
 const propose = (target, durationMinutes = 15) => ({ type: 'propose', target, content: '依當下權限處理杯子', purpose: '日常驗收', mood: '平靜', durationMinutes, intents: [] });
 const advance = async () => {
@@ -191,13 +192,13 @@ test('enter, acquire, eat, reload and return preserves the original story and sh
     assert.doesNotMatch(JSON.stringify(input), /ORIGINAL-PRIVATE-MEMORY|gzip-base64-v1/);
     if (input.contractVersion === 'world-adjudication.v1') {
       judges++;
-      return completion({ status: 'accepted', effects: judges === 1
+      return completion({ status: 'accepted', completionMinutes:15, effects: judges === 1
         ? [{ kind: 'materialize', supplyId: 'acceptance-meal', expectedRemaining: 1 }]
-        : [{ kind: 'consume', objectId: 'acceptance-meal:1', expectedRevision: 1 }], check: null });
+        : [{ kind: 'consume', objectId: 'acceptance-meal:1', expectedRevision: 1 }], check: null },JSON.parse(JSON.parse(init.body).messages[1].content));
     }
     return completion(input.self.id === 'cass'
       ? { type: 'propose', target: judges === 0 ? 'acceptance-meal' : 'acceptance-meal:1', content: '取得餐點或食用手上的餐點', purpose: '吃飯', mood: '平靜', durationMinutes: 15, intents: [] }
-      : { type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] });
+      : { type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 90, intents: [] },JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
     for (let n = 0; n < 2; n++) {
@@ -231,8 +232,8 @@ test('the actual scene supports autonomous permission, borrowing, carrying, wash
   global.fetch = async (_url, init) => {
     const input = JSON.parse(JSON.parse(init.body).messages[1].content);
     return completion(input.contractVersion === 'world-adjudication.v1'
-      ? { status: 'accepted', effects, check: null, ...(stages ? { stages } : {}) }
-      : input.self.id === actor ? choice : rest);
+      ? { status: 'accepted', completionMinutes:stages?Math.max(...stages.map(stage=>stage.afterMinutes)):15, effects, check: null, ...(stages ? { stages } : {}) }
+      : input.self.id === actor ? choice : rest,JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   const wake = async () => { assert.equal((await act({ operation: 'intervene', target: actor, text: '想做什麼由你決定，這裡有杯子可留意。' })).status, 200); };
   try {
@@ -273,7 +274,7 @@ test('acceptance memory never enables vector recall or touches the paused story 
     assert.match(String(url), /chat\/completions$/);
     const payload = JSON.parse(init.body); calls++;
     assert.doesNotMatch(payload.messages[0].content, /你可以直接完成決策，或只回傳/);
-    return completion(rest);
+    return completion(rest,JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
     assert.deepEqual((await (await GET()).json()).recallUsage, { enabled: false });

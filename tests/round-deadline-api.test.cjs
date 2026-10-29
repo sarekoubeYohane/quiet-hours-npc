@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API, provider transport, elapsed clock and real SQLite. */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{env}=load('cloudflare-workers');
@@ -15,7 +16,7 @@ function clock(){
   assert.ok(done,'operation must settle under a finite clock');if(error)throw error;return value;
  },restore(){Date.now=now;AbortSignal.timeout=timeout;}};
 }
-const envelope=body=>JSON.stringify({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(body)}}]});
+const envelope=(body,_fixtureInput)=>JSON.stringify({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(_fixtureInput,body))}}]});
 function actors(w,count=4){const first=w.characters[0];w.characters=Array.from({length:count},(_,i)=>({...structuredClone(first),id:i?'actor-'+i:'owner',name:'Synthetic '+i,shortTerm:[],longTerm:[],memories:[],memoryTrace:[],observations:[],control:{mode:'autonomous'}}));w.playerBudget={calls:null,tokens:null};}
 async function replay(s,operation,response,body,sent){
  const before=sent();const again=await s.post(operation);assert.equal(again.status,response.status);assert.deepEqual(await again.json(),body);assert.equal(sent(),before,'same ID is never a second dispatch');
@@ -39,7 +40,7 @@ for(const config of [
    const actor=judge?input.actor?.id:input.self.id;wire.push({at:Date.now(),input,request,judge,actor});sent++;
    let value={status:'denied',effects:[],stages:[],check:null,routine:null};
    if(!judge){const n=(stages.get(actor)||0)+1;stages.set(actor,n);value=config.recall&&n===1?{type:'recall',questions:['Synthetic earlier context?']}:{...proposal,content:'Inspect synthetic tools',intents:[{id:'purpose',content:'Understand my surroundings',intensity:'medium',importance:'medium',urgency:'low',context:'Synthetic fixture'}]};}
-   await c.sleep(config.latency);return new Response(envelope(value),{status:200});
+   await c.sleep(config.latency);return new Response(envelope(value,JSON.parse(JSON.parse(init.body).messages[1].content)),{status:200});
   };
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();
   assert.equal(response.status,200,body.error);assert.equal(sent,config.recall?12:8);assert.equal(embedding,config.recall?4:0);assert.equal(searches,config.recall?4:0);
@@ -61,7 +62,7 @@ for(const stage of ['no-headers','body','response-save','prepared-save'])test(st
  try{
   s=await scenario({modify:w=>actors(w)});const before=await s.read();
   if(stage.endsWith('save'))store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const trace=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(stage==='prepared-save'?trace.dispatches[0]?.stage==='dispatch-prepared':trace.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(26000);}}});
-  global.fetch=async()=>{sent++;if(stage==='no-headers'){await c.sleep(26000);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(26000);controller.enqueue(new TextEncoder().encode(envelope(proposal)));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal));};
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;if(stage==='no-headers'){await c.sleep(26000);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(26000);controller.enqueue(new TextEncoder().encode(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content))));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,stage==='prepared-save'?0:1);
   store.onStorage(undefined);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,before.turn);assert.deepEqual(saved.world.events,before.events);
   assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'?0:1);
@@ -102,7 +103,7 @@ test('slow preacceptance is rejected before any lease or paid dispatch',async()=
 test('uncancellable trace beyond lease retains measured usage once and never resumes the round',async()=>{
  const c=clock();let s,sent=0,delayed=false;
  try{
-  s=await scenario();global.fetch=async()=>{sent++;return new Response(envelope(proposal));};
+  s=await scenario();global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(500000);}}});
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);store.onStorage(undefined);
   let saved=await query(operation.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,30);assert.equal(saved.world.aiUsage.totalOutputTokens,10);assert.equal(saved.world.aiUsage.totalUnknownCalls,0);assert.equal(sent,1);
@@ -118,7 +119,7 @@ for(const kind of ['recall','request-disconnect'])test(kind+' stops before any c
  try{
   s=await scenario({modify:w=>actors(w)});const controller=new AbortController();
   if(kind==='recall'){env.RECALL_ENABLED='true';env.RECALL_USAGE_DB=store.database();env.OWNER_EMBEDDING_KEY='synthetic-owner-key';env.MEMORY_VECTOR_INDEX={query:async()=>({matches:[]})};}
-  global.fetch=async(url)=>{if(String(url).includes('embeddings')){await c.sleep(11000);return Response.json({usage:{total_tokens:7},data:[{index:0,embedding:Array(1536).fill(.1)}]});}sent++;if(kind==='request-disconnect'){controller.abort();await c.sleep(1000);}return new Response(envelope(kind==='recall'?{type:'recall',questions:['Earlier?']}:proposal));};
+  global.fetch=async(url,_fixtureInit)=>{if(String(url).includes('embeddings')){await c.sleep(11000);return Response.json({usage:{total_tokens:7},data:[{index:0,embedding:Array(1536).fill(.1)}]});}sent++;if(kind==='request-disconnect'){controller.abort();await c.sleep(1000);}return new Response(envelope(kind==='recall'?{type:'recall',questions:['Earlier?']}:proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),payload={worldContext:'program-fixture',mode:'openai',model:'gpt-6-luna',...operation};
   const response=await c.run(POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload),signal:controller.signal}))),body=await response.json();
   assert.equal(response.status,502);assert.equal(sent,1);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);
@@ -142,7 +143,7 @@ test('four sequential candidates appear in later actual NPC inputs and commit to
   global.fetch=async(_url,init)=>{sent++;const input=JSON.parse(JSON.parse(init.body).messages[1].content),judge=input.contractVersion==='world-adjudication.v1';let value;
    if(judge){const n=sent/2;value={status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'tools',expectedRevision:n,key:'condition',value:n%2?'broken':'sound'}],stages:[],branches:null,check:null,routine:null};}
    else{seen.push(input.objects.find(object=>object.id==='tools').state.condition);value={...proposal,content:'Inspect synthetic tools'};}
-   await c.sleep(14000);return new Response(envelope(value));
+   await c.sleep(14000);return new Response(envelope(value,JSON.parse(JSON.parse(init.body).messages[1].content)));
   };
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,200,body.error);assert.equal(sent,8);assert.equal(seen.length,4);
   assert.deepEqual(seen,['sound','broken','sound','broken'],'later actual inputs contain the preceding candidate state, not transition names or historical event text');
@@ -162,7 +163,7 @@ test('legacy pending markers use their stored absolute deadline without changing
 test('a prepared save crossing the absolute model cutoff stops before fetch even when the timer callback has not run',async()=>{
  const s=await scenario(),clock=Date.now;let instant=clock(),sent=0,delayed=false;Date.now=()=>instant;
  try{
-  global.fetch=async()=>{sent++;return new Response(envelope(proposal));};
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='dispatch-prepared'){delayed=true;instant+=26000;}}});
   const operation=op(),response=await s.post(operation);assert.equal(response.status,502);assert.equal(sent,0);assert.equal((await query(operation.operationId)).world.turn,0);
  }finally{store.onStorage(undefined);Date.now=clock;s.restore();}

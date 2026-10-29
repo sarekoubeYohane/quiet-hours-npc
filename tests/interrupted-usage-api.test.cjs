@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 /* Diagnostic only. Synthetic transport, isolated SQLite, controlled time.
  * Not proof that the production Worker died at this boundary. */
 const assert = require('node:assert/strict');
@@ -11,13 +12,13 @@ const { scenario, proposal, approval } = require('./routine-program-fixture.cjs'
 const instant = 1793246600000;
 const operation = { operation:'advance', minutes:15, operationId:instant + ':00000000-0000-4000-8000-000000000001' };
 const lookup = async () => (await (await GET(new Request('https://test.invalid/api/world?operationId=' + operation.operationId))).json());
-const response = () => Response.json({usage:{prompt_tokens:30,completion_tokens:10,...(process.env.CRASH_CACHE==='yes'?{prompt_tokens_details:{cached_tokens:5}}:{})},choices:[{message:{content:JSON.stringify({...proposal,type:'rest',target:'',content:'Synthetic rest'})}}]});
+const response = (_fixtureInput) => Response.json({usage:{prompt_tokens:30,completion_tokens:10,...(process.env.CRASH_CACHE==='yes'?{prompt_tokens_details:{cached_tokens:5}}:{})},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,{...proposal,type:'rest',target:'',content:'Synthetic rest'}))}}]});
 
 async function child() {
   Date.now = () => instant;
   const s = await scenario({modify:w=>{w.playerBudget={calls:null,tokens:null};w.modelPrices=[{id:'crash-price',provider:'openai',model:'gpt-6-luna',input:1,output:2,cachedInput:.5,source:'synthetic',date:'2026-10-29',custom:true,savedAt:instant}];if(process.env.CRASH_ADJ==='yes')w.modelPrices.push({id:'world-crash-price',provider:'openai',model:'fixture-world',input:3,output:4,source:'synthetic',date:'2026-10-29',custom:true,savedAt:instant});if(process.env.CRASH_CALLS==='2'&&process.env.CRASH_ADJ!=='yes'){const second=structuredClone(w.characters[0]);second.id='second';second.shortTerm=[];second.longTerm=[];second.memories=[];second.memoryTrace=[];second.observations=[];delete second.cognition;delete second.control;w.characters.push(second);}}});
   let receivedCandidate = false, sent = 0;
-  global.fetch = async () => { sent++;if(process.env.CRASH_ADJ==='yes')return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(sent===1?proposal:approval())}}]}); if(process.env.CRASH_PARTIAL==='yes'&&sent===2)return Response.json({choices:[{message:{content:JSON.stringify({...proposal,type:'rest',target:'',content:'Synthetic rest'})}}]});return response(); };
+  global.fetch = async (_fixtureUrl,_fixtureInit) => { sent++;if(process.env.CRASH_ADJ==='yes')return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),sent===1?proposal:approval()))}}]}); if(process.env.CRASH_PARTIAL==='yes'&&sent===2)return Response.json({choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{...proposal,type:'rest',target:'',content:'Synthetic rest'}))}}]});return response(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)); };
   store.onStorage(async (sql, values) => {
     let parsedInMemory=false;
     if (sql.startsWith('INSERT INTO decision_traces') || sql.startsWith('UPDATE decision_traces')) {

@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
 const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),mode:'openai',model:'gpt-6-luna',...body})});
 const read=async()=> (await (await GET()).json()).world;
-const reply=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const reply=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 function fixture({allowed=true,holder='cass'}={}){
  const world=seedWorld();world.characters=[world.characters.find(c=>c.id==='cass'),world.characters.find(c=>c.id==='owner')];
  world.characters[0].location='kris-home';world.characters[0].region='kris-home-main';world.characters[1].location='kris-home';world.characters[1].region='kris-home-main';world.characters[1].control={mode:'taken-over'};
@@ -17,8 +18,8 @@ async function setup(candidate,options={}){
  const original=global.fetch;let npc=0,judgments=0;const inputs=[],systems=[];
  global.fetch=async(_url,init)=>{
   const packet=JSON.parse(init.body),input=JSON.parse(packet.messages[1].content);inputs.push(input);systems.push(packet.messages[0].content);
-  if(input.contractVersion==='world-adjudication.v1'){judgments++;return reply(typeof candidate==='function'?candidate(input):candidate);}
-  npc++;return reply({type:'propose',target:options.target||'borrowed-cup',content:options.content||'拿穩杯子時手滑掉落，承接可能的外在後果',purpose:'整理器具',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]});
+  if(input.contractVersion==='world-adjudication.v1'){judgments++;return reply(typeof candidate==='function'?candidate(input):candidate,JSON.parse(JSON.parse(init.body).messages[1].content));}
+  npc++;return reply({type:'propose',target:options.target||'borrowed-cup',content:options.content||'拿穩杯子時手滑掉落，承接可能的外在後果',purpose:'整理器具',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]},JSON.parse(JSON.parse(init.body).messages[1].content));
  };
  return {world,inputs,systems,restore:()=>{global.fetch=original;},counts:()=>({npc,judgments})};
 }

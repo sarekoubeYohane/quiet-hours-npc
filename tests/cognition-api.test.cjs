@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- API fixtures. */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
@@ -10,7 +11,7 @@ async function withModel(choose, run) {
   const previous = global.fetch, inputs = [];
   global.fetch = async (_url, init) => {
     const body = JSON.parse(init.body), input = JSON.parse(body.messages[1].content); inputs.push(input);
-    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], cognitiveUpdates: [], interpretation: '', ...choose(input) }) } }] });
+    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], cognitiveUpdates: [], interpretation: '', ...choose(input) })) } }] });
   };
   try {
     await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
@@ -29,7 +30,7 @@ test('one existing decision saves a belief before its intention and legal action
     const operationId = `${Date.now()}:${crypto.randomUUID()}`, response = await advance({ operationId });
     assert.equal(response.status, 200); const result = await response.json(), after = await read(), cass = after.characters[0];
     assert.equal(cass.cognition.beliefs.length, 1); assert.equal(cass.cognition.beliefs[0].conviction, 'leaning');
-    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.equal(cass.intents[0].id, 'visit-cafe');
+    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.ok(cass.intents.some(node=>node.id==='cass:visit-cafe'&&node.scope==='找個地方安頓自己的節奏'));
     assert.equal(cass.location, 'cafe'); assert.equal(cass.mood, '安心');
     assert.ok(after.events.some(event => event.actor === 'cass' && event.kind === 'move'));
     assert.equal(after.characters[1].cognition?.beliefs.length || 0, 0);
@@ -79,7 +80,7 @@ test('mistaken certainty and unresolved contradictory beliefs coexist until the 
     const cass = (await read()).characters[0]; assert.equal(cass.cognition.beliefs.length, 2);
     assert.equal(cass.cognition.beliefs[0].conviction, 'certain'); assert.deepEqual(cass.cognition.beliefs[1].contradictions, ['personal-space']);
     assert.equal(inputs.findLast(input => input.self.id === 'cass').self.cognition.beliefs.length, 2);
-    assert.ok((await read()).characters.every(character => character.intents.length === 0));
+    assert.ok((await read()).characters.every(character => character.intents.every(node=>node.kind==='direction')));
   });
 });
 test('only a bounded set of related relationship tags is visible and omitted tags cannot be changed', async () => {

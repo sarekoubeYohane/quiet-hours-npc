@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Fixtures load the temporary CommonJS build. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -13,9 +14,9 @@ const counters = value => { const copy = {...value}; delete copy.costs; return c
 const usage = windowStartedAt => ({ windowStartedAt, calls: 5, inputTokens: 150, outputTokens: 100, unknownCalls: 1, totalCalls: 20, totalInputTokens: 600, totalOutputTokens: 400, totalUnknownCalls: 2, savedDecisions: 7 });
 const withModel = async (run, failAt = 0) => {
   const original = global.fetch; let calls = 0;
-  global.fetch = async () => {
+  global.fetch = async (_fixtureUrl,_fixtureInit) => {
     if (++calls === failAt) throw Error('provider unavailable');
-    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 15, intents: [] }) } }] });
+    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 15, intents: [] })) } }] });
   };
   try { await run(); } finally { global.fetch = original; }
 };

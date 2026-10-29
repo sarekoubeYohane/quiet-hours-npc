@@ -25,4 +25,5 @@ function fixtureDecision(input, candidate, { adopt = [], drop = [] } = {}) {
 // The caller opts in to adopting the listed fixture intentions. Existing nodes
 // retain their current scope and version; unlisted nodes are never exited.
 function fixturePursuitDecision(input,candidate){return fixtureDecision(input,candidate,{adopt:candidate?.intents||[]});}
-module.exports={fixtureDecision,fixturePursuitDecision};
+function savedPursuit(actor,item){return {...item,id:item.id.startsWith(actor+':')?item.id:actor+':'+item.id,version:1,kind:'intent',scope:item.content,satisfaction:null,parents:[],references:[],status:'active',reason:'明示合成測試起點的追求'};}
+module.exports={fixtureDecision,fixturePursuitDecision,savedPursuit};

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node test fixtures load the temporary CommonJS build. */
+const {fixtureDecision,fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -9,7 +10,9 @@ const store = build('store');
 const intent = (id, content, context = '') => ({ id, content, intensity: 'high', importance: 'medium', urgency: 'low', context });
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
 const advance = async () => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
-const decision = (intents, action = {}) => ({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents, ...action });
+const decision = (data,intents, action = {}) => fixturePursuitDecision(data,{ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents, ...action });
+const children=c=>c.intents.filter(n=>n.kind!=='direction');
+const ids=c=>children(c).filter(n=>n.status==='active').map(n=>n.id);
 const withModel = async (respond, run) => {
   const original = global.fetch;
   global.fetch = async (_url, init) => {
@@ -25,16 +28,16 @@ const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 test('world API persists NPC-selected queue order, including a waiting intent, in one decision per NPC', async () => {
   store.install(worldWithAdjudication()); let calls = 0;
   const queue = [intent('waiting', '確認 Vera 平安', '已傳訊息，還在等回覆'), intent('rest', '讓自己恢復精神')];
-  await withModel(id => { calls++; return decision(id === 'cass' ? queue : []); }, async () => {
+  await withModel((id,data) => { calls++; return decision(data,id === 'cass' ? queue : []); }, async () => {
     assert.equal((await advance()).status, 200);
-    assert.deepEqual((await (await GET()).json()).world.characters[0].intents, queue);
+    assert.deepEqual(children((await (await GET()).json()).world.characters[0]).map(n=>n.content),queue.map(n=>n.content));
     assert.equal(calls, 4);
   });
 });
 
 test('every NPC receives the shared Playbook and only its own private queue and character setting', async () => {
   const world = worldWithAdjudication();
-  for (const c of world.characters) c.intents = [intent(c.id, `${c.id}-private-intent`)];
+  for (const c of world.characters) c.intents.push({...intent(c.id+':private', `${c.id}-private-intent`),version:1,kind:'intent',scope:'本人私有方向',satisfaction:null,parents:[],references:[],status:'active',reason:'合成起點'});
   store.install(world); const prompts = [];
   await withModel((id, data, payload) => {
     prompts.push(payload.messages[0].content);
@@ -43,7 +46,7 @@ test('every NPC receives the shared Playbook and only its own private queue and 
       assert.equal(JSON.stringify(data).includes(`${other.id}-private-intent`), false);
       assert.equal(JSON.stringify(data).includes(other.personality), false);
     }
-    return decision(data.self.intents);
+    return decision(data,[]);
   }, async () => {
     assert.equal((await advance()).status, 200);
     assert.equal(prompts.length, 4);
@@ -55,9 +58,9 @@ test('every NPC receives the shared Playbook and only its own private queue and 
 });
 
 test('invalid queue rolls back the entire round and preserves paid usage', async () => {
-  const world = worldWithAdjudication(); world.characters[0].intents = [intent('prior', '先安頓自己')];
+  const world = worldWithAdjudication(); /* New world retains its seed direction. */
   store.install(world); let calls = 0;
-  await withModel(() => decision(++calls === 1 ? [intent('new', '新的方向')] : [{ ...intent('invalid', '格式錯誤'), urgency: 'tomorrow' }]), async () => {
+  await withModel((_id,data) => {const value=decision(data,[intent('new','新的方向')]);if(++calls===2)value.pursuitUpdates[0].node.urgency='tomorrow';return value;}, async () => {
     assert.equal((await advance()).status, 502);
     const saved = (await (await GET()).json()).world;
     assert.equal(saved.turn, 0); assert.equal(saved.minute, world.minute);
@@ -69,75 +72,70 @@ test('invalid queue rolls back the entire round and preserves paid usage', async
 });
 
 test('old worlds load empty queues while preserving their memories, habits and activity progress', async () => {
-  const old = worldWithAdjudication(); delete old.characters[0].intents;
+  const old = worldWithAdjudication(); delete old.pursuitVersion;delete old.pursuitContext;delete old.characters[0].intents;
   old.characters[0].habits = [{ key: 'rest', type: 'rest', target: '', location: 'kris-home', period: 3, observedDays: [0, 1, 2], lastSeen: 1200 }];
   old.characters[0].plan = { action: { type: 'rest' }, startedAt: 1245, until: 1335, attention: '', modelKey: 'openai:gpt-6-luna' };
   store.install(old);
   const loaded = (await (await GET()).json()).world;
-  assert.deepEqual(loaded.characters[0].intents, []);
+  assert.deepEqual(loaded.characters[0].intents.filter(node=>node.kind!=='direction'),[]);
   assert.deepEqual(loaded.characters[0].memories, old.characters[0].memories);
   assert.deepEqual(loaded.characters[0].habits, old.characters[0].habits);
   assert.deepEqual(loaded.characters[0].plan, old.characters[0].plan);
-  await withModel(() => decision([]), async () => {
-    assert.equal((await advance()).status, 200);
+  await withModel((_id,data) => decision(data,[]), async () => {
+    assert.equal((await advance()).status, 409);
     assert.deepEqual((await (await GET()).json()).world.characters[0].plan, old.characters[0].plan);
   });
 });
 
-test('NPC can keep intentions after an action, reorder them, and remove one after receiving the actual blocked result', async () => {
+test('NPC keeps omitted pursuits across a blocked action and explicitly drops one afterward', async () => {
   store.install(worldWithAdjudication()); const waiting = intent('waiting', '確認 Vera 平安', '等回覆');
   const recovering = intent('recovering', '好好休息'); let round = 0;
   await withModel((id, data) => {
-    if (id !== 'cass') return decision([]);
-    if (round === 0) return decision([waiting, recovering]);
+    if (id !== 'cass') return decision(data,[]);
+    if (round === 0) return decision(data,[waiting, recovering]);
     if (round === 1) {
-      assert.deepEqual(data.self.intents, [waiting, recovering]);
-      return decision([recovering, waiting], { type: 'work', target: 'unavailable-task' });
+      assert.deepEqual(ids(data.self), ['cass:waiting','cass:recovering']);
+      return decision(data,[], { type: 'work', target: 'unavailable-task' });
     }
-    assert.deepEqual(data.self.intents, [recovering, waiting]);
+    assert.deepEqual(ids(data.self), ['cass:waiting','cass:recovering']);
     assert.ok(data.self.memories.some(m => m.text.includes('未通過規則檢查')));
-    return decision([waiting]);
+    return fixtureDecision(data,{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[]},{drop:['cass:recovering']});
   }, async () => {
     for (round = 0; round < 3; round++) {
       assert.equal((await advance()).status, 200);
       const cass = (await (await GET()).json()).world.characters[0];
-      assert.deepEqual(cass.intents, round === 0 ? [waiting, recovering] : round === 1 ? [recovering, waiting] : [waiting]);
+      assert.deepEqual(ids(cass),round<2?['cass:waiting','cass:recovering']:['cass:waiting']);
     }
   });
 });
 
 test('continuing an activity retains its queue without additional model decisions', async () => {
   store.install(worldWithAdjudication()); const queue = [intent('recover', '恢復精神')]; let calls = 0;
-  await withModel(() => { calls++; return decision(queue, { durationMinutes: 90 }); }, async () => {
+  await withModel((_id,data) => { calls++; return decision(data,queue, { durationMinutes: 90 }); }, async () => {
     assert.equal((await advance()).status, 200);
     for (let i = 0; i < 5; i++) assert.equal((await advance()).status, 200);
     const saved = (await (await GET()).json()).world;
     assert.equal(calls, 4);
-    assert.deepEqual(saved.characters.map(c => c.intents), [queue, queue, queue, queue]);
+    assert.ok(saved.characters.every(c=>children(c).length===1&&children(c)[0].id===c.id+':recover'&&children(c)[0].version===1));
   });
 });
 
-for (const [name, malformed] of [
-  ['missing queue', undefined], ['duplicate identifiers', [intent('same', '一'), intent('same', '二')]],
-  ['oversized queue', Array.from({ length: 13 }, (_, i) => intent(String(i), '方向'))],
-  ['blank intent', [intent('blank', ' ')]], ['oversized context', [intent('long', '方向', 'x'.repeat(401))]],
-  ['unknown intent fields', [{ ...intent('extra', '方向'), deadline: 10 }]],
-]) test(`model contract rejects ${name} without advancing the world`, async () => {
-  const world = worldWithAdjudication(); store.install(world);
-  await withModel(() => decision(malformed), async () => {
-    assert.equal((await advance()).status, 502);
-    const saved = (await (await GET()).json()).world;
-    assert.deepEqual(saved.characters, world.characters);
-    assert.equal(saved.turn, 0);
-    assert.equal(saved.aiUsage.calls, 1);
-    assert.equal(saved.aiUsage.inputTokens, 30);
-  });
+for(const [name,mutate] of [
+ ['old full array',v=>{delete v.pursuitUpdates;v.intents=[];}],
+ ['duplicate identifiers',v=>{v.pursuitUpdates.push(structuredClone(v.pursuitUpdates[0]));}],
+ ['oversized increment',v=>{v.pursuitUpdates=Array(5).fill(v.pursuitUpdates[0]);}],
+ ['blank intent',v=>{v.pursuitUpdates[0].node.content=' ';}],
+ ['oversized context',v=>{v.pursuitUpdates[0].node.context='x'.repeat(401);}],
+ ['unknown intent fields',v=>{v.pursuitUpdates[0].node.deadline=10;}],
+])test('v3 contract rejects '+name+' without advancing',async()=>{
+ const initial=worldWithAdjudication();store.install(initial);
+ await withModel((_id,data)=>{const v=decision(data,[intent('new','方向')]);mutate(v);return v;},async()=>{assert.equal((await advance()).status,502);const saved=(await(await GET()).json()).world;assert.deepEqual(saved.characters,initial.characters);assert.equal(saved.turn,0);assert.equal(saved.aiUsage.calls,1);assert.equal(saved.aiUsage.inputTokens,30);});
 });
 
 test('a storage conflict leaves no partially saved queue or activity', async () => {
-  const world = worldWithAdjudication(); world.characters[0].intents = [intent('prior', '保留的方向')];
+  const world = worldWithAdjudication(); /* Keep the new seed direction. */
   store.install(world); store.conflictOnNextSave();
-  await withModel(() => decision([intent('unsaved', '尚未儲存的方向')], { durationMinutes: 90 }), async () => {
+  await withModel((_id,data) => decision(data,[intent('unsaved', '尚未儲存的方向')], { durationMinutes: 90 }), async () => {
     const response = await advance();
     assert.equal(response.status, 502);
     assert.match((await response.json()).error, /儲存衝突/);

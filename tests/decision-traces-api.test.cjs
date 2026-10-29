@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),{scenario,proposal}=require('./routine-program-fixture.cjs');
@@ -86,7 +87,7 @@ test('nested request and snapshot credential fields are masked while hidden fact
 
 test('each actor dispatch freezes its own sequential world, including unchanged authority scene facts',async()=>{
  const s=await scenario({modify:w=>{const other=structuredClone(w.characters[0]);other.id='other';other.name='其他角色';other.shortTerm=[];other.longTerm=[];other.memories=[];other.memoryTrace=[];other.observations=[];delete other.cognition;delete other.control;w.characters.push(other);w.scene={...(w.scene||{}),doors:{'cafe-door':'closed'},occluded:['cafe-storeroom'],noise:{'cafe-front':'busy'}};}});
- const previous=global.fetch;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify({...proposal,type:input.self.id==='owner'?'move':'rest',target:input.self.id==='owner'?'kris-home':'',content:'繼續生活',purpose:'',timeIntent:{kind:input.self.id==='owner'?'completion':'open-ended',maxMinutes:null}})}}]});};
+ const previous=global.fetch;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{...proposal,type:input.self.id==='owner'?'move':'rest',target:input.self.id==='owner'?'kris-home':'',content:'繼續生活',purpose:'',timeIntent:{kind:input.self.id==='owner'?'completion':'open-ended',maxMinutes:null}}))}}]});};
  try{
   const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const id=(await r.json()).operationEvidence.operationId;
   const trace=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;

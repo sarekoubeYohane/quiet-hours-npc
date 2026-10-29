@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario,proposal}=require('./routine-program-fixture.cjs');
@@ -9,10 +10,10 @@ for(const [kind,reason] of [['json','json-parse'],['long','memory-selection-refe
  const s=await scenario({modify:w=>{
   const second=structuredClone(w.characters[0]);second.id='second';second.shortTerm=[{id:'second-short',characterId:'second',version:1,time:w.minute,text:'PRIVATE-EXPERIENCE',source:{kind:'experience'}}];second.longTerm=[{id:'second-long',characterId:'second',version:1,time:w.minute,text:'PRIVATE-LONG',source:{kind:'experience'},origin:{id:'old',version:1},reason:'保留'}];second.memories=[];second.observations=[];second.memoryTrace=[];delete second.cognition;delete second.control;w.characters.push(second);
  }}),op=operation(),before=await s.read();let calls=0;
- global.fetch=async()=>{
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{
   calls++;const ref=kind==='long'?{id:'second-long',version:1}:kind==='foreign'?{id:before.characters[0].shortTerm[0].id,version:1}:{id:'second-short',version:kind==='version'?2:1};
   const candidate={...proposal,type:'move',target:'kris-home',content:'移動',purpose:'',memorySelections:calls===1?[]:[{...ref,reason:kind==='format'?'':'留作回憶'}]};
-  return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:calls===2&&kind==='json'?'{PRIVATE-MALFORMED':JSON.stringify(candidate)}}]});
+  return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:calls===2&&kind==='json'?'{PRIVATE-MALFORMED':JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),candidate))}}]});
  };
  try{
   const r=await s.post(op),first=await r.json();assert.equal(r.status,502);const data=await lookup(op.operationId),trace=data.decisionTrace;
@@ -30,10 +31,10 @@ for(const mode of ['normal','omitted','write-failed'])test(`NPC safe reason ${mo
  const s=await scenario(),op=operation(),auth=load('auth'),logs=[],original={log:console.log,warn:console.warn,error:console.error};
  for(const method of Object.keys(original))console[method]=(...args)=>logs.push(args);
  let calls=0;
- global.fetch=async()=>{
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{
   calls++;if(mode==='write-failed')store.failTraceWrites(true);
   const candidate={...proposal,type:'rest',target:'',content:privateText,purpose:'',memorySelections:[{id:'unknown-ref',version:1,reason:'保留'}]};
-  const raw=mode==='omitted'?'{'+'x'.repeat(1100000):JSON.stringify(candidate);
+  const raw=mode==='omitted'?'{'+'x'.repeat(1100000):JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),candidate));
   return Response.json({usage:{prompt_tokens:8,completion_tokens:2},choices:[{message:{content:raw}}]});
  };
  try{
@@ -54,7 +55,7 @@ for(const mode of ['normal','omitted','write-failed'])test(`NPC safe reason ${mo
   store.failTraceWrites(false);
   global.fetch=async(_url,init)=>{
    const input=JSON.parse(init.body);assert.ok(!JSON.stringify(input).includes(privateText));assert.ok(!JSON.stringify(input).includes('memory-selection-reference'));
-   return Response.json({usage:{prompt_tokens:8,completion_tokens:2},choices:[{message:{content:JSON.stringify({...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null},memorySelections:[]})}}]});
+   return Response.json({usage:{prompt_tokens:8,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null},memorySelections:[]}))}}]});
   };
   assert.equal((await s.post(operation())).status,200);
  }finally{Object.assign(console,original);auth.setUserId('test-owner');store.failTraceWrites(false);s.restore();}
