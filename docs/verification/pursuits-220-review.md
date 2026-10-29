@@ -1,6 +1,6 @@
 # #220 最終兩軸 review 修正
 
-審查基準 `f9493c7...144bcea`。Standards初審提出1項P3，複查補充詞彙表工程細節1項P3；Spec初審提出P1一項／P2兩項，複查補充assessment綁定回歸及paired-ended新綁定逃逸各1項P2。以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原兩位reviewer已對最終功能基準完成複查，結果見文末。
+審查基準 `f9493c7...144bcea`。Standards初審提出1項P3，複查補充詞彙表工程細節1項P3；Spec初審提出P1一項／P2兩項，複查補充assessment綁定回歸、paired-ended新綁定逃逸及cache未知後繼續派送各1項P2。以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原兩位reviewer已對最終功能基準完成複查，結果見文末。
 
 ## Standards
 
@@ -36,19 +36,22 @@
 
 ## 必要驗證與限制
 
+**追加Spec P2：cache用量不明立即阻後續派送。** 原runner只檢查prompt／output，cached大於prompt或為字串時仍清除unresolved，使同輪必要裁定再次forward。現在先持久保存cache未知標記與未解派送，仍將原response交給既有adapter記下已知30／10 tokens及未知成本；下一fetch wrapper在任何forward前停止，原ID讀回不補派送。兩個真runtime／fileSQLite反例先RED再GREEN；合法cached=10仍到第二必要裁定邊界，原完整positive省略cached也保持合法。本修正僅runner與其測試，未改追求產品或用量政策。
+
 原節點／邊／深度、四更新／8KiB、88KiB input、164000bytes完整provider body、輸出tokens、回合工作／租約與玩家政策均保留。加入最小prompt綁定說明後，80來源測得完整body162394bytes；quote-heavy完整圖與原80來源壓力保留，沒有放寬閾值、縮短來源或移除schema斷言。原T7文件中的精確量測是其記錄版本，不能當作本修正版的所有實測值。
 
-前一功能提交`7b8f25b`已驗90項native與18項runner（121625ms）；下列為追加paired-ended修正`f2b6c07`的指定驗證：
+前一功能提交`7b8f25b`已驗90項native與18項runner（121625ms）；下列native為paired-ended產品修正`f2b6c07`的指定驗證，runner與用量API為最後cache守門基準`974629b`：
 
 | 檢查 | 實際結果 |
 | --- | --- |
-| `node --test tooling/experiments/pursuit-runner-228.test.mjs` | 18/18通過、0fail，115303ms；含跨output／新grant同payer及官方price host新反例 |
+| `node --test tooling/experiments/pursuit-runner-228.test.mjs` | 21/21通過、0fail，129324ms；含跨output／新grant同payer、官方price host與三個cache用量案例 |
 | review API＋graph＋exit＋lifecycle＋capacity＋memory-selection | 97/97通過、0fail，35865ms；含新增15個最高API旅程、原capacity14與memory-selection4 |
+| costs／interrupted-usage／usage-recovery API | 24/24通過、0fail，34521ms；已知用量與未知成本／恢復守門保持 |
 | 受控正向完整批次 | 10trial／80advance、17受控forward（含裁定）、64partner fixture、81原引擎用量；max完整body106004bytes，真付費0 |
 | 原player policy | 原12calls／30000tokens可首forward並到限停止，沒有set-budget或刷新窗口；完整80advance另明示用合成既有100calls／1,000,000tokens payer |
 | UI | archive dropped／satisfied各2次fixture、history版本差異3次fixture；真WorldApp／SQLite重載、文字缺口、390px及原ID零新增派送通過 |
 | typecheck／本輪ESLint／diff check | 通過；沒有提高原輸出、期限或預算上限 |
 
-原兩位reviewer已對固定功能基準`f2b6c07`完成最終複查：Standards原2項P3、Spec原1項P1及4項P2全部修正，共7項finding，0未解、0新增code smell。初審及中途複查歷史保留於上文，不把新修正覆寫成初審零問題。整合後完整預設回歸由整合PR記錄。預設suite把18項runner放在獨立第四組，先完成Workers／migration／#211 checker；source-pin反例不與其他來源讀取者並行。
+原兩位reviewer已對固定功能基準`974629b`完成最終複查：Standards原2項P3、Spec原1項P1及5項P2全部修正，共8項finding，0未解、0新增code smell。產品追求邏輯仍為f2b6c07，最後cache修正只有runner及其測試。初審及中途複查歷史保留於上文，不把新修正覆寫成初審零問題。整合2c06044完整預設套件已1107/1107通過（世界1042、auth32、Workers／migration／#211 checker15、runner18）；production build、typecheck、diff check通過，full lint為0error／4項既有warning。此完整結果屬追加cache修正前版本；最終同head CI另由整合PR記錄。預設suite把21項runner放在獨立第四組，先完成Workers／migration／#211 checker；source-pin反例不與其他來源讀取者並行。
 
 #229仍未執行。2026-10-29只補官方模型文件來源預檢，公開去識別metadata含來源hash，完整原文留私有；Standard短context價目與其他tier條件尚未構成本批已封存適用價格。需要最終review版本／runner指紋、相關人工controller、實際account/tier、有限人類授權與有效憑證後才可另行派送；default仍未paid-ready。
