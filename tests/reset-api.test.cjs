@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node tests load a temporary transpiled build. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { fixtureDecision } = require('./pursuit-fixture.cjs');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const root = process.env.QUIET_HOURS_AUTH_BUILD;
@@ -40,8 +41,8 @@ async function read(cookie) {
 }
 const advance = (cookie, body = {}) => post(cookie, { operation: 'advance', minutes: 15, ...body });
 const resetWorld = (cookie, body = {}) => post(cookie, { operation: 'reset', ...body });
-const modelReply = () => Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '休息一下', mood: '平靜', durationMinutes: 60, intents: [] }) } }] });
-const paidAdvance = async (cookie, fetcher = async () => modelReply()) => {
+const modelReply = init => Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content), { type: 'rest', target: '', content: '休息一下', mood: '平靜', durationMinutes: 60, intents: [] })) } }] });
+const paidAdvance = async (cookie, fetcher = async (_url, init) => modelReply(init)) => {
   const original = global.fetch; global.fetch = fetcher;
   try { return await advance(cookie, { mode: 'openai', model: 'gpt-6-luna' }); } finally { global.fetch = original; }
 };
@@ -61,7 +62,8 @@ test('reset returns the signed-in world to the initial seed, keeps the version m
   const result = await response.json();
   assert.equal(result.operationSettled, true);
   assert.equal(result.version, before.version + 1);
-  assert.deepEqual(result.world, { ...seedWorld(), aiUsage: before.world.aiUsage });
+  assert.notEqual(result.world.pursuitContext, before.world.pursuitContext);
+  assert.deepEqual(result.world, { ...seedWorld(), pursuitContext: result.world.pursuitContext, aiUsage: before.world.aiUsage });
   const after = await read(cookie);
   assert.equal(after.version, before.version + 1);
   assert.deepEqual(after.world, result.world);
@@ -137,7 +139,7 @@ test('reset waits while another page holds the world lease and never leaves a ha
   const original = global.fetch;
   let release, entered; const ready = new Promise(r => entered = r), gate = new Promise(r => release = r);
   let calls = 0;
-  global.fetch = async () => { calls++; entered(); await gate; return modelReply(); };
+  global.fetch = async (_url, init) => { calls++; entered(); await gate; return modelReply(init); };
   try {
     const running = advance(cookie, { mode: 'openai', model: 'gpt-6-luna' });
     await ready;
@@ -172,9 +174,10 @@ test('a world saved by an older program version loads with compatible defaults a
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.version, 8);
-  assert.deepEqual(result.world, seedWorld());
+  assert.ok(result.world.pursuitContext);
+  assert.deepEqual(result.world, { ...seedWorld(), pursuitContext: result.world.pursuitContext });
   const after = await read(cookie);
-  assert.deepEqual({ ...after.world, aiUsage: undefined }, { ...seedWorld(), aiUsage: undefined });
+  assert.deepEqual({ ...after.world, aiUsage: undefined }, { ...seedWorld(), pursuitContext: result.world.pursuitContext, aiUsage: undefined });
   assert.equal(after.world.aiUsage.totalCalls, 0);
 });
 
