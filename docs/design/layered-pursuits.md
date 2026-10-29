@@ -45,3 +45,13 @@
 共享任務只連結一份活動 `pursuitIds` 與既有進度，局部重排不另啟動／取消活動。當次仍只選一個焦點，角色可在較高優先根等待時選另一分支，或繼續手上活動。替代方法不是新增必做節點，圖／優先不繞過世界前提。多層滿足、範圍改寫與上層退出的完整處置仍分別由 #224／#225 接續；目前有下層／活動關聯的複雜退出保持明示拒絕。
 
 13 個新增 API 旅程與 24 個 T1 回歸通過；真 UI／SQLite 三輪重載、實際下一請求和手機寬度核對見 [#223 驗證](../verification/layered-pursuits-223.md)。最大共享圖代表例證明 12 節點／16 邊／4 層可在原包絡維護，超節點、超邊及第 5 層反例被拒絕；完整最大文字／來源／候選與四角色情境仍由 #227 統一驗證，不能以此代表整體滿載工作已完成。
+
+## #224 主觀滿足與跨行動承接
+
+新增 `assess`，沿既有六欄更新 `{operation,id,version,node,references,reason}`。node 為 `{status,progress,basis:{kind,text}}`：status 是 active／satisfied；progress 是 ready／waiting／deferred／blocked／enough。satisfied 只能配 ready；enough 只供仍 active 的持續 direction。省略的舊 progress 保持可讀、代表尚無明示推進評估，沒有自動新增歷史。upsert.node 原形保持，不從行動或世界結果推導滿足。
+
+basis.kind=known-result 時必須至少一個當次有效可見 short／long／belief／relationship 來源；subjective 可依本人感受或理解，用空來源合法。短依據 text 上限160字，仍計入原4KiB追求更新、共同四項／8KiB、12KiB狀態及有界痕跡，不增加模型 slot、輸出 tokens 或時限。保存 assessment 的類型、短評、來源身份與世界時間，與形成來源 references 分開；不是來源正文備份或外在真相。可見誤解仍可支持角色判斷，尚未執行 action 的假來源不能通過引用檢查。
+
+評估滿足只改主觀節點，不造物、不攝取、不恢復需求、不代其他上層完成，也不複製活動進度。仍有實際關聯活動時，最小切片拒絕直接 satisfied，待 #225 明示處置；同批多層可在當次已有依據且圖一致時各自評估。已 satisfied 身份不能 upsert 復活。持續方向 active＋enough 仍可日後明示 ready，但不會由引擎反覆生成同類任務。
+
+角色／分析沿同一追求面板呈現推進情況、滿足與短評來源缺口；短評與既有活動、物件成果並列理解。源遺忘／未展示下的完整投影維護由 #227 加入整合，不以觀察者 trace 復活記憶。受控旅程及真實行為界線見 [#224 驗證](../verification/pursuit-lifecycle-224.md)。

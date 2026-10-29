@@ -34,6 +34,7 @@ try{
  }
  await page.reload();await nav('分析');await page.getByRole('button',{name:'Vera',exact:true}).click();const panel=page.getByRole('region',{name:'分層追求',exact:true});
  assert.match(await panel.innerText(),/本人認為已滿足/);assert.match(await panel.innerText(),/暫時足夠/);assert.match(await panel.innerText(),/依當時可知結果/);assert.match(await panel.innerText(),/研究後完成一份自己的設計/);
+ assert.match(await panel.innerText(),/歷史關係，不列當前順序/);assert.doesNotMatch(await panel.innerText(),/本層第 0 位/);
  await panel.screenshot({path:outputPath('satisfied-and-enough.png')});
  await nav('觀察');await page.getByRole('button',{name:'人物檔案',exact:true}).click();assert.match(await page.getByRole('region',{name:'人物檔案',exact:true}).innerText(),/本人認為已滿足/);
  await page.setViewportSize({width:390,height:844});await nav('分析');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:outputPath('mobile-analysis.png'),fullPage:true});
