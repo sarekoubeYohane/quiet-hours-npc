@@ -6,9 +6,14 @@ const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.
 const {seedWorld}=build('world');
 const {GET,POST}=build('route');
 const store=build('store');
+const {candidate:fixtureCandidate}=require('./pursuit-selection-fixture.cjs');
+// Legal formation fixtures explicitly declare their possibilities and adoption.
+// Invalid contract samples below are returned as written, without transport repair.
+function declareFixtureCandidates(value,data){for(const update of value.pursuitUpdates.filter(u=>u.operation==='upsert'&&u.version===0)){const proposal=fixtureCandidate(data.self.id,'form-'+value.pursuitCandidates.length,update.node.content,update.node.scope);value.pursuitCandidates.push(proposal);value.pursuitSelection.adoptions.push({candidateId:proposal.id,pursuitId:update.id});}}
+function selectFixtureFocus(value,id,version=0){const adoption=value.pursuitSelection.adoptions.find(a=>a.pursuitId===id);value.pursuitSelection.focus=adoption?{kind:'candidate',id:adoption.candidateId,version:0}:{kind:'existing',id,version};}
 const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...body})});
 const read=async()=> (await (await GET()).json()).world;
-const decision=data=>({contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:null,pursuitUpdates:[],action:{type:'rest',target:'',content:'休息一會兒',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'',knownResults:[],choice:'new',method:'',change:{kind:'not-applicable',detail:''},reason:'',selectedAction:{type:'rest',target:''},intentIds:[]},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]});
+const decision=data=>({contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:null,pursuitCandidates:[],pursuitSelection:{adoptions:[],declinedCandidateIds:[],focus:null,reason:''},pursuitUpdates:[],action:{type:'rest',target:'',content:'休息一會兒',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'',knownResults:[],choice:'new',method:'',change:{kind:'not-applicable',detail:''},reason:'',selectedAction:{type:'rest',target:''},intentIds:[]},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]});
 const node=(id,parents=[])=>({id,content:'先確認自己想做什麼',intensity:'medium',importance:'medium',urgency:'low',context:'',kind:'intent',scope:'只先安靜想一會兒',satisfaction:null,parents});
 const update=(id,version=0,parents=[])=>({operation:'upsert',id,version,node:node(id,parents),references:[],reason:'我想先照顧自己'});
 async function setup(){const w=seedWorld();w.adjudication={provider:'openai',model:'gpt-6-luna'};store.install(w);await POST(request({operation:'set-model-key',key:'fixture-key'}));return w;}
@@ -20,8 +25,8 @@ test('new world admits explicit child pursuit, preserves omission through SQLite
  await transport((data,payload)=>{calls++;assert.match(payload.messages[0].content,/contractVersion回傳npc-decision.v3/);assert.doesNotMatch(payload.messages[0].content,/省略表示放下|回傳npc-decision.v2/);const value=decision(data);assert.equal(data.contractVersion,'npc-decision.v3');assert.equal(data.pursuitContext,initial.pursuitContext);
   if(data.self.id==='cass'){
    assert.equal(data.self.intents[0].kind,'direction');
-   if(round===0){value.pursuitUpdates=[update('cass:thinking',0,[{id:'cass:direction',version:1}])];value.focusIntentId='cass:thinking';value.methodAssessment.intentIds=['cass:thinking'];}
-   else {assert.equal(data.self.intents.find(i=>i.id==='cass:thinking').scope,'只先安靜想一會兒');value.focusIntentId='cass:thinking';value.methodAssessment.intentIds=['cass:thinking'];}
+   if(round===0){value.pursuitUpdates=[update('cass:thinking',0,[{id:'cass:direction',version:1}])];declareFixtureCandidates(value,data);selectFixtureFocus(value,'cass:thinking');value.focusIntentId='cass:thinking';value.methodAssessment.intentIds=['cass:thinking'];}
+   else {assert.equal(data.self.intents.find(i=>i.id==='cass:thinking').scope,'只先安靜想一會兒');selectFixtureFocus(value,'cass:thinking',1);value.focusIntentId='cass:thinking';value.methodAssessment.intentIds=['cass:thinking'];}
   }return value;},async()=>{
   assert.equal((await advance()).status,200);const saved=await read();assert.equal(saved.characters[0].intents.length,2);assert.equal(saved.characters[0].intents[1].version,1);
   round++;assert.equal((await advance()).status,200);assert.deepEqual((await read()).characters[0].intents,saved.characters[0].intents);assert.equal(calls,8);
@@ -67,7 +72,7 @@ for(const [name,mutate] of [
 
 test('later actor failure rolls back earlier pursuit and world changes, and exact operation replay dispatches nothing',async()=>{
  const initial=await setup();let calls=0;const operationId=`${Date.now()}:${crypto.randomUUID()}`;
- await transport(data=>{calls++;const value=decision(data);if(data.self.id==='cass'){value.pursuitUpdates=[update('cass:uncommitted')];value.focusIntentId='cass:uncommitted';value.methodAssessment.intentIds=['cass:uncommitted'];}else {value.focusIntentId='missing';}return value;},async()=>{
+ await transport(data=>{calls++;const value=decision(data);if(data.self.id==='cass'){value.pursuitUpdates=[update('cass:uncommitted')];declareFixtureCandidates(value,data);selectFixtureFocus(value,'cass:uncommitted');value.focusIntentId='cass:uncommitted';value.methodAssessment.intentIds=['cass:uncommitted'];}else {value.focusIntentId='missing';}return value;},async()=>{
   assert.equal((await advance({operationId})).status,502);const saved=await read();assert.deepEqual(saved.characters,initial.characters);assert.deepEqual(saved.events,initial.events);assert.equal(saved.aiUsage.totalCalls,2);
   assert.equal((await advance({operationId})).status,502);assert.equal(calls,2);assert.deepEqual((await read()).characters,initial.characters);
  });
@@ -75,17 +80,17 @@ test('later actor failure rolls back earlier pursuit and world changes, and exac
 
 test('storage conflict does not commit a pursuit or activity and retains four paid usage receipts',async()=>{
  const initial=await setup();store.conflictOnNextSave();let calls=0;
- await transport(data=>{calls++;const value=decision(data);value.pursuitUpdates=[update(`${data.self.id}:uncommitted`)];value.focusIntentId=`${data.self.id}:uncommitted`;value.methodAssessment.intentIds=[value.focusIntentId];return value;},async()=>{assert.equal((await advance()).status,502);const saved=await read();assert.equal(calls,4);assert.equal(saved.turn,0);assert.deepEqual(saved.characters,initial.characters);assert.equal(saved.aiUsage.totalCalls,4);});
+ await transport(data=>{calls++;const value=decision(data);value.pursuitUpdates=[update(`${data.self.id}:uncommitted`)];declareFixtureCandidates(value,data);selectFixtureFocus(value,`${data.self.id}:uncommitted`);value.focusIntentId=`${data.self.id}:uncommitted`;value.methodAssessment.intentIds=[value.focusIntentId];return value;},async()=>{assert.equal((await advance()).status,502);const saved=await read();assert.equal(calls,4);assert.equal(saved.turn,0);assert.deepEqual(saved.characters,initial.characters);assert.equal(saved.aiUsage.totalCalls,4);});
 });
 
 test('successful original operation replay and GET retain exact pursuit versions with no new dispatch',async()=>{
  await setup();let calls=0;const operationId=`${Date.now()}:${crypto.randomUUID()}`;
- await transport(data=>{calls++;const v=decision(data);v.pursuitUpdates=[update(`${data.self.id}:step`)];return v;},async()=>{const first=await advance({operationId});assert.equal(first.status,200);const body=await first.json();const replay=await advance({operationId});assert.equal(replay.status,200);assert.deepEqual(await replay.json(),body);const saved=await read();assert.equal(saved.characters[0].intents[1].version,1);assert.equal(calls,4);await read();assert.equal(calls,4);});
+ await transport(data=>{calls++;const v=decision(data);v.pursuitUpdates=[update(`${data.self.id}:step`)];declareFixtureCandidates(v,data);return v;},async()=>{const first=await advance({operationId});assert.equal(first.status,200);const body=await first.json();const replay=await advance({operationId});assert.equal(replay.status,200);assert.deepEqual(await replay.json(),body);const saved=await read();assert.equal(saved.characters[0].intents[1].version,1);assert.equal(calls,4);await read();assert.equal(calls,4);});
 });
 
 test('same-batch parent creation is independent of update ordering and omitted increment is retention',async()=>{
  await setup();let round=0;
- await transport(data=>{const v=decision(data);if(data.self.id==='cass'&&round===0){v.pursuitUpdates=[update('cass:child',0,[{id:'cass:parent',version:0}]),update('cass:parent')];}else delete v.pursuitUpdates;return v;},async()=>{assert.equal((await advance()).status,200);const before=(await read()).characters[0].intents;assert.equal(before.find(i=>i.id==='cass:child').parents[0].version,1);round++;assert.equal((await advance()).status,200);assert.deepEqual((await read()).characters[0].intents,before);});
+ await transport(data=>{const v=decision(data);if(data.self.id==='cass'&&round===0){v.pursuitUpdates=[update('cass:child',0,[{id:'cass:parent',version:0}]),update('cass:parent')];declareFixtureCandidates(v,data);}else delete v.pursuitUpdates;return v;},async()=>{assert.equal((await advance()).status,200);const before=(await read()).characters[0].intents;assert.equal(before.find(i=>i.id==='cass:child').parents[0].version,1);round++;assert.equal((await advance()).status,200);assert.deepEqual((await read()).characters[0].intents,before);});
 });
 
 test('takeover, single direct action and return preserve autonomous pursuits and private actor input',async()=>{
@@ -99,14 +104,14 @@ test('takeover, single direct action and return preserve autonomous pursuits and
 
 test('save failure retains original pursuit graph and known dispatch accounting',async()=>{
  const initial=await setup();store.throwBeforeNextSave();let calls=0;
- await transport(data=>{calls++;const v=decision(data);v.pursuitUpdates=[update(`${data.self.id}:unsaved`)];return v;},async()=>{const response=await advance();assert.equal(response.status,502);const saved=await read();assert.equal(saved.turn,0);assert.deepEqual(saved.characters,initial.characters);assert.equal(calls,4);assert.equal(saved.aiUsage.totalCalls,4);assert.equal(saved.aiUsage.totalInputTokens,120);});
+ await transport(data=>{calls++;const v=decision(data);v.pursuitUpdates=[update(`${data.self.id}:unsaved`)];declareFixtureCandidates(v,data);return v;},async()=>{const response=await advance();assert.equal(response.status,502);const saved=await read();assert.equal(saved.turn,0);assert.deepEqual(saved.characters,initial.characters);assert.equal(calls,4);assert.equal(saved.aiUsage.totalCalls,4);assert.equal(saved.aiUsage.totalInputTokens,120);});
 });
 
 for(const legacy of [false,true])test(`existing acceptance scene admits native v3 and restores ${legacy?'legacy':'v3'} original story`,async()=>{
  const initial=await setup();if(legacy){delete initial.pursuitVersion;delete initial.pursuitContext;initial.characters[0].intents=[];store.install(initial);await POST(request({operation:'set-model-key',key:'fixture-key'}));}
  let calls=0;
  assert.equal((await POST(request({operation:'enter-acceptance'}))).status,200);const scene=await read();assert.equal(scene.pursuitVersion,1);assert.notEqual(scene.pursuitContext,initial.pursuitContext);
- await transport(data=>{calls++;const v=decision(data);assert.ok(data.self.intents.some(i=>i.kind==='direction'));if(data.self.id==='cass'){const node=data.self.intents.find(i=>i.id==='cass:acceptance-food');assert.equal(node.version,1);assert.equal(node.status,'active');v.focusIntentId=node.id;v.methodAssessment.intentIds=[node.id];}return v;},async()=>{
+ await transport(data=>{calls++;const v=decision(data);assert.ok(data.self.intents.some(i=>i.kind==='direction'));if(data.self.id==='cass'){const node=data.self.intents.find(i=>i.id==='cass:acceptance-food');assert.equal(node.version,1);assert.equal(node.status,'active');selectFixtureFocus(v,node.id,node.version);v.focusIntentId=node.id;v.methodAssessment.intentIds=[node.id];}return v;},async()=>{
   assert.equal((await advance({worldContext:scene.contextId})).status,200);assert.equal(calls,4);
   assert.equal((await POST(request({operation:'exit-acceptance',worldContext:scene.contextId}))).status,200);const restored=await read();assert.deepEqual(restored.characters,initial.characters);assert.equal(restored.pursuitVersion,initial.pursuitVersion);assert.equal(restored.pursuitContext,initial.pursuitContext);assert.equal(restored.aiUsage.totalCalls,4);
   if(legacy){assert.equal((await advance({worldContext:restored.contextId})).status,409);assert.equal(calls,4);}
