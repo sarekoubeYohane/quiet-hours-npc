@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- T5 shared upsert+assess extension integration target, not yet in the T6 default test list. */
+/* eslint-disable @typescript-eslint/no-require-imports -- T5/T6 shared same-decision upsert+assess+arrangement contract. */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=load('world'),{GET,POST}=load('route'),store=load('store');

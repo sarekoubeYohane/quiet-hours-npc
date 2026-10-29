@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "worldTurn": 4,
+  "fixtureNpc": 4,
+  "fixtureJudgments": 1,
+  "realPaidDispatches": 0,
+  "objectRevision": 2,
+  "physicalProgress": "partial",
+  "pausedPhaseCursor": 1,
+  "origin": [
+    {
+      "id": "owner:work",
+      "version": 1
+    }
+  ],
+  "currentPausedPursuits": [],
+  "originalPursuit": "dropped",
+  "replacementPursuit": "satisfied-after-scope-change",
+  "reloadedAnalysis": true,
+  "reloadedProfile": true,
+  "nextActualInputBytes": 10579
+}
