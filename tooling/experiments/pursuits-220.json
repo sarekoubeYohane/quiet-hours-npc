@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "issue": 220,
+  "status": "registered-live-blocked",
+  "implementationCommit": null,
+  "runnerSha256": null,
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "adjudicationModel": "gpt-6-luna",
+  "parameters": {
+    "reasoning_effort": "none",
+    "store": false,
+    "npcMaxOutputTokens": 2048,
+    "adjudicationMaxOutputTokens": 12000,
+    "recall": false,
+    "retries": false
+  },
+  "schedule": [
+    "L1:1",
+    "L2:1",
+    "L3:1",
+    "L4:1",
+    "L5:1",
+    "L5:2",
+    "L4:2",
+    "L3:2",
+    "L2:2",
+    "L1:2"
+  ],
+  "window": {
+    "advances": 8,
+    "minutes": 15
+  },
+  "limits": {
+    "calls": 160,
+    "tokens": 2000000,
+    "usd": 1,
+    "elapsedMs": 2700000
+  },
+  "authorizationReference": null,
+  "priceSnapshot": null,
+  "scenes": {
+    "service": {
+      "file": "tooling/experiments/pursuits-220.service.scene.json",
+      "sha256": "18178459c9ce40c21f9d5d1b47162fa41c7a84507d6c1afef6678b60dcbc9331"
+    },
+    "creative": {
+      "file": "tooling/experiments/pursuits-220.creative.scene.json",
+      "sha256": "76854ff1570026f37980392ca7ce649a1ca7198d7fd5bfe6631b877ee7961a39"
+    }
+  },
+  "stopOn": [
+    "technical-error",
+    "pending-or-uncertain",
+    "unknown-usage-or-cost",
+    "version-or-scene-mismatch",
+    "any-limit",
+    "user-stop",
+    "evidence-gap"
+  ],
+  "classifications": [
+    "formation",
+    "progress",
+    "satisfaction",
+    "world-result",
+    "waiting",
+    "known-obstacle",
+    "refusal",
+    "change-or-drop",
+    "repetition-without-new-information",
+    "technical-interruption",
+    "insufficient-evidence"
+  ],
+  "realProviderCalls": 0
+}
