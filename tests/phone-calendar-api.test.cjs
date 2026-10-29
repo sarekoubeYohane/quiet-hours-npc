@@ -112,4 +112,3 @@ test('刪除後明示重新建立的同名外部紀錄可以新提醒，取消�
   for(stage=0;stage<5;stage++)assert.equal((await advance()).status,200);const saved=await read(),d=saved.phones.devices[0];assert.equal(d.notifications.length,2);assert.equal(saved.events.filter(e=>e.kind==='phone-notification').length,2);assert.ok(d.notifications[0].cancelledAt);assert.equal(d.notifications[1].cancelledAt,undefined);
  });
 });
-

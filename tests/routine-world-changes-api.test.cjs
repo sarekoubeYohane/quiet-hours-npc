@@ -304,4 +304,3 @@ test('invalid or oversized alias scopes roll back instead of broadening a known 
   try{const before=await s.read(),r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,502);const w=await s.read();assert.deepEqual(w.objects,before.objects);assert.equal(w.routineRules,undefined);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}finally{s.restore();}
  }
 });
-
