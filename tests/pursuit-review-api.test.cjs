@@ -6,6 +6,25 @@ const {createPartner}=require('../tooling/experiments/pursuit-partner-228.cjs');
 const {load}=require('./pursuit-graph-fixture.cjs');
 const demand=require('./fixtures/demand-integration-loop.cjs');
 
+for(const mode of ['waiting','deferred','known-result'])test(`an omitted active binding permits later ${mode} assessment while a new stale upsert still fails`,async()=>{
+ let round=0;const inputs=[];
+ const s=await scenario(input=>{
+  inputs.push(input);
+  if(round===0)return decision(input,{updates:[upsert('owner:parent',[],{kind:'direction'}),upsert('owner:child',[{id:'owner:parent',version:0}])]});
+  if(round===1)return decision(input,{updates:[edit(input,'owner:parent',{importance:'high'})]});
+  if(round===2){const update=assess(input,'owner:child','active',mode==='known-result'?'ready':mode);if(mode==='known-result'){assert.ok(input.self.shortTerm.length);const memory=input.self.shortTerm.at(-1);update.references=[{kind:'short',id:memory.id,version:memory.version}];update.node.basis={kind:'known-result',text:'依本次仍可知的真實經歷再取捨'};}return decision(input,{updates:[update]});}
+  if(round===3)return decision(input,{updates:[edit(input,'owner:child',{parents:[{id:'owner:parent',version:1}]})]});
+  return decision(input);
+ },ownerOnly);
+ try{
+  for(round=0;round<3;round++){const response=await s.advance();assert.equal(response.status,200,await response.clone().text());}
+  const saved=owner(await s.read()),child=saved.intents.find(n=>n.id==='owner:child');assert.equal(child.version,2);assert.equal(child.parents[0].version,1);assert.equal(child.progress,mode==='known-result'?'ready':mode);assert.equal(saved.intents.find(n=>n.id==='owner:parent').version,2);
+  const trace=saved.pursuitTrace.filter(t=>t.id===child.id).at(-1);assert.equal(trace.operation,'assess');assert.equal(trace.before.parents[0].version,1);assert.equal(trace.after.parents[0].version,1);
+  round=3;assert.equal((await s.advance()).status,502);assert.deepEqual(owner(await s.read()).intents,saved.intents);
+  round=4;assert.equal((await s.advance()).status,200);const next=inputs.at(-1).self.intents.find(n=>n.id===child.id);assert.equal(next.parents[0].version,1);assert.equal(next.progress,child.progress);
+ }finally{s.restore();}
+});
+
 test('an active child cannot silently accept a materially changed parent through assessment alone',async()=>{
  let round=0;const s=await scenario(input=>round===0?decision(input,{updates:[upsert('owner:parent',[],{kind:'direction'}),upsert('owner:child',[{id:'owner:parent',version:0}])]}):decision(input,{updates:[edit(input,'owner:parent',{scope:'完全不同的新承接範圍'}),assess(input,'owner:child','active','waiting')]}),ownerOnly);
  try{assert.equal((await s.advance()).status,200);const before=await s.read();round++;assert.equal((await s.advance()).status,502);assert.deepEqual((await s.read()).characters,before.characters);}finally{s.restore();}

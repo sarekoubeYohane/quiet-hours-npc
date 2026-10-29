@@ -63,7 +63,7 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
  if(value===undefined)value=[];
  if(!Array.isArray(value)||value.length>pursuitLimits.updates||memoryBytes(value)>pursuitLimits.updateBytes)fail('追求更新容量無效');
  const archived=[...(c.pursuitArchived||[])];let archivedDropped=c.pursuitArchivedDropped||0;
- const updates=value as PursuitUpdate[],next=structuredClone(c.intents||[]),seen=new Set<string>(),operations=new Map<string,Set<string>>(),orders=new Set<string>(),trace:PursuitTrace[]=[];
+ const updates=value as PursuitUpdate[],next=structuredClone(c.intents||[]),operations=new Map<string,Set<string>>(),orders=new Set<string>(),trace:PursuitTrace[]=[];
  // Earlier v3 slices carried parent identity/version without local order.
  // Their saved array position is the existing order, never a new NPC choice.
 
@@ -73,7 +73,7 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
  for(const item of orderedUpdates){
   if(!fields(item,['operation','id','version','node','references','reason'])||!['upsert','drop','reorder','assess','archive'].includes(item.operation)||!text(item.id,64,true)||!item.id.startsWith(c.id+':')||!Number.isSafeInteger(item.version)||item.version<0||!text(item.reason,160,true)||!Array.isArray(item.references)||item.references.length>4)fail('追求候選格式無效');
   if(item.operation==='reorder'){if(orders.has(item.id))fail('重複追求重排範圍');orders.add(item.id);}
-  else {const prior=operations.get(item.id)||new Set<string>();if(prior.has(item.operation)||prior.size&&(!['upsert','assess'].includes(item.operation)||[...prior].some(operation=>!['upsert','assess'].includes(operation)))||item.id===`${c.id}:roots`)fail('重複或保留的追求身份');prior.add(item.operation);operations.set(item.id,prior);seen.add(item.id);}
+  else {const prior=operations.get(item.id)||new Set<string>();if(prior.has(item.operation)||prior.size&&(!['upsert','assess'].includes(item.operation)||[...prior].some(operation=>!['upsert','assess'].includes(operation)))||item.id===`${c.id}:roots`)fail('重複或保留的追求身份');prior.add(item.operation);operations.set(item.id,prior);}
   const old=c.intents?.find(i=>i.id===item.id);
   if(item.operation==='archive'){
    if(!old||old.status==='active'||item.version!==old.version||item.node!==null||item.references.length!==0||!visible.intents?.some(i=>i.id===old.id&&i.version===old.version)||next.some(i=>!archiveIds.has(i.id)&&i.parents?.some(p=>p.id===old.id))||c.plan?.pursuitIds?.includes(old.id)||c.pausedActivity?.plan.pursuitIds?.includes(old.id))fail('只能歸檔本次可見且沒有有效活動的已結束追求');
@@ -130,7 +130,7 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
    if(!text(parent.id,64,true)||parent.id===node.id||!Number.isSafeInteger(parent.version)||parent.order!==undefined&&(!Number.isSafeInteger(parent.order)||(parent.order??-1)<0)||Object.keys(parent).some(key=>!['id','version','order'].includes(key)))fail('追求關係無效');
    const original=c.intents?.find(i=>i.id===parent.id),endpoint=next.find(i=>i.id===parent.id);
    if(!endpoint||endpoint.status!=='active'||!parent.id.startsWith(c.id+':'))fail('追求上層不存在');
-   if(seen.has(node.id)&&(original?original.version!==parent.version:parent.version!==0))fail('追求上層版本失效');
+   if(operations.get(node.id)?.has('upsert')&&(original?original.version!==parent.version:parent.version!==0))fail('追求上層版本失效');
   }
  }
  for(const item of updates.filter(update=>update.operation==='reorder'))applyPursuitOrder(c,next,item,visible,trace,w.minute);
