@@ -16,7 +16,7 @@ export function traceWorldSnapshot(world: World) {
     scene:world.scene,environment:world.scene?.external||{},naturalChanges:world.naturalChanges||[],routineRules:world.routineRules||[],
     actors:world.characters.map(traceActorSnapshot)});
 }
-export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown;timePolicy?:{version:string;leaseCreatedAt:number;workDeadline:number;leaseDeadline:number;clientMs:number}}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
+export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'requestId'|'operation'|'baseVersion'|'contextId'|'outcome'> & {deployment?:unknown;timePolicy?:{version:string;leaseCreatedAt:number;workDeadline:number;leaseDeadline:number;clientMs:number};accounting?:{windowStartedAt:number}}, checkpoint?: (trace:DecisionTrace)=>Promise<void>) {
   const secrets=new Set<string>();let unknownCredentials=false,contentLimitExceeded=false,omittedOriginalBytes=0;
   const omitContent=()=>unknownCredentials||contentLimitExceeded;
   const trace:DecisionTrace={...context,schemaVersion:1,acceptedAt:Date.now(),lastKnownStage:'accepted',dispatches:[],steps:[],gaps:[],redacted:false};
@@ -53,6 +53,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       await legacy?.(event);
       if(event.kind==='prepared'){
         active={sequence:trace.dispatches.length+1,task,actorId:actor.id,requestId:event.requestId,provider,model,startedAt:Date.now(),
+          price:world.modelPrices?.find(p=>p.provider===provider&&p.model===model)??null,
           ...(omitContent()?{}:{requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world)}),stage:'dispatch-prepared',signal:event.timing??null};
         trace.dispatches.push(active);trace.lastKnownStage='dispatch-prepared';
       }else if(active&&event.kind==='fetch-start'){active.fetchStartedAt=event.at;return;}

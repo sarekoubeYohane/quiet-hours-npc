@@ -116,3 +116,15 @@ NPC 的解析／驗證邊界另傳遞可選的封閉 `failure.reason`：`json-pa
 ## #181 自主生活權威快照
 
 私有派送快照、整輪 result 與逐角色 npc-feedback 在原捕獲點保存四項需求／有限變化史、喜好／來源／變更、習慣與真正開始證據／省略數、事件型關聯引用、暫停活動／恢復前提及意圖。它們與 NPC 實際輸入仍分離，不把觀察者權威數值灌回本人。新增內容占用既有1MiB單筆及64筆／16MiB上限，原遮蔽、淘汰與缺口政策保持，舊實錄不補造缺失欄位。證據見[#181追溯子切片](../verification/life-trace-181.md)。
+
+## #92：中斷後已知用量的恢復入帳（2026-10-29）
+
+世界的有界 operation journal 除了原 `results`，增加獨立的 `usage` 核對回條：每操作保存已入帳的相對用量／歷史成本 cohort 及是否由原 worker 完成收尾。它不在 HTTP receipt body、不進故事／NPC 輸入，也不是完整外部帳本。受理 paid advance 時建立空回條；正常世界 CAS 將故事、用量、定案 marker 與原回應一起提交。已確認未提交或晚到原 worker 的收尾，在最新 owner row 以 state＋operations＋version CAS 只合併未入帳差額，不替換故事、租約或原 uncertain status/body。
+
+同 ID POST 的 expired-pending／uncertain 重放分支，可以從該操作 durable trace 的正常 `usage` 恢復已知 calls／input／output 與可得的價格資料。GET 仍唯讀，只呈現核對狀態。恢復用量與 marker 在同一 SQLite statement 提交；競爭者重讀 marker 後只加差額，未知提交結果的重試也不重複計數。核對不派送模型、不重套效果、不重建原 HTTP 結果、不增加故事 version；另保留舊無 marker 的原 worker CAS 衝突合併之版本語義。
+
+新 trace 記錄當輪 `windowStartedAt` 及各次派送當時的 price 快照；回復沿原窗口與既有 `beginCost` 計算。歷史價格缺失時保留 tokens 與 unknown price cohort，不能套目前價格。缺 token usage 的 durable 已派送嘗試只計呼叫與未知用量；prepared 不能證明 fetch 發生。`lateUsage` 從不作恢復輸入；已由原 worker 定案的回條禁止後續 trace 重算。原 worker 不再續行時，已保存部分可以入帳，但不可見派送的崩潰窗口仍明示 `unknownRange`，已知小計不是完整總額。
+
+舊操作沒有去重回條時，僅在 trace.baseVersion 與當前 world version 完全相同才可恢復：舊世界提交及舊 retainPaidUsage 都會增加 version，因此這個有限證據可證明尚未入帳。版本已變時，無法可靠判定是否已收尾，顯示 `legacy-unverifiable`，不猜算。儲存不可讀／不可寫、trace 缺失／淘汰，保留 pending／unavailable 與未知範圍。這不是從累計總數猜原操作差額，也不掃描加總 archive。
+
+核對回條與 results 共同遵守既有最多八筆及 journal bytes 淘汰政策；被淘汰的未定案核對只留下有界計數 `unresolvedUsageEvicted`，保留費用不完整警示，不保留新增私有內容。floor 防止淘汰 ID／遲到 worker 再次補算。所有權仍取登入 owner，trace 遮蔽與容量原則不變，不需要新 migration。這個切片沒有完成 #91／#92 的其餘驗收；正式站最初中斷與 HTTP 讀取失敗仍由 #77 分開查證。

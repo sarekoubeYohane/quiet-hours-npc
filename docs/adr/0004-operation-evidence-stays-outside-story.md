@@ -32,3 +32,7 @@ journal仍是精確HTTP重放權威。archive證明ID曾受理而journal遺失�
 ## #168 工程落實
 
 以最多四角色的完整合法鏈推導 400 秒工作、30 秒收尾、430 秒固定租約及445秒前端等待；25秒完整聊天及10秒完整回想包含自身保存，外層另留60秒累計餘量，避免只增加末次 timeout。接受較久的同世界占用，保留逐slot資訊、原子提交、冪等、已知用量與必要await保存。不可取消尾端不能恢復候選執行；結果不明仍查原journal。原pending按原存絕對期限，舊125秒client在新付費受理前更新。完整支援包絡與取捨見[工程契約](../design/round-time-budget.md)，本地與正式驗證分列於[#168報告](../verification/round-time-budget-168-2026-10-25.md)；不以此結案#85／#106。
+
+## #92 已知用量恢復的原子去重回條
+
+2026-10-29 中斷 RED 顯示，正常 usage 已 durable 仍可能因原 worker 未收尾而永久漏入世界統計。採用既有有界 journal 的獨立 accounting marker，與用量在同一 owner row CAS 入帳；正常提交也原子寫入 marker，原 worker 晚到只補尚未入帳差額。原 HTTP receipt 與故事保持獨立。新 trace 保存原窗口與歷史價格；舊資料缺少可靠去重基礎時明示無法核對，lateUsage 不參與補算。接受有限容量／崩潰未知窗口，淘汰未定案 marker 留有界未知範圍警示；不建立無界帳本或以重派送補證據。詳見[工程契約](../design/operation-evidence.md)。

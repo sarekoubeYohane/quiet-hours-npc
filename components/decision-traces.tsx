@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
+import UsageRecoveryStatus from '@/components/usage-recovery-status';
+import type { UsageRecoveryView } from '@/lib/usage-recovery';
 import type { CandidateFailureReason } from '@/lib/model-adapter';
 import { Button } from '@/components/ui/button';
 import { readWorldResponse } from '@/lib/world-response';
@@ -18,7 +20,7 @@ type TraceIndex = { records:Array<{operationId:string;requestId:string;outcome:s
   retention:{count:number;bytes:number;evicted:number;firstAvailableAt?:number;lastAvailableAt?:number;limits:unknown};gap?:string };
 type TraceStatus = {status?:string;gap?:string;lastKnownStage?:string};
 type TraceOperation = {state:string;decisionTraceStatus?:TraceStatus;evidence?:{outcome:string;resultVersion?:number}|null};
-type TraceResponse = {error?:string;decisionTrace?:Trace|null;decisionTraces?:TraceIndex;operation?:TraceOperation};
+type TraceResponse = {usageRecovery?:UsageRecoveryView;error?:string;decisionTrace?:Trace|null;decisionTraces?:TraceIndex;operation?:TraceOperation};
 const contentStyle = {whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:'28rem',overflow:'auto',fontSize:'.85rem',fontFamily:'ui-monospace, SFMono-Regular, Consolas, "Noto Sans TC", monospace'} as const;
 const outcomes:Record<string,string> = {committed:'世界已提交','rolled-back':'回合已回復', 'not-committed':'世界未提交',unknown:'世界提交狀態未知'};
 const sources:Record<string,string> = {program:'程式檢查／紀錄','model-self-report':'模型自述（不代表真實因果）','maintainer-hypothesis':'維護者假設（尚待驗證）'};
@@ -41,6 +43,7 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
   const [index,setIndex]=useState<TraceIndex>();
   const [shown,setShown]=useState<Trace|null>();
   const [selected,setSelected]=useState('');
+  const [usageRecovery,setUsageRecovery]=useState<UsageRecoveryView>();
   const [operationStatus,setOperationStatus]=useState<TraceOperation>();
   const [message,setMessage]=useState(''),[loading,setLoading]=useState(true);
   useEffect(()=>{
@@ -51,7 +54,7 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
         if(controller.signal.aborted)return;
         setIndex(body.decisionTraces);
         const id=operationId||body.decisionTraces?.records[0]?.operationId;
-        if(id){const detail=await readTrace(id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);setOperationStatus(detail.operation);}}
+        if(id){const detail=await readTrace(id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);setOperationStatus(detail.operation);setUsageRecovery(detail.usageRecovery);}}
         else setShown(null);
       } catch(error) { if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。'); }
       finally {if(!controller.signal.aborted)setLoading(false);}
@@ -59,8 +62,8 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
     void load();return ()=>controller.abort();
   },[operationId]);
   async function select(id:string) {
-    setLoading(true);setMessage('');setSelected(id);setShown(undefined);setOperationStatus(undefined);
-    try { const body=await readTrace(id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null);setOperationStatus(body.operation); }
+    setLoading(true);setMessage('');setSelected(id);setShown(undefined);setOperationStatus(undefined);setUsageRecovery(undefined);
+    try { const body=await readTrace(id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null);setOperationStatus(body.operation);setUsageRecovery(body.usageRecovery); }
     catch(error) {setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。');}
     finally {setLoading(false);}
   }
@@ -78,6 +81,7 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
     {message&&<p role="alert">{message}<Button variant="link" disabled={loading||!selected} onClick={()=>void select(selected)}>重新讀取實錄</Button></p>}
     {selected&&!loading&&lastResponse?.operationId===selected&&lastResponse.gap&&<p aria-label="本次HTTP追溯回應">本次 HTTP 回應（非已保存回條）：{lastResponse.status}<br/>最後已知階段：{lastResponse.lastKnownStage||'未知'}<br/>資料缺口：{lastResponse.gap}</p>}
     {selected&&!loading&&<p aria-label="本筆追溯保存狀態">操作：{selected}<br/>操作狀態：{operationStatus?.state||'未記錄'} · 追溯保存：{operationStatus?.decisionTraceStatus?.status||'未記錄'}<br/>操作回條最後已知階段：{operationStatus?.decisionTraceStatus?.lastKnownStage||'未保存／未知'}{operationStatus?.evidence&&<><br/>操作回條的世界結果：{outcomes[operationStatus.evidence.outcome]||operationStatus.evidence.outcome}{operationStatus.evidence.resultVersion!==undefined?`（版本 ${operationStatus.evidence.resultVersion}）`:''}</>}{operationStatus?.decisionTraceStatus?.gap&&<><br/>本筆資料缺口：{operationStatus.decisionTraceStatus.gap}</>}</p>}
+    {!loading&&<UsageRecoveryStatus value={usageRecovery}/>}
     {shown===null&&!loading&&!message&&<p>沒有保存這筆實錄：可能是舊操作、已淘汰、未捕獲或寫入失敗。找不到紀錄不代表沒有派送；舊版未保存的輸入及理由無法重建。</p>}
     {shown&&<>
       {operationStatus?.decisionTraceStatus?.gap&&<p>以下是最後成功保存的實錄；操作回條可能記錄更後階段，不能把這份較早副本視為完整實錄。</p>}

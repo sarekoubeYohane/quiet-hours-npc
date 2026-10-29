@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /* Diagnostic only. Synthetic transport, isolated SQLite, controlled time.
  * Not proof that the production Worker died at this boundary. */
 const assert = require('node:assert/strict');

@@ -1,3 +1,4 @@
+import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, type UsageReceipt } from '@/lib/usage-recovery';
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
@@ -36,59 +37,10 @@ const owner = async () => {
   } catch { return reply({ error: '登入驗證服務暫時無法使用，請稍後重試。' }, 503); }
 };
 
-// A confirmed failed CAS did not commit this round. Merge only its paid deltas
-// into the latest owner's row; a thrown save has an unknown outcome and is not replayed.
-async function retainPaidUsage(db: ReturnType<typeof database>, id: string, before: AIUsage | undefined, after: AIUsage | undefined) {
-  if (!after) return;
-  const calls = after.totalCalls - (before?.totalCalls || 0);
-  if (calls <= 0) return;
-  const counter = (name: string) => `coalesce(json_extract(state, '$.aiUsage.${name}'), 0)`;
-  const window = counter('windowStartedAt');
-  const hourly = (name: string, delta: string) => `CASE WHEN ${window} = paid.window THEN ${counter(name)} + paid.${delta} WHEN ${window} > paid.window THEN ${counter(name)} ELSE paid.${delta} END`;
-  const costBinds: (string | number)[] = [];
-  const costFields: string[] = [];
-  // Each price cohort is an additive paid receipt. Merge into the latest row in
-  // the same SQL update as token deltas, including reset/other-page races.
-  for (const group of ['total', 'hour'] as const) {
-    const pairs: string[] = [];
-    for (const [key, cohort] of Object.entries(after.costs?.[group] || {})) {
-      const old = group === 'hour' && before?.windowStartedAt !== after.windowStartedAt ? undefined : before?.costs?.[group]?.[key];
-      if (cohort.calls <= (old?.calls || 0)) continue;
-      const basePath = `$.aiUsage.costs.${group}.${JSON.stringify(key)}`;
-      const empty = {...cohort,calls:0,input:0,output:0,cachedInput:0,knownUsd:0,unknownCalls:0};
-      const entries: string[] = [];
-      costBinds.push(`$.${JSON.stringify(key)}`,basePath,JSON.stringify(empty));
-      for (const field of ['calls','input','output','cachedInput','knownUsd','unknownCalls'] as const) {
-        const stored = `coalesce(json_extract(state, ?), 0)`;
-        entries.push(`'$.${field}', ${group === 'hour' ? `CASE WHEN ${window} = paid.window THEN ${stored} + ? ELSE ? END` : `${stored} + ?`}`);
-        const delta = cohort[field] - (old?.[field] || 0);
-        costBinds.push(`${basePath}.${field}`,delta);
-        if (group === 'hour') costBinds.push(delta);
-      }
-      entries.push("'$.lastDispatchAt', max(coalesce(json_extract(state, ?), 0), ?)");
-      costBinds.push(`${basePath}.lastDispatchAt`,cohort.lastDispatchAt);
-      pairs.push(`?, json_set(coalesce(json_extract(state, ?), json(?)), ${entries.join(',')})`);
-    }
-    if (pairs.length) costFields.push(`'$.aiUsage.costs.${group}', ${group === 'hour' ? `CASE WHEN ${window} > paid.window THEN coalesce(json_extract(state, '$.aiUsage.costs.hour'), json('{}')) ELSE ` : ''}json_set(${group === 'hour' ? `CASE WHEN ${window} = paid.window THEN coalesce(json_extract(state, '$.aiUsage.costs.hour'), json('{}')) ELSE json('{}') END` : `coalesce(json_extract(state, '$.aiUsage.costs.total'), json('{}'))`}, ${pairs.join(',')})${group === 'hour' ? ' END' : ''}`);
-  }
-  await db.prepare(`WITH paid(window, calls, input, output, unknown) AS (VALUES (?, ?, ?, ?, ?))
-    UPDATE worlds SET state = json_set(state,
-      '$.aiUsage.windowStartedAt', max(${window}, paid.window),
-      '$.aiUsage.calls', ${hourly('calls', 'calls')},
-      '$.aiUsage.inputTokens', ${hourly('inputTokens', 'input')},
-      '$.aiUsage.outputTokens', ${hourly('outputTokens', 'output')},
-      '$.aiUsage.unknownCalls', ${hourly('unknownCalls', 'unknown')},
-      '$.aiUsage.totalCalls', ${counter('totalCalls')} + paid.calls,
-      '$.aiUsage.totalInputTokens', ${counter('totalInputTokens')} + paid.input,
-      '$.aiUsage.totalOutputTokens', ${counter('totalOutputTokens')} + paid.output,
-      '$.aiUsage.totalUnknownCalls', ${counter('totalUnknownCalls')} + paid.unknown,
-      '$.aiUsage.savedDecisions', ${counter('savedDecisions')}
-      ${costFields.length ? ',' + costFields.join(',') : ''}
-    ), version = version + 1 FROM paid WHERE owner = ?`)
-    .bind(after.windowStartedAt, calls,
-      after.totalInputTokens - (before?.totalInputTokens || 0),
-      after.totalOutputTokens - (before?.totalOutputTokens || 0),
-      after.totalUnknownCalls - (before?.totalUnknownCalls || 0), ...costBinds, id).run();
+// Accounting and its idempotency marker share one owner-row CAS. The story
+// version and exact HTTP receipt are independent from this bookkeeping update.
+async function retainPaidUsage(db: ReturnType<typeof database>, id: string, operationId:string, before:AIUsage|undefined, after:AIUsage|undefined) {
+  if(after)await recoverPaidUsage(db,id,operationId,paidDelta(before,after),true);
 }
 
 type WorldTrace = {
@@ -145,8 +97,8 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read');
     const loaded = await loadWorld(id);
     let operation;
-    let decisionTrace=null,decisionTraces;
-    try{decisionTraces=await listDecisionTraces(database(),id,loaded.world.contextId);if(operationId)decisionTrace=await readDecisionTrace(database(),id,operationId);}catch{decisionTraces={records:[],gap:'trace-read-failed'};}
+    let decisionTrace=null,decisionTraces;let traceReadFailed=false;
+    try{decisionTraces=await listDecisionTraces(database(),id,loaded.world.contextId);if(operationId)decisionTrace=await readDecisionTrace(database(),id,operationId);}catch{traceReadFailed=true;decisionTraces={records:[],gap:'trace-read-failed'};}
     const row = await database().prepare('SELECT operations, state, version FROM worlds WHERE owner = ?').bind(id).first<{operations:string;state:string;version:number}>();
     // Return the current story and diagnostics from the same committed row.
     loaded.world = JSON.parse(row!.state);
@@ -176,7 +128,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key,value])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -186,13 +138,16 @@ const uncertainResult: OperationResult = { status: 502, body: { error: '上次�
 const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
 const operationIdPattern = /^\d{13}:[0-9a-f-]{36}$/;
 const isOperationExpired = (issuedAt: number, floor: number) => issuedAt <= floor || issuedAt < Date.now() - 86400000;
-type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }> };
+type Journal = { floor: number; results: Record<string, OperationResult | { pending: number }>; usage?:Record<string,UsageReceipt>; unresolvedUsageEvicted?:number };
 function trimJournal(journal: Journal, maxResults: number, protectedId?: string) {
   const oldest = Object.keys(journal.results).filter(id => id !== protectedId).sort((a,b) => Number(a.split(':')[0]) - Number(b.split(':')[0]));
   while (oldest.length && (Object.keys(journal.results).length > maxResults || new TextEncoder().encode(JSON.stringify(journal)).byteLength > 500000)) {
     const id = oldest.shift()!;
     journal.floor = Math.max(journal.floor, Number(id.split(':')[0]));
+    const removed=journal.results[id];
+    if(journal.usage?.[id]&&!journal.usage[id].finalized||'status' in removed&&removed.body.operationUncertain&&!journal.usage?.[id]?.finalized)journal.unresolvedUsageEvicted=Math.min(Number.MAX_SAFE_INTEGER,(journal.unresolvedUsageEvicted||0)+1);
     delete journal.results[id];
+    if(journal.usage)delete journal.usage[id];
   }
 }
 
@@ -271,10 +226,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const serializedJournal = stored!.operations;
     journal = JSON.parse(serializedJournal);
     const previous = journal.results[operationId];
-    if (previous && 'status' in previous) { traceWorld(trace, 'journal-replay', { outcome: previous.body.operationUncertain ? 'uncertain' : 'settled' }); return settledReply(previous); }
+    if (previous && 'status' in previous) { if(previous.body.operationUncertain)try{await recoverPaidUsage(database(),id,operationId);}catch{/* Immutable receipt is still authoritative; GET exposes the outstanding gap. */} traceWorld(trace, 'journal-replay', { outcome: previous.body.operationUncertain ? 'uncertain' : 'settled' }); return settledReply(previous); }
     if (previous && 'pending' in previous) {
       if (previous.pending > Date.now()) { trace.lease = previous.pending; traceWorld(trace, 'lease-wait', { outcome: 'pending' }); return waiting(); }
       traceWorld(trace, 'lease-expired', { outcome: 'uncertain' });
+      try{await recoverPaidUsage(database(),id,operationId);}catch{/* Storage recovery remains visible and retryable through the same ID. */}
       await database().prepare('UPDATE worlds SET operations = json_set(operations, ?, json(?)) WHERE owner = ? AND json_extract(operations, ?) = ?')
         .bind(`$.results."${operationId}"`, JSON.stringify(uncertainResult), id, `$.results."${operationId}".pending`, previous.pending).run();
       const latest = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
@@ -333,6 +289,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     finishSignal=deadlineSignal(lease,'fixed-lease');
     trace.lease = lease;
     journal.results[operationId] = { pending: lease };
+    if(b.operation==='advance'&&b.mode!=='demo'){journal.usage??={};journal.usage[operationId]=emptyUsageReceipt(currentUsage(world).windowStartedAt);}
     const pendingJournal = JSON.stringify(journal);
     const acquired = await db.prepare('UPDATE worlds SET locked_until = ?, operations = ? WHERE owner = ? AND locked_until < ? AND version = ? AND operations = ?').bind(lease, JSON.stringify(journal), id, Date.now(), version, serializedJournal).run();
     if (!acquired.meta.changes) { traceWorld(trace, 'lease-wait', { outcome: 'contended' }); return waiting(); }
@@ -343,7 +300,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const beforeOperation = structuredClone(world);
     evidence=createOperationEvidence({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,world:beforeOperation,deployment:currentEnvironment(),
       ...(b.operation==='advance'?{replay:{operation:'advance',operationId,worldContext:b.worldContext,mode:b.mode!,model:b.model,minutes:b.minutes!}}:{})});
-    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment(),timePolicy:{version:roundTimePolicy.version,leaseCreatedAt,workDeadline,leaseDeadline:lease,clientMs:roundClientMs}},writeTrace);
+    decisionTrace=createDecisionTrace({operationId,requestId:trace.requestId,operation:b.operation!,baseVersion:version,contextId:world.contextId,outcome:'unknown',deployment:currentEnvironment(),timePolicy:{version:roundTimePolicy.version,leaseCreatedAt,workDeadline,leaseDeadline:lease,clientMs:roundClientMs},accounting:{windowStartedAt:currentUsage(world).windowStartedAt}},writeTrace);
     // All configured service credentials must be known before the first private
     // checkpoint: an NPC input can accidentally contain the other provider key.
     decisionTrace.step('time-policy',undefined,{version:roundTimePolicy.version,leaseCreatedAt,leaseAcquiredAt:Date.now(),workDeadline,leaseDeadline:lease,clientMs:roundClientMs});
@@ -517,6 +474,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     result.body.decisionTraceStatus=traceWriteFailed?{status:'write-failed',gap:'trace-write-failed'}:{status:'pending',gap:'world-and-trace-are-separate-transactions'};
     result.body.operationEvidence=finishEvidence(world,failure?'rolled-back':'committed',version+1);
     journal.results[operationId] = result;
+    if(journal.usage?.[operationId])journal.usage[operationId]={applied:paidDelta(paidBefore,world.aiUsage!),finalized:true};
     // The current exact response may exceed the historical byte budget by itself.
     trimJournal(journal, 8, operationId);
     paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
@@ -525,7 +483,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (!saved.meta.changes) {
       commitRejected=true;decisionTrace?.step('commit-conflict',undefined,{worldCommitted:false});await finishTrace('not-committed');
       traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
-      await retainPaidUsage(db, id, initialUsage, world.aiUsage);
+      await retainPaidUsage(db, id, operationId, initialUsage, world.aiUsage);
       paidRetained=true;
       throw Error('儲存衝突，請重新載入再試。');
     }
@@ -553,7 +511,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           // A different tab can settle an expired pending marker as uncertain
           // before this worker stops. That receipt has no committed paid ledger;
           // retain our measured/unknown attempts once without changing its body.
-          if(receipt.body.operationUncertain&&!paidRetained&&paidAfter){await retainPaidUsage(database(),id,paidBefore,paidAfter);paidRetained=true;}
+          if(receipt.body.operationUncertain&&!paidRetained&&paidAfter){await retainPaidUsage(database(),id,operationId,paidBefore,paidAfter);paidRetained=true;}
           const original=receipt.body.operationEvidence as OperationEvidence|undefined;
           const outcome=receipt.body.operationUncertain?'unknown':original?.outcome||'unknown';
           decisionTrace?.step('journal-confirmed',undefined,{outcome,resultVersion:original?.resultVersion});
@@ -564,17 +522,18 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           return settledReply(receipt);
         }
         if(!receipt||!('pending' in receipt)||receipt.pending!==lease){decisionTrace?.step('journal-unavailable',undefined,{gap:'original-operation-receipt-unavailable'});decisionTrace?.gap('original-operation-receipt-unavailable');await finishTrace(commitRejected?'not-committed':'unknown');return reply({...uncertainResult.body,decisionTraceStatus:traceStatus},uncertainResult.status);}
-        if(!paidRetained&&paidAfter){await retainPaidUsage(database(),id,paidBefore,paidAfter);paidRetained=true;}
+        if(!paidRetained&&paidAfter){await retainPaidUsage(database(),id,operationId,paidBefore,paidAfter);paidRetained=true;}
         decisionTrace?.step('world-not-committed',undefined,{pendingLeaseConfirmed:true});
         result.body.decisionTraceStatus=await finishTrace('not-committed');
-        const failedJournal=JSON.parse(observed!.operations) as Journal;
+        const current=await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
+        const failedJournal=JSON.parse(current!.operations) as Journal;
         failedJournal.results[operationId]=result;
         trimJournal(failedJournal,8,operationId);
         // A failure receipt now contains bounded evidence too. Preserve the byte
         // budget and eviction watermark under the same observed-journal CAS;
         // a late writer cannot discard newer receipts or revive an evicted ID.
         await database().prepare('UPDATE worlds SET operations = ? WHERE owner = ? AND operations = ? AND json_extract(operations, ?) = ?')
-          .bind(JSON.stringify(failedJournal),id,observed!.operations,`$.results."${operationId}".pending`,lease).run();
+          .bind(JSON.stringify(failedJournal),id,current!.operations,`$.results."${operationId}".pending`,lease).run();
         const row = await database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind(id).first<{operations:string}>();
         const settled = row && (JSON.parse(row.operations) as Journal).results[operationId];
         if (settled && 'status' in settled) {
