@@ -1,4 +1,5 @@
 import { pursuitUpdatesSchema, pursuitPrompt, updatePursuits } from './pursuits';
+import { pursuitCandidatesSchema, pursuitSelectionSchema, pursuitSelectionPrompt, parsePursuitSelection } from './pursuit-selection';
 import { normalDecisionInput, finalizeDecisionInput } from './npc-input';
 import { arrangementCueReceipts } from './arrangement-cues';
 import { phonePrompt, phoneForActor, validatePhoneActionReferences } from './phones';
@@ -48,13 +49,15 @@ const actionSchema = { type: 'object', properties: {
   pursuitContext:{type:'string'},
   focusIntentId:{type:['string','null'],maxLength:64},
   pursuitUpdates:pursuitUpdatesSchema,
+  pursuitCandidates:pursuitCandidatesSchema,
+  pursuitSelection:pursuitSelectionSchema,
   memorySelections: memorySelectionSchema,
   memoryOperations: memoryOperationSchema,
   arrangementUpdates: arrangementUpdatesSchema,
   preferenceUpdates: preferenceUpdatesSchema,
   habitCandidates:habitCandidateSchema,
   cognitiveUpdates: cognitiveUpdatesSchema, interpretation: { type: 'string', maxLength: 256 },
-}, required: ['methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
+}, required: ['methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'pursuitCandidates', 'pursuitSelection', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
 
 function decisionWireSchema(allowedTypes:string[], short:Parameters<typeof memorySelectionSchemaFor>[0]) {
   const fields=Object.fromEntries(Object.entries(actionSchema.properties).filter(([key])=>!['type','target','content','purpose'].includes(key)));
@@ -89,7 +92,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(original.contractVersion===npcContractVersion&&(original.action===undefined||original.methodAssessment===undefined))throw Error('本版決策需行動與方法評估。');
   if(data.reconfirmBodyConsequences!==undefined&&typeof data.reconfirmBodyConsequences!=='boolean')throw Error('身體後果重新確認選擇格式無效。');
   if(data.reconfirmBodyConsequences===true&&data.type!=='propose')throw Error('只有新提案可選擇重新確認身體後果。');
-  const work = { pursuitUpdates:data.pursuitUpdates, arrangementUpdates:data.arrangementUpdates, methodAssessment:data.methodAssessment, habitCandidates:data.habitCandidates, preferenceUpdates: data.preferenceUpdates, memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
+  const work = { pursuitCandidates:data.pursuitCandidates,pursuitSelection:data.pursuitSelection,pursuitUpdates:data.pursuitUpdates, arrangementUpdates:data.arrangementUpdates, methodAssessment:data.methodAssessment, habitCandidates:data.habitCandidates, preferenceUpdates: data.preferenceUpdates, memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
   if (memoryBytes(work) > 8192 || (Array.isArray(data.pursuitUpdates)?data.pursuitUpdates.length:0) + (Array.isArray(data.arrangementUpdates)?data.arrangementUpdates.length:0) + (Array.isArray(data.habitCandidates)?data.habitCandidates.length:0) + (Array.isArray(data.memorySelections) ? data.memorySelections.length : 0) + (Array.isArray(data.cognitiveUpdates) ? data.cognitiveUpdates.length : 0) + (Array.isArray(data.memoryOperations) ? data.memoryOperations.length : 0) + (Array.isArray(data.preferenceUpdates) ? data.preferenceUpdates.length : 0) > 4) throw Error();
   const text = (value: unknown, max: number, nonempty = false) => typeof value === 'string' && value.length <= max && (!nonempty || value.trim().length > 0);
   if (!allowedTypes.includes(data.type as string) || !text(data.target, 100) || !text(data.content, 500) || !text(data.mood, 20) ||
@@ -104,6 +107,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   }
   const pursuit=updatePursuits(world,character,data.pursuitUpdates,context.visible);
   const intents=pursuit.intents;
+  const pursuitEvidence=parsePursuitSelection(character,context.visible,data.pursuitCandidates,data.pursuitSelection,data.pursuitUpdates,intents,data.focusIntentId);
   if(data.focusIntentId!==null&&!intents.some(i=>i.id===data.focusIntentId&&i.status==='active'))throw Error('追求焦點不存在。');
   const attention = parseAttention(world, character, data.attentionConditions);
   if (data.interpretation !== undefined && (!text(data.interpretation, 256) || new TextEncoder().encode(data.interpretation as string).length > 256)) throw Error();
@@ -119,7 +123,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(data.type==='phone'){if(data.durationMinutes!==15||timeIntent?.kind==='open-ended')throw Error('手機是15分鐘單次操作。');validatePhoneActionReferences(world,context.visible,action,context.phoneReferences);}
   const methodAssessment=parseMethodAssessment(data.methodAssessment,action,intents,context);
   if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw Error('方法與追求焦點不一致。');
-  return { ...pursuit,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
+  return { ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { observer?: ModelObserver; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const direct=provider==='openai';
@@ -134,8 +138,9 @@ messages[0].content+=' self.noticeOpportunities只是你實際取得的新主觀
 messages[0].content+=' self.arrangementCues是你實際可知條件下想起既有安排的一次考慮機會；不強制行動、完成、意圖置頂或改變活動，可continue、延期或放下。相同條件不每輪提醒。';
 messages[0].content+=' self.lastKnownState 集中呈現本次仍可見的主觀來源、時間及引用；它不是即時世界真相，不把聽聞、推測或錯誤感知改成事實，也不保證受阻原因。supplies 只表示知道該來源，availability=unknown 不表示仍有庫存；指定那份耗盡不代表整個場所有無其他來源，未得知補充保持未知。';
 messages[0].content+=pursuitPrompt;
+messages[0].content+=pursuitSelectionPrompt;
 messages[0].content+=methodAssessmentPrompt+phonePrompt+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
-messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment 的更新 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
+messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
 let recalled = false;
 for (;;) {
 const requestId = crypto.randomUUID();

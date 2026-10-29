@@ -11,6 +11,8 @@ setModelResponder(request=>{
  const data=JSON.parse(request.messages[1].content);calls++;assert.equal(data.contractVersion,'npc-decision.v3');
  if(calls===2)assert.equal(data.self.intents.find(n=>n.id==='owner:quiet').scope,'先讓自己安靜休息一會兒');
  const value={contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:'owner:quiet',pursuitUpdates:calls===1?[{operation:'upsert',id:'owner:quiet',version:0,node:{id:'owner:quiet',content:'照顧自己的精神',context:'',kind:'intent',scope:'先讓自己安靜休息一會兒',satisfaction:null,intensity:'medium',importance:'medium',urgency:'low',parents:[{id:'owner:direction',version:1}]},references:[],reason:'依自己的想法承接休息'}]:[],action:{type:'rest',target:'',content:'安靜休息',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'照顧自己的精神',knownResults:[],choice:'new',method:'安靜休息',change:{kind:'none',detail:''},reason:'仍想照顧自己',selectedAction:{type:'rest',target:''},intentIds:['owner:quiet']},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]};
+ value.pursuitCandidates=calls===1?[{id:'owner:candidate:quiet',kind:'intent',content:'照顧自己的精神',scope:'先讓自己安靜休息一會兒',satisfaction:null,references:[]}]:[];
+ value.pursuitSelection={adoptions:calls===1?[{candidateId:'owner:candidate:quiet',pursuitId:'owner:quiet'}]:[],declinedCandidateIds:[],focus:calls===1?{kind:'candidate',id:'owner:candidate:quiet',version:0}:{kind:'existing',id:'owner:quiet',version:1},reason:'我現在願意照顧自己的精神'};
  return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(value)}}]});
 });
 let browser;
