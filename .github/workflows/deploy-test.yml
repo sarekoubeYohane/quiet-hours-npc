@@ -54,6 +54,8 @@ jobs:
       url: ${{ env.TEST_SITE_URL }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 檢查部署設定（secret 與 variable）
         env:

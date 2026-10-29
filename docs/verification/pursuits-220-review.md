@@ -55,3 +55,9 @@
 原兩位reviewer已對固定功能基準`974629b`完成最終複查：Standards原2項P3、Spec原1項P1及5項P2全部修正，共8項finding，0未解、0新增code smell。產品追求邏輯仍為f2b6c07，最後cache修正只有runner及其測試。初審及中途複查歷史保留於上文，不把新修正覆寫成初審零問題。整合2c06044完整預設套件已1107/1107通過（世界1042、auth32、Workers／migration／#211 checker15、runner18）；production build、typecheck、diff check通過，full lint為0error／4項既有warning。此完整結果屬追加cache修正前版本；最終同head CI另由整合PR記錄。預設suite把21項runner放在獨立第四組，先完成Workers／migration／#211 checker；source-pin反例不與其他來源讀取者並行。
 
 #229仍未執行。2026-10-29只補官方模型文件來源預檢，公開去識別metadata含來源hash，完整原文留私有；Standard短context價目與其他tier條件尚未構成本批已封存適用價格。需要最終review版本／runner指紋、相關人工controller、實際account/tier、有限人類授權與有效憑證後才可另行派送；default仍未paid-ready。
+
+## CI checkout歷史前置修正
+
+整合`efe9804`的GitHub CI世界1042/1042、auth32/32通過；第三組原#211 checker的兩個pinned-material案例因checkout預設depth1缺少`f8319bf45449c0967772215c0d1f91222b0fd211`而失敗。該提交確為origin/main祖先，並非封存材料或產品測試失敗。僅將`npc-world-checks.yml`的world及`deploy-test.yml`的deploy兩個實際跑pnpm test工作之checkout設為`fetch-depth: 0`；check-head、triggers、環境、權限與部署命令不變，未執行或觸發部署。
+
+以本機file來源建立隔離depth1 clone，`is-shallow-repository=true`且原SHA不可讀，原5個#211 checker重現3pass／2fail（687ms）；僅從同一本機來源`fetch --unshallow`，確認shallow=false且原SHA可讀後，原checker5/5通過、0fail（3383ms）。兩次均使用no-network preload，零模型派送；未修改#211材料或測試，不重跑已通過的1042／21項。最終同head CI由整合PR記錄。
