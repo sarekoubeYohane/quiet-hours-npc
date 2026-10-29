@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Fixtures load the temporary CommonJS build. */
-const {fixtureDecision,savedPursuit}=require('./pursuit-fixture.cjs');
+const {fixtureDecision,savedPursuit,expectedUnreferencedPursuits}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -56,7 +56,7 @@ test('return re-evaluates preserved intentions and only known takeover experienc
     assert.deepEqual(returned.intents,queue);
     assert.equal((await advance()).status,200);
     const decisions=perceived.filter(p=>p.self.id==='owner'); assert.equal(decisions.length,1);
-    assert.deepEqual(decisions[0].self.intents,queue);
+    assert.deepEqual(decisions[0].self.intents,expectedUnreferencedPursuits(queue));
     assert.ok(decisions[0].self.memories.some(m=>m.text.includes('只有店主知道的想法二')));
     assert.equal(JSON.stringify(decisions[0]).includes('Cass的私密事件'),false);
   });
@@ -98,7 +98,7 @@ test('return ends an unfinished designated activity and cancels a pending comman
     assert.equal((await advance()).status,200);
     const data=perceived.filter(p=>p.self.id==='owner'); assert.equal(data.length,1);
     assert.equal(JSON.stringify(data[0]).includes('取消的想法'),false);
-    assert.deepEqual(data[0].self.intents,queue);
+    assert.deepEqual(data[0].self.intents,expectedUnreferencedPursuits(queue));
   });
 });
 

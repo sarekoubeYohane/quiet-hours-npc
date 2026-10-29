@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node test fixtures load the temporary CommonJS build. */
-const {fixtureDecision,fixturePursuitDecision}=require('./pursuit-fixture.cjs');
+const {fixtureDecision,fixturePursuitDecision,expectedUnreferencedPursuits}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -41,7 +41,8 @@ test('every NPC receives the shared Playbook and only its own private queue and 
   store.install(world); const prompts = [];
   await withModel((id, data, payload) => {
     prompts.push(payload.messages[0].content);
-    assert.deepEqual(data.self.intents, world.characters.find(c => c.id === id).intents);
+    assert.deepEqual(data.self.intents, expectedUnreferencedPursuits(world.characters.find(c => c.id === id).intents));
+    for(const node of data.self.intents){assert.equal(Object.hasOwn(node,'reason'),false);assert.deepEqual(node.sourceGaps,{formation:0,assessment:0});}
     for (const other of world.characters.filter(c => c.id !== id)) {
       assert.equal(JSON.stringify(data).includes(`${other.id}-private-intent`), false);
       assert.equal(JSON.stringify(data).includes(other.personality), false);
