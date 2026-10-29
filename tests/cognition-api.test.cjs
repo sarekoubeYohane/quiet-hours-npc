@@ -212,10 +212,15 @@ test('an actually known message sender can receive contextual relationship tags 
 });
 test('pressure review candidates remain an actionable subset after the shared input budget selects visible beliefs', async () => {
   const w = worldWithAdjudication(), c = w.characters[0]; c.memories = [];
-  c.shortTerm = Array.from({ length: 20 }, (_, i) => ({ id: `large-recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(875), source: { kind: 'experience' } }));
-  c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `b${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '乙'.repeat(133), conviction: 'leaning', references: [], contradictions: [], reason: '仍有影響' })), relationshipTags: [], trace: [] }; store.install(w); assert.equal((await GET()).status, 200);
+  // Fill legal short/cognition budgets and two saved pursuit contexts so the
+  // complete input must select a strict subset of the 24 beliefs.
+  c.shortTerm = Array.from({ length: 20 }, (_, i) => ({ id: `large-recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(1055), source: { kind: 'experience' } }));
+  Object.assign(c.intents.find(node => node.kind === 'direction'), { content: '方向'.repeat(100), context: '背景'.repeat(80), scope: '範圍'.repeat(100), satisfaction: '足夠'.repeat(80), reason: '理由'.repeat(80) });
+  c.intents.push({ ...c.intents[0], id: 'cass:pressure-background', kind: 'intent' });
+  c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `b${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '乙'.repeat(170), conviction: 'leaning', references: [], contradictions: [], reason: '仍有影響' })), relationshipTags: [], trace: [] }; store.install(w); assert.equal((await GET()).status, 200);
   await withModel(input => input.self.id === 'cass' ? { cognitiveUpdates: [{ kind: 'belief', operation: 'withdraw', id: input.self.cognition.reviewCandidates.at(-1).id, version: 1, references: evidence(input), reason: '從本次展示的有限整理候選放下一個看法' }] } : {}, async (inputs, advance) => {
     assert.equal((await advance()).status, 200); const input = inputs.find(item => item.self.id === 'cass'), cognition = input.self.cognition;
+    assert.ok(Buffer.byteLength(JSON.stringify(input)) <= 88 * 1024); assert.equal(input.self.shortTerm.length, 20);
     assert.ok(cognition.beliefs.length < 24); assert.ok(cognition.reviewCandidates.length > 0 && cognition.reviewCandidates.length <= 8);
     assert.ok(cognition.reviewCandidates.every(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version)));
     assert.equal((await read()).characters[0].cognition.beliefs.length, 23);
