@@ -1,4 +1,5 @@
-import {hasObjectPermission,type WorldObject,type SceneSupply} from './world-effects';
+import type { RoutineBinding } from './routine-world-contract';
+import {hasObjectPermission,EffectValidationError,type WorldObject,type SceneSupply} from './world-effects';
 
 // Pure material and utensil qualifications. Callers retain their own visibility,
 // locality, rights, finite availability and pending-output checks.
@@ -17,4 +18,34 @@ export function emptyRoutineVessel(state:Record<string,string>):boolean {
 }
 export function usableRoutineObject(object:WorldObject,actorId:string,access:'authorized'|'physical'='authorized'):boolean {
  return object.lifecycle==='active'&&object.state.condition!=='broken'&&object.state.available!=='no'&&(access==='physical'||(object.holder===null||object.holder===actorId)&&hasObjectPermission(object,actorId));
+}
+
+// A material role keeps its confirmed source semantics for concrete objects and
+// supplies alike. Legacy food needs its subject because that kind covers meals
+// and ingredients; newer kinds can carry the confirmed source category.
+export type RoutineSourceQualification=Pick<RoutineBinding,'sourceRole'|'sourceSubject'|'kind'>&{background:{kind:string}|null};
+export function finiteSourceScope(source:WorldObject|SceneSupply) {
+ const scope=source.finiteScope;
+ if(scope!==undefined&&(!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).length!==3||scope.version!==1||!['region','location'].includes(scope.coverage)||typeof scope.subject!=='string'||!scope.subject.trim()||new TextEncoder().encode(scope.subject).byteLength>128))throw new EffectValidationError('有限來源範圍資料格式無效。',{reason:'finite_scope_invalid'});
+ return scope;
+}
+// A usable individual portion is not an authority claim about every source of
+// its kind/category. Only explicit coverage can constrain another background.
+export function routineFiniteScopeMatches(source:WorldObject|SceneSupply,binding:RoutineSourceQualification):boolean {
+ if(binding.sourceRole!=='material')return source.kind===binding.background?.kind;
+ const scope=finiteSourceScope(source);
+ return !!scope&&scope.subject===binding.sourceSubject;
+}
+export function routineMaterialSourceMatches(source:WorldObject|SceneSupply,binding:RoutineSourceQualification):boolean {
+ if(binding.sourceRole!=='material')return true;
+ const state='initialState' in source?source.initialState:source.state;
+ const subject=!!binding.sourceSubject&&(source.label.includes(binding.sourceSubject)||['material','category'].some(key=>state[key]===binding.sourceSubject));
+ const kind=binding.background?.kind??binding.kind;
+ return source.kind==='food'||kind==='food'||!kind?subject:source.kind===kind||source.kind===binding.kind;
+}
+
+export function routineOrdinarySourceMatches(source:SceneSupply,binding:RoutineSourceQualification):boolean {
+ const scope=source.background?.scope;
+ return !!source.background&&(!binding.kind||source.kind===binding.kind)&&routineMaterialSourceMatches(source,binding)&&
+  (!scope||scope.version===1&&scope.role===binding.sourceRole&&scope.subject===binding.sourceSubject);
 }

@@ -76,3 +76,35 @@ quantity 為至多 1,000,000 的正整數量與至多 24 字單位；當來源�
 成功編譯且實際綁定有限來源、又有 background 替代選項時，引擎在該場所規則保存 server-only `finiteSourceBindings`：最多 8 個 operation、每項最多 8 個 role。這個約束防止該來源被帶往其他場所後原規則憑背景補回；可操作的新 active 來源仍優先，可正常恢復。它不複製物件歷史，不由讀取補建，不修改舊 receipt，也不把無關場所資料累積進規則。直接來自既有 renewable background 的物件不建立有限約束，因此同杯清洗後再次泡茶仍能重用。
 
 模型 wire 不接受 `finiteSourceBindings`；NPC 輸入不含該內部欄位。新操作的有界 observer evidence 在 result.rules 投影該欄位，與被確認的 background/role 一起解釋為何不能 fallback，仍受既有 evidence 大小與遮蔽限制。材料主題延用既有 schema：legacy food 按 label/material/category 比對確認主題，新 kind 按確認類別匹配，沒有把通用世界種類重新限制為 food。
+
+## #196 日常關聯方向與宣告時序
+
+新 `routine.version=3` 的 `binding.link` 明示 `direction`：`to-role` 為候選物件 `state[key] === 已綁定角色ID`；`from-role` 為先前角色 `state[key] === 候選ID`。舊保存資料缺欄位仍採 `to-role`，不反轉所有關聯。linked 多個匹配視為承接歧義，不任選第一個同名物件。bindings 依序宣告，階段 preconditions 在當階段形成效果之前驗證角色引用。每階段只保存相關 binding state／link key 的前提，續作時重驗必要關聯，不以全物件 revision 或全部 state 作失效依據。舊計畫缺新 guard 不回填歷史。詳見 [本地反例與驗證](../verification/drink-binding-196-2026-10-27.md)。
+
+## #197 舊1 item的部分攝取
+
+沿現有有界形成／分拆能力：當次裁定可明示 `form partition` 將完整舊物轉成同來源的等份整體，再 `separate` 真正要攝取的份額並 `ingest`；保留原來源、權利、全部狀態曝光及容器，轉換不補貨、不自行恢復需求、不推定毫升。只有真正攝取部分取得本次確認的比例恢復；最後耗盡才同步更新容器。讀取舊資料仍不補容量或歷史，也不變更原正整數數量契約。技術 `endedByFormation`／`lifecycle=consumed` 與實際攝取分開；見 [機械路徑與限制](../verification/partial-drink-197-2026-10-27.md)。
+
+## #199 已確認方法的成對表述範圍
+
+v3 的方法身份仍以已確認 `operation`、所屬規則的角色／場所與程序前提為邊界。每個 `methods` 項目可在原本同次裁定中明示至多4組 `aliases: [{content,purpose}]`。純匹配只接受原配對或明示核准的配對，不能將某組 content 與另一組 purpose 作笛卡兒積，也不推測近似句子相同。當前 target 仍由原 bindings 重新綁定，版本、來源與權利持續驗證，沒有保存或重播前次具體成果／骰子。
+
+送出的 schema 要求新候選明示 aliases 陣列（無別名填 `[]`）；舊候選與舊世界未存此欄位時保持原核准範圍，不在讀取時補造同義核准或身體後果。已知方法投影展開核准配對，沿原最多16筆容量；此列表是有界的已知方法提示，仍可提出未列新方法。未知 wording、用途改變與配對矛盾走既有一次例外裁定，observer 的 method wording／purpose 檢查保留未命中原因，不靜默改寫行動。新增別名不能提高32KiB候選或既有輸出、時間、預算上限；過大候選按原契約回復。
+
+此機制只保證**已明示核准範圍**可免費重用，不宣稱程式理解所有自然語言同義句。舊方法未確認的合理新措辭仍需原本正常裁定；沒有獨立分類、匹配或格式修復模型。觀察者操作證據白名單保留成對 aliases，角色只取得已知配對及時間，不取得私有規則 ID 或權威版本。fixture 驗證見 [#199](../verification/method-reuse-199-2026-10-27.md)。
+
+## #200 有依據前提否決的免費重驗
+
+v3 已確認程序本身保存 method 配對、場所／知情範圍及有限的 role／state／access／source guards，無須另建無界拒絕庫。每規則另以 server-only `confirmedSources` 記錄至多32組已在該 operation／role／type 精確確認或成功綁定的來源身份及相關前提指紋；每來源最多4個指紋、每指紋至多4096 UTF-8 bytes，整個來源關聯至多32768 bytes。超過採FIFO釋放並累計 `confirmedSourcesDropped`／`confirmedSourceFactsDropped`，淘汰後缺口回到有界例外，不從 trace 回補。讀取舊規則不補造來源核准。新對象若符合原 guards 可免費成功綁定並記錄；若不符且尚未確認它適用該 scope，應正常確認新 scope，不把舊狹窄條件變成新來源永久禁令。找不到可執行角色時，若仍可在當前世界定位到已知且身份範圍相容的指定物件、具明示 kind／label 的本地來源，或既存供應／場所狀態，就能驗證該方法的可用性前提不成立，回傳尚未開始的 denied。每次都重新檢查當前相關事實；不是保存一次失敗後永久禁止，也不拿整個 world version 使無關變化洗掉障礙。
+
+前提包含存續／餘量、當前可達、許可、必要狀態及已確認份量；明示 alias 配對沿 #199 匹配，實際 target 仍重新綁定。正常可執行 scope 優先於同句已失效 scope；有權且真正的修復、授權、新來源可立即恢復執行。重驗只針對開始前的必要條件，活動已開始的五段結果及部分消耗不改用免費否決取代。
+
+`verified-prerequisite` observer 步驟保存 role、條件類型與至多16個相關身份（超過另記 omittedIds），實際當前值沿原私有 world snapshot 核對；固定規則32／每規則程序8／每程序角色8及原trace容量維持。這個 observer 診斷與 `blockedReason` 均不成為 NPC 的知識來源；NPC仍沿 #194／#157 的合法本人經歷與投影取得結果，未知原因保持未知。
+
+沒有相容來源身份／缺角色宣告、錯誤或歧義 link、kind／label 不符、編譯效果故障、格式、unsupported、逾時與預算停止不構成可驗證世界障礙。沒有已確認程序或只有 explanation 的一般否決，仍是一次正常有界例外裁定，本輪沒有把它們永久記成世界禁令，也不宣稱所有未知提案已能免費否決。舊規則不補造新核准、遺忘不由私有診斷補回，整輪保存／回復／原ID重送沿原責任。
+
+#200 review 修正：身份相同不證明前提未變。指紋只包含本角色相關可達／權利、來源存續／餘量與該 role 明示的必要狀態／份量，忽略權威 revision、無關鍵及其他角色的許可。綁定或首次前提確認記錄當時指紋；同一方法的實際階段提交後，server-only `routineSourceScope` 才保存該方法自己造成的後續前提。預檢在副本上，未來狀態不寫入真正規則；階段／整輪保存失敗共同回復。另一行動把同杯 light→none 之後再變 heavy，不更新舊擦拭方法的指紋，因此 heavy 可重新走新 scope，而 none 的未變重試仍免費。原始模型 phase schema／parser 不接受這個內部 metadata；指紋不列入 NPC 或操作證據白名單的原文，觀察者仍可用相關 world snapshot 與匹配分支核對。
+
+## #206 來源範圍反例
+
+legacy serve 的供應選擇由明確 target／確認 dish 綁定；不得用全區 food 名稱掃描，把一份耗盡成品升格成所有餐點的限制。v3 製作的 material sourceSubject／kind／state 與有限來源角色仍保留，整體普通原料的明確範圍也不可由背景重生。無新持久資料；[API／SQLite／實際輸入及既有畫面驗收](../verification/source-scope-206-2026-10-28.md)。

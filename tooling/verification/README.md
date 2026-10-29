@@ -72,3 +72,5 @@ node tooling/verification/browser-life-integration.mjs
 各 runner 使用真實 WorldApp／世界 API／JSON／SQLite，只有 auth、Worker bindings、模型 transport、時鐘及骰子是可控邊界。`BROWSER_ARTIFACT_DIR` 須為可寫目錄；個別 runner 可採其預設 repository 證據目錄。沒有真實 Key，不連正式世界，不以替身證明真實 NPC 會形成相同行為。本輪使用 Chromium 143、Playwright 及 Noto Sans TC；支援一般已安裝 Chromium，或設定 `CHROMIUM_MODULE` 為 `@sparticuz/chromium`。
 
 需求、長活動、睡眠、喜好、習慣及私有追溯各有獨立 API／SQLite 案例，預設 `pnpm test` 收錄於 `tests/run-activities.mjs`。各基線、參數／容量、相容及回退政策見[自主生活工程契約](../../docs/design/autonomous-life.md)；正式付費驗收另依[有限交接流程](../../docs/verification/autonomous-life-live-runbook.md)取得授權。
+
+#186／#201：`browser-method-reassessment.mjs` 以同一真實 WorldApp／API／SQLite 世界完成15次既有UI推進，串接耗盡餐點的來源評估／免費重試、另一NPC自主回覆、替代食物真正攝取、舊茶→新茶→部分份量及別名免費續用、已知咖啡館有限飲水來源。桌機與390px分析、重載／原ID重送零派送、容量量測輸出 `docs/verification/assets/method-reassessment/`。模型、時鐘為明示fixture，原小時額度／HTTP期限不變；不能用它宣稱正式loop已解。詳見[跨回合報告](../../docs/verification/method-reassessment-201-2026-10-27.md)及[整合契約](../../docs/design/method-reassessment-integration.md)。

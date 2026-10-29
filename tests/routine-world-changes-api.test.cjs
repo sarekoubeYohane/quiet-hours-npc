@@ -76,7 +76,7 @@ test('hidden-only changes do not leak authority revisions or add and remove know
   await advance();s.choose({...s.method('cup-b'),content:'保留一個不可知的內部標記',purpose:'外在處理'});s.reply({status:'accepted',completionMinutes:15,stages:[],branches:null,check:null,routine:null,effects:[{kind:'change-state',version:1,access:'authorized',target:{type:'object',id:'cup-b'},expectedRevision:1,exposure:'hidden',changes:[{key:'內部標記',from:null,value:'secret-v3-condition'}],reason:'observer-only private reason'}]});
   let w=await advance();assert.equal(w.objects[1].revision,2);assert.equal(w.objects[1].state.內部標記,'secret-v3-condition');
   s.choose({type:'rest',target:'',content:'休息',purpose:'',mood:'平靜',durationMinutes:15,intents:[]});await advance();
-  const prompts=s.inputs.filter(input=>input.contractVersion==='npc-decision.v1'),before=prompts[1],after=prompts[2];assert.ok(before.knownMethods.some(method=>method.content===s.method('cup-a').content));assert.deepEqual(after.knownMethods,before.knownMethods);assert.deepEqual(after.objects.find(object=>object.id==='cup-b'),before.objects.find(object=>object.id==='cup-b'));assert.equal(Object.hasOwn(after.objects[1],'revision'),false);assert.equal(JSON.stringify(after).includes('secret-v3-condition'),false);assert.equal(JSON.stringify(after).includes('observer-only private reason'),false);
+  const prompts=s.inputs.filter(input=>input.contractVersion==='npc-decision.v2'),before=prompts[1],after=prompts[2];assert.ok(before.knownMethods.some(method=>method.content===s.method('cup-a').content));assert.deepEqual(after.knownMethods,before.knownMethods);assert.deepEqual(after.objects.find(object=>object.id==='cup-b'),before.objects.find(object=>object.id==='cup-b'));assert.equal(Object.hasOwn(after.objects[1],'revision'),false);assert.equal(JSON.stringify(after).includes('secret-v3-condition'),false);assert.equal(JSON.stringify(after).includes('observer-only private reason'),false);
  }finally{s.restore();}
 });
 test('v3 wire rejects missing required binding fields, trusted metadata, historical identities and revisions before any world change',async()=>{
@@ -90,7 +90,7 @@ test('a v3 method saves environment body and natural effects together and reuses
  try{
   s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});let w=await advance();assert.equal(w.scene.external['cafe-front'].state.污漬,'無');assert.equal(w.characters[0].physical.state.手腕,'輕微酸痛');assert.equal(w.characters[0].physical.exposure.手腕,'subject');assert.equal(w.naturalChanges.length,1);assert.equal(w.naturalChanges[0].status,'pending');
   s.choose({type:'rest',target:'',content:'休息',mood:'平靜',durationMinutes:15,intents:[]});w=await advance();assert.equal(w.scene.external['cafe-front'].state.濕潤,'乾');assert.equal(w.naturalChanges[0].status,'executed');assert.deepEqual(s.counts(),{npc:2,adjudication:1});assert.deepEqual(store.snapshot().naturalChanges,w.naturalChanges);
-  s.reply({status:'denied',completionMinutes:null,stages:[],branches:null,effects:[],check:null,routine:null});s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});w=await advance();assert.deepEqual(s.counts(),{npc:3,adjudication:2});assert.equal(w.routineRules.length,1);assert.equal(w.naturalChanges.length,1);
+  s.reply({status:'denied',completionMinutes:null,stages:[],branches:null,effects:[],check:null,routine:null});s.choose({...proposal('cafe'),content:'擦拭桌面並休息手腕',purpose:'清潔桌面'});w=await advance();assert.deepEqual(s.counts(),{npc:3,adjudication:1},'the same confirmed environment now fails its saved prerequisite without another adjudication');assert.equal(w.routineRules.length,1);assert.equal(w.naturalChanges.length,1);
  }finally{s.restore();}
 });
 test('natural changes to unrelated state do not invalidate a v3 phase but related conditions retain earlier committed progress',async()=>{
@@ -247,4 +247,59 @@ test('physical material binding preserves finite supply ownership while normaliz
  const p=f.program('physical-tea','擅用眼前茶葉製成茶飲','飲用',[f.binding('raw','supply','local',[],{kind:'food',access:'physical',sourceRole:'material',sourceSubject:'茶葉'})],[f.phase(15,[{kind:'physical',version:1,operation:'materialize',supplyId:'$raw',expectedRemaining:0,reason:'自行取用眼前茶葉，沒有取得物主許可。'},forming])]);
  const s=await scenario({objects:[],adjustWorld:w=>{w.supplies=[{id:'owned-leaf',label:'最後一份茶葉',kind:'food',region:'cafe-front',owner:'cass',knownTo:['owner'],allowedTo:['cass'],remaining:1,initialState:{},quantity:{amount:1,unit:'item'},consumable:false}];},adjustReply:()=>f.approval([p],'physical-tea','茶葉')});
  try{s.choose({...proposal('cafe'),content:'擅用眼前茶葉製成茶飲',purpose:'飲用'});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const w=await s.read();assert.equal(w.objects.filter(o=>o.kind==='drink').length,1);assert.equal(w.supplies[0].remaining,0);assert.deepEqual(w.supplies[0].allowedTo,['cass']);assert.equal(w.supplies.length,1);assert.equal(w.objects.find(o=>o.kind==='food').owner,'cass');assert.ok(w.objects.find(o=>o.kind==='food').unpermittedCount>0);assert.deepEqual(store.snapshot().objects,w.objects);}finally{s.restore();}
+});
+
+test('confirmed method alias pairs rebind current objects after SQLite reload without another adjudication',async()=>{
+ const s=await scenario({objects:['cup-a','cup-b','cup-c'].map(cup),adjustReply:reply=>{reply.routine.programs[0].methods[0].aliases=[{content:'洗淨這個杯子',purpose:'清潔杯子'},{content:'清洗杯子',purpose:'清潔'}];return reply;}});
+ try{
+  const advance=async action=>{s.choose(action);const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return s.read();};
+  let w=await advance(proposal('cup-a'));
+  w=await advance({...proposal('cup-b'),content:'洗淨這個杯子',purpose:'清潔杯子'});
+  assert.equal(w.objects.find(o=>o.id==='cup-b').state.茶漬,'無');
+  w=await advance({...proposal('cup-c'),purpose:'清潔'});
+  assert.equal(w.objects.find(o=>o.id==='cup-c').state.茶漬,'無');
+  assert.deepEqual(s.counts(),{npc:3,adjudication:1});
+  const input=s.inputs.filter(x=>x.contractVersion==='npc-decision.v2').at(-1);
+  assert.ok(input.knownMethods.some(method=>method.content==='洗淨這個杯子'&&method.purpose==='清潔杯子'));
+  assert.equal(w.objects.find(o=>o.id==='cup-a').revision,2,'reusing another target must not replay the old effect');
+ }finally{s.restore();}
+});
+
+test('same drink wording with confirmed 飲用 or 喝茶 purposes consumes the new target without another adjudication',async()=>{
+ const f=require('./routine-world-programs-fixture.cjs'),p=f.cafePrograms().find(p=>p.operation==='drink');
+ p.methods=[{content:'喝茶',purpose:'飲用',aliases:[{content:'喝茶',purpose:'喝茶'},{content:'飲用這杯茶',purpose:'解渴'}]}];
+ const objects=['a','b','c'].flatMap(id=>[{...cup('cup-'+id),state:{contents:'tea'}},{id:'tea-'+id,label:'這杯茶',kind:'drink',consumable:true,source:'fixture-tea',revision:1,lifecycle:'active',region:'cafe-front',holder:'owner',owner:'owner',knownTo:['owner'],allowedTo:['owner'],state:{vessel:'cup-'+id,beverage:'tea'}}]);
+ const s=await scenario({objects,adjustWorld:w=>{w.characters[0].routineCapabilities=['drink'];},adjustReply:()=>f.approval([p],'drink','茶')});
+ try{
+  const advance=async(target,purpose,content='喝茶')=>{s.choose({...proposal(target),content,purpose});const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return s.read();};
+  await advance('cup-a','飲用');let w=await advance('cup-b','喝茶');
+  assert.equal(w.objects.find(o=>o.id==='tea-b').lifecycle,'consumed');assert.equal(w.objects.find(o=>o.id==='cup-b').state.contents,'empty');
+  assert.deepEqual(s.counts(),{npc:2,adjudication:1});
+  const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};
+  s.choose({...proposal('cup-c'),content:'飲用這杯茶',purpose:'解渴'});assert.equal((await s.post(op)).status,200);const saved=await s.read();assert.equal(saved.objects.find(o=>o.id==='tea-c').lifecycle,'consumed');assert.equal((await s.post(op)).status,200);assert.deepEqual(s.counts(),{npc:3,adjudication:1});assert.deepEqual((await s.read()).objects,saved.objects);
+  assert.equal(s.inputs.filter(x=>x.contractVersion==='npc-decision.v2').at(-1).objects.some(o=>o.id==='tea-a'),false);
+ }finally{s.restore();}
+});
+
+test('alias purpose pairs do not cross-expand and old methods do not gain new scope on read',async()=>{
+ for(const aliases of [undefined,[{content:'洗淨這個杯子',purpose:'清潔杯子'}]]){
+  const s=await scenario({adjustReply:reply=>{if(aliases)reply.routine.programs[0].methods[0].aliases=aliases;return reply;}});
+  try{
+   const advance=async()=>{const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return s.read();};
+   await advance();s.choose({...proposal('cup-b'),purpose:aliases?'清潔杯子':'清潔'});s.reply({status:'denied',effects:[],check:null});
+   const w=await advance();assert.equal(w.objects.find(o=>o.id==='cup-b').state.茶漬,'有');assert.deepEqual(s.counts(),{npc:2,adjudication:2});
+   assert.equal(w.routineRules[0].programs[0].methods[0].aliases===undefined,!aliases);
+   s.choose({...proposal('cup-b'),purpose:'泡茶'});const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await s.post(op)).status,200);assert.equal((await s.read()).objects.find(o=>o.id==='cup-b').state.茶漬,'有');assert.deepEqual(s.counts(),{npc:3,adjudication:3});
+   const detail=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json();
+   assert.ok(detail.decisionTrace.steps.some(step=>step.kind==='rule-selection'&&step.data.check==='method'&&step.data.wording===true&&step.data.purpose===false),'contradictory purpose must retain a method mismatch in observer trace');
+   assert.ok(s.inputs.filter(input=>input.contractVersion==='npc-decision.v2').every(input=>!JSON.stringify(input).includes('rule-selection')));
+  }finally{s.restore();}
+ }
+});
+
+test('invalid or oversized alias scopes roll back instead of broadening a known method',async()=>{
+ for(const aliases of [[{content:'洗杯',purpose:''}],Array.from({length:5},()=>({content:'洗杯',purpose:'清洗'})),[{content:'洗杯',purpose:'清洗',target:'cup-b'}]]){
+  const s=await scenario({adjustReply:reply=>{reply.routine.programs[0].methods[0].aliases=aliases;return reply;}});
+  try{const before=await s.read(),r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,502);const w=await s.read();assert.deepEqual(w.objects,before.objects);assert.equal(w.routineRules,undefined);assert.deepEqual(s.counts(),{npc:1,adjudication:1});}finally{s.restore();}
+ }
 });

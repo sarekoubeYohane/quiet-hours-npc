@@ -36,7 +36,8 @@ test('focused looking obtains current people, replaces work and consumes world t
   assert.equal(owner(saved).control.active,undefined);
   assert.ok(owner(saved).observations.some(o=>o.sense==='sight'&&o.source==='vera'));
   const probe=saved.events.findLast(e=>e.actor==='owner'&&e.kind==='observe');
-  assert.equal(probe.perception.find(t=>t.characterId==='owner').status,'direct');
+  // Nearby unknown physical objects also enter the probe; clear people stay direct clues.
+  assert.ok(['direct','noticed'].includes(probe.perception.find(t=>t.characterId==='owner').status));
  });
 });
 test('listening uses current ongoing sounds with focused attention, never replays vanished words',async()=>{

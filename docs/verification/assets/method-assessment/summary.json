@@ -1,0 +1,14 @@
+{
+  "fixture": true,
+  "npc": 2,
+  "judgments": 1,
+  "checks": {
+    "actualUI": true,
+    "sqliteReload": true,
+    "actualNextMessages": true,
+    "sourceRef": true,
+    "sameIdZeroDispatch": true
+  },
+  "inputBytes": 4309,
+  "assessmentBytes": 375
+}

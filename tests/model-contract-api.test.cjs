@@ -12,7 +12,7 @@ test('system contract version reaches filtered adapter input and incompatible ou
  global.fetch=async(_url,init)=>{const data=JSON.parse(init.body);inputs.push(JSON.parse(data.messages[1].content));return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({...candidate,contractVersion:'npc-decision.v99'})}}]});};
  try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'})); const before=await read();
  const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));assert.equal(response.status,502);
- assert.equal(inputs[0].contractVersion,'npc-decision.v1');assert.equal(Object.hasOwn(inputs[0],'characters'),false);
+ assert.equal(inputs[0].contractVersion,'npc-decision.v2');assert.equal(Object.hasOwn(inputs[0],'characters'),false);
  const after=await read();assert.deepEqual(after.characters,before.characters);assert.equal(after.aiUsage.totalInputTokens,10);
  }finally{global.fetch=original;}
 });
@@ -48,7 +48,7 @@ test('adjudication cannot inject dice or world effects into the program action a
  assert.equal(response.status,502);const after=await read();assert.deepEqual(after.characters,before.characters);assert.deepEqual(after.events,before.events);assert.equal(after.aiUsage.totalCalls,1);assert.equal(after.aiUsage.totalInputTokens,7);
  }finally{global.fetch=original;}
 });
-test('current contract replies and legacy versionless replies both save through the world API',async()=>{
+test('legacy v1 contract replies and versionless replies both save through the world API',async()=>{
  for(const version of [undefined,'npc-decision.v1']){
   store.install(worldWithAdjudication());const original=global.fetch;
   global.fetch=async()=>Response.json({usage:{prompt_tokens:7,completion_tokens:2},choices:[{message:{content:JSON.stringify({...candidate,...(version?{contractVersion:version}:{})})}}]});

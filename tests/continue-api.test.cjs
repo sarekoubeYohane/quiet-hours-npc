@@ -119,7 +119,7 @@ for (const scenario of ['rule mode', 'other model', 'expired activity', 'no acti
     let calls = 0;
     await model((_data, payload) => {
       calls++;
-      const allowed = payload.response_format.json_schema.schema.properties.type.enum;
+      const allowed = payload.response_format.json_schema.schema.properties.action.anyOf.flatMap(branch=>branch.properties.type.enum);
       return action(allowed.includes('continue') ? 'continue' : 'rest');
     }, async () => {
       const response = await advance();

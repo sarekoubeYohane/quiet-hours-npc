@@ -4,7 +4,7 @@ import { validateCognition, projectRelationships, relationshipsProjection, type 
 import type { Character } from './world';
 import type { Observation } from './perception';
 
-export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
+export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; object?: string; supply?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
 export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; observationSequence?: number; consumed?: boolean; controlled?: boolean };
 export type MemoryRef = { id: string; version: number };
 export type RememberedSource = MemoryRef & { source: MemorySource };
@@ -25,7 +25,7 @@ function validRefs(value: unknown): value is MemoryRef[] {
   return Array.isArray(value) && value.length <= 8 && value.every(validRef) && new Set(value.map(item => `${item.id}:${item.version}`)).size === value.length;
 }
 function observationSource(observation: Observation): MemorySource {
-  return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
+  return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.objectId ? { object: observation.objectId } : {}), ...(observation.supplyId ? { supply: observation.supplyId } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
 }
 function validateShort(item: ShortMemory) {
   if (textBytes(item.text) > 4096) throw new MemoryValidationError('短期經歷超過 4096 bytes；保留原資料，未截斷文字。');
@@ -150,7 +150,7 @@ export function memoryProjection(c: Character) {
   return (c.shortTerm || []).map(({ id, version, time, text, source, controlled }) => ({ id, version, time, text, source, ...(controlled ? { controlled: true } : {}) }));
 }
 function sourceProjection(source: MemorySource): MemorySource {
-  return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
+  return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.object ? { object: source.object } : {}), ...(source.supply ? { supply: source.supply } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
 }
 function rememberedSources(item: LongMemory): RememberedSource[] {
   return item.rememberedSources ?? [{ id: item.id, version: item.version, source: item.source }];
@@ -228,7 +228,37 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
   validateMemoryState(candidate);
   return { shortTerm: candidate.shortTerm, longTerm: candidate.longTerm, memoryTrace: candidate.memoryTrace };
 }
-export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arrangement[];capacity:number}; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T {
+export type LastKnownEntry = { reference: MemoryRef & { kind: 'short' | 'long' }; time: number; text?: string; textLocation?: 'self.longTerm'; source: MemorySource };
+export type LastKnownState = { entries: LastKnownEntry[]; capacity: number; omitted: number; gap: string };
+// A view of accounts already present in this request, never an independent
+// store. In particular no World, trace or forgotten memory is available here.
+function lastKnownState(short: ReturnType<typeof memoryProjection>, long: MemoryProjection, topics: string[], byteLimit: number, recalled: MemoryProjection = []): LastKnownState {
+  const state: LastKnownState = { entries: [], capacity: 8, omitted: 0, gap: '僅整理本次可見的主觀來源；未列出、已忘或未得知的狀態與後續補充仍未知，所知狀態不證明受阻原因。' };
+  const accounts = [...short.map(item => ({ ...item, kind: 'short' as const })), ...[...recalled, ...long].map(item => ({ ...item, kind: 'long' as const }))];
+  const latest = [...accounts].sort((a,b) => b.time-a.time).slice(0,4).map(item=>item.text).join('\n');
+  // Reconnect explicit identities retained in accounts even after their object
+  // leaves the active list. These tokens only rank already-visible sources.
+  for (const item of accounts) for (const match of item.text.matchAll(/\[([^\[\]\s]{1,128})\]/g)) {
+    const id=match[1];
+    if (latest.includes(' '+id+' ') || latest.includes('['+id+']')) topics.push(id);
+  }
+  const requested = (item: {id:string;version:number}) => recalled.some(ref=>ref.id===item.id&&ref.version===item.version);
+  const relevant = (text: string) => topics.some(topic => topic.length > 1 && text.includes(topic));
+  // Exact known identities/labels are relevance hints, not semantic matching or
+  // truth correction. Keep competing subjective accounts instead of collapsing
+  // them into one authoritative assertion.
+  accounts.sort((a, b) => Number(requested(b)) - Number(requested(a)) || Number(relevant(b.text)) - Number(relevant(a.text)) || b.time - a.time);
+  for (const item of accounts) {
+    if (state.entries.length === state.capacity) break;
+    const entry = { reference: { kind: item.kind, id: item.id, version: item.version }, time: item.time, ...(requested(item) ? {textLocation: 'self.longTerm' as const} : {text: item.text}), source: item.source };
+    state.entries.push(entry);
+    if (memoryBytes(state) > byteLimit) state.entries.pop();
+  }
+  state.omitted = accounts.length - state.entries.length;
+  return state;
+}
+export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState; plan?: {action: {target?: string}}; intents?: {content:string;context:string}[]; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T & { self: { arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState } } {
+  input.self.lastKnownState = undefined;
   if(input.self.arrangements)input.self.arrangements.items=[];
   const candidates = input.self.longTerm || [];
   const tendencies = input.learnedHabits || [];
@@ -261,7 +291,7 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ learnedHabits:input.learnedHabits, arrangements:input.self.arrangements, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const payload = () => recalledMemories ? { input, recalledMemories } : ({ arrangements:input.self.arrangements, lastKnownState:input.self.lastKnownState, learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
   if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
@@ -285,6 +315,12 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
   if(input.self.preferences) for(const preference of preferences){input.self.preferences.items.push(preference);if(memoryBytes(payload())>88*1024)input.self.preferences.items.pop();}
   if(input.learnedHabits) for(const tendency of tendencies){input.learnedHabits.push(tendency);if(memoryBytes(payload())>88*1024)input.learnedHabits.pop();}
   if(input.self.arrangements&&character)for(const item of arrangementsForDecision(character,{shortTerm:character.shortTerm?.filter(m=>(input.self.shortTerm as MemoryRef[]).some(r=>r.id===m.id&&r.version===m.version)),longTerm:character.longTerm?.filter(m=>input.self.longTerm?.some(r=>r.id===m.id&&r.version===m.version))}).items){input.self.arrangements.items.push(item);if(memoryBytes(payload())>88*1024)input.self.arrangements.items.pop();}
+  const topicWords = [input.self.plan?.action.target || '', ...(input.self.intents || []).flatMap(intent => [intent.content, intent.context])];
+  const topics = topicWords.filter(Boolean);
+  const available = Math.min(8192, 88 * 1024 - memoryBytes(payload()) - 64);
+  // Leave canonical sources intact under capacity pressure; the view is a
+  // duplicate that may be omitted, and explicitly records its source gap.
+  if (available >= 512) input.self.lastKnownState = lastKnownState(input.self.shortTerm as ReturnType<typeof memoryProjection>, input.self.longTerm, topics, available, (recalledMemories as { memories?: MemoryProjection } | undefined)?.memories || []);
   return input;
 }
 export function validateMemoryState(c: Character) {
@@ -292,14 +328,14 @@ export function validateMemoryState(c: Character) {
   validateCognition(c);
   validatePreferences(c);
   const boundedId = (value: unknown) => typeof value === 'string' && value.length > 0 && textBytes(value) <= 128;
-  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
+  const validSource = (source: MemorySource) => source && typeof source === 'object' && !Array.isArray(source) && Object.keys(source).every(key => ['kind', 'person', 'object', 'supply', 'region', 'sense', 'clarity'].includes(key)) && ['legacy-unclassified', 'experience', 'observation'].includes(source.kind) && (source.person === undefined || boundedId(source.person)) && (source.object === undefined || boundedId(source.object)) && (source.supply === undefined || boundedId(source.supply)) && (source.region === undefined || boundedId(source.region)) && (source.sense === undefined || ['sight', 'hearing', 'touch'].includes(source.sense)) && (source.clarity === undefined || ['clear', 'vague'].includes(source.clarity));
   if(c.observationSequence!==undefined&&(!Number.isSafeInteger(c.observationSequence)||c.observationSequence<0))throw new MemoryValidationError('感知順序高水位無效');
   const shortIds = new Set<string>(),observationSequences=new Set<number>();
   for (const item of c.shortTerm || []) {
     if (shortIds.has(item.id)) throw new MemoryValidationError('短期記憶身份重複');
     shortIds.add(item.id);
     if(item.observationSequence!==undefined){if(!item.observation||!Number.isSafeInteger(item.observationSequence)||item.observationSequence<1||observationSequences.has(item.observationSequence)||c.observationSequence!==undefined&&item.observationSequence>c.observationSequence)throw new MemoryValidationError('感知順序無效或重複');observationSequences.add(item.observationSequence);}
-    if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
+    if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.objectId !== item.source.object || item.observation.supplyId !== item.source.supply || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
     if (!boundedId(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || (item.eventId && !boundedId(item.eventId))) throw new MemoryValidationError('短期記憶身份或來源無效');
     validateShort(item);
   }

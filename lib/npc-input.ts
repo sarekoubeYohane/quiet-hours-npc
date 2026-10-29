@@ -13,7 +13,7 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
  const perceived=perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined});
  perceived.self.cognition=cognitionForDecision(c,perceived.contacts,perceived.visiblePeople);
  perceived.self.relationships=relationshipsProjection(perceived.self.cognition.relationshipTags);
- const input=budgetMemoryInput({contractVersion:'npc-decision.v1',...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
+ const input=budgetMemoryInput({contractVersion:'npc-decision.v2',...perceived,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
  return finalizeDecisionInput(w,c,input);
 }
 
