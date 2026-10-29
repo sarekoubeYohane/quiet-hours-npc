@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "worldTurn": 3,
+  "actualFixtureDispatches": 3,
+  "realPaidDispatches": 0,
+  "sharedNodes": 1,
+  "actualDesignResults": 1,
+  "reloadedAnalysis": true,
+  "reloadedProfile": true,
+  "continuedOriginalStartedAt": 1260,
+  "continuedOriginalUntil": 1320,
+  "nextActualInputBytes": 7711
+}

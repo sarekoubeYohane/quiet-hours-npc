@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API transport fixture. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${n}.cjs`));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
@@ -11,8 +12,8 @@ test('GET leaves legacy phone baseline absent; first committed advance provision
  const id=w.phones.devices[0].objectId;w.objects=w.objects.filter(o=>o.id!==id);store.install(w);
  assert.equal((await POST(req({operation:'advance',minutes:15}))).status,200);assert.equal((await read()).objects.some(o=>o.id===id),false);
 });
-async function withModel(choose,run){const old=global.fetch,inputs=[];global.fetch=async(_u,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)})}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:100,tokens:1000000}}));await run(inputs,b=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,...b})));}finally{global.fetch=old;}}
-const op=(input,p)=>({type:'phone',target:input.phones.find(d=>d.owner===input.self.id)?.objectId,content:JSON.stringify({collection:'memos',...p})});
+async function withModel(choose,run){const old=global.fetch,inputs=[];global.fetch=async(_u,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)}))}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:100,tokens:1000000}}));await run(inputs,b=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,...b})));}finally{global.fetch=old;}}
+const op=(input,p)=>({type:'phone',target:input.phones.find(d=>d.owner===input.self.id)?.objectId,content:JSON.stringify(fixtureDecision(input,{collection:'memos',...p}))});
 test('normal phone decisions create, list, read, revise and remove exact private memo text without extra calls',async()=>{
  const w=seedWorld();w.adjudication={provider:'openai',model:'gpt-6-luna'};store.install(w);let stage=0;
  await withModel(input=>input.self.id!=='cass'?{}:op(input,[{operation:'create',id:'note',version:0,text:'我想晚點談，不代表已答應。'},{operation:'list'},{operation:'read',id:'note',version:1},{operation:'update',id:'note',version:1,text:'新的原文，舊想法已修改。'},{operation:'delete',id:'note',version:2}][stage]),async(inputs,advance)=>{
@@ -24,7 +25,7 @@ test('only actual finite displayed content can be read by a nearby third person;
  const w=seedWorld();w.adjudication={provider:'openai',model:'gpt-6-luna'};w.characters.forEach(c=>{c.location='kris-home';c.region='kris-living';});store.install(w);let stage=0;
  await withModel(input=>{
   if(input.self.id==='cass')return stage===0?op(input,{operation:'create',id:'private',version:0,text:'這句只留給真正讀者。'}):stage===1?op(input,{operation:'display',id:'private',version:1}):{};
-  if(input.self.id==='kris'&&stage>=2){const device=input.phones.find(d=>d.owner==='cass');return {type:'phone',target:device.objectId,content:JSON.stringify({collection:'memos',operation:stage===2?'list':'read',...(stage===3?{id:'private',version:1}:{})})};}
+  if(input.self.id==='kris'&&stage>=2){const device=input.phones.find(d=>d.owner==='cass');return {type:'phone',target:device.objectId,content:JSON.stringify(fixtureDecision(input,{collection:'memos',operation:stage===2?'list':'read',...(stage===3?{id:'private',version:1}:{})}))};}
   return {};
  },async(inputs,advance)=>{
   for(stage=0;stage<4;stage++)assert.equal((await advance()).status,200);

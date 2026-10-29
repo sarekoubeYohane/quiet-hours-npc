@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- External transport fixture shared by API and browser. */
+const {fixturePursuitDecision}=require('../pursuit-fixture.cjs');
 const assert=require('node:assert/strict');
 const action=(type='reflect',extra={})=>({type,target:'',content:'依自己所知重新考慮生活',mood:'平靜',durationMinutes:15,timeIntent:{kind:['reflect','rest','continue'].includes(type)?'open-ended':'completion',maxMinutes:null},intents:[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[],interpretation:'',...extra});
 const intent=(id,content)=>({id,content,intensity:'medium',importance:'medium',urgency:'low',context:'由我自行決定順序'});
@@ -11,9 +12,9 @@ function transport(){let choose=()=>action(),npc=0,adjudication=0;const inputs=[
  const input=JSON.parse(request.messages[1].content);inputs.push(input);requests.push(request);let value;
  if(input.contractVersion==='world-adjudication.v1'){adjudication++;value={status:'accepted',completionMinutes:480,check:null,effects:[],stages:[],routine:null,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}};}
  else {npc++;value=choose(input);}
- return Response.json({usage:{prompt_tokens:20,completion_tokens:5},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:20,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(JSON.parse(request.messages[1].content),value))}}]});
  }};}
-const phoneAction=(input,command)=>action('phone',{target:input.phones.find(p=>p.owner===input.self.id).objectId,content:JSON.stringify({collection:'calendar',...command})});
+const phoneAction=(input,command)=>action('phone',{target:input.phones.find(p=>p.owner===input.self.id).objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'calendar',...command}))});
 const actor=w=>w.characters.find(c=>c.id==='owner');
 const device=w=>w.phones.devices.find(d=>w.objects.find(o=>o.id===d.objectId).owner==='owner');
 async function run(s,checkpoint=async()=>{}){

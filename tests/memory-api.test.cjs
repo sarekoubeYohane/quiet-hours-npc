@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- API fixtures. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
@@ -14,7 +15,7 @@ test('legacy subjective experiences share bounded storage and stable identity wi
  const old=worldWithAdjudication();delete old.characters[0].shortTerm;delete old.characters[0].longTerm;old.characters[0].memories=c.memories;store.install(old);
  const legacy=(await read()).characters[0].shortTerm;assert.equal(legacy.length,2);assert.notEqual(legacy[0].id,legacy[1].id);assert.equal(legacy[0].source.kind,'legacy-unclassified');
 });
-async function withModel(run,choose=()=>({})){const old=global.fetch,inputs=[];global.fetch=async(_,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[],attentionConditions:[],memorySelections:[],...choose(input)})}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs,body=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,limits:{calls:120,tokens:500000},...body})));}finally{global.fetch=old;}}
+async function withModel(run,choose=()=>({})){const old=global.fetch,inputs=[];global.fetch=async(_,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:90,intents:[],attentionConditions:[],memorySelections:[],...choose(input)}))}}]});};try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await run(inputs,body=>POST(req({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,limits:{calls:120,tokens:500000},...body})));}finally{global.fetch=old;}}
 test('one decision selects subjective memory with stable versions and operation replay without extra calls',async()=>{
  const w=worldWithAdjudication();store.install(w);
  await withModel(async(inputs,advance)=>{

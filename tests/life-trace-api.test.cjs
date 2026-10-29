@@ -1,16 +1,17 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const id=()=>Date.now()+':'+crypto.randomUUID(),reply=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const id=()=>Date.now()+':'+crypto.randomUUID(),reply=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const common={target:'',content:'安靜片刻',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}};
 const read=async operationId=>(await(await GET(operationId?new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(operationId)):undefined)).json());
 test('private dispatch, result and actor-feedback preserve actual life state and sources at their own saved boundaries',async()=>{
  const world=seedWorld();world.contextId='life-trace';world.characters=world.characters.filter(c=>c.id==='owner');world.adjudication={provider:'openai',model:'fixture-judge'};store.install(world);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const original=global.fetch,inputs=[];let stage=0,pair,calls=0;
- global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return reply({status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:120,resumable:true,activityIdentity:{version:1,key:'quiet-reading',label:'安靜閱讀'},bodyActivity:{version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0}});
-  inputs.push(input);let value=stage===0?{...common,type:'work',target:'tidy',content:'整理桌面'}:stage===1?{...common,type:'propose',target:'cafe',content:'在角落讀書',purpose:'安靜閱讀'}:stage===2?{...common,type:'pause',preferenceUpdates:[{operation:'upsert',id:'quiet-reading',version:0,topic:'閱讀',context:'收拾之後',text:'我喜歡安靜讀書。',references:[{kind:'short',...pair.action}],reason:'這次閱讀讓我想保留這個偏好。'}],habitCandidates:[pair]}:{...common,type:'rest',timeIntent:{kind:'open-ended',maxMinutes:null}};return reply(value);
+ global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1')return reply({status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:120,resumable:true,activityIdentity:{version:1,key:'quiet-reading',label:'安靜閱讀'},bodyActivity:{version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0}},JSON.parse(JSON.parse(init.body).messages[1].content));
+  inputs.push(input);let value=stage===0?{...common,type:'work',target:'tidy',content:'整理桌面'}:stage===1?{...common,type:'propose',target:'cafe',content:'在角落讀書',purpose:'安靜閱讀'}:stage===2?{...common,type:'pause',preferenceUpdates:[{operation:'upsert',id:'quiet-reading',version:0,topic:'閱讀',context:'收拾之後',text:'我喜歡安靜讀書。',references:[{kind:'short',...pair.action}],reason:'這次閱讀讓我想保留這個偏好。'}],habitCandidates:[pair]}:{...common,type:'rest',timeIntent:{kind:'open-ended',maxMinutes:null}};return reply(value,JSON.parse(JSON.parse(init.body).messages[1].content));
  };
  try{
   const advance=async()=>{const operationId=id(),r=await post({operation:'advance',minutes:15,operationId});assert.equal(r.status,200,await r.clone().text());return {operationId,data:await r.json()};};

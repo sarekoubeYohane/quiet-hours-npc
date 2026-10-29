@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {scenario,proposal,vessel}=require('./routine-program-fixture.cjs');
@@ -43,7 +44,7 @@ test('a consumed specified meal only retains the actor own sourced observation, 
   }});
   try{
    await advance(s);s.choose(rest);await advance(s);const input=s.inputs.filter(entry=>entry.input.self)[1].input,text=JSON.stringify(input);
-   assert.equal(text.includes('我看見 Cass 吃完指定餐點'),known);assert.doesNotMatch(text,/SECRET-MODEL-CLAIM|SECRET-MEMBER|allowedTo|remaining/);
+   assert.equal(text.includes('我看見 Cass 吃完指定餐點'),known);assert.doesNotMatch(text,/SECRET-MODEL-CLAIM|SECRET-MEMBER|allowedTo/);assert.ok(input.supplies.every(supply=>!Object.hasOwn(supply,'remaining')),'world stock stays private; pursuit capacity remaining is independent');
    const result=feedback(input).at(-1);assert.match(result.text,/meal/);assert.match(result.text,/沒有新增/);
    if(known){const observation=input.self.shortTerm.find(m=>m.id==='prior-observation');assert.equal(observation.source.kind,'observation');assert.equal(observation.source.person,'cass');}
    assert.equal((await s.read()).objects.find(o=>o.id==='meal').lifecycle,'consumed');
@@ -78,7 +79,7 @@ test('free routine reuse retains known broken utensil context while private supp
   }});
   try{
    await advance(s);s.choose(rest);await advance(s);const input=s.inputs.filter(entry=>entry.input.self)[1].input;
-   assert.equal(s.counts().judgments,0);assert.match(input.self.activity,/器具.*損壞/);assert.ok(feedback(input).at(-1).text.includes('cup-a'));assert.doesNotMatch(JSON.stringify(input),/private-owner|private-list|材料已用完|remaining|allowedTo/);
+   assert.equal(s.counts().judgments,0);assert.match(input.self.activity,/器具.*損壞/);assert.ok(feedback(input).at(-1).text.includes('cup-a'));assert.doesNotMatch(JSON.stringify(input),/private-owner|private-list|材料已用完|allowedTo/);assert.ok(input.supplies.every(supply=>!Object.hasOwn(supply,'remaining')));
    values.push({activity:input.self.activity,feedback:feedback(input).map(m=>({time:m.time,text:m.text}))});
   }finally{s.restore();}
  }
@@ -120,7 +121,7 @@ test('actor feedback does not disclose the private proposal to another present N
  const s=await scenario({reply:{status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'cup-a',expectedRevision:1,key:'contents',value:'water'}],stages:[],check:null},decision:{...proposal,target:'cup-a',content:'PRIVATE-PROPOSAL'},modify:w=>{
   const peer=structuredClone(w.characters[0]);peer.id='peer';peer.name='旁人';peer.memories=[];peer.shortTerm=[];peer.longTerm=[];peer.relationships={};delete peer.control;w.characters.push(peer);
  }}),transport=global.fetch;
- global.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self?.id==='peer'){s.inputs.push({input,request:JSON.parse(init.body)});return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(rest)}}]});}return transport(url,init);};
+ global.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.self?.id==='peer'){s.inputs.push({input,request:JSON.parse(init.body)});return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),rest))}}]});}return transport(url,init);};
  try{await advance(s);const peer=s.inputs.find(e=>e.input.self?.id==='peer').input;assert.doesNotMatch(JSON.stringify(peer),/PRIVATE-PROPOSAL|行動回饋/);const w=await s.read();assert.ok(w.characters.find(c=>c.id==='owner').shortTerm.some(m=>m.text.includes('PRIVATE-PROPOSAL')));}finally{s.restore();}
 });
 
@@ -128,7 +129,7 @@ test('the next ordinary decision can wait, rest, ask, refuse or choose another m
  const intent={id:'independent',content:'由我決定如何生活',intensity:'high',importance:'medium',urgency:'low',context:'仍保留原本方向'};
  for(const next of [{...rest,content:'等待一會兒'},{...rest},{...rest,type:'say',target:'observer',content:'可以幫我找別的工具嗎？'},{...rest,type:'say',target:'observer',content:'我不想做這件事'},{...proposal,target:'cup-a',content:'換一種方法處理杯子',purpose:'整理'}]){
   const s=await scenario({reply:denied,decision:{...proposal,target:'cup-a',intents:[intent]}});
-  try{await advance(s);s.choose({...next,intents:[intent]});await advance(s);const input=s.inputs.filter(e=>e.input.self).at(-1).input;assert.deepEqual(input.self.intents,[intent]);assert.ok(feedback(input).length);assert.deepEqual((await s.read()).characters[0].intents,[intent]);if(next.type==='propose'){const judgment=s.inputs.filter(e=>e.input.contractVersion==='world-adjudication.v1').at(-1).input;assert.equal(judgment.action.content,next.content);}}
+  try{await advance(s);const retained=(await s.read()).characters[0].intents;assert.ok(retained.some(node=>node.id==='owner:independent'&&node.scope===intent.content));assert.ok(retained.some(node=>node.kind==='direction'));s.choose({...next,intents:[intent]});await advance(s);const input=s.inputs.filter(e=>e.input.self).at(-1).input;assert.deepEqual(input.self.intents,retained);assert.ok(feedback(input).length);assert.deepEqual((await s.read()).characters[0].intents,retained);if(next.type==='propose'){const judgment=s.inputs.filter(e=>e.input.contractVersion==='world-adjudication.v1').at(-1).input;assert.equal(judgment.action.content,next.content);}}
   finally{s.restore();}
  }
 });

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -189,9 +190,9 @@ test('the NPC decision input sees the experienced outcome but not the private ro
   let payload;
   const fakeFetch = async (url, options) => {
     payload = JSON.parse(options.body);
-    return Response.json({ choices: [{ message: { content: JSON.stringify({
+    return Response.json({ choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(options.body).messages[1].content),{
       type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: []
-    }) } }] });
+    })) } }] });
   };
   await aiDecision(world, owner, 'mock-key', 'gpt-6-luna', 'openai', fakeFetch);
   const view = JSON.parse(payload.messages[1].content);

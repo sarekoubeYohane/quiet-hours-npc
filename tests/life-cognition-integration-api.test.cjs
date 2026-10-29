@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API fixtures, only model transport and RNG are controlled. */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store');
@@ -12,11 +13,11 @@ async function setup(initial=seedWorld()){
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});await post({operation:'set-budget',limits:{calls:120,tokens:500000}});
  const original=global.fetch,inputs=[],bodies=[];let choose=()=>action();
- global.fetch=async(_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);bodies.push(body);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(choose(input))}}]});};
+ global.fetch=async(_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);bodies.push(body);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),choose(input)))}}]});};
  return {post,inputs,bodies,choose:fn=>{choose=fn;},restore:()=>{global.fetch=original;},advance:async(body={})=>{const response=await post({operation:'advance',...body});assert.equal(response.status,200,await response.clone().text());return read();}};
 }
 const memoryPayload=input=>({preferences:input.self.preferences,cognition:input.self.cognition,shortTerm:input.self.shortTerm,longTerm:input.self.longTerm,memoryReview:input.self.memoryReview,memories:input.self.memories,observations:input.self.observations,relationships:input.self.relationships,knownControlExperiences:input.knownControlExperiences,pendingInterventions:input.pendingInterventions,learnedHabits:input.learnedHabits});
-async function performedPair(s){s.choose(()=>action({type:'work',target:'tidy',content:'整理桌面'}));await s.advance();s.choose(()=>action());const w=await s.advance(),evidence=actor(w).habitEvidence;return{trigger:evidence.at(-2).memory,action:evidence.at(-1).memory};}
+async function performedPair(s){s.choose(()=>action({type:'work',target:'tidy',content:'整理桌面'}));await s.advance();s.choose(()=>action({intents:combined({}).intents}));const w=await s.advance(),evidence=actor(w).habitEvidence;return{trigger:evidence.at(-2).memory,action:evidence.at(-1).memory};}
 const ref=pair=>({kind:'short',...pair.action});
 function combined(pair){return action({
  type:'work',target:'tidy',content:'先把手上的工作做好',
@@ -30,7 +31,7 @@ test('one normal decision commits four kinds of subjective maintenance with auto
  const s=await setup();try{
   const pair=await performedPair(s);s.choose(()=>combined(pair));const operationId=`${Date.now()}:${crypto.randomUUID()}`;
   const response=await s.post({operation:'advance',operationId});assert.equal(response.status,200);const result=await response.json(),saved=await read(),c=actor(saved);
-  assert.equal(c.preferences.items[0].version,1);assert.equal(c.eventHabits[0].observedDays.length,1);assert.equal(c.longTerm.filter(m=>m.origin.id===pair.action.id).length,1);assert.equal(c.cognition.beliefs[0].conviction,'leaning');assert.deepEqual(c.intents.map(i=>i.id),['work-first','rest-later']);
+  assert.equal(c.preferences.items[0].version,1);assert.equal(c.eventHabits[0].observedDays.length,1);assert.equal(c.longTerm.filter(m=>m.origin.id===pair.action.id).length,1);assert.equal(c.cognition.beliefs[0].conviction,'leaning');assert.deepEqual(c.intents.map(i=>i.id),['owner:direction','owner:work-first','owner:rest-later']);
   assert.ok(saved.events.some(event=>event.actor==='owner'&&event.time===saved.minute&&event.text.includes('整理')));assert.equal(s.inputs.length,3);
   assert.deepEqual(await(await s.post({operation:'advance',operationId})).json(),result);assert.deepEqual(actor(await read()),c);assert.equal(s.inputs.length,3);
   s.choose(()=>action());await s.advance();const input=s.inputs.at(-1);assert.equal(input.self.preferences.items[0].id,'rest-choice');assert.equal(input.self.cognition.beliefs[0].id,'work-pace');assert.equal(input.learnedHabits.some(item=>item.tendency.includes('之後')),false,'one day is only a candidate');assert.equal(input.self.eventHabits,undefined);assert.equal(input.self.habitEvidence,undefined);assert.equal(input.self.preferences.trace,undefined);

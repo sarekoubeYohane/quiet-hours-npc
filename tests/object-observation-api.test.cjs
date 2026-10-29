@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Model transport fixture; real World API, perception and SQLite. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
@@ -14,7 +15,7 @@ function scene(actorId='owner'){
 }
 async function run(w,fn){
  store.install(w);const inputs=[],messages=[],old=fetch,random=Math.random;let action=rest,judgment;Math.random=()=>0.675;
- global.fetch=async(url,init)=>{assert.match(String(url),/api\.openai\.com/);const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);messages.push(body.messages);const value=input.contractVersion==='world-adjudication.v1'?judgment:{...rest,...(input.self.id===w.characters[0].id?action:rest)};assert.ok(value,'unexpected adjudication call');return Response.json({choices:[{message:{content:JSON.stringify(value)}}]});};
+ global.fetch=async(url,init)=>{assert.match(String(url),/api\.openai\.com/);const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);messages.push(body.messages);const value=input.contractVersion==='world-adjudication.v1'?judgment:{...rest,...(input.self.id===w.characters[0].id?action:rest)};assert.ok(value,'unexpected adjudication call');return Response.json({choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),value))}}]});};
  const advance=async(operationId=Date.now()+":"+crypto.randomUUID())=>{const r=await post({operation:'advance',operationId,minutes:15,mode:'openai',model:'gpt-6-luna',limits:{calls:120,tokens:500000}});assert.equal(r.status,200,await r.clone().text());return read();};
  try{await post({operation:'set-model-key',mode:'openai',key:'fixture-key'});await post({operation:'set-budget',limits:{calls:120,tokens:500000}});await fn({inputs,messages,choose:a=>action=a,reply:value=>judgment=value,advance});}finally{global.fetch=old;Math.random=random;}
 }

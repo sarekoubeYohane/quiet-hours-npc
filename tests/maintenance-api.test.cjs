@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API fixtures. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name + '.cjs'));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
@@ -10,7 +11,7 @@ async function withModel(choose, run) {
   const old = global.fetch, inputs = [];
   global.fetch = async (_, init) => {
     const input = JSON.parse(JSON.parse(init.body).messages[1].content); inputs.push(input);
-    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], memoryOperations: [], ...choose(input) }) } }] });
+    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], memoryOperations: [], ...choose(input) })) } }] });
   };
   try {
     await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));

@@ -1,16 +1,17 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
+const completion=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,v))}}]});
 const cup=()=>({id:'cup',source:'finite-cups',label:'店內茶杯',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:'empty',condition:'broken'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea'],condition:['broken','sound']}});
 async function fixture(modify=()=>{}) {
  const w=seedWorld();w.contextId='obstacle-fixture';w.adjudication={provider:'openai',model:'fixture-adjudicator'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});
  w.routineRules=[{id:'tea-rule',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner']}];w.objects=[cup()];modify(w);store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch,inputs=[];let decision={type:'work',target:'tea',content:'泡茶',mood:'平靜',durationMinutes:30,intents:[]},candidate={status:'unsupported',effects:[],stages:[],check:null};
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return completion(input.contractVersion==='world-adjudication.v1'?candidate:decision);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return completion(input.contractVersion==='world-adjudication.v1'?candidate:decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,inputs,decision:v=>{decision=v;},candidate:v=>{candidate=v;},read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=previous;}};
 }
 test('known broken utensil gives a knowable obstruction across fresh worded operations and serialized reload, then actual repair recovers',async()=>{
@@ -58,7 +59,7 @@ test('genuinely new methods use one adjudicator slot, retain denied versus unsup
  for(const outcome of ['accepted','denied','unsupported','invalid']){
   const s=await fixture();try{
    s.decision({type:'propose',target:'cup',content:'用感應加熱器修復茶具',purpose:'修理器具',mood:'平靜',durationMinutes:30,intents:[]});
-   s.candidate(outcome==='accepted'?{status:'accepted',effects:[{kind:'state',objectId:'cup',expectedRevision:1,key:'condition',value:'sound'}],stages:[],check:null}:outcome==='invalid'?{status:'accepted',effects:[],stages:[],check:null,patch:{invent:'tea'}}:{status:outcome,effects:[],stages:[],check:null});
+   s.candidate(outcome==='accepted'?{status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'cup',expectedRevision:1,key:'condition',value:'sound'}],stages:[],check:null}:outcome==='invalid'?{status:'accepted',effects:[],stages:[],check:null,patch:{invent:'tea'}}:{status:outcome,effects:[],stages:[],check:null});
    const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,outcome==='invalid'?502:200);const w=await s.read();assert.equal(s.inputs.filter(i=>i.contractVersion==='world-adjudication.v1').length,1);assert.equal(w.aiUsage.totalCalls,2);assert.equal(w.routineAudit?.at(-1)?.result,outcome==='invalid'?undefined:'exception');assert.equal(w.objects[0].state.condition,outcome==='accepted'?'sound':'broken');
    if(outcome==='invalid'){assert.equal(w.turn,0);assert.ok((await r.json()).stopReason);}
    else assert.match(w.characters.find(c=>c.id==='owner').activity,outcome==='accepted'?/condition=sound/:outcome==='denied'?/沒有成功/:/無法落實/);

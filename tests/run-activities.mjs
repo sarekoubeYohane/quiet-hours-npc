@@ -95,6 +95,7 @@ try {
   allTests.push('tests/demand-integration-api.test.cjs');
 
   allTests.push('tests/interrupted-usage-api.test.cjs','tests/usage-recovery-ui.test.cjs');
+  allTests.push('tests/pursuit-graph-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- API transport fixtures. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
@@ -9,7 +10,7 @@ const reference = input => ({kind:'short',id:input.self.shortTerm[0].id,version:
 const preference = input => ({operation:'upsert',id:'quiet-tea',version:0,topic:'喝茶',context:'獨自整理思緒時',text:'即使剛才不順利，我仍喜歡茶的香氣。',references:[reference(input)],reason:'這次感受到的香氣對我很有意義。'});
 async function withModel(choose, run) {
  const previous=global.fetch, inputs=[];
- global.fetch=async (_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)})}}]});};
+ global.fetch=async (_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',...choose(input)}))}}]});};
  try {await POST(request({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs,body=>POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,...body})));} finally {global.fetch=previous;}
 }
 test('normal decisions save subjective preferences from visible experiences and reload them without extra calls or forced intentions',async()=>{
@@ -17,7 +18,7 @@ test('normal decisions save subjective preferences from visible experiences and 
  await withModel(input=>input.self.id==='cass'&&update?{preferenceUpdates:[preference(input)]}:{},async(inputs,advance)=>{
   const operationId=`${Date.now()}:${crypto.randomUUID()}`,response=await advance({operationId});assert.equal(response.status,200);const result=await response.json(),saved=await read();
   assert.equal(saved.characters[0].preferences.items[0].text,'即使剛才不順利，我仍喜歡茶的香氣。');
-  assert.equal(saved.characters[0].preferences.items[0].version,1);assert.deepEqual(saved.characters[0].intents,[]);assert.equal(inputs.length,4);
+  assert.equal(saved.characters[0].preferences.items[0].version,1);assert.deepEqual(saved.characters[0].intents.filter(node=>node.kind!=='direction'),[]);assert.equal(inputs.length,4);
   assert.deepEqual(await(await advance({operationId})).json(),result);assert.equal(inputs.length,4);
   update=false;assert.equal((await advance()).status,200);const next=inputs.findLast(input=>input.self.id==='cass');assert.equal(next.self.preferences.items[0].id,'quiet-tea');
   assert.equal(JSON.stringify(next).includes('preferenceTrace'),false);assert.equal(inputs.findLast(input=>input.self.id==='vera').self.preferences.items.length,0);

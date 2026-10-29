@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
@@ -9,7 +10,7 @@ async function setup(adjust=x=>x,adjustNpc=x=>x){
  const w=seedWorld();w.contextId='routine-contract';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};w.objects=[{id:'ordinary-mug',source:'fixture',label:'杯子',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea','coffee','dirty']}},{id:'shared-tea-kit',source:'fixture',label:'共用茶具',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{available:'yes'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner']}];store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch;let calls=0,contract,request;
- global.fetch=async(_url,init)=>{calls++;const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);const value=input.contractVersion==='world-adjudication.v1'?(contract=input,request=body,adjust(accepted())):adjustNpc(structuredClone(proposal));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});};
+ global.fetch=async(_url,init)=>{calls++;const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);const value=input.contractVersion==='world-adjudication.v1'?(contract=input,request=body,adjust(accepted())):adjustNpc(structuredClone(proposal));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),value))}}]});};
  return {post,read:async()=>await(await GET()).json(),restore:()=>{global.fetch=previous;},calls:()=>calls,contract:()=>contract,request:()=>request};
 }
 test('successful operation keeps the original proposal and unaligned candidate readable after reload', async()=>{
@@ -118,7 +119,7 @@ test('the original deployment and API request stay attached when a later deploym
 });
 test('a many-actor operation keeps exact dispatch counts while its receipt remains byte bounded and never enters NPC input',async()=>{
  const s=await setup();const w=store.snapshot(),actor=w.characters[0];w.characters=Array.from({length:40},(_,index)=>({...structuredClone(actor),id:index===0?'owner':'observer-fixture-'+index,control:undefined,memories:[],shortTerm:[],longTerm:[],memoryTrace:[],cognition:undefined,observations:[]}));w.playerBudget={calls:null,tokens:null};store.replaceCommittedWorld(w);
- let sent=0;const inputs=[];global.fetch=async(_url,init)=>{sent++;inputs.push(JSON.parse(init.body));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'休'.repeat(500),purpose:'休息',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}})}}]});};
+ let sent=0;const inputs=[];global.fetch=async(_url,init)=>{sent++;inputs.push(JSON.parse(init.body));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'休'.repeat(500),purpose:'休息',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}}))}}]});};
  try{
   const response=await s.post({operation:'advance',minutes:15}),body=await response.json();assert.equal(response.status,200,body.error);
   const e=body.operationEvidence;assert.deepEqual(e.counts,{npc:40,adjudication:0});assert.equal(sent,40);assert.ok(e.dispatches.length<=32);assert.ok(Buffer.byteLength(JSON.stringify(e))<=65536);assert.equal(e.truncated,true);
@@ -131,7 +132,7 @@ test('a failed-save receipt observes the journal byte budget and evicts old resu
   const initial=store.snapshot();initial.characters[0].goal='PRIVATE-LARGE-BACKGROUND'.repeat(9500);store.replaceCommittedWorld(initial);
   await s.post({operation:'takeover'});await s.post({operation:'return-control'});
   const w=store.snapshot(),actor=w.characters[0];w.characters=Array.from({length:40},(_,index)=>({...structuredClone(actor),goal:'休息',id:index===0?'owner':'fixture-'+index,control:undefined,memories:[],shortTerm:[],longTerm:[],memoryTrace:[],cognition:undefined,observations:[]}));w.playerBudget={calls:null,tokens:null};store.replaceCommittedWorld(w);
-  global.fetch=async()=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'休'.repeat(500),purpose:'休息',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}})}}]});
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'休'.repeat(500),purpose:'休息',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}}))}}]});
   const before=await store.database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind('test-owner').first();assert.ok(Buffer.byteLength(before.operations)<500000);
   store.throwBeforeNextSave();const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,502);
   const after=await store.database().prepare('SELECT operations FROM worlds WHERE owner = ?').bind('test-owner').first();assert.ok(Buffer.byteLength(after.operations)<=500000,'failed-save evidence must not exceed the journal budget');
