@@ -79,6 +79,9 @@ test('a conflict replacing the journal cannot turn the same accepted operation i
 for(const task of ['npc','adjudication'])test(`${task} timeout records no answer then preserves a late discarded reply without resuming world work`,async()=>{
  const s=await scenario(),original=global.fetch,originalTimeout=AbortSignal.timeout,op=operation();let release,entered;
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let calls=0;
+ // AbortSignal.timeout uses an unref timer; this deliberately unresolved
+ // transport gate must keep the test event loop alive until timeout wins.
+ const keepAlive=setInterval(()=>{},1000);
  AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
  global.fetch=async(url,init)=>{
   calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if((input.contractVersion==='world-adjudication.v1')!==(task==='adjudication'))return original(url,init);
@@ -92,7 +95,7 @@ for(const task of ['npc','adjudication'])test(`${task} timeout records no answer
   const after=await lookup(op.operationId),late=after.decisionTrace.dispatches.at(-1);assert.equal(late.stage,'late-discarded');assert.equal(late.discarded,true);assert.deepEqual(late.lateUsage,{inputTokens:12,outputTokens:4});assert.ok(late.responseBody);
   assert.equal(after.decisionTrace.outcome,'rolled-back');assert.deepEqual(after.world,before.world);assert.equal(after.version,before.version);const sent=calls;
   assert.deepEqual(await(await s.post(op)).json(),first);assert.equal(calls,sent);
- }finally{release();await running;AbortSignal.timeout=originalTimeout;s.restore();}
+ }finally{release();try{await running;}finally{clearInterval(keepAlive);AbortSignal.timeout=originalTimeout;s.restore();}}
 });
 
 test('an expired lease discards the received candidate and preserves trace identity after uncertain replay',async()=>{
@@ -194,13 +197,16 @@ test('fault records obey the shared count, byte and single-record limits through
 
 test('an oversized late reply keeps known usage, discard classification and gaps in its bounded receipt',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let release,entered;const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
+ // AbortSignal.timeout uses an unref timer; this deliberately unresolved
+ // transport gate must keep the test event loop alive until timeout wins.
+ const keepAlive=setInterval(()=>{},1000);
  AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
  global.fetch=async()=>{entered();store.onNextTraceWrite(()=>{throw Error('fixture one checkpoint failure');});await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:'x'.repeat(1100000)}}]});};let running;
  try{
   running=s.post(op);await ready;assert.equal((await running).status,502);const before=await lookup(op.operationId);release();
   let after;for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,5));after=await lookup(op.operationId);if(after.decisionTrace.dispatches[0].discarded)break;}
   const t=after.decisionTrace,d=t.dispatches[0];assert.equal(t.gap,'single-record-limit');assert.ok(t.gaps.includes('checkpoint-write-failed'));assert.equal(d.discarded,true);assert.equal(d.failure.kind,'timeout');assert.deepEqual(d.lateUsage,{inputTokens:12,outputTokens:4});assert.deepEqual(after.world,before.world);assert.ok(Buffer.byteLength(JSON.stringify(t))<=1024*1024);
- }finally{release();await running;AbortSignal.timeout=originalTimeout;s.restore();}
+ }finally{release();try{await running;}finally{clearInterval(keepAlive);AbortSignal.timeout=originalTimeout;s.restore();}}
 });
 
 test('a valid JSON NPC reply with an illegal action is a contract validation failure rather than a parse failure',async()=>{

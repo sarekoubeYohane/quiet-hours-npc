@@ -18,11 +18,13 @@ export function routineObstacle(w:World,c:Character,a:Action,operation:string):s
  const objects=(w.objects||[]).filter(o=>o.region===region&&o.knownTo.includes(c.id)&&(!vesselTarget||o.id===vesselTarget));
  const supplies=(w.supplies||[]).filter(s=>s.region===region&&!s.background&&(!vesselTarget||s.id===vesselTarget));
  if(target&&!objects.length&&!supplies.some(s=>s.knownTo.includes(c.id)))return '目前找不到可用的指定物件。';
+ // Food serving binds its exact target or confirmed dish below in the routine
+ // interpreter. A label-matched meal elsewhere cannot veto that source.
+ if(operation==='food')return;
  const materials=(w.supplies||[]).filter(s=>s.region===region&&!s.background&&rawRoutineMaterial(s,operation));
  if(materials.length&&!materials.some(s=>s.remaining>0&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id))){
   return materials.every(s=>s.knownTo.includes(c.id)&&s.remaining===0)?'已知的材料已用完，這次活動尚未完成。':'目前沒有可用的材料，這次活動尚未完成。';
  }
- if(operation==='food')return;
  const utensils=objects.filter(o=>o.kind==='utensil'&&'contents' in o.state);
  const supports=(values:string[]|undefined)=>supportsRoutineDrink(values,operation);
  if(utensils.length&&!utensils.some(o=>supports(o.stateTransitions?.contents)))return '目前的器具不能承接這次飲品，這次活動尚未完成。';
