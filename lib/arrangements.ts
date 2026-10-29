@@ -10,6 +10,7 @@ export type ArrangementPursuitState={status:'active'|'ended'|'missing';currentVe
 export type Arrangement = {pursuit?:ArrangementPursuit|null; id:string;characterId:string;version:number;time:number;text:string;condition:ArrangementCondition;status:'active'|'completed'|'dropped';references:PreferenceReference[];memory:{id:string;version:number};conditionSince?:number;cue?:ArrangementCueState };
 export type ArrangementState = {schemaVersion:1;items:Arrangement[];archived?:{id:string;version:number}[]};
 export const arrangementCapacity=16;
+const pursuitIdentity=(v:unknown):v is string=>typeof v==='string'&&!!v.trim()&&v.length<=64;
 const bounded=(v:unknown,max:number):v is string=>typeof v==='string'&&!!v.trim()&&new TextEncoder().encode(v).length<=max;
 const fields=(v:object,keys:string[])=>Object.keys(v).every(key=>keys.includes(key));
 export function arrangementExperience(item:Pick<Arrangement,'id'|'version'|'text'|'condition'|'status'|'pursuit'>){return `我的柔性安排 ${item.id} v${item.version}（${item.status}）：${item.text}；條件：${JSON.stringify(item.condition)}${item.pursuit?`；關聯追求：${item.pursuit.id}`:''}`;}
@@ -62,7 +63,7 @@ export function updateArrangements(w:World,c:Character,value:unknown,visible:Cha
   const proposed=item.pursuit===undefined?old?.pursuit??null:item.pursuit;
   let pursuit:ArrangementPursuit|null=null;
   if(proposed!==null){
-   if(typeof proposed!=='object'||Array.isArray(proposed)||Object.keys(proposed).sort().join(',')!=='id,version'||!bounded(proposed.id,64)||!proposed.id.startsWith(c.id+':')||!Number.isSafeInteger(proposed.version)||proposed.version<0)throw new MemoryValidationError('安排追求關聯格式或本人範圍無效');
+   if(typeof proposed!=='object'||Array.isArray(proposed)||Object.keys(proposed).sort().join(',')!=='id,version'||!pursuitIdentity(proposed.id)||!proposed.id.startsWith(c.id+':')||!Number.isSafeInteger(proposed.version)||proposed.version<0)throw new MemoryValidationError('安排追求關聯格式或本人範圍無效');
    if(item.operation==='upsert'&&item.pursuit!==undefined){
     const original=c.intents?.find(node=>node.id===proposed.id),endpoint=nextIntents.find(node=>node.id===proposed.id);
     if(!endpoint||endpoint.status!=='active'||(original?original.version!==proposed.version||!visible.intents?.some(node=>node.id===original.id&&node.version===original.version):proposed.version!==0))throw new MemoryValidationError('安排追求端點不存在、已結束、過期或本次未展示');
@@ -85,7 +86,7 @@ export function validateArrangements(c:Character){
  if(state.schemaVersion!==1||!fields(state,['schemaVersion','items','archived'])||!Array.isArray(state.items)||state.items.length>arrangementCapacity||memoryBytes({...state,items:state.items.map(item=>{const core={...item};delete core.cue;return core;})})>24*1024||memoryBytes(state)>40*1024||new Set(state.items.map(i=>i.id)).size!==state.items.length)throw new MemoryValidationError('安排容量或狀態無效');
  for(const item of state.items){
   if(item.conditionSince!==undefined&&(!Number.isFinite(item.conditionSince)||item.conditionSince<0||item.conditionSince>item.time))throw new MemoryValidationError('安排條件啟用時間無效');
-  if(item.pursuit&&(typeof item.pursuit!=='object'||Array.isArray(item.pursuit)||Object.keys(item.pursuit).sort().join(',')!=='id,version'||!bounded(item.pursuit.id,64)||!item.pursuit.id.startsWith(c.id+':')||!Number.isSafeInteger(item.pursuit.version)||item.pursuit.version<1))throw new MemoryValidationError('安排保存追求關聯無效');
+  if(item.pursuit&&(typeof item.pursuit!=='object'||Array.isArray(item.pursuit)||Object.keys(item.pursuit).sort().join(',')!=='id,version'||!pursuitIdentity(item.pursuit.id)||!item.pursuit.id.startsWith(c.id+':')||!Number.isSafeInteger(item.pursuit.version)||item.pursuit.version<1))throw new MemoryValidationError('安排保存追求關聯無效');
   const cue=item.cue;
   if(cue&&(memoryBytes(cue)>1024||!fields(cue,['conditionKey','lastMatch','epoch','trigger','observationCursor'])||cue.conditionKey!==conditionKey(item.condition)||cue.lastMatch!==null&&!bounded(cue.lastMatch,1024)||!Number.isSafeInteger(cue.epoch)||cue.epoch<0||cue.observationCursor&&(!fields(cue.observationCursor,['id','time','sequence'])||!bounded(cue.observationCursor.id,128)||!Number.isFinite(cue.observationCursor.time)||cue.observationCursor.time<0||cue.observationCursor.sequence!==undefined&&(!Number.isSafeInteger(cue.observationCursor.sequence)||cue.observationCursor.sequence<0))||cue.trigger&&(!fields(cue.trigger,['key','at','handledAt'])||!bounded(cue.trigger.key,2048)||!Number.isFinite(cue.trigger.at)||cue.trigger.handledAt!==undefined&&!Number.isFinite(cue.trigger.handledAt))))throw new MemoryValidationError('安排喚起游標無效');
   if(item.characterId!==c.id||!bounded(item.id,128)||!Number.isSafeInteger(item.version)||item.version<1||!Number.isFinite(item.time)||!bounded(item.text,512)||!validArrangementCondition(item.condition)||!['active','completed','dropped'].includes(item.status)||!bounded(item.memory?.id,128)||item.memory.version!==1)throw new MemoryValidationError('安排狀態無效');

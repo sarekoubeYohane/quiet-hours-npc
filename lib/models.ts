@@ -1,12 +1,12 @@
 import { pursuitUpdatesSchema, pursuitPrompt, updatePursuits } from './pursuits';
 import { pursuitCandidatesSchema, pursuitSelectionSchema, pursuitSelectionPrompt, parsePursuitSelection } from './pursuit-selection';
-import { normalDecisionInput, finalizeDecisionInput } from './npc-input';
+import { normalDecisionInput, finalizeDecisionInput, boundDecisionRequest } from './npc-input';
 import { arrangementCueReceipts } from './arrangement-cues';
 import { phonePrompt, phoneForActor, validatePhoneActionReferences } from './phones';
 import { arrangementsForDecision, arrangementUpdatesSchema, arrangementPrompt, updateArrangements } from './arrangements';
 import { preferenceUpdatesSchema, preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
-import { requestModel, type ModelObserver } from './model-adapter';
+import { requestModel, modelRequestBody, type ModelObserver } from './model-adapter';
 export const npcContractVersion = 'npc-decision.v3';
 import { cognitiveUpdatesSchema, knownPeopleForDecision, updateCognition, type CognitiveDecisionContext } from './cognition';
 import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, normalizeMemory, budgetMemoryInput, memoryBytes, memorySelectionSchema, memorySelectionSchemaFor, evaluateMemories, memoryOperationSchema } from './memory';
@@ -141,12 +141,20 @@ messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;
 messages[0].content+=methodAssessmentPrompt+phonePrompt+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
-let recalled = false;
+let recalled = false;let recalledHandles:{id:string;version:number}[]=[];
 for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
 // context. The route rechecks operation version/lease after completion.
-const schema=decisionWireSchema(allowedTypes,visible.shortTerm || []);
+let schema=decisionWireSchema(allowedTypes,input.self.shortTerm);
+boundDecisionRequest(w,c,input,()=>{schema=decisionWireSchema(allowedTypes,input.self.shortTerm);messages[1].content=JSON.stringify(input);return new TextEncoder().encode(modelRequestBody({model,provider},messages,schema,{allowRecall:recall?.enabled&&!recalled})).length<164000;},recalled?input.self.longTerm.filter(m=>recalledHandles.some(r=>r.id===m.id&&r.version===m.version)).map(({id,version})=>({id,version})):[]);
+visible.intents=input.self.intents;
+visible.shortTerm=(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version));
+visible.longTerm=(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version));
+visible.arrangements={schemaVersion:1,items:input.self.arrangements.items};
+visible.preferences={schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0};
+visible.cognition={...input.self.cognition,trace:[]};
+decisionContext.phoneReferences=input.phones;decisionContext.knownPeople=knownPeopleForDecision(visible,input.contacts.map(p=>p.id));decisionContext.memoryReview=input.self.memoryReview;decisionContext.historyCandidates=input.self.cognition.historyCandidates||[];
 const raw = await requestModel({key,model,provider},messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
@@ -160,7 +168,7 @@ try {
     const memories=await recall.search(value.questions);
 
     if (!Array.isArray(memories)) throw Error('回想結果格式無效。');
-    const handles = memories.map(({ id, version }) => ({ id, version }));
+    const handles = memories.map(({ id, version }) => ({ id, version }));recalledHandles=handles;
     for (const recalled of memories) {
       if (!(c.longTerm || []).some(item => item.id === recalled?.id && item.version === recalled?.version && item.characterId === c.id && (!item.state || item.state === 'active'))) throw Error('回想引用不屬於目前自己的記憶版本。');
     }

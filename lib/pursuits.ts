@@ -1,7 +1,7 @@
 import type { Character, Intent, World } from './world';
 import { memoryBytes, MemoryValidationError } from './memory';
 
-export const pursuitLimits = { nodes:12, edges:16, depth:4, updates:4, stateBytes:12*1024, updateBytes:4*1024, trace:24, traceBytes:16*1024 } as const;
+export const pursuitLimits = { nodes:12, edges:16, depth:4, updates:4, stateBytes:12*1024, updateBytes:4*1024, trace:24, traceBytes:16*1024, archived:24, archivedBytes:8*1024 } as const;
 export type PursuitReference={kind:'short'|'long'|'belief'|'relationship';id:string;version:number};
 export type PursuitParent={id:string;version:number;order?:number};
 export type PursuitProgress='ready'|'waiting'|'deferred'|'blocked'|'enough';
@@ -12,12 +12,16 @@ export type PursuitExit={id:string;version:number;endedVersion:number;status:'sa
 type PursuitNode=Omit<Intent,keyof PursuitFields>&Pick<PursuitFields,'kind'|'scope'|'satisfaction'|'parents'>;
 type PursuitOrder={scope:'roots'|'children';members:{id:string;version:number}[]};
 type PursuitEvaluation={status:'active'|'satisfied';progress:PursuitProgress;basis:{kind:PursuitAssessment['kind'];text:string}};
-export type PursuitUpdate={operation:'upsert'|'drop'|'reorder'|'assess';id:string;version:number;node:PursuitNode|PursuitOrder|PursuitEvaluation|null;references:PursuitReference[];reason:string};
+export type PursuitUpdate={operation:'upsert'|'drop'|'reorder'|'assess'|'archive';id:string;version:number;node:PursuitNode|PursuitOrder|PursuitEvaluation|null;references:PursuitReference[];reason:string};
 const text=(value:unknown,max:number,nonempty=false):value is string=>typeof value==='string'&&value.length<=max&&(!nonempty||!!value.trim());
 const fields=(value:unknown,keys:string[])=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 function fail(message:string):never{throw new MemoryValidationError(message);}
 export function initialDirection(c:Character):Intent{return {id:`${c.id}:direction`,content:c.goal,intensity:'medium',importance:'medium',urgency:'low',context:'',version:1,kind:'direction',scope:c.goal,satisfaction:null,parents:[],references:[],status:'active',reason:'角色設定提供的初始方向'};}
 export function currentDirections(c:Character){return (c.intents||[]).filter(i=>i.kind==='direction'&&i.status==='active').map(i=>i.content).join('；');}
+export function pursuitsForDecision(c:Character,visible:Character=c){
+ const available=(ref:PursuitReference)=>{const list=ref.kind==='short'?visible.shortTerm:ref.kind==='long'?visible.longTerm:ref.kind==='belief'?visible.cognition?.beliefs:visible.cognition?.relationshipTags;return !!list?.some(item=>item.id===ref.id&&item.version===ref.version&&item.characterId===c.id&&(!('state'in item)||!item.state||item.state==='active'));};
+ return (c.intents||[]).map(node=>{const projected=structuredClone(node),formation=(node.references||[]).filter(ref=>!available(ref)).length,assessment=(node.assessment?.references||[]).filter(ref=>!available(ref)).length;delete projected.reason;projected.references=(node.references||[]).filter(available);if(formation)projected.context='';if(projected.assessment){projected.assessment.text='';projected.assessment.references=projected.assessment.references.filter(available);}return {...projected,sourceGaps:{formation,assessment}};});
+}
 export function orderedPursuits(nodes:Intent[],parentId:string|null){
  const items=nodes.filter(node=>node.status==='active'&&(parentId===null?!node.parents?.length:node.parents?.some(parent=>parent.id===parentId)));
  return parentId===null?items:items.sort((a,b)=>(a.parents?.find(p=>p.id===parentId)?.order??nodes.indexOf(a))-(b.parents?.find(p=>p.id===parentId)?.order??nodes.indexOf(b)));
@@ -52,23 +56,31 @@ const parentSchema={type:'object',properties:{id:{type:'string',minLength:1,maxL
 export const pursuitNodeSchema={type:'object',properties:{id:{type:'string',minLength:1,maxLength:64},content:{type:'string',minLength:1,maxLength:200},intensity:level,importance:level,urgency:level,context:{type:'string',maxLength:160},kind:{type:'string',enum:['direction','intent','task']},scope:{type:'string',minLength:1,maxLength:200},satisfaction:{type:['string','null'],maxLength:160},parents:{type:'array',maxItems:pursuitLimits.nodes-1,items:parentSchema}},required:['id','content','intensity','importance','urgency','context','kind','scope','satisfaction','parents'],additionalProperties:false};
 const pursuitOrderSchema={type:'object',properties:{scope:{type:'string',enum:['roots','children']},members:{type:'array',minItems:1,maxItems:pursuitLimits.nodes,items:parentSchema}},required:['scope','members'],additionalProperties:false};
 const pursuitEvaluationSchema={type:'object',properties:{status:{type:'string',enum:['active','satisfied']},progress:{type:'string',enum:['ready','waiting','deferred','blocked','enough']},basis:{type:'object',properties:{kind:{type:'string',enum:['subjective','known-result']},text:{type:'string',minLength:1,maxLength:160}},required:['kind','text'],additionalProperties:false}},required:['status','progress','basis'],additionalProperties:false};
-export const pursuitUpdatesSchema={type:'array',maxItems:pursuitLimits.updates,items:{type:'object',properties:{operation:{type:'string',enum:['upsert','drop','reorder','assess']},id:{type:'string',minLength:1,maxLength:64},version:{type:'integer',minimum:0},node:{anyOf:[pursuitNodeSchema,pursuitOrderSchema,pursuitEvaluationSchema,{type:'null'}]},references:{type:'array',maxItems:4,items:{type:'object',properties:{kind:{type:'string',enum:['short','long','belief','relationship']},id:{type:'string',minLength:1,maxLength:128},version:{type:'integer',minimum:1}},required:['kind','id','version'],additionalProperties:false}},reason:{type:'string',minLength:1,maxLength:160}},required:['operation','id','version','node','references','reason'],additionalProperties:false}};
-export const pursuitPrompt='同一id在同次可各有一項upsert和assess，兩者都用當次原version（新=0），先套範圍再評估；每項仍各占原共同四項額度，前後差異分開保存。新承接可同次明示waiting/deferred/blocked，不可在第一步尚未執行前立即satisfied。上層退出或實質改寫範圍/標準時，每個原有效下層都須同批明示upsert（轉接其他parents、parents空陣列獨立保留，或確認仍支援修改後上層）/drop/assess；只處理受影響下層，沒有提及的無關分支保留。有效關係不可仍支援已結束上層，共享工作保留其他仍成立動機而不複製進度。滿圖可先在先前正常決策逐批明示轉接/獨立保留，再變更上層，不為此新增模型呼叫。活動仍須以本次明示continue/pause/resume/abandon或改做新行動處置；暫停進度若目的結束須當次resume或abandon處置，不能漏掉。已結束項目不能當current focus或methodAssessment.intentIds，退出只連到本次退出紀錄；原成果和活動開始動機不被轉接回寫。 assess 明示分開評估追求：node={status:active或satisfied,progress:ready或waiting或deferred或blocked或enough,basis:{kind:subjective或known-result,text:短依據}}，帶回當次節點id/version、references、reason。satisfied只配ready，表示本人認為已滿足；drop表示放下，與滿足不同。持續direction可active+enough表示目前已足夠，方向仍保留，不自動產生下一份同類任務；有新機會時可再明示ready。waiting/deferred/blocked仍是active，不是結束。known-result只能引用本次實際可見的既有經歷/信念版本，至少一個來源；當次尚未執行action不能當成果。subjective可依本人感受或理解，references可空；它不是已證實的世界成果，勿複製來源正文或把猜測說成世界核准。各層分別判斷，下層完成不自動滿足上層，已有可知依據時可同次評估多層。已滿足身份不復活；範圍與標準保留，追求不另存物理進度。 '+'reorder 是明示局部重排：id=本人id+:roots、version=0、node={scope:roots,members:[{id,version}]} 調整根之間；同一上層則 id=上層id、version=當次上層版本、node={scope:children,members:[{id,version}]}。members 只列本次要互換先後的子集，未列者保留位置與追求。重排仍是一項心理更新；支援關係不是世界前提或必做方法清單，優先不強迫行動，仍可跨分支選焦點。 本版 npc-decision.v3 使用唯一 self.intents 分層追求，不回傳舊 intents 完整陣列。pursuitContext 原樣回傳本次輸入值。pursuitUpdates 是明示增量，空陣列或未提及均保留；不得靠漏寫放下。每項 operation=upsert、drop、assess 或 reorder、id、version（新=0，舊=本次版本）、node、references、reason。upsert.node 含 id、content、intensity/importance/urgency（low/medium/high）、context（自己的簡短背景）、kind（direction/intent/task）、scope（願意承接到哪個程度）、satisfaction（本人認為什麼算夠，可null開放）、parents（上層id/version，新上層version=0）；drop.node=null。id 以自己id加冒號開頭。direction 可新增、改寫或放下，依現行保存方向判斷，不重設為初始goal。新想法無歷史可用references=[]，否則只引用本次實際可見short/long/belief/relationship的id/version。reason 是短變更理由，不要求長篇心理過程。支援有界共享下層，一個下層可連多個上層，只保留同一份進度；各上層不自動完成。有下層或活動關聯的複雜退出仍須先合法處置。focusIntentId 指本次唯一活動焦點的有效追求id，無焦點用null；methodAssessment.intentIds 與焦點一致，沒有則[]。一個行動不自動結束追求，也不產生另一份進度。追求更新和原心理更新合計最多4項／8KiB，追求更新本身最多4KiB；共用全角色每人12節點而非各層12個。';
+export const pursuitUpdatesSchema={type:'array',maxItems:pursuitLimits.updates,items:{type:'object',properties:{operation:{type:'string',enum:['upsert','drop','reorder','assess','archive']},id:{type:'string',minLength:1,maxLength:64},version:{type:'integer',minimum:0},node:{anyOf:[pursuitNodeSchema,pursuitOrderSchema,pursuitEvaluationSchema,{type:'null'}]},references:{type:'array',maxItems:4,items:{type:'object',properties:{kind:{type:'string',enum:['short','long','belief','relationship']},id:{type:'string',minLength:1,maxLength:128},version:{type:'integer',minimum:1}},required:['kind','id','version'],additionalProperties:false}},reason:{type:'string',minLength:1,maxLength:160}},required:['operation','id','version','node','references','reason'],additionalProperties:false}};
+export const pursuitPrompt='同一id在同次可各有一項upsert和assess，兩者都用當次原version（新=0），先套範圍再評估；每項仍各占原共同四項額度，前後差異分開保存。新承接可同次明示waiting/deferred/blocked，不可在第一步尚未執行前立即satisfied。上層退出或實質改寫範圍/標準時，每個原有效下層都須同批明示upsert（轉接其他parents、parents空陣列獨立保留，或確認仍支援修改後上層）/drop/assess；只處理受影響下層，沒有提及的無關分支保留。有效關係不可仍支援已結束上層，共享工作保留其他仍成立動機而不複製進度。滿圖可先在先前正常決策逐批明示轉接/獨立保留，再變更上層，不為此新增模型呼叫。活動仍須以本次明示continue/pause/resume/abandon或改做新行動處置；暫停進度若目的結束須當次resume或abandon處置，不能漏掉。已結束項目不能當current focus或methodAssessment.intentIds，退出只連到本次退出紀錄；原成果和活動開始動機不被轉接回寫。 assess 明示分開評估追求：node={status:active或satisfied,progress:ready或waiting或deferred或blocked或enough,basis:{kind:subjective或known-result,text:短依據}}，帶回當次節點id/version、references、reason。satisfied只配ready，表示本人認為已滿足；drop表示放下，與滿足不同。持續direction可active+enough表示目前已足夠，方向仍保留，不自動產生下一份同類任務；有新機會時可再明示ready。waiting/deferred/blocked仍是active，不是結束。known-result只能引用本次實際可見的既有經歷/信念版本，至少一個來源；當次尚未執行action不能當成果。subjective可依本人感受或理解，references可空；它不是已證實的世界成果，勿複製來源正文或把猜測說成世界核准。各層分別判斷，下層完成不自動滿足上層，已有可知依據時可同次評估多層。已滿足身份不復活；範圍與標準保留，追求不另存物理進度。 '+'reorder 是明示局部重排：id=本人id+:roots、version=0、node={scope:roots,members:[{id,version}]} 調整根之間；同一上層則 id=上層id、version=當次上層版本、node={scope:children,members:[{id,version}]}。members 只列本次要互換先後的子集，未列者保留位置與追求。重排仍是一項心理更新；支援關係不是世界前提或必做方法清單，優先不強迫行動，仍可跨分支選焦點。 本版 npc-decision.v3 使用唯一 self.intents 分層追求，不回傳舊 intents 完整陣列。pursuitContext 原樣回傳本次輸入值。pursuitUpdates 是明示增量，空陣列或未提及均保留；不得靠漏寫放下。archive只可整理本次可見、已結束且無有效活動的追求，node=null、references=[]；同批已結束上下層依整份候選驗證；最近有界歸檔身份不可復用，釋放更早身份會明示缺口。每項 operation=upsert、drop、assess、archive 或 reorder、id、version（新=0，舊=本次版本）、node、references、reason。upsert.node 含 id、content、intensity/importance/urgency（low/medium/high）、context（自己的簡短背景）、kind（direction/intent/task）、scope（願意承接到哪個程度）、satisfaction（本人認為什麼算夠，可null開放）、parents（上層id/version，新上層version=0）；drop.node=null。id 以自己id加冒號開頭。direction 可新增、改寫或放下，依現行保存方向判斷，不重設為初始goal。新想法無歷史可用references=[]，否則只引用本次實際可見short/long/belief/relationship的id/version。reason 是短變更理由，不要求長篇心理過程。支援有界共享下層，一個下層可連多個上層，只保留同一份進度；各上層不自動完成。有下層或活動關聯的複雜退出仍須先合法處置。focusIntentId 指本次唯一活動焦點的有效追求id，無焦點用null；methodAssessment.intentIds 與焦點一致，沒有則[]。一個行動不自動結束追求，也不產生另一份進度。追求更新和原心理更新合計最多4項／8KiB，追求更新本身最多4KiB；共用全角色每人12節點而非各層12個。';
 
 export function updatePursuits(w:World,c:Character,value:unknown,visible:Character){
  if(value===undefined)value=[];
  if(!Array.isArray(value)||value.length>pursuitLimits.updates||memoryBytes(value)>pursuitLimits.updateBytes)fail('追求更新容量無效');
+ const archived=[...(c.pursuitArchived||[])];let archivedDropped=c.pursuitArchivedDropped||0;
  const updates=value as PursuitUpdate[],next=structuredClone(c.intents||[]),seen=new Set<string>(),operations=new Map<string,Set<string>>(),orders=new Set<string>(),trace:PursuitTrace[]=[];
  // Earlier v3 slices carried parent identity/version without local order.
  // Their saved array position is the existing order, never a new NPC choice.
- for(const node of next)for(const parent of node.parents||[])parent.order??=next.indexOf(node);
+
  // Scope formation/revision precedes assessment, independent of wire order.
- const orderedUpdates=[...updates.filter(item=>item.operation==='upsert'),...updates.filter(item=>item.operation!=='upsert'&&item.operation!=='reorder'),...updates.filter(item=>item.operation==='reorder')];
+ const archiveIds=new Set(updates.filter(item=>item.operation==='archive').map(item=>item.id));
+ const orderedUpdates=[...updates.filter(item=>item.operation==='upsert'),...updates.filter(item=>!['upsert','reorder','archive'].includes(item.operation)),...updates.filter(item=>item.operation==='reorder'),...updates.filter(item=>item.operation==='archive').sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)];
  for(const item of orderedUpdates){
-  if(!fields(item,['operation','id','version','node','references','reason'])||!['upsert','drop','reorder','assess'].includes(item.operation)||!text(item.id,64,true)||!item.id.startsWith(c.id+':')||!Number.isSafeInteger(item.version)||item.version<0||!text(item.reason,160,true)||!Array.isArray(item.references)||item.references.length>4)fail('追求候選格式無效');
+  if(!fields(item,['operation','id','version','node','references','reason'])||!['upsert','drop','reorder','assess','archive'].includes(item.operation)||!text(item.id,64,true)||!item.id.startsWith(c.id+':')||!Number.isSafeInteger(item.version)||item.version<0||!text(item.reason,160,true)||!Array.isArray(item.references)||item.references.length>4)fail('追求候選格式無效');
   if(item.operation==='reorder'){if(orders.has(item.id))fail('重複追求重排範圍');orders.add(item.id);}
   else {const prior=operations.get(item.id)||new Set<string>();if(prior.has(item.operation)||prior.size&&(!['upsert','assess'].includes(item.operation)||[...prior].some(operation=>!['upsert','assess'].includes(operation)))||item.id===`${c.id}:roots`)fail('重複或保留的追求身份');prior.add(item.operation);operations.set(item.id,prior);seen.add(item.id);}
   const old=c.intents?.find(i=>i.id===item.id);
+  if(item.operation==='archive'){
+   if(!old||old.status==='active'||item.version!==old.version||item.node!==null||item.references.length!==0||!visible.intents?.some(i=>i.id===old.id&&i.version===old.version)||next.some(i=>!archiveIds.has(i.id)&&i.parents?.some(p=>p.id===old.id))||c.plan?.pursuitIds?.includes(old.id)||c.pausedActivity?.plan.pursuitIds?.includes(old.id))fail('只能歸檔本次可見且沒有有效活動的已結束追求');
+   next.splice(next.findIndex(i=>i.id===old.id),1);archived.push({id:old.id,version:old.version!});trace.push({id:old.id,time:w.minute,operation:'archive',reason:item.reason,before:old});continue;
+  }
+  if(!old&&c.pursuitArchived?.some(i=>i.id===item.id))fail('已歸檔身份不可重新承接');
+  if(old&&!visible.intents?.some(i=>i.id===old.id&&i.version===old.version))fail('追求未在本次完整展示');
   const createdHere=!old&&updates.some(update=>update.operation==='upsert'&&update.id===item.id&&update.version===0);
   if(item.operation!=='reorder'&&(old?old.version!==item.version||old.status!=='active':item.version!==0||item.operation!=='upsert'&&!(item.operation==='assess'&&createdHere)))fail('追求身份或版本失效');
   for(const ref of item.references){
@@ -89,7 +101,7 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
   }
   if(item.operation==='drop'){
    if(item.node!==null||!old)fail('追求退出格式無效');
-   const ended:Intent={...old,version:item.version+1,status:'dropped',reason:item.reason};
+   const ended:Intent={...old,version:item.version+1,status:'dropped',context:'',references:[]};delete ended.reason;delete ended.assessment;delete ended.progress;
    next[next.findIndex(i=>i.id===item.id)]=ended;
    trace.push({id:item.id,time:w.minute,operation:'drop',reason:item.reason,before:old,after:ended});continue;
   }
@@ -112,18 +124,20 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
  }
  for(const node of next.filter(i=>i.status==='active')){
   for(const parent of node.parents||[]){
-   if(!text(parent.id,64,true)||parent.id===node.id||!Number.isSafeInteger(parent.version)||!Number.isSafeInteger(parent.order)||(parent.order??-1)<0||Object.keys(parent).some(key=>!['id','version','order'].includes(key)))fail('追求關係無效');
+   if(!text(parent.id,64,true)||parent.id===node.id||!Number.isSafeInteger(parent.version)||parent.order!==undefined&&(!Number.isSafeInteger(parent.order)||(parent.order??-1)<0)||Object.keys(parent).some(key=>!['id','version','order'].includes(key)))fail('追求關係無效');
    const original=c.intents?.find(i=>i.id===parent.id),endpoint=next.find(i=>i.id===parent.id);
    if(!endpoint||endpoint.status!=='active'||!parent.id.startsWith(c.id+':'))fail('追求上層不存在');
    if(seen.has(node.id)&&(original?original.version!==parent.version:parent.version!==0))fail('追求上層版本失效');
   }
  }
  for(const item of updates.filter(update=>update.operation==='reorder'))applyPursuitOrder(c,next,item,visible,trace,w.minute);
- const visit=(id:string,path:string[]):number=>{if(path.includes(id))return fail('追求關係循環');const node=next.find(i=>i.id===id)!;return 1+Math.max(0,...(node.parents||[]).map(p=>visit(p.id,[...path,id])));};
+ const visit=(id:string,path:string[]):number=>{if(path.includes(id))return fail('追求關係循環');const node=next.find(i=>i.id===id)!;if(!node||node.status!=='active')return 0;return 1+Math.max(0,...(node.parents||[]).map(p=>visit(p.id,[...path,id])));};
  for(const node of next)for(const parent of node.parents||[]){const endpoint=next.find(i=>i.id===parent.id);if(endpoint?.version)parent.version=endpoint.version;}
- if(next.length>pursuitLimits.nodes||next.some(node=>!Number.isSafeInteger(node.version)||(node.version??0)<1)||next.reduce((n,i)=>n+(i.parents?.length||0),0)>pursuitLimits.edges||next.some(i=>visit(i.id,[])>pursuitLimits.depth)||memoryBytes(next)>pursuitLimits.stateBytes)fail('追求狀態超過容量');
+ if(next.length>pursuitLimits.nodes||next.some(node=>!Number.isSafeInteger(node.version)||(node.version??0)<1)||next.filter(i=>i.status==='active').reduce((n,i)=>n+(i.parents?.length||0),0)>pursuitLimits.edges||next.some(i=>visit(i.id,[])>pursuitLimits.depth)||memoryBytes(next)>pursuitLimits.stateBytes)fail('追求狀態超過容量');
  const history=[...(c.pursuitTrace||[]),...trace];let dropped=c.pursuitTraceDropped||0;
  while(history.length>pursuitLimits.trace||memoryBytes(history)>pursuitLimits.traceBytes){history.shift();dropped++;}
  const pursuitExits:PursuitExit[]=(c.intents||[]).flatMap(old=>{const current=next.find(node=>node.id===old.id);return old.status==='active'&&current&&(current.status==='satisfied'||current.status==='dropped')?[{id:old.id,version:old.version!,endedVersion:current.version!,status:current.status}]:[];});
- return {intents:next,pursuitTrace:history,pursuitTraceDropped:dropped,pursuitExits};
+ const protectedIds=new Set([...(c.arrangements?.items||[]).flatMap(item=>item.pursuit?[item.pursuit.id]:[]),...[c.plan,c.pausedActivity?.plan].flatMap(plan=>[...(plan?.pursuitIds||[]),...(plan?.pursuitOrigin?.pursuits.map(p=>p.id)||[])])]);
+ while(archived.length>pursuitLimits.archived||memoryBytes(archived)>pursuitLimits.archivedBytes){const index=archived.findIndex(item=>!protectedIds.has(item.id));if(index<0)fail('歸檔身份仍有保存中的安排或活動來源，須先明示整理關聯');archived.splice(index,1);archivedDropped++;}
+ return {pursuitArchived:archived,pursuitArchivedDropped:archivedDropped,intents:next,pursuitTrace:history,pursuitTraceDropped:dropped,pursuitExits};
 }

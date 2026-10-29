@@ -15,17 +15,19 @@ function providerFailure(status:number){
   return status<200||status>=300?Object.assign(Error(status===401?'API Key 無效，請確認它屬於所選服務。':status===402?'模型服務額度不足，請先儲值。':status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${status}，本回合沒有儲存。`), { code: status === 429 || status === 402 ? 'provider_limit' : 'technical_failure' }):undefined;
 }
 // Transport sees only the already filtered transcript and task schema, never World.
+export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean}={}){
+ const {model,provider}=service;
+ return JSON.stringify({model,messages,...(provider==='openai'?{store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}}}:{temperature:.8,max_tokens:options.maxOutputTokens??2048})});
+}
 export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void; fetcher?: typeof fetch; requestId?: string }): Promise<string> {
-const {key, model, provider} = service;
+const {key, provider} = service;
 const direct = provider === 'openai', fetcher = options.fetcher || fetch;
 let r:Response;
 const requestSignal = options.signal;
 const observe=async(event:ModelObservation)=>{try{await options.observer?.(event);}catch{/* Evidence errors do not change model behavior. */}};
 const checkpoint=(event:ModelObservation)=>awaitSignal(observe(event),requestSignal);
 const fail=async(kind:ModelFailureKind,stage:string)=>{try{await awaitSignal(observe({kind:'failure',failure:kind,stage}),requestSignal);}catch{if(!requestSignal.aborted)throw Error('實錄保存失敗。');}};
-const requestBody=JSON.stringify({model,messages,...(direct?{
-store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},
-}:{temperature:.8,max_tokens:options.maxOutputTokens??2048})});
+const requestBody=modelRequestBody(service,messages,schema,options);
 // Persist the actual bytes before crossing the provider boundary. A crash here
 // means dispatch is unknown, not absent. No header or service key is observed.
 checkSignal(requestSignal);

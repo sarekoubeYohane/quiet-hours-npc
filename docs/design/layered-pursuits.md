@@ -71,3 +71,7 @@ basis.kind=known-result 時必須至少一個當次有效可見 short／long／b
 真正新啟動的自主活動保存 `pursuitOrigin={at,pursuits:[{id,version}]}`，與原 plan.action 並列，當前關聯改用 pursuitIds。continue／pause／resume／轉接不覆寫 origin，缺少來源的舊活動不補造。origin 僅保留身份／版本，原範圍依有界追求 trace 核對；痕跡淘汰後明示歷史缺口，不把身份當記憶正文。方法評估的 intentIds 只允目前 active 焦點；本次退出身份／原版／新版另以 `pursuit-exit-links` 的 program 來源實錄對照，不混成模型心理自述或當前目的。
 
 受控 API、SQLite、真正下一請求、實際階段與畫面證據見 [#225 驗證](../verification/pursuit-exit-225.md)。這些結果不代表真實 NPC 願意形成或退出同樣追求；#220／#229 的行為證據仍需另行有限授權。
+
+## #227 滿載與遺忘下的完整可知投影
+
+目前已加入完整 normal／recall 輸入與實際 provider body 守門、完整追求圖優先、有界 ended 歸檔與來源缺口，並驗證精確滿額狀態仍可明示結束／整理。取代上文交由 #227 接續的最小限制；不改原輸出、時限、心理／追求及候選額度。工程契約見 [滿載與來源缺口](pursuit-capacity.md)，受控 API／SQLite／派送／畫面證據見 [#227 驗證](../verification/pursuit-capacity-227.md)。#228 完整 runner 與 #229 真實行為仍是各自驗收，不由本票推定完成。
