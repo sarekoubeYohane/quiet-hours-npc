@@ -102,6 +102,23 @@ for(const kind of ['calls','tokens','usd'])test('authorization '+kind+' is a low
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
+for(const cached of [31,'10',10])test(`cached usage ${JSON.stringify(cached)} preserves known SQL tokens and gates the necessary next paid dispatch`,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'pursuit-cache-usage-'));
+ try{
+  const options=await registration(directory);let calls=0;
+  const result=await runExperiment({...options,providerFetch:async(_url,init)=>{
+   calls++;if(calls>1)throw Error('synthetic second dispatch reached');
+   const input=JSON.parse(JSON.parse(init.body).messages[1].content),value=decision(input,{type:'propose',target:'cafe',content:'查看附近有哪些可使用的材料'});value.timeIntent={kind:'completion',maxMinutes:null};value.action.purpose='確認當前可用材料';
+   return Response.json({usage:{prompt_tokens:30,completion_tokens:10,prompt_tokens_details:{cached_tokens:cached}},choices:[{message:{content:JSON.stringify(value)}}]});
+  }});
+  const invalid=typeof cached!=='number'||cached>30;assert.equal(calls,invalid?1:2);assert.ok(result.stopped);
+  const first=await readback({runDirectory:directory}),second=await readback({runDirectory:directory});
+  assert.equal(first.world.aiUsage.inputTokens,(first.state.fixtureCalls+1)*30);assert.equal(first.world.aiUsage.outputTokens,(first.state.fixtureCalls+1)*10);assert.equal(first.state.tokens,40);assert.ok(first.decisionTrace.dispatches.some(d=>d.usage?.inputTokens===30&&d.usage?.outputTokens===10));
+  if(invalid){assert.equal(first.costSummary.total.complete,false);assert.ok(first.state.unresolvedDispatch);assert.equal(first.state.unknownUsage,'invalid-cached-tokens');}
+  assert.equal(first.state.pendingOperationId,second.state.pendingOperationId);assert.equal(first.world.turn,second.world.turn);assert.equal(calls,invalid?1:2);assert.equal(first.state.trials.length,10);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
 for(const failure of ['unknown-usage','stop','elapsed','key-echo','technical'])test('runner stops on '+failure+' and reopens only the original operation without another dispatch',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'pursuit-stop-'+failure+'-'));
   try{

@@ -63,4 +63,4 @@ T8正向完整80advance是**合成既有100calls／1,000,000tokens payer**的plu
 
 ## 最終review與修正
 
-兩軸初審及複查共提出Standards P3兩項、Spec P1一項／P2四項，均已在唯一review-fix分支處理，詳見[分軸修正與RED→GREEN證據](pursuits-220-review.md)。修正涵蓋歸檔用語、詞彙表領域定義、跨output持久payer／一次性授權、未提及與歷史綁定版、保留綁定後正常assessment、paired-ended新綁定完整驗證、L5人工相關承接確認；另完成真官方price host allowlist反例與來源預檢。新增15個API旅程與3個runner反例接入預設套件；末次指定runner18/18、必要native97/97，0fail、0真實付費。runner獨立第四組執行，避免source-pin反例與Workers／migration讀取來源競態。原兩位reviewer對固定功能基準f2b6c07複查皆通過，7項finding全部修正、0未解及0新增code smell；整合後完整回歸由整合PR記錄，不能把舊版精確body量測冒稱新head實測。
+兩軸初審及複查共提出Standards P3兩項、Spec P1一項／P2五項，均已在唯一review-fix分支處理，詳見[分軸修正與RED→GREEN證據](pursuits-220-review.md)。修正涵蓋歸檔用語、詞彙表領域定義、跨output持久payer／一次性授權、未提及與歷史綁定版、保留綁定後正常assessment、paired-ended新綁定完整驗證、L5人工相關承接確認；另完成真官方price host allowlist反例與來源預檢。新增15個API旅程與6個runner案例接入預設套件；末次指定runner21/21、必要native97/97，0fail、0真實付費。runner獨立第四組執行，避免source-pin反例與Workers／migration讀取來源競態。原兩位reviewer對固定功能基準974629b複查皆通過，8項finding全部修正、0未解及0新增code smell；整合後完整回歸由整合PR記錄，不能把舊版精確body量測冒稱新head實測。
