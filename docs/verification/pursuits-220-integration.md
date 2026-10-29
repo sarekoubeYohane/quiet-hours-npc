@@ -53,10 +53,14 @@ T8首組連續8輪結合：兩候選承接／共享下層 → 詢問與真正Cas
 
 整合 `ff68f64`（T1–T7產品及projection regression修正）完整預設套件：世界／活動1027/1027、auth32/32、Workers／D1 migrations／#211 checker15/15，合計1074項，0fail；世界組耗時723504ms。新增T8 runner測試另列指定執行，已接預設suite，避免把尚未包含的新測試算進上述1074。typecheck／build通過，lint保留4項既有warning。最終整合兩軸code review及修正由整合PR紀錄補足。
 
-最新 `node --test tooling/experiments/pursuit-runner-228.test.mjs` 為 **15/15通過、0fail（121693ms）**。正向完整批次為10個trial／80次advance、17次受控forward（含必要裁定）、64次非焦點partner fixture、81次原引擎計量；全為合成回覆，真正付費呼叫0。最大完整body106004bytes，沒有增加原輸出或期限。必要感知骰只於此受控positive固定`.675`；live的時鐘／骰與玩家限制不動。檔案SQLite原WorldApp重載、人物檔案、分析、390px、POST拒絕及GET世界不變均通過，公開摘要在上圖目錄。
+T8交付時 `node --test tooling/experiments/pursuit-runner-228.test.mjs` 為 **15/15通過、0fail（121693ms）**。正向完整批次為10個trial／80次advance、17次受控forward（含必要裁定）、64次非焦點partner fixture、81次原引擎計量；全為合成回覆，真正付費呼叫0。最大完整body106004bytes，沒有增加原輸出或期限。必要感知骰只於此受控positive固定`.675`；live的時鐘／骰與玩家限制不動。檔案SQLite原WorldApp重載、人物檔案、分析、390px、POST拒絕及GET世界不變均通過，公開摘要在上圖目錄。
 
 T8正向完整80advance是**合成既有100calls／1,000,000tokens payer**的plumbing壓力，未改正式／原預設玩家上限。另以原12calls／30000tokens驗證合法首派送後到限停止，沒有set-budget、沒有trial刷新小時窗口。模型回覆、價目與授權均為測試fixture，不是官方價目或人類真實授權。
 
 ## #229 尚缺條件
 
-獨立L1–L5各2次方案、固定8×15分鐘窗口與判讀在[新版預登記](pursuits-220-preregistration.md)。runner已可轉送真正焦點／裁定body，但沒有本輪人類有限付費授權；正式product/runner commit與官方價格原件仍待最終封存，也未讀取或探測真Key。取得有效憑證、明確有限授權餘額／到期／payer scope、價格與停止來源後，才可另行執行#229。無真實成功鏈或退出分支時，#220與#229保持開啟；不自動關閉#211或其他既有問題。
+獨立L1–L5各2次方案、固定8×15分鐘窗口與判讀在[新版預登記](pursuits-220-preregistration.md)。runner已可轉送真正焦點／裁定body，但沒有本輪人類有限付費授權；正式product/runner commit與適用account/tier價格仍待最終封存，也未讀取或探測真Key。官方模型文件已完成零派送來源預檢，私有原件hash與未封存價目metadata見新版預登記，不代表本批paid-ready。取得有效憑證、明確有限授權餘額／到期／payer scope、價格與停止來源後，才可另行執行#229。無真實成功鏈或退出分支時，#220與#229保持開啟；不自動關閉#211或其他既有問題。
+
+## 最終review與修正
+
+兩軸審查對`f9493c7...144bcea`提出Standards P3一項、Spec P1一項／P2兩項，均已在唯一review-fix分支處理，詳見[分軸修正與RED→GREEN證據](pursuits-220-review.md)。修正涵蓋歸檔用語、跨output持久payer／一次性授權、未提及與歷史綁定版、L5人工相關承接確認；另完成真官方price host allowlist反例與來源預檢。新增5個API旅程與3個runner反例接入預設套件；runner獨立第四組執行，避免source-pin反例與Workers／migration讀取來源競態。末次必要測試數與原reviewer複核在修正報告及整合PR記錄，不能把舊版精確body量測冒稱新head實測。

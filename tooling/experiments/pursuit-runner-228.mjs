@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createRuntime } from './pursuit-runtime-228.mjs';
+import { claimExperiment } from './pursuit-account-228.mjs';
 
 export const digest = value => createHash('sha256').update(value).digest('hex');
 async function durableWrite(file,text,maxBytes){
@@ -14,7 +15,7 @@ async function durableWrite(file,text,maxBytes){
   try{handle=await open(temporary,'wx',0o600);await handle.writeFile(text);await handle.sync();await handle.close();handle=null;await rename(temporary,file);}
   finally{await handle?.close();await rm(temporary,{force:true});}
 }
-const runnerFiles=['tooling/experiments/pursuit-runner-228.mjs','tooling/experiments/pursuit-runtime-228.mjs','tooling/experiments/pursuit-partner-228.cjs','tests/pursuit-selection-fixture.cjs','package.json','pnpm-lock.yaml'];
+const runnerFiles=['tooling/experiments/pursuit-runner-228.mjs','tooling/experiments/pursuit-runtime-228.mjs','tooling/experiments/pursuit-account-228.mjs','tooling/experiments/pursuit-partner-228.cjs','tests/pursuit-selection-fixture.cjs','package.json','pnpm-lock.yaml'];
 const productPaths=['lib','app','components','drizzle','package.json','pnpm-lock.yaml','tests/pursuit-selection-fixture.cjs'];
 export async function runnerDigest(root=process.cwd()) {
   const files=[...runnerFiles,...(await readdir(join(root,'drizzle'))).filter(file=>file.endsWith('.sql')).sort().map(file=>'drizzle/'+file)];
@@ -25,6 +26,7 @@ export async function runnerDigest(root=process.cwd()) {
 }
 const fixedSchedule=['L1:1','L2:1','L3:1','L4:1','L5:1','L5:2','L4:2','L3:2','L2:2','L1:2'];
 const finite=n=>typeof n==='number'&&Number.isFinite(n)&&n>0;
+const officialPriceSource=value=>{try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&['openai.com','www.openai.com','developers.openai.com','platform.openai.com'].includes(url.hostname);}catch{return false;}};
 const git=(root,args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']}).trim();
 export async function preflight({ root = process.cwd(), planPath = join(root, 'tooling/experiments/pursuits-220.json'), authorization = null, priceSnapshot = null } = {}) {
   let plan;
@@ -35,6 +37,7 @@ export async function preflight({ root = process.cwd(), planPath = join(root, 't
   if (!plan?.implementationCommit) missing.push('reviewed-implementation-commit');
   if (!plan?.runnerSha256) missing.push('sealed-runner-sha256');
   if (plan) {
+    if(plan.l5ChangePolicy!=='explicit-bound-controller-confirmation')errors.push('l5-change-policy');
     if(plan.version!==1||plan.issue!==220||plan.provider!=='openai'||plan.model!=='gpt-6-luna'||plan.adjudicationModel!=='gpt-6-luna'||JSON.stringify(plan.parameters)!==JSON.stringify({reasoning_effort:'none',store:false,npcMaxOutputTokens:2048,adjudicationMaxOutputTokens:12000,recall:false,retries:false})) errors.push('model-parameters');
     if(JSON.stringify(plan.schedule)!==JSON.stringify(fixedSchedule)||plan.window?.advances!==8||plan.window?.minutes!==15)errors.push('schedule-window');
     if(!['calls','tokens','usd','elapsedMs'].every(key=>finite(plan.limits?.[key])))errors.push('finite-plan-limits');
@@ -44,7 +47,7 @@ export async function preflight({ root = process.cwd(), planPath = join(root, 't
   }
   const planSha256=plan?digest(JSON.stringify(plan)):null;
   if(authorization&&(!authorization.approved||!authorization.reference||!authorization.runId||authorization.scope!=='isolated-pursuit-220'||authorization.payer!=='pursuit-experiment-payer'||authorization.planSha256!==planSha256||!(authorization.expiresAt>Date.now())||!['calls','tokens','usd','elapsedMs'].every(key=>finite(authorization.remaining?.[key]))))errors.push('finite-authorization');
-  if(priceSnapshot&&(!/^https:\/\/(?:www\.)?openai\.com\//.test(priceSnapshot.source||'')||!/^\d{4}-\d{2}-\d{2}$/.test(priceSnapshot.date||'')||!(/^[a-f0-9]{64}$/.test(priceSnapshot.evidenceSha256||''))||priceSnapshot.provider!==plan?.provider||priceSnapshot.model!==plan?.model||!finite(priceSnapshot.input)||!finite(priceSnapshot.output)))errors.push('official-price-snapshot');
+  if(priceSnapshot&&(!officialPriceSource(priceSnapshot.source)||!/^\d{4}-\d{2}-\d{2}$/.test(priceSnapshot.date||'')||!(/^[a-f0-9]{64}$/.test(priceSnapshot.evidenceSha256||''))||priceSnapshot.provider!==plan?.provider||priceSnapshot.model!==plan?.model||!finite(priceSnapshot.input)||!finite(priceSnapshot.output)))errors.push('official-price-snapshot');
   if(authorization&&priceSnapshot&&authorization.priceSha256!==digest(JSON.stringify(priceSnapshot)))errors.push('authorized-price-mismatch');
   if(authorization&&Object.keys(authorization).some(key=>!['approved','reference','runId','scope','payer','planSha256','priceSha256','expiresAt','remaining'].includes(key)))errors.push('authorization-fields');
   if(priceSnapshot&&Object.keys(priceSnapshot).some(key=>!['provider','model','source','date','input','output','evidenceSha256'].includes(key)))errors.push('price-fields');
@@ -54,17 +57,18 @@ export async function preflight({ root = process.cwd(), planPath = join(root, 't
 const exists=async file=>{try{await access(file);return true;}catch{return false;}};
 export async function readback({runDirectory,root=process.cwd()}) {
   const state=JSON.parse(await readFile(join(runDirectory,'run-state.json'),'utf8'));
-  const runtime=await createRuntime({root,databasePath:join(runDirectory,'world.sqlite'),readonly:true});
+  const runtime=await createRuntime({root,databasePath:state.accountDatabasePath||join(runDirectory,'world.sqlite'),readonly:true});
   try{return {state,...await(await runtime.get(state.pendingOperationId||state.lastOperationId)).json()};}finally{await runtime.close();}
 }
 
 // Public executable runner. Tests inject only provider transport and credential input;
 // they enter this same paid-mode gate, with explicitly synthetic finite authorization.
-export async function runExperiment({root=process.cwd(),planPath=join(root,'tooling/experiments/pursuits-220.json'),mode='preflight',runDirectory,authorization=null,priceSnapshot=null,credential,providerFetch=globalThis.fetch,controlledTransport=false,stopRequested=async()=>false,clock=()=>Date.now(),storageFault}={}) {
+export async function runExperiment({root=process.cwd(),planPath=join(root,'tooling/experiments/pursuits-220.json'),mode='preflight',runDirectory,authorization=null,priceSnapshot=null,credential,providerFetch=globalThis.fetch,controlledTransport=false,stopRequested=async()=>false,clock=()=>Date.now(),storageFault,accountDirectory,confirmMealCommitment=async()=>null}={}) {
   const checked=await preflight({root,planPath,authorization,priceSnapshot});
   if(mode==='preflight')return checked;
   if(mode!=='live'||!checked.paidReady)throw Error('Preflight rejected: '+[...checked.errors,...checked.missing].join(', '));
   if(!runDirectory||!credential)throw Error('Private output directory and explicit credential source required');
+  if(accountDirectory&&!controlledTransport)throw Error('account-directory-is-controlled-test-only');
   const relativeOutput=relative(resolve(root),resolve(runDirectory));
   if(!relativeOutput||!isAbsolute(relativeOutput)&&relativeOutput!=='..'&&!relativeOutput.startsWith('..'+(process.platform==='win32'?'\\':'/')))throw Error('Private output must be outside repository');
   await mkdir(runDirectory,{recursive:true,mode:0o700});
@@ -72,11 +76,15 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
   const state={version:1,runId:authorization.runId,planSha256:checked.planSha256,firstDispatchAt:null,forwardedCalls:0,providerInvocations:0,fixtureCalls:0,tokens:0,usd:0,pendingOperationId:null,lastOperationId:null,stopped:null,trials:fixedSchedule.map(id=>({id,status:'not-reached',rounds:0,classification:'unassessed'}))};
   // Exclusive creation forbids accidental restart/reset/retry of an interrupted batch.
   const lock=await open(join(runDirectory,'RUN.lock'),'wx',0o600);await lock.writeFile('Exclusive experiment. Readback only after stop.');await lock.sync();await lock.close();
+  const account=await claimExperiment({accountDirectory,authorization,planSha256:checked.planSha256,runDirectory});
+  try {
+  state.accountDatabasePath=account.databasePath;
+  account.persist(state);
   await durableWrite(stateFile,JSON.stringify(state),256*1024);
   await durableWrite(join(runDirectory,'run-manifest.json'),JSON.stringify({plan:checked.plan,authorization,priceSnapshot}),64*1024);
-  const save=()=>durableWrite(stateFile,JSON.stringify(state,null,2),256*1024);
+  const save=async()=>{account.persist(state);await durableWrite(stateFile,JSON.stringify(state,null,2),256*1024);};
   const plan=checked.plan,limits=Object.fromEntries(Object.keys(plan.limits).map(key=>[key,Math.min(plan.limits[key],authorization.remaining[key])]));
-  const runtime=await createRuntime({root,databasePath:join(runDirectory,'world.sqlite'),storageFault});
+  const runtime=await createRuntime({root,databasePath:account.databasePath,storageFault});
   const oldFetch=globalThis.fetch;
   let key='',currentTrial,roundStart,roundDispatches=0,roundTokens=0,traceFrames=[],trialBytes=0,partner;
   const require=createRequire(import.meta.url);
@@ -135,7 +143,7 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
       const sceneEntry=plan.scenes[scenario==='L4'?'creative':'service'];
       const bytes=await readFile(resolve(root,sceneEntry.file));if(digest(bytes)!==sceneEntry.sha256)throw Error('scene-hash');
       await runtime.initializeStory(JSON.parse(bytes));
-      partner=createPartner(scenario);trial.status='running';trial.payerBefore=payerProjection(reset.world);trialBytes=0;
+      partner=createPartner(scenario,{runId:state.runId,trial:trial.id});trial.status='running';trial.payerBefore=payerProjection(reset.world);trialBytes=0;
       for(let round=0;round<plan.window.advances;round++) {
         await stop();roundStart=await(await runtime.get()).json();roundDispatches=0;roundTokens=0;traceFrames=[];
         if(roundStart.unresolvedUsageRecovery||!roundStart.costSummary.total.complete)throw Error('unknown-usage-or-cost');
@@ -151,9 +159,18 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
         const actual=(after.decisionTrace.dispatches||[]).map(frame=>frame.requestBody);
         if(traceFrames.some(frame=>!actual.includes(frame.requestBody)))throw Error('prepared-request-mismatch');
         await writeEvidence(`${trial.id.replace(':','-')}-${round+1}.json`,{trial:trial.id,round:round+1,operationId:state.pendingOperationId,before:roundStart,after,transport:traceFrames});
-        partner.observe(after.world);
-        trial.rounds++;trial.lastVersion=after.version;trial.payerAfter=payerProjection(after.world);trial.partner=partner.report();
-        state.lastOperationId=state.pendingOperationId;state.pendingOperationId=null;await save();
+        state.lastOperationId=state.pendingOperationId;state.pendingOperationId=null;
+        trial.rounds++;trial.lastVersion=after.version;trial.payerAfter=payerProjection(after.world);await save();
+        let confirmation=null;
+        if(scenario==='L5'){
+          const remaining=Math.min(authorization.expiresAt-clock(),limits.elapsedMs-(state.firstDispatchAt?clock()-state.firstDispatchAt:0));
+          if(remaining<=0)throw Error('elapsed-limit');
+          const signal=AbortSignal.timeout(Math.max(1,remaining));let listener;
+          try{confirmation=await Promise.race([confirmMealCommitment({runId:state.runId,trial:trial.id,operationId:state.lastOperationId,world:structuredClone(after.world),signal}),new Promise((_,reject)=>{listener=()=>reject(Error('confirmation-time-limit'));signal.addEventListener('abort',listener,{once:true});})]);}
+          finally{if(listener)signal.removeEventListener('abort',listener);}
+          await stop();
+        }
+        partner.observe(after.world,{operationId:state.lastOperationId,confirmation});trial.partner=partner.report();await save();
       }
       trial.status='window-ended';await save();
       if(index===0)await runtime.archive(join(runDirectory,'first-trial.sqlite'));
@@ -165,8 +182,9 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
   const readbackText=redact(JSON.stringify(reopened));
   if(Buffer.byteLength(readbackText)>1024*1024||trialBytes+Buffer.byteLength(readbackText)>16*1024*1024){state.stopped='evidence-gap';await save();await durableWrite(join(runDirectory,'readback.json'),JSON.stringify({gap:'readback-size-limit',operationId:state.pendingOperationId||state.lastOperationId,bytes:Buffer.byteLength(readbackText)}),1024);}
   else await durableWrite(join(runDirectory,'readback.json'),readbackText,1024*1024);
-  key='';
+  key='';account.finish(state,reopened.operation?.state==='settled'&&reopened.costSummary?.total.complete===true&&!reopened.usageRecovery?.unknownRange&&!reopened.unresolvedUsageRecovery);
   return {...state,sqliteReopened:true,realProviderCalls:controlledTransport?0:state.providerInvocations,forwardingTransport:controlledTransport?'injected-controlled-provider':'provider'};
+  } finally {account.close();}
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -175,7 +193,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   else {
     const authorization=value('--authorization')?JSON.parse(await readFile(value('--authorization'),'utf8')):null;
     const priceSnapshot=value('--prices')?JSON.parse(await readFile(value('--prices'),'utf8')):null;
-    const result=await runExperiment({mode:args.includes('--live')?'live':'preflight',planPath:value('--plan')||undefined,runDirectory:value('--output'),authorization,priceSnapshot,credential:async()=>{const name=value('--credential-env');if(!name)throw Error('Explicit credential env name required');return process.env[name];}});
+    const result=await runExperiment({mode:args.includes('--live')?'live':'preflight',planPath:value('--plan')||undefined,runDirectory:value('--output'),authorization,priceSnapshot,confirmMealCommitment:async({trial})=>{const directory=value('--confirmations-dir');if(!directory)return null;try{const bytes=await readFile(join(directory,trial.replace(':','-')+'.json'));return bytes.length<=4096?JSON.parse(bytes):null;}catch{return null;}},credential:async()=>{const name=value('--credential-env');if(!name)throw Error('Explicit credential env name required');return process.env[name];}});
     console.log(JSON.stringify(result,null,2));
     if(result.stopped||result.errors?.length)process.exitCode=2;
   }

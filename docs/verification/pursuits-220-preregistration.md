@@ -12,7 +12,7 @@
 | L2 | 2 | Cass 明確表示想吃一份普通簡餐。 |
 | L3 | 2 | Cass 只表示有點餓但還未決定；焦點角色自行提出協助後才接受。沒有提出則記未到達接受分支。 |
 | L4 | 2 | Vera 在自己的房間與既有創作機會中自行選擇；沒有外部服務要求。 |
-| L5 | 2 | 同 L2 起點；只有焦點角色已真實提交 active 非方向追求後，Cass 下一個合法說話機會表示現在不需要餐點。未承接或未變更都保留未到達／未驗證狀態。 |
+| L5 | 2 | 同L2起點；只有真實提交相關餐點承接、由外部controller人工讀證據確認並綁定run/trial/operationId/pursuitId/version/scope後，Cass下一個合法說話機會表示現在不需要餐點。無關整理、資訊only、拒絕或未確認均不觸發、不消耗變化機會；未承接或未變更保留未到達／未驗證。 |
 
 固定順序：L1:1 → L2:1 → L3:1 → L4:1 → L5:1 → L5:2 → L4:2 → L3:2 → L2:2 → L1:2。每組最多8次15分鐘 advance，成果後仍保留下一次正常決策。任何停止保留全部10個位置與未到達分母；不延長、重試、換場景補成功。若創作合理時長需替代窗口，須另封存整批方案，在首筆付費前完成，不能與本固定批次混算。
 
@@ -21,6 +21,8 @@
 ## 界線與停止
 
 同一 payer 使用同一 private file SQLite；trial 間真 reset API 只重建故事，完整小時／累計用量、價格與玩家限制保留。初始 scene 安裝是本機隔離建置，不能在組內使用。live 使用真實 Date.now；15分鐘只從世界 advance.minutes 推進，不以假時鐘刷新用量。
+
+payer資料及已用授權claim固定在output以外的private account.sqlite；同runId或授權reference換output不能重領，真正新grant也不換payer。既有未明派送會阻止新grant，先只讀原ID，不由刪除output繞過。L5人工確認只控制事前登記的partner世界內台詞，不注入焦點角色意願、記憶或動作，也沒有付費classifier。
 
 方案全批上限：160次真正 provider forward、2,000,000已回報input+output tokens、US$1、首個派送起45分鐘。有效值取方案、明確有限授權餘量與原玩家政策的最小可用範圍。fixture角色回覆仍佔引擎原用量，不能扣除它製造玩家額度。全批有限餘量按逐次真正body bytes＋max output保守預留，玩家沿既有已知累計guard；單次回覆可跨玩家token門檻，已知用量照記並停止後續派送，不聲稱供應商硬切斷。可能提早停止，不能因此提高上限。
 
@@ -39,3 +41,5 @@ L5 須先有真實自主承接、實際可知變化、明示改變及一致下�
 ## 首筆付費仍缺
 
 最終已 review 的產品完整 commit、runner digest、正式封存參數／場景／順序、官方價目原件及hash、使用者明確有限授權（payer/scope/run/expiry/各餘額）、可用憑證的指定來源與原玩家餘量。預檢不讀真 Key，亦不呼叫 provider 探測；本 prompt 沒有付費授權，#229保持未完成。
+
+2026-10-29另完成零派送官方文件預檢：[gpt-6-luna官方模型文件](https://developers.openai.com/api/docs/models/gpt-6-luna)。私有來源原件4111bytes，SHA256 `20b10b062d96a4b0745f7675624c564271a229046c5fafc9e63c76f776dcee59`；Standard短context列input US$0.10／output US$0.50／cached input US$0.01每百萬tokens。官方另列>272K完整request倍價、Fast 2倍及regional +10%。此處只記已查證來源，不公開整份官方原文、不把合成測試價目升格；實際account/tier與適用價目尚未核對，仍須首派前另封存，default manifest仍未paid-ready。

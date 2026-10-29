@@ -1,0 +1,10 @@
+{
+  "result": "PASS",
+  "realPaidCalls": 0,
+  "fixtureCalls": 3,
+  "historicalParentVersion": 1,
+  "currentParentVersion": 2,
+  "oldChildScopePreserved": true,
+  "reloadNoDispatch": true,
+  "nextActualInputBytes": 5619
+}

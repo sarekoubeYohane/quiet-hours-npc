@@ -22,7 +22,9 @@ node tooling/experiments/pursuit-runner-228.mjs --readback /private/new-run
 
 preflight 核對完整產品 commit／工作樹、runner digest、模型與參數、兩種場景 hash、十組順序、固定窗口與有限方案；授權綁 plan hash、price hash、payer、isolated scope、run ID、到期與各有限餘額。官方價目須有來源、日期及保存原件 SHA256，不用測試合成單價冒充正式價目。預設 manifest 故意保留尚未封存的 commit/digest 與授權／價目缺口，不能 paidReady。
 
-runDirectory 必須在 repository 外；run-state 以 exclusive create 拒絕重啟。同一 SQLite 保存 payer，trial 間先封存證據，再真 reset，再只於初始邊界套入封存 scene；帳務、限制、keys與journal不重建。Date.now 使用實際時鐘，沒有每輪人造15分鐘。原有 pending／uncertain／unknown 決不切下一組。
+runDirectory 必須在 repository 外，只保存本批證據。live 的 payer 權威固定在使用者 private `~/.quiet-hours-npc/pursuit-220/account.sqlite`，不能透過output換位置；CLI不提供更換account位置的參數。SQLite原子claim唯一runId與payer/授權reference，並限制同payer一個active／未明批次。同授權或runId換output也拒絕，沒有讀Key或新派送；已用授權不自動重發餘額。真正不同的新授權仍共用原payer世界、用量、小時窗口與限制；未明派送未核對前會停止新的grant。有效claim最多256筆，僅清理已到期且非active的claim，滿載拒絕新增，不清除尚有效的grant。
+
+run-state以temp→fsync→rename保存，控制狀態也持久化到獨立output的同一account SQLite；output內RUN.lock不是唯一守門。同一SQLite內trial間先封存證據，再真reset，再只於初始邊界套入scene；帳務、限制、keys與journal不重建。Date.now使用實際時鐘，沒有每輪人造15分鐘。原有pending／uncertain／unknown決不切下一組。測試可在受控transport模式注入暫存account儲存位置，live模式禁止此override。
 
 每個 runtime 使用隨機32-byte加密秘密，只保留在process記憶體binding，不採公共browser fixture的固定秘密、不寫秘密到生成module。Key只經原 set-model-key API加密保存；header／Authorization不進原件。原body原樣forward；副本保存前沿共用redaction遮蔽literal／JSON escape／Bearer echo。停止後新runtime只GET，沒有加密秘密、不讀取或探測Key。
 
@@ -41,3 +43,5 @@ runDirectory 必須在 repository 外；run-state 以 exclusive create 拒絕重
 受控旅程只在測試端固定必要感知骰 `.675`；先前未固定時，新來源雖存在但可能未察覺，下一次真輸入斷言會合理失敗。固定外部骰後通過，不修改live的骰子或Date.now，不把合法未察覺樣本當作追求功能失效。獨立預檢、版本／來源指紋、原預設到限、三種授權最小上限、unknown usage、STOP、elapsed、Key echo、transport error、pending SQLite及原ID重開／拒絕重啟、證據超界與正向完整旅程共15項；typecheck與本輪eslint通過。完整既有1074項回歸另見整合報告，最終code review由整合PR記錄。
 
 `readback.json`、SQLite及首組只讀副本支援重新開檔查原ID；HTTP WorldApp只讀入口拒絕POST，重載不派送。圖、scope、本人滿足與實際物件分開顯示。C1–C30完整對照見[整合驗證](pursuits-220-integration.md)，真實試驗責任見[新版預登記](pursuits-220-preregistration.md)。
+
+L5以外部controller的明確人工證據確認判定相關承接，不以任意active工作或餐點keyword推論。確認須帶runId、trial、真正已提交operationId、pursuitId、version、相同scope、relatedMealCommitment=true與人工review reference；只能在該已提交世界中核對有效非direction追求，不寫入焦點角色追求／記憶。沒有確認維持not-reached，不消耗唯一變化機會。程式API `confirmMealCommitment` 可等待外部人工判讀（仍受原45分鐘／授權期限約束）；CLI可用`--confirmations-dir /private/confirmations`讀取`L5-1.json`／`L5-2.json`，每次已提交回合後只核對當下匹配的有界原件。過期／不符操作、版本或scope不觸發；人工相關性判讀本身不是程式已驗證語義或真實行為成功。
