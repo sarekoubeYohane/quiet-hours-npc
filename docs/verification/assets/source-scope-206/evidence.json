@@ -1,0 +1,15 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "uiAdvances": 2,
+  "npcCalls": 2,
+  "adjudicatorCalls": 0,
+  "reload": true,
+  "replayZeroDispatch": true,
+  "nextRequestContainsBread": true,
+  "oldSourceRemaining": 0,
+  "actualSourceId": "bread",
+  "desktop": true,
+  "mobile390": true,
+  "pageErrors": []
+}

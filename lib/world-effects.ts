@@ -1,5 +1,6 @@
 import { changeBodyNeeds, type IngestEffect } from './needs';
-import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
+import { finiteSourceScope } from './routine-materials';
 import { validQuantity } from './world-formation-contract';
 import { applyFormation } from './world-formation';
 import type { FormationEffect, Quantity, ObjectSource, FormationFact } from './world-formation-contract';
@@ -20,9 +21,10 @@ export function requiresWorldEffects(action: Action): boolean {
  return action.type === 'propose' || action.type === 'work' && action.target === 'tea';
 }
 
-export type SceneSupply={stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
+export type FiniteSourceScope={version:1;coverage:'region'|'location';subject:string};
+export type SceneSupply={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;quantity?:Quantity;consumable?:boolean;coOwners?:string[];pending?:boolean;availableAt?:number;background?:{ruleId:string;sequence:number;scope?:{version:1;role:'material'|'equipment';subject:string|null}};id:string;label:string;region:string;remaining:number;owner:string;knownTo:string[];allowedTo:string[];kind:string;initialState:Record<string,string>;stateTransitions?:Record<string,string[]>};
 export type PhysicalHistory={actorId:string;minute:number;operation:string;permitted:boolean;priorHolder:string|null};
-export type WorldObject={stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
+export type WorldObject={finiteScope?:FiniteSourceScope;stateExposure?:Record<string,'public'|'hidden'>;physicalHistory?:PhysicalHistory[];physicalHistoryDropped?:number;unpermittedCount?:number;endedByFormation?:{operation:'partition'|'transform';at:number;actorId:string;disposition:'consumed'|'destroyed'};quantity?:Quantity;consumable?:boolean;coOwners?:string[];sources?:ObjectSource[];formation?:FormationFact;id:string;source:string;label:string;region:string;holder:string|null;owner:string;revision:number;state:Record<string,string>;lifecycle:'active'|'consumed'|'destroyed';kind:string;knownTo:string[];allowedTo:string[];stateTransitions?:Record<string,string[]>;acceptedBy?:string[]};
 export type StateChange={key:string;from:string|null;value:string};
 export type ChangeStateEffect={kind:'change-state';version:1;expectedRevision:number;changes:StateChange[];reason:string}&({access:'authorized'|'physical';target:{type:'object';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'environment';id:string};exposure:'public'|'hidden'}|{access:'physical';target:{type:'body';id:string};exposure:'public'|'subject'|'hidden'});
 export type DisplaceBodyEffect={kind:'displace-body';version:1;targetId:string;expectedRegion:string;expectedRevision:number;toRegion:string;reason:string};
@@ -82,22 +84,27 @@ export function authorityForProposal(w:World,c:Character,action?:Action){
  const eligibleObjects=(w.objects||[]).filter(object=>objectIds.has(object.id)||object.lifecycle==='active'&&object.holder===c.id)
   .map(object=>{const copy={...object};delete copy.physicalHistory;delete copy.physicalHistoryDropped;delete copy.unpermittedCount;return copy;});
  const eligibleSupplies=(w.supplies||[]).filter(supply=>supplyIds.has(supply.id)).map(supply=>({...supply,materializedObjectId:supply.remaining>0?materializedObjectId(supply):null}));
+ const eligibleRestrictions=[...(w.supplies||[]).map(source=>({type:'supply' as const,source})),...(w.objects||[]).map(source=>({type:'object' as const,source}))].flatMap(({type,source})=>{
+  const scope=finiteSourceScope(source);
+  return scope?.coverage==='location'&&source.region!==local&&regions.find(region=>region.id===source.region)?.location===c.location?[{type,id:source.id,region:source.region,scope,readOnly:true as const}]:[];
+ });
  // A bounded authority subset is explicit about omissions, never a complete
  // execution snapshot. Prefer the requested identity and actor's own objects.
  eligibleObjects.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target)||Number(b.holder===c.id)-Number(a.holder===c.id));
  eligibleSupplies.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target));
  const objects:WorldObject[]=[],supplies:(SceneSupply&{materializedObjectId:string|null})[]=[];
+ const finiteRestrictions:typeof eligibleRestrictions=[];
  let bytes=32;
  const retain=<T,>(source:T[],target:T[])=>{for(const item of source){const size=new TextEncoder().encode(JSON.stringify(item)).length+2;if(target.length<32&&bytes+size<=64*1024){target.push(item);bytes+=size;}}};
- retain(eligibleObjects,objects);retain(eligibleSupplies,supplies);
- return {explorationScope:{region:local,objectsOmitted:eligibleObjects.length-objects.length,suppliesOmitted:eligibleSupplies.length-supplies.length,complete:eligibleObjects.length===objects.length&&eligibleSupplies.length===supplies.length},external:{bodies:w.characters.filter(person=>regionOf(person)===local&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:local})},objects,supplies,effectContractVersion:'world-effects.v5',effectRules,effectContract:effectCandidateSchema};
+ retain(eligibleRestrictions,finiteRestrictions);retain(eligibleObjects,objects);retain(eligibleSupplies,supplies);
+ return {explorationScope:{region:local,objectsOmitted:eligibleObjects.length-objects.length,suppliesOmitted:eligibleSupplies.length-supplies.length,restrictionsOmitted:eligibleRestrictions.length-finiteRestrictions.length,complete:eligibleObjects.length===objects.length&&eligibleSupplies.length===supplies.length&&eligibleRestrictions.length===finiteRestrictions.length},external:{bodies:w.characters.filter(person=>regionOf(person)===local&&(person.id===c.id||canSee(w,c,regionOf(person)))).map(person=>({id:person.id,...worldTargetSnapshot(w,{type:'body',id:person.id})})),environment:worldTargetSnapshot(w,{type:'environment',id:local})},objects,supplies,finiteRestrictions,effectContractVersion:'world-effects.v5',effectRules,effectContract:effectCandidateSchema};
 }
 function physicalPrimitive(effect:PhysicalEffect,c:Character):Exclude<Effect,PhysicalEffect|IngestEffect> {
  if(effect.operation==='materialize')return {kind:'materialize',supplyId:effect.supplyId,expectedRemaining:effect.expectedRemaining};
  if(effect.operation==='take'||effect.operation==='place')return {kind:'transfer',objectId:effect.objectId,expectedRevision:effect.expectedRevision,toHolder:effect.operation==='take'?c.id:null,toRegion:regionOf(c)};
  return {kind:effect.operation,objectId:effect.objectId,expectedRevision:effect.expectedRevision};
 }
-function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number):string[]{
+function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|null=null,nominalDueAt?:number,routineSourceScope?:RoutineSourceScope):string[]{
  const results:string[]=[];
  const previousIdentities=new Set((w.objects||[]).map(object=>object.id));
  for(const [effectIndex,original] of effects.entries()){
@@ -108,6 +115,8 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    throw new EffectValidationError(message,{reason,phaseIndex,effectIndex,effect:original,actorRegion:regionOf(c),actual:structuredClone(w.objects?.find(o=>o.id===id)||w.supplies?.find(s=>s.id===id)||null)});
   };
   if(e.kind==='discover'){
+   for(const id of e.supplyIds){const supply=w.supplies?.find(item=>item.id===id);if(supply?.pending){if(!canConfirmRoutineBackground(w,c,routineSourceScope,id))fail('background_discovery_scope','尚未確認的背景來源不能由這次查找建立。');delete supply.pending;}}
+
    const objects=new Set(objectObservationCandidates(w,c,e.objectIds).map(item=>item.objectId)),supplies=new Set(supplyObservationCandidates(w,c,e.supplyIds).map(item=>item.supplyId));
    if(e.region!==regionOf(c)||!canSee(w,c,e.region)||e.objectIds.some(id=>!objects.has(id)||w.objects?.find(object=>object.id===id)?.region!==e.region)||e.supplyIds.some(id=>!supplies.has(id)||w.supplies?.find(supply=>supply.id===id)?.region!==e.region))fail('discovery_scope','查找結果超出目前可接觸的範圍。');
    results.push('已查探目前可接觸的範圍');
@@ -138,6 +147,8 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    results.push('身體外在位置已改變');
   }else if(e.kind==='materialize'){
    const s=w.supplies?.find(s=>s.id===e.supplyId);
+   if(s?.background&&routineBackgroundHasFiniteConflict(w,c,s,routineSourceScope))fail('background_finite_scope','當前適用的有限來源約束不允許普通背景代換。');
+   if(s&&!physical&&!s.knownTo.includes(c.id)&&canContactRoutineBackground(w,c,routineSourceScope,s.id))s.knownTo.push(c.id);
    if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&(physical||phaseIndex===null))||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!physical&&!s.allowedTo.includes(c.id)||s.region!==regionOf(c)||physical&&!canSee(w,c,s.region))fail('supply_precondition','裁定供應前提無效。');
    if(!validQuantity(s.quantity??{amount:1,unit:'item'})||s.consumable!==undefined&&typeof s.consumable!=='boolean')fail('quantity_precondition','供應份量或消耗能力無法安全承接。');
    if(!validObjectKind(s.kind))fail('object_kind','物件種類超出有界資料契約。');
@@ -323,7 +334,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   try{
    if(phase.effects.some(e=>e.kind==='transfer'&&e.toHolder!==null&&e.toHolder!==c.id))throw Error('階段需要接收者新的選擇。');
    predicted.minute=Math.max(predicted.minute,w.minute+phase.afterMinutes);
-   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex);validateResultTime(predicted,phase.afterMinutes);
+   checkPhase(predicted,predictedActor,phase);applyEffects(predicted,predictedActor,phase.effects,phaseIndex,undefined,phase.routineSourceScope);validateResultTime(predicted,phase.afterMinutes);
   }catch(error){
    if(error instanceof EffectValidationError)throw error;
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>'target' in p?worldTargetSnapshot(predicted,p.target):predicted.objects?.find(o=>o.id===p.objectId)||null)});
@@ -386,7 +397,7 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
    const phase=phases.stages[index];
    predicted.minute=Math.max(predicted.minute,actor.plan.startedAt+phase.afterMinutes);
    checkPhase(predicted,actor,phase);
-   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes);
+   applyEffects(predicted,actor,phase.effects,index,actor.plan.startedAt+phase.afterMinutes,phase.routineSourceScope);
   }
   return true;
  }catch{return false;}
@@ -396,7 +407,7 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
 export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):string[] {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
- const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined);
+ const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined,phase.routineSourceScope);
  commitWorldChanges(w,clone);
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  emitExternalConsequences(w,c.id,phase.effects);
