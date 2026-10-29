@@ -4,11 +4,14 @@ import { memoryBytes, MemoryValidationError } from './memory';
 export const pursuitLimits = { nodes:12, edges:16, depth:4, updates:4, stateBytes:12*1024, updateBytes:4*1024, trace:24, traceBytes:16*1024 } as const;
 export type PursuitReference={kind:'short'|'long'|'belief'|'relationship';id:string;version:number};
 export type PursuitParent={id:string;version:number;order?:number};
-export type PursuitFields={version:number;kind:'direction'|'intent'|'task';scope:string;satisfaction:string|null;parents:PursuitParent[];references:PursuitReference[];status:'active'|'dropped';reason:string};
+export type PursuitProgress='ready'|'waiting'|'deferred'|'blocked'|'enough';
+export type PursuitAssessment={kind:'subjective'|'known-result';text:string;references:PursuitReference[];time:number};
+export type PursuitFields={version:number;kind:'direction'|'intent'|'task';scope:string;satisfaction:string|null;parents:PursuitParent[];references:PursuitReference[];status:'active'|'satisfied'|'dropped';reason:string;progress?:PursuitProgress;assessment?:PursuitAssessment};
 export type PursuitTrace={id:string;time:number;operation:string;reason:string;before?:Intent;after?:Intent};
 type PursuitNode=Omit<Intent,keyof PursuitFields>&Pick<PursuitFields,'kind'|'scope'|'satisfaction'|'parents'>;
 type PursuitOrder={scope:'roots'|'children';members:{id:string;version:number}[]};
-export type PursuitUpdate={operation:'upsert'|'drop'|'reorder';id:string;version:number;node:PursuitNode|PursuitOrder|null;references:PursuitReference[];reason:string};
+type PursuitEvaluation={status:'active'|'satisfied';progress:PursuitProgress;basis:{kind:PursuitAssessment['kind'];text:string}};
+export type PursuitUpdate={operation:'upsert'|'drop'|'reorder'|'assess';id:string;version:number;node:PursuitNode|PursuitOrder|PursuitEvaluation|null;references:PursuitReference[];reason:string};
 const text=(value:unknown,max:number,nonempty=false):value is string=>typeof value==='string'&&value.length<=max&&(!nonempty||!!value.trim());
 const fields=(value:unknown,keys:string[])=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 function fail(message:string):never{throw new MemoryValidationError(message);}
@@ -47,8 +50,9 @@ const level={type:'string',enum:['low','medium','high']};
 const parentSchema={type:'object',properties:{id:{type:'string',minLength:1,maxLength:64},version:{type:'integer',minimum:0}},required:['id','version'],additionalProperties:false};
 export const pursuitNodeSchema={type:'object',properties:{id:{type:'string',minLength:1,maxLength:64},content:{type:'string',minLength:1,maxLength:200},intensity:level,importance:level,urgency:level,context:{type:'string',maxLength:160},kind:{type:'string',enum:['direction','intent','task']},scope:{type:'string',minLength:1,maxLength:200},satisfaction:{type:['string','null'],maxLength:160},parents:{type:'array',maxItems:pursuitLimits.nodes-1,items:parentSchema}},required:['id','content','intensity','importance','urgency','context','kind','scope','satisfaction','parents'],additionalProperties:false};
 const pursuitOrderSchema={type:'object',properties:{scope:{type:'string',enum:['roots','children']},members:{type:'array',minItems:1,maxItems:pursuitLimits.nodes,items:parentSchema}},required:['scope','members'],additionalProperties:false};
-export const pursuitUpdatesSchema={type:'array',maxItems:pursuitLimits.updates,items:{type:'object',properties:{operation:{type:'string',enum:['upsert','drop','reorder']},id:{type:'string',minLength:1,maxLength:64},version:{type:'integer',minimum:0},node:{anyOf:[pursuitNodeSchema,pursuitOrderSchema,{type:'null'}]},references:{type:'array',maxItems:4,items:{type:'object',properties:{kind:{type:'string',enum:['short','long','belief','relationship']},id:{type:'string',minLength:1,maxLength:128},version:{type:'integer',minimum:1}},required:['kind','id','version'],additionalProperties:false}},reason:{type:'string',minLength:1,maxLength:160}},required:['operation','id','version','node','references','reason'],additionalProperties:false}};
-export const pursuitPrompt='reorder 是明示局部重排：id=本人id+:roots、version=0、node={scope:roots,members:[{id,version}]} 調整根之間；同一上層則 id=上層id、version=當次上層版本、node={scope:children,members:[{id,version}]}。members 只列本次要互換先後的子集，未列者保留位置與追求。重排仍是一項心理更新；支援關係不是世界前提或必做方法清單，優先不強迫行動，仍可跨分支選焦點。 本版 npc-decision.v3 使用唯一 self.intents 分層追求，不回傳舊 intents 完整陣列。pursuitContext 原樣回傳本次輸入值。pursuitUpdates 是明示增量，空陣列或未提及均保留；不得靠漏寫放下。每項 operation=upsert 或 drop、id、version（新=0，舊=本次版本）、node、references、reason。upsert.node 含 id、content、intensity/importance/urgency（low/medium/high）、context（自己的簡短背景）、kind（direction/intent/task）、scope（願意承接到哪個程度）、satisfaction（本人認為什麼算夠，可null開放）、parents（上層id/version，新上層version=0）；drop.node=null。id 以自己id加冒號開頭。direction 可新增、改寫或放下，依現行保存方向判斷，不重設為初始goal。新想法無歷史可用references=[]，否則只引用本次實際可見short/long/belief/relationship的id/version。reason 是短變更理由，不要求長篇心理過程。支援有界共享下層，一個下層可連多個上層，只保留同一份進度；各上層不自動完成。有下層或活動關聯的複雜退出仍須先合法處置。focusIntentId 指本次唯一活動焦點的有效追求id，無焦點用null；methodAssessment.intentIds 與焦點一致，沒有則[]。一個行動不自動結束追求，也不產生另一份進度。追求更新和原心理更新合計最多4項／8KiB，追求更新本身最多4KiB；共用全角色每人12節點而非各層12個。';
+const pursuitEvaluationSchema={type:'object',properties:{status:{type:'string',enum:['active','satisfied']},progress:{type:'string',enum:['ready','waiting','deferred','blocked','enough']},basis:{type:'object',properties:{kind:{type:'string',enum:['subjective','known-result']},text:{type:'string',minLength:1,maxLength:160}},required:['kind','text'],additionalProperties:false}},required:['status','progress','basis'],additionalProperties:false};
+export const pursuitUpdatesSchema={type:'array',maxItems:pursuitLimits.updates,items:{type:'object',properties:{operation:{type:'string',enum:['upsert','drop','reorder','assess']},id:{type:'string',minLength:1,maxLength:64},version:{type:'integer',minimum:0},node:{anyOf:[pursuitNodeSchema,pursuitOrderSchema,pursuitEvaluationSchema,{type:'null'}]},references:{type:'array',maxItems:4,items:{type:'object',properties:{kind:{type:'string',enum:['short','long','belief','relationship']},id:{type:'string',minLength:1,maxLength:128},version:{type:'integer',minimum:1}},required:['kind','id','version'],additionalProperties:false}},reason:{type:'string',minLength:1,maxLength:160}},required:['operation','id','version','node','references','reason'],additionalProperties:false}};
+export const pursuitPrompt='assess 明示分開評估追求：node={status:active或satisfied,progress:ready或waiting或deferred或blocked或enough,basis:{kind:subjective或known-result,text:短依據}}，帶回當次節點id/version、references、reason。satisfied只配ready，表示本人認為已滿足；drop表示放下，與滿足不同。持續direction可active+enough表示目前已足夠，方向仍保留，不自動產生下一份同類任務；有新機會時可再明示ready。waiting/deferred/blocked仍是active，不是結束。known-result只能引用本次實際可見的既有經歷/信念版本，至少一個來源；當次尚未執行action不能當成果。subjective可依本人感受或理解，references可空；它不是已證實的世界成果，勿複製來源正文或把猜測說成世界核准。各層分別判斷，下層完成不自動滿足上層，已有可知依據時可同次評估多層。已滿足身份不復活；範圍與標準保留，追求不另存物理進度。 '+'reorder 是明示局部重排：id=本人id+:roots、version=0、node={scope:roots,members:[{id,version}]} 調整根之間；同一上層則 id=上層id、version=當次上層版本、node={scope:children,members:[{id,version}]}。members 只列本次要互換先後的子集，未列者保留位置與追求。重排仍是一項心理更新；支援關係不是世界前提或必做方法清單，優先不強迫行動，仍可跨分支選焦點。 本版 npc-decision.v3 使用唯一 self.intents 分層追求，不回傳舊 intents 完整陣列。pursuitContext 原樣回傳本次輸入值。pursuitUpdates 是明示增量，空陣列或未提及均保留；不得靠漏寫放下。每項 operation=upsert 或 drop、id、version（新=0，舊=本次版本）、node、references、reason。upsert.node 含 id、content、intensity/importance/urgency（low/medium/high）、context（自己的簡短背景）、kind（direction/intent/task）、scope（願意承接到哪個程度）、satisfaction（本人認為什麼算夠，可null開放）、parents（上層id/version，新上層version=0）；drop.node=null。id 以自己id加冒號開頭。direction 可新增、改寫或放下，依現行保存方向判斷，不重設為初始goal。新想法無歷史可用references=[]，否則只引用本次實際可見short/long/belief/relationship的id/version。reason 是短變更理由，不要求長篇心理過程。支援有界共享下層，一個下層可連多個上層，只保留同一份進度；各上層不自動完成。有下層或活動關聯的複雜退出仍須先合法處置。focusIntentId 指本次唯一活動焦點的有效追求id，無焦點用null；methodAssessment.intentIds 與焦點一致，沒有則[]。一個行動不自動結束追求，也不產生另一份進度。追求更新和原心理更新合計最多4項／8KiB，追求更新本身最多4KiB；共用全角色每人12節點而非各層12個。';
 
 export function updatePursuits(w:World,c:Character,value:unknown,visible:Character){
  if(value===undefined)value=[];
@@ -58,7 +62,7 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
  // Their saved array position is the existing order, never a new NPC choice.
  for(const node of next)for(const parent of node.parents||[])parent.order??=next.indexOf(node);
  for(const item of updates){
-  if(!fields(item,['operation','id','version','node','references','reason'])||!['upsert','drop','reorder'].includes(item.operation)||!text(item.id,64,true)||!item.id.startsWith(c.id+':')||!Number.isSafeInteger(item.version)||item.version<0||!text(item.reason,160,true)||!Array.isArray(item.references)||item.references.length>4)fail('追求候選格式無效');
+  if(!fields(item,['operation','id','version','node','references','reason'])||!['upsert','drop','reorder','assess'].includes(item.operation)||!text(item.id,64,true)||!item.id.startsWith(c.id+':')||!Number.isSafeInteger(item.version)||item.version<0||!text(item.reason,160,true)||!Array.isArray(item.references)||item.references.length>4)fail('追求候選格式無效');
   if(item.operation==='reorder'){if(orders.has(item.id))fail('重複追求重排範圍');orders.add(item.id);}
   else {if(seen.has(item.id)||item.id===`${c.id}:roots`)fail('重複或保留的追求身份');seen.add(item.id);}
   const old=c.intents?.find(i=>i.id===item.id);
@@ -68,6 +72,16 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
    if(!fields(ref,['kind','id','version'])||!text(ref.id,128,true)||!Number.isSafeInteger(ref.version)||ref.version<1||!sources?.some(s=>s.id===ref.id&&s.version===ref.version&&s.characterId===c.id))fail('追求來源不屬於當次本人可見版本');
   }
   if(item.operation==='reorder')continue;
+  if(item.operation==='assess'){
+   const evaluation=item.node as PursuitEvaluation|null;
+   if(!old||!visible.intents?.some(shown=>shown.id===old.id&&shown.version===old.version)||!evaluation||!fields(evaluation,['status','progress','basis'])||!['active','satisfied'].includes(evaluation.status)||!['ready','waiting','deferred','blocked','enough'].includes(evaluation.progress)||!fields(evaluation.basis,['kind','text'])||!['subjective','known-result'].includes(evaluation.basis.kind)||!text(evaluation.basis.text,160,true))fail('追求評估格式或可見版本無效');
+   if(evaluation.status==='satisfied'&&evaluation.progress!=='ready'||evaluation.progress==='enough'&&(old.kind!=='direction'||evaluation.status!=='active'))fail('滿足與推進狀態不一致');
+   if(evaluation.basis.kind==='known-result'&&!item.references.length)fail('外在結果的滿足判斷需要本次可知來源');
+   if(evaluation.status==='satisfied'&&(c.plan?.pursuitIds?.includes(old.id)||c.pausedActivity?.plan.pursuitIds?.includes(old.id)))fail('滿足追求仍須先處置原活動');
+   const assessed:Intent={...old,version:item.version+1,status:evaluation.status,progress:evaluation.progress,reason:item.reason,assessment:{...evaluation.basis,references:item.references,time:w.minute}};
+   next[next.findIndex(node=>node.id===item.id)]=assessed;
+   trace.push({id:item.id,time:w.minute,operation:'assess',reason:item.reason,before:old,after:assessed});continue;
+  }
   if(item.operation==='drop'){
    if(item.node!==null||!old||c.intents?.some(i=>i.status==='active'&&i.parents?.some(p=>p.id===old.id))||c.plan&&c.plan.pursuitIds?.includes(old.id)||c.pausedActivity?.plan.pursuitIds?.includes(old.id))fail('追求退出需先明示處置下層與活動');
    const ended:Intent={...old,version:item.version+1,status:'dropped',reason:item.reason};
@@ -80,7 +94,8 @@ export function updatePursuits(w:World,c:Character,value:unknown,visible:Charact
   if(old&&hasChild&&(old.scope!==n.scope||old.satisfaction!==n.satisfaction||old.content!==n.content||old.kind!==n.kind))fail('追求範圍改變需先明示處置下層');
   const previous=next.find(node=>node.id===item.id);
   const parents=n.parents.map(parent=>({...parent,order:previous?.parents?.find(edge=>edge.id===parent.id)?.order??Math.max(-1,...next.filter(node=>node.status==='active').flatMap(node=>node.parents?.filter(p=>p.id===parent.id).map(p=>p.order??next.indexOf(node))||[]))+1}));
-  const updated:Intent={...n,parents,version:item.version+1,references:item.references,status:'active' as const,reason:item.reason};
+  const sameScope=old&&old.scope===n.scope&&old.satisfaction===n.satisfaction&&old.content===n.content&&old.kind===n.kind;
+  const updated:Intent={...n,parents,version:item.version+1,references:item.references,status:'active' as const,reason:item.reason,...(sameScope?{progress:old.progress,assessment:old.assessment}:{})};
   const index=next.findIndex(i=>i.id===item.id);if(index<0)next.push(updated);else next[index]=updated;
   trace.push({id:item.id,time:w.minute,operation:'upsert',reason:item.reason,...(old?{before:old}:{}),after:updated});
  }
