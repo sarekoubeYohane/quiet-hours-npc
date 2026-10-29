@@ -1,6 +1,6 @@
 {
   "functionalCommit": "69d1716",
-  "standardsFindingsFixed": 1,
+  "standardsFindingsFixed": 2,
   "specFindingsFixed": 3,
   "originalReviewerRecheck": "pending integration PR",
   "runner": {"passed":18,"failed":0,"durationMs":153882},

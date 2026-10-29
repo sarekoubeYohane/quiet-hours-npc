@@ -1,8 +1,10 @@
 # #220 最終兩軸 review 修正
 
-審查基準 `f9493c7...144bcea`。Standards提出1項P3，Spec提出P1一項／P2兩項；以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原reviewer仍需在修正合入後複核。
+審查基準 `f9493c7...144bcea`。Standards初審提出1項P3，複查補充詞彙表工程細節1項P3；Spec提出P1一項／P2兩項。以下分軸保存，不把程式fixture通過算成真實NPC行為證據。全部修正在同一review-fix分支，零真實模型派送、未讀真Key、未操作正式世界、main或部署。原reviewer仍需在修正合入後複核。
 
 ## Standards
+
+**複查P3 詞彙表只保留領域定義。** 移除追求關係定義後的persist／version／驗證工程細節，使條目回到一個純領域定義句。最後明示綁定版本、當次有效父版與stale反例的技術契約完整留在`docs/design/layered-pursuits.md`及真正pursuitPrompt，沒有刪除或放寬程式檢查。
 
 **P3 歸檔不等於再次放下或變為獨立。** 原畫面對只有before的archive顯示「→明示放下」「上層→獨立」，與詞彙表不符。現在依operation顯示「已歸檔（原已明示放下／原本人認為已滿足）」；沒有after不繪製after關係，保留原結束狀態與歷史上層身份。
 
