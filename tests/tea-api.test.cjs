@@ -43,12 +43,12 @@ test('legacy tea uses the unchanged action in one adjudication, persists water t
     const input = JSON.parse(JSON.parse(init.body).messages[1].content); requests.push(input);
     return completion(input.contractVersion === 'world-adjudication.v1' ? {
       status:'accepted',completionMinutes:30,check:null,
-      effects:[{kind:'transfer',objectId:'acceptance-cup',expectedRevision:1,toHolder:'vera',toRegion:'cafe-front'},{kind:'state',objectId:'acceptance-cup',expectedRevision:2,key:'contents',value:'water'}],
-      stages:[{afterMinutes:30,preconditions:[{objectId:'acceptance-cup',revision:3,region:'cafe-front',holder:'vera',state:[{key:'contents',value:'water'}]}],effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:3,key:'contents',value:'tea'}]}],
+      effects:[],
+      stages:[{afterMinutes:15,preconditions:[],effects:[{kind:'transfer',objectId:'acceptance-cup',expectedRevision:1,toHolder:'vera',toRegion:'cafe-front'},{kind:'state',objectId:'acceptance-cup',expectedRevision:2,key:'contents',value:'water'}]},{afterMinutes:30,preconditions:[{objectId:'acceptance-cup',revision:3,region:'cafe-front',holder:'vera',state:[{key:'contents',value:'water'}]}],effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:3,key:'contents',value:'tea'}]}],
     } : {...tea,durationMinutes:30},JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
-    assert.equal((await post(advance)).status,200);
+    const started=await post(advance),starting=await started.clone().json();assert.equal(started.status,200,JSON.stringify({error:starting.error,validation:starting.adjudicationFailure?.validation}));
     const water = await read(), cup = water.objects.find(o=>o.id==='acceptance-cup');
     assert.equal(cup.state.contents,'water'); assert.equal(cup.holder,'vera'); assert.equal(cup.owner,'owner');
     assert.equal(water.characters.find(c=>c.id==='vera').plan.phases.cursor,0);
