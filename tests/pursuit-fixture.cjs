@@ -19,8 +19,13 @@ function fixtureDecision(input, candidate, { adopt = [], drop = [] } = {}) {
     updates.push({operation:'drop',id,version:old.version,node:null,references:[],reason:'受控測試角色明示放下'});
   }
   const focus = adopt[0] ? (adopt[0].id.startsWith(input.self.id + ':') ? adopt[0].id : input.self.id + ':' + adopt[0].id) : null;
+  const newPursuits=updates.filter(update=>update.operation==='upsert'&&update.version===0);
+  const pursuitCandidates=newPursuits.map((update,index)=>({id:input.self.id+':candidate:fixture-'+index,kind:update.node.kind,content:update.node.content,scope:update.node.scope,satisfaction:update.node.satisfaction,references:update.references}));
+  const adoptions=newPursuits.map((update,index)=>({candidateId:pursuitCandidates[index].id,pursuitId:update.id}));
+  const newFocus=adoptions.find(mapping=>mapping.pursuitId===focus);
+  const pursuitSelection={adoptions,declinedCandidateIds:[],focus:focus?newFocus?{kind:'candidate',id:newFocus.candidateId,version:0}:{kind:'existing',id:focus,version:input.self.intents.find(node=>node.id===focus)?.version}:null,reason:''};
   const assessment = candidate.methodAssessment ? {...candidate.methodAssessment,intentIds:candidate.methodAssessment.intentIds.map(id=>id.startsWith(input.self.id+':')?id:input.self.id+':'+id)} : {purpose:purpose||'',knownResults:[],choice:action.type==='continue'?'continue':'new',method:'',change:{kind:'not-applicable',detail:''},reason:'',selectedAction:{type:action.type,target:action.target},intentIds:focus?[focus]:[]};
-  return {mood:'平靜',durationMinutes:15,timeIntent:{kind:action.type==='work'&&action.target==='tea'?'completion':['rest','reflect','continue','work','observe','say'].includes(action.type)?'open-ended':'completion',maxMinutes:null},attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',reconfirmBodyConsequences:false,preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[],...rest,contractVersion:'npc-decision.v3',pursuitContext:input.pursuitContext,focusIntentId:focus,pursuitUpdates:updates,action,methodAssessment:assessment};
+  return {mood:'平靜',durationMinutes:15,timeIntent:{kind:action.type==='work'&&action.target==='tea'?'completion':['rest','reflect','continue','work','observe','say'].includes(action.type)?'open-ended':'completion',maxMinutes:null},attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',reconfirmBodyConsequences:false,preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[],...rest,contractVersion:'npc-decision.v3',pursuitContext:input.pursuitContext,pursuitCandidates,pursuitSelection,focusIntentId:focus,pursuitUpdates:updates,action,methodAssessment:assessment};
 }
 // The caller opts in to adopting the listed fixture intentions. Existing nodes
 // retain their current scope and version; unlisted nodes are never exited.

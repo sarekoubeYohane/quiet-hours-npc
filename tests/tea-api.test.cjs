@@ -51,7 +51,7 @@ test('legacy tea uses the unchanged action in one adjudication, persists water t
     const started=await post(advance),starting=await started.clone().json();assert.equal(started.status,200,JSON.stringify({error:starting.error,validation:starting.adjudicationFailure?.validation}));
     const water = await read(), cup = water.objects.find(o=>o.id==='acceptance-cup');
     assert.equal(cup.state.contents,'water'); assert.equal(cup.holder,'vera'); assert.equal(cup.owner,'owner');
-    assert.equal(water.characters.find(c=>c.id==='vera').plan.phases.cursor,0);
+    assert.equal(water.characters.find(c=>c.id==='vera').plan.phases.cursor,1);
     assert.equal(requests.length,2); assert.equal(requests[1].action.type,'work'); assert.equal(requests[1].action.target,'tea');
     assert.doesNotMatch(JSON.stringify(water.events),/泡了一壺茶|活動已完成/);
     const first = await (await post(advance)).json(); assert.equal(first.world.turn,1); assert.equal(requests.length,2);
