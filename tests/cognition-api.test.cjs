@@ -30,7 +30,7 @@ test('one existing decision saves a belief before its intention and legal action
     const operationId = `${Date.now()}:${crypto.randomUUID()}`, response = await advance({ operationId });
     assert.equal(response.status, 200); const result = await response.json(), after = await read(), cass = after.characters[0];
     assert.equal(cass.cognition.beliefs.length, 1); assert.equal(cass.cognition.beliefs[0].conviction, 'leaning');
-    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.ok(cass.intents.some(node=>node.id==='cass:visit-cafe'&&node.scope==='找個地方安頓自己的節奏')); 
+    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.ok(cass.intents.some(node=>node.id==='cass:visit-cafe'&&node.scope==='找個地方安頓自己的節奏'));
     assert.equal(cass.location, 'cafe'); assert.equal(cass.mood, '安心');
     assert.ok(after.events.some(event => event.actor === 'cass' && event.kind === 'move'));
     assert.equal(after.characters[1].cognition?.beliefs.length || 0, 0);
