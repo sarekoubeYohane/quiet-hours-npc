@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -9,7 +10,7 @@ const { enterAcceptanceScene } = load('acceptance-scene');
 const read = async operationId => (await (await GET(operationId ? new Request('https://test.invalid/api/world?operationId=' + encodeURIComponent(operationId)) : undefined)).json());
 const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(body) });
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
-const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: typeof value === 'string' ? value : JSON.stringify(value) } }] });
+const completion = (value,_fixtureInput) => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: typeof value === 'string' ? value : JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 async function setup(actor = 'cass', modify = () => {}) {
   const original = seedWorld(); original.turn = 124; original.minute = 3120;
   const world = await enterAcceptanceScene(original);
@@ -21,19 +22,19 @@ async function setup(actor = 'cass', modify = () => {}) {
   return { post, advance: { operation: 'advance', minutes: 15, mode: 'openai', model: 'gpt-6.1-sol', operationId: operationId() } };
 }
 const proposal = { type: 'propose', target: 'acceptance-meal', content: '取得並享用眼前的餐點', purpose: '吃飯', mood: '平靜', durationMinutes: 15, intents: [] };
-const accepted = effects => ({ status: 'accepted', effects, check: null, stages: [] });
+const accepted = effects => ({ status: 'accepted', completionMinutes:15, effects, check: null, stages: [] });
 
 test('the dispatched contract provides generated identity and effect semantics for same-action meal consumption', async () => {
   const { post, advance } = await setup();
   const previous = global.fetch; let contract;
   global.fetch = async (_url, init) => {
     const payload = JSON.parse(init.body), input = JSON.parse(payload.messages[1].content);
-    if (input.contractVersion !== 'world-adjudication.v1') return completion(proposal);
+    if (input.contractVersion !== 'world-adjudication.v1') return completion(proposal,JSON.parse(JSON.parse(init.body).messages[1].content));
     contract = input;
     return completion(accepted([
       { kind: 'materialize', supplyId: input.supplies[0].id, expectedRemaining: 1 },
       { kind: 'consume', objectId: input.supplies[0].materializedObjectId, expectedRevision: 1 },
-    ]));
+    ]),JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
     const response = await post(advance); assert.equal(response.status, 200, (await response.clone().json()).error);
@@ -56,7 +57,7 @@ test('rejected effects retain a bounded, redacted diagnosis through rollback, re
     const input = JSON.parse(JSON.parse(init.body).messages[1].content);
     return completion(input.contractVersion === 'world-adjudication.v1'
       ? accepted([{ kind: 'consume', objectId: 'acceptance-cup', expectedRevision: 1 }])
-      : { ...proposal, target: 'acceptance-cup', purpose: '喝茶' });
+      : { ...proposal, target: 'acceptance-cup', purpose: '喝茶' },JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
     const response = await post(advance), result = await response.json();
@@ -99,7 +100,7 @@ test('a same-batch stale revision reports the failing second effect and its post
   let expectedRevision = 1;
   global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
     ? accepted([{ kind: 'transfer', objectId: 'acceptance-meal:1', expectedRevision: 1, toHolder: 'cass', toRegion: 'cafe-front' }, { kind: 'consume', objectId: 'acceptance-meal:1', expectedRevision }])
-    : { ...proposal, target: 'acceptance-meal:1' });
+    : { ...proposal, target: 'acceptance-meal:1' },JSON.parse(JSON.parse(init.body).messages[1].content));
   try {
     const response = await post(advance), result = await response.json(); assert.equal(response.status, 502);
     const diagnostic = result.adjudicationFailure;
@@ -120,7 +121,7 @@ test('a same-batch stale revision reports the failing second effect and its post
 test('malformed or oversized candidates are bounded contract failures, while transport faults remain technical', async () => {
   for (const raw of ['{invalid', JSON.stringify({ bogus: '\\'.repeat(20000) + 'Bearer sk-another-secret-value' })]) {
     const { post, advance } = await setup(), previous = global.fetch;
-    global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1' ? raw : proposal);
+    global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1' ? raw : proposal,JSON.parse(JSON.parse(init.body).messages[1].content));
     try {
       const response = await post(advance), result = await response.json(); assert.equal(response.status, 502);
       assert.equal(result.stopReason.code, 'candidate_contract');
@@ -134,7 +135,7 @@ test('malformed or oversized candidates are bounded contract failures, while tra
   }
   const { post, advance } = await setup(), previous = global.fetch;
   global.fetch = async (_url, init) => JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
-    ? Response.json({ error: 'provider unavailable' }, { status: 503 }) : completion(proposal);
+    ? Response.json({ error: 'provider unavailable' }, { status: 503 }) : completion(proposal,JSON.parse(JSON.parse(init.body).messages[1].content));
   try {
     const result = await (await post(advance)).json();
     assert.deepEqual(result.stopReason, { scope: 'technical', code: 'technical_failure' });
@@ -145,10 +146,10 @@ test('malformed or oversized candidates are bounded contract failures, while tra
 test('future phase rejection identifies the phase without applying earlier previewed effects', async () => {
   const { post, advance } = await setup('owner'); const previous = global.fetch;
   global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
-    ? { ...accepted([]), stages: [
+    ? { ...accepted([]), completionMinutes:60, stages: [
       { afterMinutes: 30, preconditions: [], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 1, key: 'contents', value: 'water' }] },
       { afterMinutes: 60, preconditions: [], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 1, key: 'contents', value: 'tea' }] },
-    ] } : { ...proposal, target: 'acceptance-cup', durationMinutes: 60 });
+    ] } : { ...proposal, target: 'acceptance-cup', durationMinutes: 60 },JSON.parse(JSON.parse(init.body).messages[1].content));
   try {
     const response = await post(advance), result = await response.json(); assert.equal(response.status, 502);
     assert.equal(result.adjudicationFailure.validation.phaseIndex, 1);
@@ -163,7 +164,7 @@ test('failure input projects static contract fields and truncates large dynamic 
   const { post, advance } = await setup('owner', world => { world.objects[0].label = '保留身份的長標籤'.repeat(1000); });
   const previous = global.fetch;
   global.fetch = async (_url, init) => completion(JSON.parse(JSON.parse(init.body).messages[1].content).contractVersion === 'world-adjudication.v1'
-    ? accepted([{ kind: 'consume', objectId: 'acceptance-cup', expectedRevision: 1 }]) : { ...proposal, target: 'acceptance-cup' });
+    ? accepted([{ kind: 'consume', objectId: 'acceptance-cup', expectedRevision: 1 }]) : { ...proposal, target: 'acceptance-cup' },JSON.parse(JSON.parse(init.body).messages[1].content));
   try {
     const response = await post(advance), body = await response.json(); assert.equal(response.status, 502);
     const receipt = body.adjudicationFailure, input = JSON.parse(receipt.input);

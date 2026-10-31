@@ -3,17 +3,9 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario:legacyScenario,proposal,advance}=require('./routine-program-fixture.cjs'),f=require('./routine-world-programs-fixture.cjs');
 const {wire}=require('./method-assessment-fixture.cjs');
-async function scenario(options){
- const s=await legacyScenario(options),transport=global.fetch;
- global.fetch=async(url,init)=>{
-  assert.equal(url,'https://api.openai.com/v1/chat/completions');
-  const input=JSON.parse(JSON.parse(init.body).messages[1].content),response=await transport(url,init);
-  if(!input.contractVersion.startsWith('npc-decision.'))return response;
-  const body=await response.json(),candidate=JSON.parse(body.choices[0].message.content);
-  body.choices[0].message.content=JSON.stringify(wire(candidate));return Response.json(body);
- };
- return s;
-}
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
+async function scenario(options){return legacyScenario(options);}
+
 const action=(target='last-food',alias=false)=>({...proposal,target,content:alias?'拿取這份點心':'取用這份點心',purpose:alias?'食用':'用餐'});
 const source=(id,remaining=1)=>({id,label:'有限點心',region:'cafe-front',remaining,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',consumable:true,initialState:{}});
 const program=()=>f.program('take-portion','取用這份點心','用餐',[f.binding('meal','supply','target',[],{kind:'food'})],[f.phase(15,[{kind:'materialize',supplyId:'$meal',expectedRemaining:0}])]);
@@ -88,7 +80,7 @@ test('verified missing permission is free until another character actually grant
  const stock={...source('last-food'),owner:'cass',allowedTo:[],knownTo:['owner','cass']},s=await scenario({decision:action(),reply:knownReply(),supplies:[stock],modify:w=>{w.objects=[];w.characters.push({...load('world').seedWorld().characters.find(c=>c.id==='cass'),location:'cafe',region:'cafe-front'});}});
  const transport=global.fetch;let grant=false,cassCalls=0,grants=0;
  global.fetch=async(url,init)=>{
-  const input=JSON.parse(JSON.parse(init.body).messages[1].content),respond=value=>Response.json({usage:{prompt_tokens:11,completion_tokens:3},choices:[{message:{content:JSON.stringify(value.type?wire(value):value)}}]});
+  const input=JSON.parse(JSON.parse(init.body).messages[1].content),respond=value=>Response.json({usage:{prompt_tokens:11,completion_tokens:3},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),value.type?wire(value):value))}}]});
   if(input.contractVersion.startsWith('npc-decision.')&&input.self.id==='cass'){cassCalls++;return respond(grant?{...proposal,target:'last-food',content:'允許店主取用這份點心',purpose:'授權'}:{...proposal,type:'rest',target:'',content:'安靜休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null}});}
   if(input.contractVersion==='world-adjudication.v1'&&input.actor.id==='cass'){grants++;grant=false;return respond({status:'accepted',completionMinutes:15,effects:[{kind:'grant',targetId:'last-food',recipient:'owner'}],check:null});}
   return transport(url,init);

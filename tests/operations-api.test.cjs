@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -79,7 +80,7 @@ test('paid success, confirmed CAS failure and ambiguous saves never dispatch a d
    if(failure==='conflict')store.conflictOnNextSave();
    if(failure==='throw-after')store.throwAfterNextSave();
    if(failure==='throw-before')store.throwBeforeNextSave();
-   let calls=0;global.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+   let calls=0;global.fetch=async(_fixtureUrl,_fixtureInit)=>{calls++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]}))}}]});};
    const body={operation:'advance',operationId:operationId(),mode:'openai',model:'gpt-6-luna',minutes:15};
    const first=await POST(request(body));const result=await first.json();
    const saved=await (await GET()).json();
@@ -146,7 +147,7 @@ test('operation lookup does not dispatch unknown requests or settle an active or
 test('paid lost-response lookup preserves latest world, events and usage without another paid call', async () => {
  store.install(worldWithAdjudication());await POST(request({operation:'set-model-key',mode:'openai',key:'test-key'}));
  const original=global.fetch;let calls=0;
- global.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{calls++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]}))}}]});};
  const body={operation:'advance',operationId:operationId(),minutes:15,mode:'openai',model:'gpt-6-luna'};
  try{
   assert.equal((await POST(request(body))).status,200);

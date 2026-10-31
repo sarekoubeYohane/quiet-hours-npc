@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public route, SQLite and external transport fixtures. */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${n}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store'),{env}=load('cloudflare-workers'),auth=load('auth'),fixture=require('./fixtures/flexible-life-loop.cjs');
@@ -24,7 +25,9 @@ test('真API一次Vector Recall使初次省略的安排可見；合法forget後�
  const s=await setup(initial);try{
   s.transport.choose(input=>fixture.action('reflect',{arrangementUpdates:[{operation:'upsert',id:'recall-plan',version:0,text:'ONLY_RECALLABLE_ARRANGEMENT '+'想'.repeat(156),condition:{kind:'time',minute:10000},references:[{kind:'short',id:input.self.shortTerm[0].id,version:input.self.shortTerm[0].version}],reason:'我想保留未來打算'}]}));await s.advance();
   let anchor;s.transport.choose(input=>{anchor=input.self.shortTerm.find(m=>m.text.includes('我的柔性安排 recall-plan'));assert.ok(anchor);return fixture.action('reflect',{memorySelections:[{id:anchor.id,version:anchor.version,reason:'我想記住這個打算'}]});});await s.advance();
-  for(let i=0;i<82;i++)await s.intervene(`後來的可知經歷 ${i}：`+'新'.repeat(460));
+  // Keep the original source outside short-term memory and the initial input,
+  // while reserving room for the new pursuit graph and the recalled arrangement.
+  for(let i=0;i<82;i++)await s.intervene(`後來的可知經歷 ${i}：`+'新'.repeat(458));
   const before=await read(),memory=fixture.actor(before).longTerm.find(m=>m.origin.id===anchor.id);assert.ok(memory);assert.equal(fixture.actor(before).shortTerm.some(m=>m.text.includes('ONLY_RECALLABLE_ARRANGEMENT')),false);
   await withRecall(s,async recall=>{
    let chat=0,forget=false;s.transport.choose(input=>{
@@ -41,21 +44,21 @@ test('真API一次Vector Recall使初次省略的安排可見；合法forget後�
 });
 test('真實備忘錄原文在合法forget與API短期FIFO後保持精確，空回想不補文，真正重讀才取得新經歷',async()=>{
  const s=await setup(),raw='MEMO_EXACT_AFTER_LEGAL_FORGET 我當時只是猜測，不是客觀事實。';try{
-  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify({collection:'memos',operation:'create',id:'external-memo',version:0,text:raw})}));await s.advance();
+  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'create',id:'external-memo',version:0,text:raw}))}));await s.advance();
   s.transport.choose(input=>fixture.action('reflect',{memorySelections:input.self.shortTerm.filter(m=>m.text.includes(raw)).map(m=>({id:m.id,version:m.version,reason:'這是當時在意的想法'}))}));await s.advance();
   s.transport.choose(input=>fixture.action('reflect',{memoryOperations:input.self.longTerm.filter(m=>m.text.includes(raw)).map(m=>({type:'forget',targets:[{id:m.id,version:m.version}],text:'',unresolved:[],reason:'我明示忘記這段內在文字'}))}));await s.advance();
   for(let i=0;i<82;i++)await s.intervene(`與原文無關的新經歷 ${i}`);
   s.transport.choose(input=>{assert.equal(JSON.stringify(input).includes(raw),false);return fixture.action('reflect');});await s.advance();
   await withRecall(s,async recall=>{let chats=0;s.transport.choose(input=>{assert.equal(JSON.stringify(input).includes(raw),false);return++chats===1?{type:'recall',questions:['之前的備忘內容是什麼？']}:fixture.action('reflect');});recall.search(()=>[]);await s.advance();assert.equal(chats,2);assert.equal(JSON.stringify(recall.embeddingInputs).includes(raw),false);});
-  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify({collection:'memos',operation:'list'})}));await s.advance();
-  s.transport.choose(input=>{assert.equal(JSON.stringify(input).includes(raw),false);return fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify({collection:'memos',operation:'read',id:'external-memo',version:1})});});await s.advance();
-  const saved=await read();assert.equal(fixture.device(saved).memos[0].text,raw);assert.ok(fixture.actor(saved).shortTerm.some(m=>m.text.includes(raw)));assert.equal(fixture.device(saved).memos[0].readers.length,1);assert.deepEqual(fixture.actor(saved).intents,[]);
+  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'list'}))}));await s.advance();
+  s.transport.choose(input=>{assert.equal(JSON.stringify(input).includes(raw),false);return fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'read',id:'external-memo',version:1}))});});await s.advance();
+  const saved=await read();assert.equal(fixture.device(saved).memos[0].text,raw);assert.ok(fixture.actor(saved).shortTerm.some(m=>m.text.includes(raw)));assert.equal(fixture.device(saved).memos[0].readers.length,1);assert.deepEqual(fixture.actor(saved).intents.filter(node=>node.kind!=='direction'),[]);
  }finally{s.restore();}
 });
 test('舊手機目前物主與原收訊人不同時，真正物主閱讀不把原收訊人顯示為已讀',async()=>{
  const initial=fixture.initialWorld(seedWorld,['owner','cass','vera']);initial.objects=[{id:'transferred-historical-phone',source:'legacy-device',label:'已有的手機',kind:'phone',region:'cafe-front',holder:'cass',owner:'cass',revision:3,state:{condition:'sound'},lifecycle:'active',knownTo:['owner','cass','vera'],allowedTo:['cass']}];
  initial.phones={schemaVersion:1,activatedAt:400,devices:[{objectId:'transferred-historical-phone',memos:[],inboxActivatedAt:400,inbox:[{id:'legacy-inbox',version:1,text:'只屬於過去收件資料的原文',from:'owner',to:'vera',deliveredAt:420,createdAt:420,updatedAt:420,sharedWith:[],readers:[]}],screen:[]}]};
- const s=await setup(initial);try{let stage=0;s.transport.choose(input=>input.self.id==='cass'?fixture.action('phone',{target:'transferred-historical-phone',content:JSON.stringify({collection:'inbox',operation:stage===1?'read':'list',...(stage===1?{id:'legacy-inbox',version:1}:{})})}):fixture.action('reflect'));
+ const s=await setup(initial);try{let stage=0;s.transport.choose(input=>input.self.id==='cass'?fixture.action('phone',{target:'transferred-historical-phone',content:JSON.stringify(fixturePursuitDecision(input,{collection:'inbox',operation:stage===1?'read':'list',...(stage===1?{id:'legacy-inbox',version:1}:{})}))}):fixture.action('reflect'));
   for(stage=0;stage<3;stage++)await s.advance();const saved=await read(),message=saved.phones.devices[0].inbox[0],cass=saved.characters.find(c=>c.id==='cass');assert.equal(message.to,'vera');assert.deepEqual(message.readers.map(r=>r.actorId),['cass']);assert.ok(cass.shortTerm.findLast(m=>m.text.includes('我查看手機收件匣列表')).text.includes('收訊人未讀'));assert.equal(saved.characters.find(c=>c.id==='vera').shortTerm.some(m=>m.text.includes(message.text)),false);
  }finally{s.restore();}
 });
@@ -81,7 +84,7 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
    if(fault==='save-unknown')store.onStorage(async sql=>{if(sql.startsWith('UPDATE worlds SET state = ?')){store.onStorage(undefined);store.throwAfterNextSave();store.failNextOperationRead();}});
    const operationId=`${Date.now()}:${crypto.randomUUID()}`,response=await s.post({operation:'advance',minutes:15,operationId}),body=await response.json(),after=await read(),calls=s.transport.counts();
    const committed=['save-after','save-unknown'].includes(fault);
-   if(committed){assert.equal(fixture.actor(after).arrangements.items[0].version,2);assert.equal(fixture.actor(after).intents[0].id,'after-new-info');assert.ok(fixture.device(after).notifications.length);if(operation==='read')assert.equal(fixture.device(after).calendar[0].readers[0].actorId,'owner');else assert.equal(after.phones.devices.find(d=>after.objects.find(o=>o.id===d.objectId).owner==='cass').inbox.length,1);}
+   if(committed){assert.equal(fixture.actor(after).arrangements.items[0].version,2);assert.ok(fixture.actor(after).intents.some(node=>node.id==='owner:after-new-info'));assert.ok(fixture.device(after).notifications.length);if(operation==='read')assert.equal(fixture.device(after).calendar[0].readers[0].actorId,'owner');else assert.equal(after.phones.devices.find(d=>after.objects.find(o=>o.id===d.objectId).owner==='cass').inbox.length,1);}
    else assert.deepEqual(story(after),story(before),`${operation}/${fault} story must roll back together`);
    assert.ok(after.aiUsage.totalCalls>=before.aiUsage.totalCalls+1,`${fault} retains known dispatch usage`);
    if(fault==='save-unknown'){assert.equal(response.status,502);assert.equal(body.operationUncertain,true);const queried=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(operationId)))).json();assert.equal(queried.operation.state,'settled');}
@@ -92,7 +95,7 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
 });
 test('真API跨帳號、跨世界與場景舊引用被拒絕，另一世界與角色輸入不取得私人原文',async()=>{
  const s=await setup();try{
-  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify({collection:'memos',operation:'create',id:'private-a',version:0,text:'ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'})}));await s.advance();const first=await read(),foreignPhone=fixture.device(first).objectId,firstScope=(await(await GET()).json()).operationScope;
+  s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'create',id:'private-a',version:0,text:'ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'}))}));await s.advance();const first=await read(),foreignPhone=fixture.device(first).objectId,firstScope=(await(await GET()).json()).operationScope;
   const other=fixture.initialWorld(seedWorld);other.contextId='other-world-193';store.installForOwner('other-owner',other);auth.setUserId('other-owner');await s.post({operation:'set-model-key',key:'other-fixture-key',worldContext:other.contextId});
   const starts=s.transport.inputs.length;s.transport.choose(()=>fixture.action('phone',{target:foreignPhone,content:JSON.stringify({collection:'memos',operation:'read',id:'private-a',version:1})}));
   assert.equal((await s.post({operation:'advance',minutes:15,worldContext:other.contextId})).status,502);assert.equal(JSON.stringify(s.transport.inputs.slice(starts)).includes('ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'),false);assert.equal((await read()).phones,undefined);
@@ -114,14 +117,14 @@ test('相同真送達與閱讀正文可由正常決策相信、存疑、拒絕�
   try{s.transport.choose(input=>{
    if(input.self.id==='cass')return stage===0?fixture.action('message',{target:'owner',content:raw}):fixture.action('reflect');
    if(stage===0)return fixture.action('reflect');
-   if(stage===1)return fixture.action('phone',{target:input.phones.find(p=>p.owner==='owner').objectId,content:JSON.stringify({collection:'inbox',operation:'list'})});
-   if(stage===2)return fixture.action('phone',{target:input.phones.find(p=>p.owner==='owner').objectId,content:JSON.stringify({collection:'inbox',operation:'read',id:messageId,version:1})});
+   if(stage===1)return fixture.action('phone',{target:input.phones.find(p=>p.owner==='owner').objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'inbox',operation:'list'}))});
+   if(stage===2)return fixture.action('phone',{target:input.phones.find(p=>p.owner==='owner').objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'inbox',operation:'read',id:messageId,version:1}))});
    const experience=input.self.shortTerm.find(m=>m.text.includes(raw));assert.ok(experience);const cognitiveUpdates=['believe','doubt'].includes(variant)?[{kind:'belief',operation:'upsert',id:'invitation-interpretation',version:0,topic:'這則邀請',text:variant==='believe'?'我傾向相信這是關心的邀請。':'我對這則邀請仍有疑問。',conviction:variant==='believe'?'leaning':'doubtful',references:[{kind:'short',id:experience.id,version:experience.version}],contradictions:[],reason:'這是實際閱讀後我自己的解讀'}]:[];
    return fixture.action(variant==='believe'?'message':'reflect',{...(variant==='believe'?{target:'cass',content:'明示自主回覆：之後可以再聊。'}:{content:variant==='refuse'?'我暫時不接受這個邀請。':'我還想再考慮。'}),cognitiveUpdates,intents:variant==='defer'?[fixture.intent('evaluate-later','稍後再考慮這則邀請')]:[]});
   });
    for(stage=0;stage<3;stage++){const w=await s.advance();messageId=fixture.device(w).inbox[0].id;assert.equal(JSON.stringify(s.transport.inputs.findLast(i=>i.self?.id==='owner')).includes(raw),false);}
-   let w=await read();assert.equal(w.events.filter(e=>e.kind==='message').length,1);assert.deepEqual(fixture.actor(w).intents,[]);assert.equal(fixture.actor(w).cognition?.beliefs.length||0,0);assert.equal(fixture.actor(w).arrangements,undefined);
-   w=await s.advance();assert.equal(fixture.device(w).inbox[0].readers[0].actorId,'owner');assert.equal(w.events.filter(e=>e.kind==='message').length,variant==='believe'?2:1);assert.equal(fixture.actor(w).arrangements,undefined);if(variant==='defer')assert.equal(fixture.actor(w).intents[0].id,'evaluate-later');if(variant==='doubt')assert.equal(fixture.actor(w).cognition.beliefs[0].conviction,'doubtful');assert.equal(s.transport.inputs.filter(i=>i.self?.id==='cass').some(i=>JSON.stringify(i).includes('readers')),false);
+   let w=await read();assert.equal(w.events.filter(e=>e.kind==='message').length,1);assert.deepEqual(fixture.actor(w).intents.filter(node=>node.kind!=='direction'),[]);assert.equal(fixture.actor(w).cognition?.beliefs.length||0,0);assert.equal(fixture.actor(w).arrangements,undefined);
+   w=await s.advance();assert.equal(fixture.device(w).inbox[0].readers[0].actorId,'owner');assert.equal(w.events.filter(e=>e.kind==='message').length,variant==='believe'?2:1);assert.equal(fixture.actor(w).arrangements,undefined);if(variant==='defer')assert.ok(fixture.actor(w).intents.some(node=>node.id==='owner:evaluate-later'));if(variant==='doubt')assert.equal(fixture.actor(w).cognition.beliefs[0].conviction,'doubtful');assert.equal(s.transport.inputs.filter(i=>i.self?.id==='cass').some(i=>JSON.stringify(i).includes('readers')),false);
   }finally{s.restore();}
  }
 });
@@ -131,9 +134,9 @@ test('共同輸入壓力省略手機handle時不可修改；明示整理本人�
  initial.objects=[{id:'pressure-phone',source:'existing-device',label:'本人已有手機',kind:'phone',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{condition:'sound'},lifecycle:'active',knownTo:['owner'],allowedTo:['owner']}];initial.phones={schemaVersion:1,activatedAt:400,devices:[{objectId:'pressure-phone',memos:records,inbox:[],inboxActivatedAt:400,screen:[],presentations:records.map(r=>({actorId:'owner',memoryId:'known-list-experience',collection:'memos',id:r.id,version:1}))}]};
  const s=await setup(initial);try{
   for(let i=0;i<82;i++)await s.intervene(`新經歷 ${i}：`+'新'.repeat(460));const before=await read();
-  s.transport.choose(input=>{assert.ok(input.phoneReferenceGap>0);assert.equal(input.phones[0].records.some(r=>r.id==='bounded-31'),false);assert.equal(JSON.stringify(input).includes('CAPACITY_PRIVATE_ORIGINAL_31'),false);return fixture.action('phone',{target:'pressure-phone',content:JSON.stringify({collection:'memos',operation:'update',id:'bounded-31',version:1,text:'尚未合法展示不得寫入'})});});
+  s.transport.choose(input=>{assert.ok(input.phoneReferenceGap>0);assert.equal(input.phones[0].records.some(r=>r.id==='bounded-31'),false);assert.equal(JSON.stringify(input).includes('CAPACITY_PRIVATE_ORIGINAL_31'),false);return fixture.action('phone',{target:'pressure-phone',content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'update',id:'bounded-31',version:1,text:'尚未合法展示不得寫入'}))});});
   assert.equal((await s.post({operation:'advance',minutes:15})).status,502);assert.deepEqual((await read()).phones,before.phones);assert.deepEqual((await read()).characters,before.characters);
   s.transport.choose(input=>fixture.action('reflect',{memoryOperations:input.self.longTerm.filter(m=>m.id.startsWith('pressure-')).slice(0,3).map(m=>({type:'forget',targets:[{id:m.id,version:m.version}],text:'',unresolved:[],reason:'我明示整理已展示的舊片段'}))}));for(let i=0;i<4;i++)await s.advance();
-  s.transport.choose(input=>{assert.ok(input.phones[0].records.some(r=>r.id==='bounded-31'));return fixture.action('phone',{target:'pressure-phone',content:JSON.stringify({collection:'memos',operation:'update',id:'bounded-31',version:1,text:'明示改寫本人紀錄'})});});const saved=await s.advance();assert.equal(fixture.device(saved).memos.length,32);assert.equal(fixture.device(saved).memos[31].version,2);assert.equal(fixture.device(saved).memos[0].text,'CAPACITY_PRIVATE_ORIGINAL_0');
+  s.transport.choose(input=>{assert.ok(input.phones[0].records.some(r=>r.id==='bounded-31'));return fixture.action('phone',{target:'pressure-phone',content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'update',id:'bounded-31',version:1,text:'明示改寫本人紀錄'}))});});const saved=await s.advance();assert.equal(fixture.device(saved).memos.length,32);assert.equal(fixture.device(saved).memos[31].version,2);assert.equal(fixture.device(saved).memos[0].text,'CAPACITY_PRIVATE_ORIGINAL_0');
  }finally{s.restore();}
 });

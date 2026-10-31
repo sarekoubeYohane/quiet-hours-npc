@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {url,server,store,load,setModelResponder,modelRequests,requests} from './browser-fixture.mjs';
+import {launchBrowser,outputPath} from './browser-runtime.mjs';
+const {decision,candidate,adoption,choose}=createRequire(import.meta.url)('../../tests/pursuit-selection-fixture.cjs');
+process.env.BROWSER_ARTIFACT_DIR ||= resolve('outputs/pursuits-222');await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
+const w=load('world').seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'gpt-6-luna'};store.install(w);let calls=0;
+setModelResponder(request=>{const input=JSON.parse(request.messages[1].content),v=decision(input);calls++;assert.equal(input.contractVersion,'npc-decision.v3');
+ if(calls===1){const rest=candidate('owner','quiet','照顧自己的精神','休息到精神舒適'),tidy=candidate('owner','tidy','收拾角落','把角落的小東西整理好');v.pursuitCandidates=[rest,tidy];v.pursuitUpdates=[adoption(input,rest,'owner:quiet','先安靜休息十五分鐘再看感受')];v.pursuitSelection.adoptions=[{candidateId:rest.id,pursuitId:'owner:quiet'}];v.pursuitSelection.reason='現在比較想照顧自己的精神';choose(v,{kind:'candidate',id:rest.id,version:0},'owner:quiet');}
+ else {assert.equal(JSON.stringify(input).includes('把角落的小東西整理好'),false);assert.equal(input.self.intents.find(n=>n.id==='owner:quiet').version,1);choose(v,{kind:'existing',id:'owner:quiet',version:1});if(calls===4)v.durationMinutes=60;}
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(v)},finish_reason:'stop'}]});
+});
+let browser;
+try{
+ browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1280,height:1000},reducedMotion:'reduce'});page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
+ const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
+ await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
+ for(let round=0;round<2;round++){const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,await response.text());}
+ const advances=requests.filter(r=>r.operation==='advance');await page.reload();await nav('分析');const panel=page.getByRole('region',{name:'決策追溯',exact:true});await panel.getByText('實際模型派送',{exact:true}).waitFor();
+ let selection=panel.getByRole('region',{name:'本次候選追求與收斂',exact:true});await selection.waitFor();assert.match(await selection.innerText(),/明示空候選集合/);await panel.getByRole('combobox',{name:'追溯操作'}).selectOption(advances[0].operationId);await selection.getByText('候選範圍：休息到精神舒適',{exact:true}).waitFor();
+ assert.match(await selection.innerText(),/未承接（不等於拒絕）/);assert.match(await selection.innerText(),/承接後範圍：先安靜休息十五分鐘再看感受/);assert.match(await selection.innerText(),/世界已提交/);await selection.screenshot({path:outputPath('candidate-convergence.png')});
+ await page.getByRole('button',{name:'店主',exact:true}).click();const current=page.getByRole('region',{name:'分層追求',exact:true});assert.match(await current.innerText(),/owner:quiet.*v1/s);assert.equal((await current.innerText()).includes('把角落的小東西整理好'),false);
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await selection.scrollIntoViewIfNeeded();await page.screenshot({path:outputPath('mobile-analysis.png')});
+ await page.reload();await nav('分析');await panel.getByText('實際模型派送',{exact:true}).waitFor();await panel.getByRole('combobox',{name:'追溯操作'}).selectOption(advances[0].operationId);await selection.getByText('候選範圍：休息到精神舒適',{exact:true}).waitFor();assert.equal(calls,2);
+ const replay=await page.request.post(url+'/api/world',{data:advances[0]});assert.equal(replay.status(),200);assert.equal(calls,2);
+ store.throwBeforeNextSave();const failed={operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',operationId:Date.now()+':'+crypto.randomUUID()};const failure=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:failed});assert.equal(failure.status(),502);assert.equal(store.snapshot().turn,2);await page.reload();await nav('分析');await panel.getByText('實際模型派送',{exact:true}).waitFor();await panel.getByRole('combobox',{name:'追溯操作'}).selectOption(failed.operationId);await selection.getByText('明示空候選集合；仍可選既有追求、等待或續做。',{exact:true}).waitFor();assert.match(await selection.innerText(),/此回合尚無已提交世界證據/);await selection.screenshot({path:outputPath('uncommitted-candidate.png')});
+ const next={...failed,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:next})).status(),200);const automatic={...next,operationId:Date.now()+':'+crypto.randomUUID()};assert.equal((await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:automatic})).status(),200);assert.equal(calls,4);await page.reload();await nav('分析');await panel.getByText('實際模型派送',{exact:true}).waitFor();await panel.getByRole('combobox',{name:'追溯操作'}).selectOption(automatic.operationId);await panel.getByText('沒有已保存且通過驗證的候選／收斂紀錄',{exact:false}).waitFor();assert.equal(await panel.getByRole('region',{name:'本次候選追求與收斂',exact:true}).count(),0);
+ assert.deepEqual(errors,[]);const saved=store.snapshot();assert.equal(saved.turn,4);assert.equal(JSON.stringify(saved).includes('把角落的小東西整理好'),false);
+ const summary={result:'PASS',turn:saved.turn,fixtureCalls:calls,realPaidCalls:0,reload:true,mobileNoOverflow:true,originalAndFinalScopeVisible:true,unadoptedAbsentFromNextActualRequest:!JSON.stringify(modelRequests[1]).includes('把角落的小東西整理好'),sameIdNoDispatch:true,uncommittedSeparated:true,noDecisionSeparatedFromEmpty:true};await writeFile(outputPath('summary.json'),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary));
+}finally{await browser?.close();server.close();}

@@ -291,36 +291,45 @@ export function budgetMemoryInput<T extends { self: { arrangements?:{items:Arran
     if (cognition.historyCandidates) cognition.historyCandidates = cognition.historyCandidates.slice(0, historyQuota);
     if (cognition.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.slice(0, 4 - (cognition.historyCandidates?.length || 0));
   }
-  const payload = () => recalledMemories ? { input, recalledMemories } : ({ arrangements:input.self.arrangements, lastKnownState:input.self.lastKnownState, learnedHabits:input.learnedHabits, preferences:input.self.preferences, cognition: input.self.cognition, shortTerm: input.self.shortTerm, longTerm: input.self.longTerm, memoryReview: input.self.memoryReview, memories: input.self.memories, observations: input.self.observations, relationships: input.self.relationships, knownControlExperiences: input.knownControlExperiences, pendingInterventions: input.pendingInterventions });
+  const budgetBytes=88*1024-1536;
+  const payload = () => recalledMemories ? { input, recalledMemories } : {input};
   // Compatibility text duplicates may be omitted; their canonical short-term
   // identities, source, and control provenance remain visible in full.
-  if (memoryBytes(payload()) > 88 * 1024) input.self.memories = [];
-  if (memoryBytes(payload()) > 88 * 1024) input.knownControlExperiences = [];
-  if (memoryBytes(payload()) > 88 * 1024) input.self.observations = [];
-  if (memoryBytes(payload()) > 88 * 1024) input.pendingInterventions = input.pendingInterventions.map(item => {
+  if (memoryBytes(payload()) > budgetBytes) input.self.memories = [];
+  if (memoryBytes(payload()) > budgetBytes) input.knownControlExperiences = [];
+  if (memoryBytes(payload()) > budgetBytes) input.self.observations = [];
+  if (memoryBytes(payload()) > budgetBytes) input.pendingInterventions = input.pendingInterventions.map(item => {
     const request = item as { id: string; time: number; memoryId?: string };
     return request.memoryId ? { id: request.id, time: request.time, memoryId: request.memoryId } : item;
   });
-  if (memoryBytes(payload()) > 88 * 1024) throw new MemoryValidationError('記憶輸入超過 88 KiB');
+  if (memoryBytes(payload()) > budgetBytes) throw new MemoryValidationError('記憶輸入超過 88 KiB');
+  // A recalled source and the exact arrangement it makes readable compete as
+  // one priority projection, before optional original long memories fill space.
+  const recalled=(recalledMemories as {memories?:MemoryProjection}|undefined)?.memories||[];
+  if(input.self.arrangements&&character&&recalled.length){
+    const visible={shortTerm:character.shortTerm?.filter(m=>(input.self.shortTerm as MemoryRef[]).some(r=>r.id===m.id&&r.version===m.version)),longTerm:character.longTerm?.filter(m=>recalled.some(r=>r.id===m.id&&r.version===m.version))};
+    for(const item of arrangementsForDecision(character,visible).items){if(!input.self.arrangements.items.some(shown=>shown.id===item.id&&shown.version===item.version)){input.self.arrangements.items.push(item);if(memoryBytes(payload())>budgetBytes)input.self.arrangements.items.pop();}}
+  }
   if (cognition) {
-    for (const belief of beliefs) { cognition.beliefs.push(belief); if (memoryBytes(payload()) > 88 * 1024) cognition.beliefs.pop(); }
-    for (const tag of tags) { cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags); if (memoryBytes(payload()) > 88 * 1024) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); } }
+    for (const belief of beliefs) { cognition.beliefs.push(belief); if (memoryBytes(payload()) > budgetBytes) cognition.beliefs.pop(); }
+    for (const tag of tags) { cognition.relationshipTags.push(tag); input.self.relationships = relationshipsProjection(cognition.relationshipTags); if (memoryBytes(payload()) > budgetBytes) { cognition.relationshipTags.pop(); input.self.relationships = relationshipsProjection(cognition.relationshipTags); } }
   }
   for (const candidate of candidates) {
     input.self.longTerm.push(candidate);
-    if (memoryBytes(payload()) > 88 * 1024) input.self.longTerm.pop();
+    if (memoryBytes(payload()) > budgetBytes) input.self.longTerm.pop();
   }
   input.self.memoryReview = input.self.memoryReview.filter(ref => ref.kind === 'trace' || (ref.kind === 'short' ? input.self.shortTerm as MemoryRef[] : input.self.longTerm!).some(item => item.id === ref.id && item.version === ref.version));
   if (cognition?.reviewCandidates) cognition.reviewCandidates = cognition.reviewCandidates.filter(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version));
-  if(input.self.preferences) for(const preference of preferences){input.self.preferences.items.push(preference);if(memoryBytes(payload())>88*1024)input.self.preferences.items.pop();}
-  if(input.learnedHabits) for(const tendency of tendencies){input.learnedHabits.push(tendency);if(memoryBytes(payload())>88*1024)input.learnedHabits.pop();}
-  if(input.self.arrangements&&character)for(const item of arrangementsForDecision(character,{shortTerm:character.shortTerm?.filter(m=>(input.self.shortTerm as MemoryRef[]).some(r=>r.id===m.id&&r.version===m.version)),longTerm:character.longTerm?.filter(m=>input.self.longTerm?.some(r=>r.id===m.id&&r.version===m.version))}).items){input.self.arrangements.items.push(item);if(memoryBytes(payload())>88*1024)input.self.arrangements.items.pop();}
+  if(input.self.preferences) for(const preference of preferences){input.self.preferences.items.push(preference);if(memoryBytes(payload())>budgetBytes)input.self.preferences.items.pop();}
+  if(input.learnedHabits) for(const tendency of tendencies){input.learnedHabits.push(tendency);if(memoryBytes(payload())>budgetBytes)input.learnedHabits.pop();}
+  if(input.self.arrangements&&character)for(const item of arrangementsForDecision(character,{shortTerm:character.shortTerm?.filter(m=>(input.self.shortTerm as MemoryRef[]).some(r=>r.id===m.id&&r.version===m.version)),longTerm:character.longTerm?.filter(m=>input.self.longTerm?.some(r=>r.id===m.id&&r.version===m.version))}).items){if(!input.self.arrangements.items.some(shown=>shown.id===item.id&&shown.version===item.version)){input.self.arrangements.items.push(item);if(memoryBytes(payload())>budgetBytes)input.self.arrangements.items.pop();}}
   const topicWords = [input.self.plan?.action.target || '', ...(input.self.intents || []).flatMap(intent => [intent.content, intent.context])];
   const topics = topicWords.filter(Boolean);
-  const available = Math.min(8192, 88 * 1024 - memoryBytes(payload()) - 64);
+  const available = Math.min(8192, budgetBytes - memoryBytes(payload()) - 64);
   // Leave canonical sources intact under capacity pressure; the view is a
   // duplicate that may be omitted, and explicitly records its source gap.
   if (available >= 512) input.self.lastKnownState = lastKnownState(input.self.shortTerm as ReturnType<typeof memoryProjection>, input.self.longTerm, topics, available, (recalledMemories as { memories?: MemoryProjection } | undefined)?.memories || []);
+  Object.assign(input,{projectionGaps:{longTerm:candidates.length-(input.self.longTerm?.length||0),beliefs:beliefs.length-(cognition?.beliefs.length||0),relationships:tags.length-(cognition?.relationshipTags.length||0),preferences:preferences.length-(input.self.preferences?.items.length||0),habits:tendencies.length-(input.learnedHabits?.length||0)}});
   return input;
 }
 export function validateMemoryState(c: Character) {

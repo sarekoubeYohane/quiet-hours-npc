@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=build('route'),store=build('store'),{seedWorld}=build('world');
@@ -23,7 +24,7 @@ test('budget API rejects invalid finite values and partial unlimited while legac
 });
 test('all four budget combinations govern real dispatch and retain paid use without partial rounds',async()=>{
  const original=global.fetch;let dispatched=0;
- global.fetch=async()=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[]})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[]}))}}]});};
  try{
  for(const limits of [{calls:1,tokens:null},{calls:null,tokens:1},{calls:1,tokens:1},{calls:null,tokens:null}]){
   const world=worldWithAdjudication();world.aiUsage={windowStartedAt:Date.now(),calls:0,inputTokens:0,outputTokens:0,unknownCalls:0,totalCalls:0,totalInputTokens:0,totalOutputTokens:0,totalUnknownCalls:0,savedDecisions:0};store.install(world);dispatched=0;
@@ -36,7 +37,7 @@ test('all four budget combinations govern real dispatch and retain paid use with
 });
 test('unlimited persisted policy passes old hourly and daily thresholds, then finite changes stop future dispatch',async()=>{
  const original=global.fetch,clock=Date.now;let now=clock(),dispatched=0;Date.now=()=>now;
- global.fetch=async()=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]}))}}]});};
  try{
   const world=worldWithAdjudication();world.aiUsage={windowStartedAt:now,calls:151,inputTokens:600000,outputTokens:10,unknownCalls:0,totalCalls:151,totalInputTokens:600000,totalOutputTokens:10,totalUnknownCalls:0,savedDecisions:0};store.install(world);
   await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:null,tokens:null}}));
@@ -48,7 +49,7 @@ test('unlimited persisted policy passes old hourly and daily thresholds, then fi
 });
 test('advance uses only applied budget despite unlimited or stale larger request limits and replays paid failure',async()=>{
  const original=global.fetch;let dispatched=0;
- global.fetch=async()=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]})}}]});};
+ global.fetch=async(_fixtureUrl,_fixtureInit)=>{dispatched++;return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]}))}}]});};
  try{
   for(const limits of [{calls:null,tokens:null},{calls:1200,tokens:10000000}]){
    store.install(worldWithAdjudication());dispatched=0;

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Fixtures load the temporary CommonJS build. */
+const {fixtureDecision,savedPursuit,expectedUnreferencedPursuits}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -9,13 +10,13 @@ const store = build('store');
 const request = body => new Request('https://test.invalid/api/world', { method:'POST', headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'}, body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo', ...body}) });
 const read = async () => (await (await GET()).json()).world;
 const owner = world => world.characters.find(c => c.id === 'owner');
-const queue = [{id:'care',content:'照顧咖啡館',intensity:'high',importance:'medium',urgency:'low',context:'晚點整理'}];
+const queue = [{id:'care',content:'照顧咖啡館',intensity:'high',importance:'medium',urgency:'low',context:'晚點整理'}].map(item=>savedPursuit('owner',item));
 const advance = async (limits={calls:120,tokens:500000}) => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits})) };
 const withModel = async run => {
   const original = global.fetch; const perceived=[];
   global.fetch = async (_url, init) => {
     const data = JSON.parse(JSON.parse(init.body).messages[1].content); perceived.push(data);
-    return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:data.self.intents})}}]});
+    return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[]}))}}]});
   };
   try { await POST(request({operation:'set-budget',limits:{calls:120,tokens:500000}})); await run(perceived); } finally { global.fetch=original; }
 };
@@ -55,7 +56,7 @@ test('return re-evaluates preserved intentions and only known takeover experienc
     assert.deepEqual(returned.intents,queue);
     assert.equal((await advance()).status,200);
     const decisions=perceived.filter(p=>p.self.id==='owner'); assert.equal(decisions.length,1);
-    assert.deepEqual(decisions[0].self.intents,queue);
+    assert.deepEqual(decisions[0].self.intents,expectedUnreferencedPursuits(queue));
     assert.ok(decisions[0].self.memories.some(m=>m.text.includes('只有店主知道的想法二')));
     assert.equal(JSON.stringify(decisions[0]).includes('Cass的私密事件'),false);
   });
@@ -97,7 +98,7 @@ test('return ends an unfinished designated activity and cancels a pending comman
     assert.equal((await advance()).status,200);
     const data=perceived.filter(p=>p.self.id==='owner'); assert.equal(data.length,1);
     assert.equal(JSON.stringify(data[0]).includes('取消的想法'),false);
-    assert.deepEqual(data[0].self.intents,queue);
+    assert.deepEqual(data[0].self.intents,expectedUnreferencedPursuits(queue));
   });
 });
 
@@ -120,7 +121,7 @@ test('first autonomous decision receives earlier known takeover results beyond t
     } else {
       otherInputs.push(data);
     }
-    return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:data.self.intents})}}]});
+    return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]}))}}]});
   };
   try {
     assert.equal((await advance()).status, 502);

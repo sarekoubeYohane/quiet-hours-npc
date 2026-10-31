@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
-const completion=value=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const proposal={type:'propose',target:'workpiece',content:'用現有材料加工這件作品',purpose:'完成作品',mood:'平靜',durationMinutes:30,timeIntent:{kind:'completion',maxMinutes:null},intents:[]};
 const state=(value,revision=1)=>({kind:'state',objectId:'workpiece',expectedRevision:revision,key:'progress',value});
 const outcomes=['critical-success','success','mixed','failure','critical-failure'];
@@ -11,7 +12,7 @@ async function scenario({die=2,reply=candidate(),decision=proposal}={}){
  const w=seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};w.contextId='result-fixture';w.objects=[{id:'workpiece',source:'fixture',label:'練習作品',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{progress:'raw'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{progress:['raw','partial','complete']}},{id:'material',source:'fixture-material',label:'一份材料',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{},lifecycle:'active',kind:'food',knownTo:['owner'],allowedTo:['owner']}];store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  const oldFetch=global.fetch,oldRandom=Math.random;let npc=0,judgments=0,dice=0;const requests=[];
- global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);requests.push({input,request});if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(reply);}npc++;return completion(decision);};Math.random=()=>{dice++;return (die-.5)/20;};
+ global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);requests.push({input,request});if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(reply,JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(decision,JSON.parse(JSON.parse(init.body).messages[1].content));};Math.random=()=>{dice++;return (die-.5)/20;};
  return {post,read:async()=>(await(await GET()).json()).world,choose:v=>decision=v,reply:v=>reply=v,counts:()=>({npc,judgments,dice}),requests,restore:()=>{global.fetch=oldFetch;Math.random=oldRandom;}};
 }
 const advance=async(s,extra={})=>{const r=await s.post({operation:'advance',minutes:15,...extra});assert.equal(r.status,200,await r.clone().text());return s.read();};

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -11,8 +12,8 @@ async function fixture(modify=()=>{}){
  w.routineRules=[{id:'tea-rule',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner','vera']}];
  w.objects=[{id:'local-cup',source:'finite',label:'借用的茶杯',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner','vera'],allowedTo:['owner','vera'],stateTransitions:{contents:['empty','water','tea']}}];w.supplies=[{id:'tea-leaves',label:'茶葉',region:'cafe-front',remaining:8,owner:'owner',knownTo:['owner','vera'],allowedTo:['owner','vera'],kind:'food',initialState:{}}];modify(w,c);store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
- const prev=global.fetch,inputs=[];let decision=tea,candidate={status:'accepted',effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:[{operation:'tea',minutes:30}]}};
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(input.contractVersion==='world-adjudication.v1'?candidate:decision)}}]});};
+ const prev=global.fetch,inputs=[];let decision=tea,candidate={status:'accepted',completionMinutes:null,effects:[],stages:[],check:null,routine:{family:'cafe-service',version:1,timings:[{operation:'tea',minutes:30}]}};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),input.contractVersion==='world-adjudication.v1'?candidate:decision))}}]});};
  return {post,inputs,read:async()=>(await(await GET()).json()).world,restore:()=>global.fetch=prev,decision:v=>decision=v,candidate:v=>candidate=v};
 }
 test('another capable knowledgeable actor uses actual local permission without another adjudicator or changing ownership',async()=>{
@@ -31,7 +32,7 @@ test('owner grants local materials and cup through legal proposals before recipi
  const s=await fixture(w=>{w.objects[0].allowedTo=['owner'];w.objects[0].knownTo=['owner'];w.supplies[0].allowedTo=['owner'];w.supplies[0].knownTo=['owner'];});try{
   let w=await s.read();w.characters.find(c=>c.id==='vera').control={mode:'taken-over'};w.characters.find(c=>c.id==='owner').control={mode:'autonomous'};store.replaceCommittedWorld(w);
   for(const targetId of ['local-cup','tea-leaves']){
-   s.decision({type:'propose',target:targetId,content:'允許 Vera 使用這件物資',purpose:'授權使用',mood:'平靜',durationMinutes:15,intents:[]});s.candidate({status:'accepted',effects:[{kind:'grant',targetId,recipient:'vera'}],stages:[],check:null,routine:null});const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,200,await response.text());
+   s.decision({type:'propose',target:targetId,content:'允許 Vera 使用這件物資',purpose:'授權使用',mood:'平靜',durationMinutes:15,intents:[]});s.candidate({status:'accepted',completionMinutes:15,effects:[{kind:'grant',targetId,recipient:'vera'}],stages:[],check:null,routine:null});const response=await s.post({operation:'advance',minutes:15});assert.equal(response.status,200,await response.text());
   }
   w=await s.read();assert.deepEqual(w.characters.find(c=>c.id==='vera').routineCapabilities,['tea']);assert.deepEqual(w.routineRules[0].knownTo,['owner','vera']);assert.equal(w.objects[0].holder,null);assert.equal(w.objects[0].owner,'owner');assert.equal(w.objects[0].acceptedBy,undefined);
   w.characters.find(c=>c.id==='owner').control={mode:'taken-over'};w.characters.find(c=>c.id==='vera').control={mode:'autonomous'};store.replaceCommittedWorld(w);s.decision(tea);
@@ -49,7 +50,7 @@ test('another account cannot read shared routine or receive its products',async(
 });
 test('shared method cannot substitute receiving consent when delivering a concrete borrowed cup',async()=>{
  const s=await fixture(w=>{const kris=w.characters.find(c=>c.id==='kris');kris.location='cafe';kris.region='cafe-front';w.objects[0].holder='vera';w.objects[0].knownTo.push('kris');w.objects[0].allowedTo.push('kris');});try{
-  s.decision({type:'propose',target:'local-cup',content:'交給 Kris 這隻杯子',purpose:'交付',mood:'平靜',durationMinutes:15,intents:[]});s.candidate({status:'accepted',effects:[{kind:'transfer',objectId:'local-cup',expectedRevision:1,toHolder:'kris',toRegion:'cafe-front'}],stages:[],check:null,routine:null});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);const w=await s.read();assert.equal(w.objects[0].holder,'vera');assert.equal(w.objects[0].acceptedBy,undefined);assert.equal(w.turn,0);
+  s.decision({type:'propose',target:'local-cup',content:'交給 Kris 這隻杯子',purpose:'交付',mood:'平靜',durationMinutes:15,intents:[]});s.candidate({status:'accepted',completionMinutes:15,effects:[{kind:'transfer',objectId:'local-cup',expectedRevision:1,toHolder:'kris',toRegion:'cafe-front'}],stages:[],check:null,routine:null});assert.equal((await s.post({operation:'advance',minutes:15})).status,502);const w=await s.read();assert.equal(w.objects[0].holder,'vera');assert.equal(w.objects[0].acceptedBy,undefined);assert.equal(w.turn,0);
  }finally{s.restore();}
 });
 test('concrete cup that cannot hold the requested tea remains a known obstruction rather than a technical failure',async()=>{

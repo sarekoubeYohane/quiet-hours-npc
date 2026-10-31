@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API and model boundary fixtures. */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
@@ -13,7 +14,7 @@ const advance=()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'
 const act=async action=>{assert.equal((await POST(req({operation:'direct',action}))).status,200);assert.equal((await advance()).status,200);return read();};
 const withModel=async(actions,run)=>{
  const old=global.fetch,inputs=[];
- global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]})}}]});};
+ global.fetch=async(_url,init)=>{const data=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(data);return Response.json({choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[],...actions[data.self.id]}))}}]});};
  try{await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:120,tokens:500000}}));await run(inputs);}finally{global.fetch=old;}
 };
 const scene=()=>{

@@ -1,17 +1,18 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const opid=()=>Date.now()+':'+crypto.randomUUID();
-const completion=v=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(v)}}]});
+const completion=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,v))}}]});
 const tea={type:'propose',target:'cafe',content:'泡一杯茶',purpose:'飲用',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}};
 const rest={type:'rest',target:'',content:'安靜休息',mood:'平靜',durationMinutes:45,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}};
 async function scenario(minutes=60,prepare=()=>{},adjudicate){
  const w=seedWorld();w.contextId='time-lifecycle';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-judge'};prepare(w);store.install(w);
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
  let decision=tea,npc=0,judgments=0;const inputs=[],old=global.fetch;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;if(adjudicate)return completion(adjudicate(input));return completion({status:'accepted',effects:[],stages:[],check:null,completionMinutes:null,routine:{family:'cafe-service',version:1,operation:'tea',subject:'茶',timings:['tea','coffee','food','drink','wash','return'].map(operation=>({operation,minutes:operation==='tea'?minutes:15}))}});}npc++;inputs.push(input);return completion(typeof decision==='function'?decision(input):decision);};
+ global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;if(adjudicate)return completion(adjudicate(input),JSON.parse(JSON.parse(init.body).messages[1].content));return completion({status:'accepted',effects:[],stages:[],check:null,completionMinutes:null,routine:{family:'cafe-service',version:1,operation:'tea',subject:'茶',timings:['tea','coffee','food','drink','wash','return'].map(operation=>({operation,minutes:operation==='tea'?minutes:15}))}},JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;inputs.push(input);return completion(typeof decision==='function'?decision(input):decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,choose:d=>{decision=d;},counts:()=>({npc,judgments}),inputs,restore:()=>{global.fetch=old;}};
 }
 test('switching after a known intervention preserves water and cancels future serving after reload and replay',async()=>{

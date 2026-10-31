@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -15,7 +16,7 @@ async function model(respond, run) {
   const original = global.fetch;
   global.fetch = async (_url, init) => {
     const payload = JSON.parse(init.body), data = JSON.parse(payload.messages[1].content);
-    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify(respond(data, payload)) } }] });
+    return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 20 }, choices: [{ message: { content: JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),respond(data, payload))) } }] });
   };
   try { await run(); } finally { global.fetch = original; }
 }
@@ -51,7 +52,7 @@ test('model may defer a message, update its queue, and continue without restarti
     const saved = await read(), cass = saved.characters[0];
     assert.equal(cass.plan.startedAt, world.characters[0].plan.startedAt);
     assert.equal(cass.plan.until, world.characters[0].plan.until);
-    assert.deepEqual(cass.intents, queue);
+    assert.deepEqual(cass.intents.filter(node=>node.kind!=='direction').map(node=>node.content),queue.map(node=>node.content));
     assert.deepEqual(cass.memories, initialMemories);
     assert.deepEqual(cass.habits, world.characters[0].habits);
     assert.equal((await advance()).status, 200);
@@ -69,7 +70,7 @@ test('NPC can switch from its unfinished activity and persist the replacement an
     assert.equal(cass.plan.action.type, 'reflect');
     assert.equal(cass.plan.startedAt, 1260);
     assert.equal(cass.plan.until, 1320);
-    assert.deepEqual(cass.intents, queue);
+    assert.deepEqual(cass.intents.filter(node=>node.kind!=='direction').map(node=>node.content),queue.map(node=>node.content));
     assert.ok(cass.memories.some(m => m.text.includes('先想一想')));
   });
 });
@@ -141,7 +142,7 @@ test('OpenRouter continuation eligibility uses its own provider/model and reject
     calls++;
     const payload = JSON.parse(init.body), data = JSON.parse(payload.messages[1].content);
     assert.equal(data.currentActivity.canContinueExisting, calls === 1);
-    return Response.json({ choices: [{ message: { content: JSON.stringify(action('continue')) } }] });
+    return Response.json({ choices: [{ message: { content: JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),action('continue'))) } }] });
   };
   assert.equal((await aiDecision(world, cass, 'unit-test-key', 'fixture/model', 'openrouter', fetcher)).continueExisting, true);
   await assert.rejects(aiDecision(world, cass, 'unit-test-key', 'fixture/other', 'openrouter', fetcher), /有效的意圖與行動格式/);

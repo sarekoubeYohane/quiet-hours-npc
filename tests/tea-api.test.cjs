@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const assert = require('node:assert/strict');
@@ -9,7 +10,7 @@ const { seedWorld } = load('world');
 const { enterAcceptanceScene } = load('acceptance-scene');
 const read = async () => (await (await GET()).json()).world;
 const id = () => Date.now() + ':' + crypto.randomUUID();
-const completion = value => Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+const completion = (value,_fixtureInput)=> Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 async function setup(modify = () => {}) {
   const world = await enterAcceptanceScene(seedWorld());
   world.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
@@ -24,7 +25,7 @@ test('legacy tea cannot persist a successful tea experience with an unauthorized
   const {post,advance} = await setup(), previous = global.fetch;
   global.fetch = async (_url, init) => {
     const input = JSON.parse(JSON.parse(init.body).messages[1].content);
-    return completion(input.contractVersion === 'world-adjudication.v1' ? {status:'denied',effects:[],stages:[],check:null} : tea);
+    return completion(input.contractVersion === 'world-adjudication.v1' ? {status:'denied',effects:[],stages:[],check:null} : tea,JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
     const response = await post(advance); assert.equal(response.status,200,(await response.clone().json()).error);
@@ -41,16 +42,16 @@ test('legacy tea uses the unchanged action in one adjudication, persists water t
   global.fetch = async (_url, init) => {
     const input = JSON.parse(JSON.parse(init.body).messages[1].content); requests.push(input);
     return completion(input.contractVersion === 'world-adjudication.v1' ? {
-      status:'accepted',check:null,
-      effects:[{kind:'transfer',objectId:'acceptance-cup',expectedRevision:1,toHolder:'vera',toRegion:'cafe-front'},{kind:'state',objectId:'acceptance-cup',expectedRevision:2,key:'contents',value:'water'}],
-      stages:[{afterMinutes:30,preconditions:[{objectId:'acceptance-cup',revision:3,region:'cafe-front',holder:'vera',state:[{key:'contents',value:'water'}]}],effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:3,key:'contents',value:'tea'}]}],
-    } : {...tea,durationMinutes:30});
+      status:'accepted',completionMinutes:30,check:null,
+      effects:[],
+      stages:[{afterMinutes:15,preconditions:[],effects:[{kind:'transfer',objectId:'acceptance-cup',expectedRevision:1,toHolder:'vera',toRegion:'cafe-front'},{kind:'state',objectId:'acceptance-cup',expectedRevision:2,key:'contents',value:'water'}]},{afterMinutes:30,preconditions:[{objectId:'acceptance-cup',revision:3,region:'cafe-front',holder:'vera',state:[{key:'contents',value:'water'}]}],effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:3,key:'contents',value:'tea'}]}],
+    } : {...tea,durationMinutes:30},JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   try {
-    assert.equal((await post(advance)).status,200);
+    const started=await post(advance),starting=await started.clone().json();assert.equal(started.status,200,JSON.stringify({error:starting.error,validation:starting.adjudicationFailure?.validation}));
     const water = await read(), cup = water.objects.find(o=>o.id==='acceptance-cup');
     assert.equal(cup.state.contents,'water'); assert.equal(cup.holder,'vera'); assert.equal(cup.owner,'owner');
-    assert.equal(water.characters.find(c=>c.id==='vera').plan.phases.cursor,0);
+    assert.equal(water.characters.find(c=>c.id==='vera').plan.phases.cursor,1);
     assert.equal(requests.length,2); assert.equal(requests[1].action.type,'work'); assert.equal(requests[1].action.target,'tea');
     assert.doesNotMatch(JSON.stringify(water.events),/泡了一壺茶|活動已完成/);
     const first = await (await post(advance)).json(); assert.equal(first.world.turn,1); assert.equal(requests.length,2);
@@ -75,8 +76,8 @@ test('tea has no success fallback when the cup is absent, budget is exhausted, o
       calls++; const input = JSON.parse(JSON.parse(init.body).messages[1].content);
       return completion(input.contractVersion === 'world-adjudication.v1'
         ? variant==='missing' ? {status:'unsupported',effects:[],stages:[],check:null}
-          : {status:'accepted',effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:1,key:'contents',value:'tea'}],stages:[],check:null}
-        : tea);
+          : {status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'acceptance-cup',expectedRevision:1,key:'contents',value:'tea'}],stages:[],check:null}
+        : tea,JSON.parse(JSON.parse(init.body).messages[1].content));
     };
     try {
       const response = await post(advance), result = await response.json();

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -8,7 +9,7 @@ const store = load('store');
 const { seedWorld } = load('world');
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
 const read = async id => (await (await GET(id ? new Request('https://test.invalid/api/world?operationId=' + encodeURIComponent(id)) : undefined)).json());
-const response = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
+const response = (value,_fixtureInput)=> Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 const rest = { type: 'rest', target: '', content: '安靜休息一會', purpose: '休息', mood: '平靜', durationMinutes: 15, timeIntent: { kind: 'open-ended', maxMinutes: null }, intents: [] };
 const proposal = { ...rest, type: 'propose', target: 'natural-cup', content: '觀察這只杯子並確認外在溫度的變化', purpose: '處理眼前物件', timeIntent: { kind: 'completion', maxMinutes: null } };
 const accepted = effects => ({ status: 'accepted', completionMinutes: 15, effects, stages: [], branches: null, check: null, routine: null });
@@ -39,8 +40,8 @@ async function setup(adjust = () => {}) {
     assert.doesNotMatch(JSON.stringify(input), /operationEvidence|fixture-key/);
     inputs.push(input);
     await inputHook?.(input);
-    if (input.contractVersion === 'world-adjudication.v1') { adjudication++; return response(typeof candidate === 'function' ? candidate(input) : candidate); }
-    npc++; return response(decision);
+    if (input.contractVersion === 'world-adjudication.v1') { adjudication++; return response(typeof candidate === 'function' ? candidate(input) : candidate,JSON.parse(JSON.parse(init.body).messages[1].content)); }
+    npc++; return response(decision,JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   return { post, inputs, onInput(value) { inputHook = value; }, choose(value) { decision = value; }, candidate(value) { candidate = value; }, counts: () => ({ npc, adjudication }), restore() { global.fetch = original; } };
 }

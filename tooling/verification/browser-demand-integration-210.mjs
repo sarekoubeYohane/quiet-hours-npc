@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {url,server,store,load,requests,setModelResponder} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
-const require=createRequire(import.meta.url),fixture=require('../../tests/fixtures/demand-integration-loop.cjs');
+const require=createRequire(import.meta.url),fixture=require('../../tests/fixtures/demand-integration-v3-loop.cjs');
 process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/demand-integration-210');await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
 const random=Math.random;let rolls=0;Math.random=()=>{rolls++;return .675;};let browser;
 const actor=(w,id)=>w.characters.find(c=>c.id===id),mealOf=w=>w.objects.find(o=>o.kind==='meal');

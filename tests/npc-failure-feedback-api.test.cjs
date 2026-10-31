@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const assert = require('node:assert/strict');
@@ -13,7 +14,7 @@ const id = () => Date.now() + ':' + crypto.randomUUID();
 const request = body => new Request('https://test.invalid/api/world', {
   method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: id(), mode: 'demo', ...body }),
 });
-const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
+const completion = (value,_fixtureInput)=> Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 async function scenario({ hiddenTarget = false } = {}) {
   store.install({ ...seedWorld(), adjudication: { provider: 'openai', model: 'fixture-adjudicator' } });
   await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'fixture-key' }));
@@ -32,13 +33,14 @@ async function scenario({ hiddenTarget = false } = {}) {
       adjudications.push(input);
       // Only captured fields are reused. Omitted historical fields cannot be
       // reconstructed; this transport response is an explicit fixture.
-      return completion({ status: input.actor.id === 'kris' ? 'denied' : 'unsupported', effects: [], stages: [], check: null });
+      return completion({ status: input.actor.id === 'kris' ? 'denied' : 'unsupported', effects: [], stages: [], check: null },JSON.parse(JSON.parse(init.body).messages[1].content));
     }
     prompts.push({ input, system: messages[0].content });
     const saved = report.first.dispatches.find(d => d.task === 'npc' && d.actorId === input.self.id);
+    const captured=structuredClone(saved.candidate.value);delete captured.contractVersion;
     return completion(['vera', 'kris'].includes(input.self.id)
-      ? { ...saved.candidate.value, ...(hiddenTarget ? { target: 'hidden-object' } : {}), mood: '平靜', intents: [] }
-      : { type: 'rest', target: '', content: '安靜休息', mood: '平靜', durationMinutes: 15, intents: [] });
+      ? { ...captured, ...(hiddenTarget ? { target: 'hidden-object' } : {}), mood: '平靜', intents: [] }
+      : { type: 'rest', target: '', content: '安靜休息', mood: '平靜', durationMinutes: 15, intents: [] },JSON.parse(JSON.parse(init.body).messages[1].content));
   };
   return {
     prompts,

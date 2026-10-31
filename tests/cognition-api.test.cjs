@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- API fixtures. */
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
@@ -10,7 +11,7 @@ async function withModel(choose, run) {
   const previous = global.fetch, inputs = [];
   global.fetch = async (_url, init) => {
     const body = JSON.parse(init.body), input = JSON.parse(body.messages[1].content); inputs.push(input);
-    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify({ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], cognitiveUpdates: [], interpretation: '', ...choose(input) }) } }] });
+    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{ type: 'rest', target: '', content: '', mood: '平靜', durationMinutes: 15, intents: [], attentionConditions: [], memorySelections: [], cognitiveUpdates: [], interpretation: '', ...choose(input) })) } }] });
   };
   try {
     await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'test-key' }));
@@ -29,7 +30,7 @@ test('one existing decision saves a belief before its intention and legal action
     const operationId = `${Date.now()}:${crypto.randomUUID()}`, response = await advance({ operationId });
     assert.equal(response.status, 200); const result = await response.json(), after = await read(), cass = after.characters[0];
     assert.equal(cass.cognition.beliefs.length, 1); assert.equal(cass.cognition.beliefs[0].conviction, 'leaning');
-    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.equal(cass.intents[0].id, 'visit-cafe');
+    assert.equal(cass.cognition.beliefs[0].characterId, 'cass'); assert.ok(cass.intents.some(node=>node.id==='cass:visit-cafe'&&node.scope==='找個地方安頓自己的節奏'));
     assert.equal(cass.location, 'cafe'); assert.equal(cass.mood, '安心');
     assert.ok(after.events.some(event => event.actor === 'cass' && event.kind === 'move'));
     assert.equal(after.characters[1].cognition?.beliefs.length || 0, 0);
@@ -79,7 +80,7 @@ test('mistaken certainty and unresolved contradictory beliefs coexist until the 
     const cass = (await read()).characters[0]; assert.equal(cass.cognition.beliefs.length, 2);
     assert.equal(cass.cognition.beliefs[0].conviction, 'certain'); assert.deepEqual(cass.cognition.beliefs[1].contradictions, ['personal-space']);
     assert.equal(inputs.findLast(input => input.self.id === 'cass').self.cognition.beliefs.length, 2);
-    assert.ok((await read()).characters.every(character => character.intents.length === 0));
+    assert.ok((await read()).characters.every(character => character.intents.every(node=>node.kind==='direction')));
   });
 });
 test('only a bounded set of related relationship tags is visible and omitted tags cannot be changed', async () => {
@@ -211,10 +212,15 @@ test('an actually known message sender can receive contextual relationship tags 
 });
 test('pressure review candidates remain an actionable subset after the shared input budget selects visible beliefs', async () => {
   const w = worldWithAdjudication(), c = w.characters[0]; c.memories = [];
-  c.shortTerm = Array.from({ length: 20 }, (_, i) => ({ id: `large-recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(875), source: { kind: 'experience' } }));
-  c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `b${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '乙'.repeat(133), conviction: 'leaning', references: [], contradictions: [], reason: '仍有影響' })), relationshipTags: [], trace: [] }; store.install(w); assert.equal((await GET()).status, 200);
+  // Fill legal short/cognition budgets and two saved pursuit contexts so the
+  // complete input must select a strict subset of the 24 beliefs.
+  c.shortTerm = Array.from({ length: 20 }, (_, i) => ({ id: `large-recent-${i}`, characterId: c.id, version: 1, time: i, text: '甲'.repeat(1055), source: { kind: 'experience' } }));
+  Object.assign(c.intents.find(node => node.kind === 'direction'), { content: '方向'.repeat(100), context: '背景'.repeat(80), scope: '範圍'.repeat(100), satisfaction: '足夠'.repeat(80), reason: '理由'.repeat(80) });
+  c.intents.push({ ...c.intents[0], id: 'cass:pressure-background', kind: 'intent' });
+  c.cognition = { beliefs: Array.from({ length: 24 }, (_, i) => ({ id: `b${i}`, characterId: c.id, version: 1, time: 0, topic: `主題${i}`, text: '乙'.repeat(170), conviction: 'leaning', references: [], contradictions: [], reason: '仍有影響' })), relationshipTags: [], trace: [] }; store.install(w); assert.equal((await GET()).status, 200);
   await withModel(input => input.self.id === 'cass' ? { cognitiveUpdates: [{ kind: 'belief', operation: 'withdraw', id: input.self.cognition.reviewCandidates.at(-1).id, version: 1, references: evidence(input), reason: '從本次展示的有限整理候選放下一個看法' }] } : {}, async (inputs, advance) => {
     assert.equal((await advance()).status, 200); const input = inputs.find(item => item.self.id === 'cass'), cognition = input.self.cognition;
+    assert.ok(Buffer.byteLength(JSON.stringify(input)) <= 88 * 1024); assert.equal(input.self.shortTerm.length, 20);
     assert.ok(cognition.beliefs.length < 24); assert.ok(cognition.reviewCandidates.length > 0 && cognition.reviewCandidates.length <= 8);
     assert.ok(cognition.reviewCandidates.every(candidate => (candidate.kind === 'belief' ? cognition.beliefs : cognition.relationshipTags).some(item => item.id === candidate.id && item.version === candidate.version)));
     assert.equal((await read()).characters[0].cognition.beliefs.length, 23);

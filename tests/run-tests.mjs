@@ -9,6 +9,9 @@ for (const args of [
   ['tests/run-activities.mjs'],
   ['tests/run-auth.mjs'],
   ['--test', 'tests/auth-workerd.test.mjs', 'tests/model-keys-workerd.test.mjs', 'tests/migration-gate.test.mjs', 'tooling/experiments/check-autonomous-demand-211.test.mjs'],
+  // Source-pin counterexamples deliberately alter and restore local sources.
+  // Finish every Worker/migration reader before this isolated test process.
+  ['--test', 'tooling/experiments/pursuit-runner-228.test.mjs'],
 ]) {
   const result = spawnSync(process.execPath, args, { stdio: 'inherit', env });
   if (result.status !== 0) {

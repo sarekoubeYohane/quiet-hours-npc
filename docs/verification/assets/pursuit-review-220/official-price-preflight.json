@@ -1,0 +1,15 @@
+{
+  "status": "source-preflight-only-unsealed",
+  "date": "2026-10-29",
+  "model": "gpt-6-luna",
+  "source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+  "privateSourceBytes": 4111,
+  "privateSourceSha256": "20b10b062d96a4b0745f7675624c564271a229046c5fafc9e63c76f776dcee59",
+  "standardShortContextUsdPerMillion": {"input":0.10,"output":0.50,"cachedInput":0.01},
+  "otherConditions": ["greater-than-272K-full-request-double-price","Fast-double-price","regional-plus-ten-percent"],
+  "accountTierVerified": false,
+  "finiteAuthorizationProvided": false,
+  "credentialProbed": false,
+  "realProviderCalls": 0,
+  "paidReady": false
+}
