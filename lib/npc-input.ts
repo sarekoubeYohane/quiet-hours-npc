@@ -23,8 +23,8 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
 }
 
 
-// Memory selection remains with its normal/recall caller. Both paths then use
-// this identical derived view and byte reservation before binding references.
+// Shared projections stay provider-free. The complete decision preparation
+// coordinates normal/recall selection and uses this same derived view.
 export function finalizeDecisionInput<T extends {phones:ReturnType<typeof phoneForActor>;self:Pick<ReturnType<typeof perception>['self'],'shortTerm'|'longTerm'|'arrangements'|'observations'>}>(w:World,c:Character,input:T,recalledMemories?:{id:string;version:number}[]){
  const final=Object.assign(input,{phoneReferenceGap:0,self:{...input.self,arrangementCues:[] as ReturnType<typeof arrangementCuesForDecision>,arrangementCueGap:0,noticeOpportunities:[] as {id:string;observationIds:string[]}[],noticeOpportunityGap:0}});
  const extra=recalledMemories===undefined?undefined:{recalledMemories};
