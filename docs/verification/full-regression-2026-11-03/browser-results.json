@@ -1,0 +1,1508 @@
+[
+  {
+    "name": "browser-acceptance-scene",
+    "command": [
+      "node",
+      "tooling/verification/browser-acceptance-scene.mjs"
+    ],
+    "exit": 0,
+    "seconds": 28.56,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-acceptance-scene.log",
+    "logSha256": "bf839d09f841081abe0c86925e79668ea31fce246c51cc63badacbd8e9e5b0e4",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-acceptance-scene",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-action-analysis",
+    "command": [
+      "node",
+      "tooling/verification/browser-action-analysis.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.78,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-action-analysis.log",
+    "logSha256": "da9933eb61a97e4740667e6384f5a199b97a40c5181bba10975cd28fa7de3387",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-action-analysis",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-arrangement-cues",
+    "command": [
+      "node",
+      "tooling/verification/browser-arrangement-cues.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.87,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-arrangement-cues.log",
+    "logSha256": "a23f9c37710c31cd894f2f590faeb068f3ec51204da5405172573e1efadcec38",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-arrangement-cues",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-arrangements",
+    "command": [
+      "node",
+      "tooling/verification/browser-arrangements.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.29,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-arrangements.log",
+    "logSha256": "1f3ae83dd4540a592009b376985960633968b37856ca9bee27fe3e391aeef048",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-arrangements",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-candidate-diagnostics",
+    "command": [
+      "node",
+      "tooling/verification/browser-candidate-diagnostics.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.2,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-candidate-diagnostics.log",
+    "logSha256": "87bf273c3be6c1b043a71af75901f9c60a7524696895b73ac4cf0c104a4f6a14",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-candidate-diagnostics",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-decision-trace-faults",
+    "command": [
+      "node",
+      "tooling/verification/browser-decision-trace-faults.mjs"
+    ],
+    "exit": 0,
+    "seconds": 27.9,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-decision-trace-faults.log",
+    "logSha256": "d438a4d89ad6f7e213686bed323b1a688c38d7768aa38704c635d3bd79ca9cdf",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-decision-trace-faults",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-decision-traces",
+    "command": [
+      "node",
+      "tooling/verification/browser-decision-traces.mjs"
+    ],
+    "exit": 0,
+    "seconds": 11.23,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-decision-traces.log",
+    "logSha256": "b9c475ba735b41fa4e04bb54f83ad3f93584efb30bfdfd169358a17a00a817d2",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-decision-traces",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-demand-integration-210",
+    "command": [
+      "node",
+      "tooling/verification/browser-demand-integration-210.mjs"
+    ],
+    "exit": 0,
+    "seconds": 25.33,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-demand-integration-210.log",
+    "logSha256": "85b6db4f2f92f6dec2ca70ed6fd043f1d5a72afb6b467fc422d729f0d8284a1c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-demand-integration-210",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-discovery-208",
+    "command": [
+      "node",
+      "tooling/verification/browser-discovery-208.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.62,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-discovery-208.log",
+    "logSha256": "4920eae55682c45558784142191d2586753b8e3e5c6d98083a3ff2e5cdf32c6c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-discovery-208",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-flexible-life-integration",
+    "command": [
+      "node",
+      "tooling/verification/browser-flexible-life-integration.mjs"
+    ],
+    "exit": 0,
+    "seconds": 11.18,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-flexible-life-integration.log",
+    "logSha256": "ad8b5064b53917ebcdd9a369352ac25c0f85cda39150d711e594a89381d0b0d4",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-flexible-life-integration",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-life-forecast",
+    "command": [
+      "node",
+      "tooling/verification/browser-life-forecast.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.8,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-life-forecast.log",
+    "logSha256": "4fe87bd44c17634295c4ffa5f8f7fcde5ca00f5f0b8c4ad00db06c6274e9f967",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-life-forecast",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-life-habits",
+    "command": [
+      "node",
+      "tooling/verification/browser-life-habits.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.55,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-life-habits.log",
+    "logSha256": "8f86ee0c25ba3952193446458739791d95e546e9179ca779360765bf74757e99",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-life-habits",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-life-integration",
+    "command": [
+      "node",
+      "tooling/verification/browser-life-integration.mjs"
+    ],
+    "exit": 0,
+    "seconds": 20.23,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-life-integration.log",
+    "logSha256": "12d8417121449373240a84dc86b69a296cd535bd238c60867fb3b6cc2fea8b14",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-life-integration",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-life-needs",
+    "command": [
+      "node",
+      "tooling/verification/browser-life-needs.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.36,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-life-needs.log",
+    "logSha256": "82ddebfff3bc1e53eb7e91806c2e9063344499acf31f1f8b7e479c3a9ee3f505",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-life-needs",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-live-gaps",
+    "command": [
+      "node",
+      "tooling/verification/browser-live-gaps.mjs"
+    ],
+    "exit": 0,
+    "seconds": 60.66,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-live-gaps.log",
+    "logSha256": "8f86b17749ed9262b2b5ac56a6f7a5d93989b69bc4a587556921dca8abfc076b",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-live-gaps",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-method-assessment",
+    "command": [
+      "node",
+      "tooling/verification/browser-method-assessment.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.26,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-method-assessment.log",
+    "logSha256": "f35bf5a224f2de5be2783bcb9a461bd90fb4dad0256b599b18fe92c5f47c152c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-method-assessment",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-method-reassessment",
+    "command": [
+      "node",
+      "tooling/verification/browser-method-reassessment.mjs"
+    ],
+    "exit": 0,
+    "seconds": 30.88,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-method-reassessment.log",
+    "logSha256": "0fe29246650f79b60da9d43f02c42cf39f50602bb04705e469eb60e8644ec3dc",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-method-reassessment",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-model-key-retention",
+    "command": [
+      "node",
+      "tooling/verification/browser-model-key-retention.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.3,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-model-key-retention.log",
+    "logSha256": "1561c6917d3443a6cf6a3d4d9b84b4d15b6ebdcd9ec94bd68817c61c4d6bd69b",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-model-key-retention",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-natural-changes",
+    "command": [
+      "node",
+      "tooling/verification/browser-natural-changes.mjs"
+    ],
+    "exit": 0,
+    "seconds": 8.62,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-natural-changes.log",
+    "logSha256": "234dfbef9491e4ea8e7dfb9fa29a034af9ee5e3d8171bcc49bdc32c0b2cb8e58",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-natural-changes",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-object-observation",
+    "command": [
+      "node",
+      "tooling/verification/browser-object-observation.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.91,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-object-observation.log",
+    "logSha256": "e7ac542a637648f8262cb4506adcdab4df7201001646468ff82186bff5a845b1",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-object-observation",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-operation-evidence",
+    "command": [
+      "node",
+      "tooling/verification/browser-operation-evidence.mjs"
+    ],
+    "exit": 0,
+    "seconds": 11.31,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-operation-evidence.log",
+    "logSha256": "871d4843ca6d458be35099ae37a8e59bb18f11ebe4c6c1e4a9d6b6708db19ded",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-operation-evidence",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-phone-calendar",
+    "command": [
+      "node",
+      "tooling/verification/browser-phone-calendar.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.47,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-phone-calendar.log",
+    "logSha256": "332c29a663e0e06249d7edb312fc182ed1edc9340ca4528210c7001901f3cb2d",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-phone-calendar",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-phone-inbox",
+    "command": [
+      "node",
+      "tooling/verification/browser-phone-inbox.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.28,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-phone-inbox.log",
+    "logSha256": "00c4ef79680746c543e14bdf082d5fcdeec5edef53c15a8db95af142c627d794",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-phone-inbox",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-phone-memos",
+    "command": [
+      "node",
+      "tooling/verification/browser-phone-memos.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.4,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-phone-memos.log",
+    "logSha256": "1b657c515901ccfd55e9c1c4f9c60fe599555c1cc3763e45d489d3a337e7bc33",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-phone-memos",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-phone-notifications",
+    "command": [
+      "node",
+      "tooling/verification/browser-phone-notifications.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.36,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-phone-notifications.log",
+    "logSha256": "93315cbd544e45ca8e593d3039b1d94b9c329751890d91c6ae606d476464785d",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-phone-notifications",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-preferences",
+    "command": [
+      "node",
+      "tooling/verification/browser-preferences.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.48,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-preferences.log",
+    "logSha256": "93ecb18c803b7f7e6712eb69d7b46c2cfe491d0d3d1bdf1704eb1c635bcab047",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-preferences",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-arrangements-226",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-arrangements-226.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.26,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-arrangements-226.log",
+    "logSha256": "a8cb89486d497550dd94e3e9b1df1950b6e6d7aeb3469f372fa983b12f9b2cbe",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-arrangements-226",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-capacity-227",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-capacity-227.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.92,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-capacity-227.log",
+    "logSha256": "7419d02ca4bd07767bd5509960b17f00995fc1ecc490f418406eaff0a88fa782",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-capacity-227",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-exit-225",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-exit-225.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.49,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-exit-225.log",
+    "logSha256": "a936c10285ad4721f5f0dde4627f03fc9ae28b7be13745ff980dfff4281e157c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-exit-225",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-graph-223",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-graph-223.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.35,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-graph-223.log",
+    "logSha256": "f099e9506ec00f169badd6a9e1f0c24ef756c7c5ecc2dc01ae38b4760e52fea2",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-graph-223",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-history-review-220",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-history-review-220.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.25,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-history-review-220.log",
+    "logSha256": "6f7d9c41c0086c3eaaa407739e3d5f5fdfe186303f9f9f419514b0c6d37e6be1",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-history-review-220",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-lifecycle-224",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-lifecycle-224.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.66,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-lifecycle-224.log",
+    "logSha256": "c0ff800ee8beb8a44f04c16706575ecc0e60f33f91ea015bceac88ef98b8c8e8",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-lifecycle-224",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuit-selection-222",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-selection-222.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.99,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-selection-222.log",
+    "logSha256": "9d5f5aa1246cd3f84874f55e4144b86a15867d9d631e370e602d555dd3960061",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuit-selection-222",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-pursuits-221",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuits-221.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.54,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-pursuits-221.log",
+    "logSha256": "059a6153068b29c58a659b980fa00c28388e0a9e7a2f5452895262f265752545",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-pursuits-221",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-routine-discovery-209",
+    "command": [
+      "node",
+      "tooling/verification/browser-routine-discovery-209.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.9,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-routine-discovery-209.log",
+    "logSha256": "dc98875ea507d4613601d057e2bca66ee70b7e50ab7e842db6b53ebea73f6441",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-routine-discovery-209",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-routine-discovery-pending-209",
+    "command": [
+      "node",
+      "tooling/verification/browser-routine-discovery-pending-209.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.52,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-routine-discovery-pending-209.log",
+    "logSha256": "5254ce86b08d256cce9c2c34cf1d7d33c2fd7136e8b0285cdcd39b89b4500f22",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-routine-discovery-pending-209",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-sleep",
+    "command": [
+      "node",
+      "tooling/verification/browser-sleep.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.59,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-sleep.log",
+    "logSha256": "39ef75f704341a557fe7f0269b6f9fd035282768a37657223c3a78aa58dc8bdd",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-sleep",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-smoke",
+    "command": [
+      "node",
+      "tooling/verification/browser-smoke.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.75,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-smoke.log",
+    "logSha256": "091ea058613944503d21077beae6b88dc4199fda6262324f8259d5e27c2d9e10",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-smoke",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser-source-scope-206",
+    "command": [
+      "node",
+      "tooling/verification/browser-source-scope-206.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.9,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser-source-scope-206.log",
+    "logSha256": "9ca7ad1e69c9e038b76e02bff3d7c0f88f72fea14136d2ff00f0dfc504714552",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser-source-scope-206",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser100",
+    "command": [
+      "node",
+      "tooling/verification/browser100.mjs"
+    ],
+    "exit": 0,
+    "seconds": 17.72,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser100.log",
+    "logSha256": "b49afc9de4d93141b83657fa90f1ba574e6f189a47898a51f9a162c08414cb57",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser100",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser109",
+    "command": [
+      "node",
+      "tooling/verification/browser109.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.01,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser109.log",
+    "logSha256": "0210376d4d8d8665de3613772b91e7a58f557d4e6c3d990fb019a54f4f43b8e4",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser109",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser110",
+    "command": [
+      "node",
+      "tooling/verification/browser110.mjs"
+    ],
+    "exit": 0,
+    "seconds": 11.68,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser110.log",
+    "logSha256": "6e8e4398553e6fb7ef6db966622180823980033ac504a22ae46abb3cee04fc09",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser110",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser111",
+    "command": [
+      "node",
+      "tooling/verification/browser111.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.05,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser111.log",
+    "logSha256": "384872d62661b4cf535c64846acfb1cbb9f301dffb6be21a797cf8236a965aa3",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser111",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser112",
+    "command": [
+      "node",
+      "tooling/verification/browser112.mjs"
+    ],
+    "exit": 0,
+    "seconds": 12.34,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser112.log",
+    "logSha256": "9bc42482a979cbfd461b64b35362ba5848a1c607e312411f4b327568ba508367",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser112",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser116",
+    "command": [
+      "node",
+      "tooling/verification/browser116.mjs"
+    ],
+    "exit": 0,
+    "seconds": 10.73,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser116.log",
+    "logSha256": "52365f674f922e2179bde4dfb8829803557079b825cbe6780af4c57eb6e7e4fc",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser116",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser117",
+    "command": [
+      "node",
+      "tooling/verification/browser117.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.4,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser117.log",
+    "logSha256": "7bccd60bfdf37ca0c321ae8d9cc28d6e18777026b035af771f37140bb82c9d74",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser117",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser118",
+    "command": [
+      "node",
+      "tooling/verification/browser118.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.74,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser118.log",
+    "logSha256": "438d358e5810e79e081c8470ac5b63bd43cb20cbb1ffb92d52c7c882c4227d5a",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser118",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser119",
+    "command": [
+      "node",
+      "tooling/verification/browser119.mjs"
+    ],
+    "exit": 0,
+    "seconds": 25.05,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser119.log",
+    "logSha256": "5263021a8b87e17315d2ad35c9aa945da329748dc618a6d93781a19127a0fd46",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser119",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser122-123",
+    "command": [
+      "node",
+      "tooling/verification/browser122-123.mjs"
+    ],
+    "exit": 0,
+    "seconds": 15.99,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser122-123.log",
+    "logSha256": "d6729be1141751790976fb28aa6f99e94c3b6cc3aa8cbf1e41a22c499369035c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser122-123",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser127",
+    "command": [
+      "node",
+      "tooling/verification/browser127.mjs"
+    ],
+    "exit": 0,
+    "seconds": 29.97,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser127.log",
+    "logSha256": "2f153198f53592f1b24397aab49b4a1a0c9f82c6c20e24a7f978bc9fe08ac925",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser127",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser128",
+    "command": [
+      "node",
+      "tooling/verification/browser128.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.39,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser128.log",
+    "logSha256": "63b3fc4ec9c3e7937d2780e5eb4a3e736a153f4c331a937ca5e48681dc8991dc",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser128",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser129",
+    "command": [
+      "node",
+      "tooling/verification/browser129.mjs"
+    ],
+    "exit": 0,
+    "seconds": 31.16,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser129.log",
+    "logSha256": "f9455fd8fdc0c5acfe73d0ec3beb894b61a526b32d0b93c1bccc38affcce79ef",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser129",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser146",
+    "command": [
+      "node",
+      "tooling/verification/browser146.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.02,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser146.log",
+    "logSha256": "9adb33249b333d717aa6724bdcbe78e7b2ee17a8220df876a740d65a9f8929d6",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser146",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser147",
+    "command": [
+      "node",
+      "tooling/verification/browser147.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.25,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser147.log",
+    "logSha256": "fe27ac84d34987bc196b6a74fa02a9ee6c729c588121e93c8b257649dce0a4e2",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser147",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser148",
+    "command": [
+      "node",
+      "tooling/verification/browser148.mjs"
+    ],
+    "exit": 0,
+    "seconds": 9.13,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser148.log",
+    "logSha256": "4dff720364b9ebba3733e008ca829ce3a6a9bcaf68b3667d2c007e1b32fc8c9d",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser148",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser149",
+    "command": [
+      "node",
+      "tooling/verification/browser149.mjs"
+    ],
+    "exit": 0,
+    "seconds": 10.61,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser149.log",
+    "logSha256": "381d158c85dc0d89b3db38622db8b76c811e9bfaca0a5adfef33286fa78c6404",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser149",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser151",
+    "command": [
+      "node",
+      "tooling/verification/browser151.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.33,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151.log",
+    "logSha256": "bff886c2a70825e16d82f42e3c5871440cf3cd119728edcca1c99a394dd67dde",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser175-176",
+    "command": [
+      "node",
+      "tooling/verification/browser175-176.mjs"
+    ],
+    "exit": 0,
+    "seconds": 12.01,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser175-176.log",
+    "logSha256": "90af819a45a5c46b0d75b13f69069de2520b43f82965801a6a8c19ead76f4b40",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser175-176",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser56",
+    "command": [
+      "node",
+      "tooling/verification/browser56.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.02,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser56.log",
+    "logSha256": "6583c2743c73bb3c15e95f6dbbf3d8c0cf6b28bd42aa4eb4214268185aad30db",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser56",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser80",
+    "command": [
+      "node",
+      "tooling/verification/browser80.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.11,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser80.log",
+    "logSha256": "a25396401939dede5a9aa5f65518a72626856f15d01f461d61c707fe84060fc6",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser80",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser81",
+    "command": [
+      "node",
+      "tooling/verification/browser81.mjs"
+    ],
+    "exit": 0,
+    "seconds": 7.26,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser81.log",
+    "logSha256": "7cee82a605e6cd4785a5e48df43cacd839458150edc19dce4d047054542f00fb",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser81",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser82",
+    "command": [
+      "node",
+      "tooling/verification/browser82.mjs"
+    ],
+    "exit": 0,
+    "seconds": 9.77,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser82.log",
+    "logSha256": "dfe672e84d52ca1e2a1161d1eaacb7ab4e3fc5558be67e052c4d56c309d5322a",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser82",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser83",
+    "command": [
+      "node",
+      "tooling/verification/browser83.mjs"
+    ],
+    "exit": 0,
+    "seconds": 13.04,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser83.log",
+    "logSha256": "f84f8744eb7467cf0e4f4277085db1d6831f01d7382ad0844afcbfe28183c4eb",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser83",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser88",
+    "command": [
+      "node",
+      "tooling/verification/browser88.mjs"
+    ],
+    "exit": 0,
+    "seconds": 3.99,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser88.log",
+    "logSha256": "0ca00126d1379ea6acf7207731696284505a9af1573a5abb9f45c2a3c6aeef78",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser88",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser89",
+    "command": [
+      "node",
+      "tooling/verification/browser89.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.8,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser89.log",
+    "logSha256": "9e7736db91f2e15552d6e938806b0216f00d880a4371d22315ba5f772769ab81",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser89",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser90",
+    "command": [
+      "node",
+      "tooling/verification/browser90.mjs"
+    ],
+    "exit": 0,
+    "seconds": 9.06,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser90.log",
+    "logSha256": "24f0c039973c8141e678d404db40e0cf4ec4dc3dd6a5079e16377812048b135b",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser90",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser93",
+    "command": [
+      "node",
+      "tooling/verification/browser93.mjs"
+    ],
+    "exit": 0,
+    "seconds": 14.16,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser93.log",
+    "logSha256": "c18e49b66499375c8b1ae483cc0aa985f9909985fcda0b2ce52cd6225716c2a5",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser93",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser94",
+    "command": [
+      "node",
+      "tooling/verification/browser94.mjs"
+    ],
+    "exit": 0,
+    "seconds": 6.81,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser94.log",
+    "logSha256": "e3a36eba1cd758b4c6e3e3d3ae26e1eb93848eed7d42c22f50d48eb85713e268",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser94",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser95",
+    "command": [
+      "node",
+      "tooling/verification/browser95.mjs"
+    ],
+    "exit": 0,
+    "seconds": 12.44,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser95.log",
+    "logSha256": "9a459d456d2a2f7a67c5f923f2d5ac3c364dcfb81475bd2a5b06ea75288a1c67",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser95",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  },
+  {
+    "name": "browser151-cafe",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.48,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-cafe.log",
+    "logSha256": "8cacd640acab50e9ce76fed40efe54b0eaf0dccce7cbd942299dfbb09e43d271",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-cafe",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "cafe"
+    }
+  },
+  {
+    "name": "browser151-borrow",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.35,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-borrow.log",
+    "logSha256": "7b20b9677f38607be847bd7c0c70707f4a57730e1e044ba266d4bc0651835460",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-borrow",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "borrow"
+    }
+  },
+  {
+    "name": "browser151-meal",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 5.31,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-meal.log",
+    "logSha256": "29c1954c9521230b53780a5733b3afbbc7708d589d27adaa1644ea9edf80c101",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-meal",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "meal"
+    }
+  },
+  {
+    "name": "browser151-physical",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.22,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-physical.log",
+    "logSha256": "a8b50ed99f9ffc4d1db88e099139937d9b503678591f5498292354507c19fe5c",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-physical",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "physical"
+    }
+  },
+  {
+    "name": "browser151-natural",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.75,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-natural.log",
+    "logSha256": "02eac3b29c8c3c9a507ec390dec361978bcf71ea115e60d0566e213f8a52151a",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-natural",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "natural"
+    }
+  },
+  {
+    "name": "browser151-material-subject",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.79,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-material-subject.log",
+    "logSha256": "ffff19f72bc6ff386a70781ae051e53207452f4173164fac2543398afa247117",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-material-subject",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "material-subject"
+    }
+  },
+  {
+    "name": "browser151-finite-material",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.4,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-finite-material.log",
+    "logSha256": "d4f47c078159e6afb07e12958a59ce6ce37470041b81fe92fe29374df2aae225",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-finite-material",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "finite-material"
+    }
+  },
+  {
+    "name": "browser151-save-after",
+    "command": [
+      "node",
+      "tooling/verification/browser151-world.mjs"
+    ],
+    "exit": 0,
+    "seconds": 4.19,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser151-save-after.log",
+    "logSha256": "30d428c4923954ac67712c00a0b06521052c867de3084cb6b1c671c825b798a2",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser151-save-after",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "BROWSER151_SCENARIO": "save-after"
+    }
+  },
+  {
+    "name": "browser100-legacy",
+    "command": [
+      "node",
+      "tooling/verification/browser100.mjs"
+    ],
+    "exit": 0,
+    "seconds": 12.11,
+    "evidenceLevel": "L: WorldApp/HTTP/handlers/SQLite; auth/host/model fixture",
+    "log": "artifacts/regression-20261103/logs/browser100-legacy.log",
+    "logSha256": "a865f0d8af310a58b9a48335c59c5b38cbd194402dd19c1d87ba9312d57a8efb",
+    "cwd": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103",
+    "environment": {
+      "PLAYWRIGHT_MODULE": "/private/tmp/npc-regression-browser/node_modules/playwright",
+      "CHROMIUM_EXECUTABLE": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "BROWSER_ARTIFACT_DIR": "/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/artifacts/regression-20261103/browser/browser100-legacy",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs",
+      "TEA_ACTION": "legacy"
+    }
+  },
+  {
+    "name": "browser-pursuit-runner-228",
+    "command": [
+      "node",
+      "tooling/verification/browser-pursuit-runner-228.mjs"
+    ],
+    "exit": 0,
+    "evidenceLevel": "L: readonly reopened file SQLite; synthetic prior trial",
+    "log": "artifacts/regression-20261103/logs/browser-pursuit-runner-228.log",
+    "logSha256": "bf6aa31afd83b8acc171c05bd4a88a2f42dcad3b40bf52f99d503ebf253f1cec",
+    "environment": {
+      "EXPERIMENT_SQLITE": "/private/tmp/npc-regression-pursuit-7bf2hud2/first-trial.sqlite",
+      "NODE_OPTIONS": "--import=/Users/sarekoubeyohane/Documents/ChatGPT/NPC觀察室/quiet-hours-npc-regression-20261103/tooling/verification/no-network.mjs"
+    }
+  }
+]

@@ -1,0 +1,173 @@
+{
+  "date": "2026-11-03",
+  "timezone": "Asia/Taipei",
+  "baselineCommit": "9c7c2d0e6e9430e3e06bfa9e7ff17b364842b611",
+  "originalCheckoutHead": "8e4b8468a54dd912d5e1ffa3d9db4712914cf961",
+  "originalUntrackedPreserved": [
+    "artifacts/"
+  ],
+  "codeCommit": "1fae637c9a44d2d5947c8bc6cffd7e4370c16b3c",
+  "codeTree": "99e1adf27f712c26e2409ee107abc0da48e5ffd7",
+  "browserTestedCommit": "373e0199e9dc2f2630b75b45eaa78c8a0e3aa2bb",
+  "browserTestedTree": "99e1adf27f712c26e2409ee107abc0da48e5ffd7",
+  "fullSuiteProductCommit": "c7f8062",
+  "productDiffToFinal": "empty for lib/app/components/drizzle/tests/package.json/pnpm-lock.yaml",
+  "environment": {
+    "node": "26.5.0",
+    "pnpm": "11.25.0",
+    "chrome": "156.0.8078.80",
+    "playwright": "1.64.1",
+    "ciNode24": "not yet verified by hosted CI",
+    "dependencies": "existing repo node_modules symlink; unchanged lockfile;no fresh frozen install claimed"
+  },
+  "testGroups": {
+    "world/activities": 1044,
+    "auth/key": 37,
+    "Workers/migration/materials": 15,
+    "pursuit runner": 21
+  },
+  "totalTests": 1117,
+  "failures": 0,
+  "skipped": 0,
+  "browserEntryPoints": 78,
+  "additionalFileSqliteReadback": 1,
+  "controlledRunner": {
+    "controlled": true,
+    "realPaidDispatches": 0,
+    "trials": 10,
+    "advances": 80,
+    "forwardedControlledProviderCalls": 17,
+    "partnerFixtureCalls": 64,
+    "engineCalls": 81,
+    "syntheticOriginalPlayerLimit": {
+      "calls": 100,
+      "tokens": 1000000
+    },
+    "sqliteReopened": true,
+    "wallClockUnmodified": true,
+    "perceptionDie": 0.675,
+    "maxBodyBytes": 106004
+  },
+  "realModelCalls": 0,
+  "productionWorldOperations": 0,
+  "deployments": 0,
+  "merges": 0,
+  "sourceInventoryCount": 66,
+  "clauseAuditRows": 2825,
+  "clauseAuditMeaning": "paragraph/Issue extraction including history;candidate methods;not 2825 independently verified requirements",
+  "commands": [
+    {
+      "command": "pnpm test",
+      "result": "PASS:1117/1117,0fail,0skip",
+      "log": "artifacts/regression-20261103/logs/test-final-context.log",
+      "sha256": "aece2bb9313b38f5507a40739aec9c28a2fa1e75107222ef20b7d988b6f2c4e5"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/typecheck-delivery.log",
+      "sha256": "38288cce0993f69f084aa0a0910d241021a084834f8732549591bbd16b11d899"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "PASS:0errors,4existing warnings",
+      "log": "artifacts/regression-20261103/logs/lint-delivery.log",
+      "sha256": "49c6ae15192dc31fdfb88c1866a51cf904ce4b6c980c8ae18284c84484330fb9"
+    },
+    {
+      "command": "CI workflow pnpm exec eslint runtime list",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/ci-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm exec eslint lib/world-effects.ts tests/action-feedback-api.test.cjs tests/routine-obstacles-api.test.cjs tooling/verification/browser*.mjs",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/changed-lint-delivery.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm build:production",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/build-production-gated.log",
+      "sha256": "2eed12d7044cb1fa312a8b14fdc9f88825d6c197d73e6a4e75b6dd0b2a70efb5"
+    },
+    {
+      "command": "CI production Wrangler name/APP_ENV assertion",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/production-gate-delivery.log",
+      "sha256": "191d81c9a113591f0865b9971484fc194d645a95647bfa750ddb811ae5481074"
+    },
+    {
+      "command": "pnpm build:test",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/build-test-delivery.log",
+      "sha256": "b90060ce665a88317cc655b09b88fd286a80d4bfc45e2b20d06decfca1f6bab5"
+    },
+    {
+      "command": "node tooling/check-test-build.mjs dist/server/wrangler.json",
+      "result": "PASS",
+      "log": "artifacts/regression-20261103/logs/test-build-gate-delivery.log",
+      "sha256": "9746aa1d03a2e44859f2c9528547fe74a0405482735beec56abbdf09949e9a99"
+    },
+    {
+      "command": "node tooling/experiments/check-autonomous-demand-211.mjs",
+      "result": "REFUSED:exit2;old pinned checkout differs;paidReady false",
+      "log": "artifacts/regression-20261103/logs/demand-material-gate.log",
+      "sha256": "e8579d83820c661693db9f8a7d5a3642c32929d77b585ef1a2907b9e4f125b63"
+    },
+    {
+      "command": "node tooling/experiments/pursuit-runner-228.mjs",
+      "result": "PASS preflight reporting missing authorization/seal;paidReady false",
+      "log": "artifacts/regression-20261103/logs/pursuit-preflight.log",
+      "sha256": "55a0cc4b34b4f2f0bd82105da0215c4b9a0b09302b23f8d2fa9d4497d16a0e2c"
+    },
+    {
+      "command": "NODE_OPTIONS=no-network node --test --test-name-pattern=a positive forwarded journey tooling/experiments/pursuit-runner-228.test.mjs; PURSUIT_EVIDENCE_DIR=new temp directory",
+      "result": "PASS:1/1;10trials/80advances;0realPaid",
+      "log": "artifacts/regression-20261103/logs/pursuit-file-sqlite.log",
+      "sha256": "7ffffef37478c26e5dfdef7a59381b2e61ae7b9e920451e925d0a712e3e580cb"
+    },
+    {
+      "command": "NODE_OPTIONS=no-network node tests/run-activities.mjs tests/action-feedback-api.test.cjs tests/routine-obstacles-api.test.cjs",
+      "result": "PASS:22/22",
+      "log": "artifacts/regression-20261103/logs/feedback-final-green.log",
+      "sha256": "0a8a42997b05d4d93c9d8e156fa64da487acf0b93b08c0610cf6c0eeb193ec9e"
+    }
+  ],
+  "assets": [
+    {
+      "path": "assets/key-expired.png",
+      "sha256": "0705655a0fe9b21ec9c748bb0cab6ba190d2efa8d1a82da2c68689314492bf61"
+    },
+    {
+      "path": "assets/key-retention.json",
+      "sha256": "628fb4677feaf83384725950974715ae17d07fe1c4b36630209b8fe9b7f5a6eb"
+    },
+    {
+      "path": "assets/sqlite-reopened-pursuit.png",
+      "sha256": "02a40eb45a28ab8bfec1601bdf7c648fcb9f48f09823f8a8419802a7e6de24f3"
+    },
+    {
+      "path": "assets/sqlite-reopened-mobile.png",
+      "sha256": "78fdfcd38147e0098341f306f3a28a38066131b7e3d2d685aaaed9a00ab831c4"
+    },
+    {
+      "path": "assets/sqlite-readback.json",
+      "sha256": "2174e1a628c5643b55863b5b00588b3e80cdc38033de04af742e6e38f3ddb2e9"
+    },
+    {
+      "path": "assets/acceptance-water.png",
+      "sha256": "f39279c21b917c2cbab841267254b30130d37e12b032e9a87360e7ef5d7a3dc4"
+    }
+  ],
+  "unverified": [
+    "clause-level assertions not individually matched remain audit gaps",
+    "real OAuth and deployed two-browser/cross-environment Key acceptance",
+    "Node24 hosted CI on final PR",
+    "real model autonomous behavior and semantic quality",
+    "production Vectorize/Embedding resources",
+    "original #77 platform incident root cause",
+    "unimplemented #27/#29/#31/#32 and outstanding #70-72/#75 scope"
+  ]
+}
