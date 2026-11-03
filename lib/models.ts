@@ -1,16 +1,15 @@
 import { pursuitPrompt, updatePursuits } from './pursuits';
 import { pursuitSelectionPrompt, parsePursuitSelection } from './pursuit-selection';
-import { normalDecisionInput, finalizeDecisionInput } from './npc-input';
 import { prepareNpcDecision, type NpcDecisionContext } from './npc-decision-preparation';
 import { phonePrompt, validatePhoneActionReferences } from './phones';
-import { arrangementsForDecision, arrangementPrompt, updateArrangements } from './arrangements';
+import { arrangementPrompt, updateArrangements } from './arrangements';
 import { preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
 import { requestModel, type ModelObserver } from './model-adapter';
 export { npcContractVersion } from './npc-decision-schema';
 import { npcContractVersion, actionTypes, methodChoices, methodChanges, methodAssessmentSchema, actionSchema } from './npc-decision-schema';
-import { knownPeopleForDecision, updateCognition, type CognitiveDecisionContext } from './cognition';
-import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, normalizeMemory, budgetMemoryInput, memoryBytes, evaluateMemories } from './memory';
+import { updateCognition, type CognitiveDecisionContext } from './cognition';
+import { MemorySelectionReferenceError, MemorySelectionFormatError, MemoryValidationError, normalizeMemory, memoryBytes, evaluateMemories } from './memory';
 import { parseAttention } from './attention';
 import { npcPlaybook } from './playbook';
 import { type World,type Character,type Action,type Intent } from './world';
@@ -86,7 +85,7 @@ const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
 const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。${resumable?'原活動可延續；仍由你判斷續做或切換。':'沒有可延續的原活動（可能已完成或決策模式／模型已改變），必須選擇新行動，不能回傳 continue。'}`;
-let previousInput:ReturnType<typeof normalDecisionInput>|undefined;
+let continuation:Parameters<typeof prepareNpcDecision>[2]['continuation'];
 const messages: { role: string; content: string }[] = [{role:'system',content:activityPrompt+"\n"+arrangementPrompt+"\n"+preferencePrompt+"\n"+memoryPrompt+"\n"+cognitionPrompt+(recall?.enabled?' 你可以直接完成決策，或只回傳 {"type":"recall","questions":["主觀回想問題"]}。最多一輪、最多兩個問題。回想後必須完整回傳最終意圖與行動，不能再次要求回想。零結果只代表未找到。':'')+"\n可在同一次決策中以 pendingInterventions 若只有 memoryId，請依 self.shortTerm 相同 id 的完整文字理解；controlled 表示接管期间取得的經歷。memorySelections 選留對自己有意義的主觀經歷（最多4筆）；每筆只填 self.shortTerm 中的 id、version 與簡短 reason。沒有選留時回傳空陣列。選留保留原本來源與不確定語義，不代表相信；不要選留已經存在 self.longTerm 的 origin。長期不會自動按年代刪除。\n"+continuationPrompt+"\n"+npcPlaybook+"\n意圖完成以已知結果判斷；尚未執行或被拒絕的行動不能假定成功。"},{role:'user',content:''}];
 messages[0].content+=' self.noticeOpportunities只是你實際取得的新主觀線索的一次考慮機會，可能模糊或誤認，不能由handle推知真正來源、裝置、寄件人或正文。依實際所見所聽自行判斷，若想查看手機再主動list/read。可continue或自行暫停／改序，忽略不代表已讀。未展示缺口不表示已處理，不額外開手機決策。';
 messages[0].content+=' self.arrangementCues是你實際可知條件下想起既有安排的一次考慮機會；不強制行動、完成、意圖置頂或改變活動，可continue、延期或放下。相同條件不每輪提醒。';
@@ -95,15 +94,13 @@ messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;
 messages[0].content+=methodAssessmentPrompt+phonePrompt+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
-let recalled = false;let recalledHandles:{id:string;version:number}[]=[];
+let recalled = false;
 for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
 // context. The route rechecks operation version/lease after completion.
-const prepared=prepareNpcDecision(w,c,{input:previousInput,modelKey:`${direct?'openai':'ai'}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled,recalled:recalled?previousInput?.self.longTerm.filter(m=>recalledHandles.some(r=>r.id===m.id&&r.version===m.version)).map(({id,version})=>({id,version})):[]});
-const input=prepared.input;previousInput=input;
+const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${direct?'openai':'ai'}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
 const {schema,context:decisionContext}=prepared;
-const visible=decisionContext.visible;
 const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
@@ -117,29 +114,11 @@ try {
     const memories=await recall.search(value.questions);
 
     if (!Array.isArray(memories)) throw Error('回想結果格式無效。');
-    const handles = memories.map(({ id, version }) => ({ id, version }));recalledHandles=handles;
+    const handles = memories.map(({ id, version }) => ({ id, version }));
     for (const recalled of memories) {
       if (!(c.longTerm || []).some(item => item.id === recalled?.id && item.version === recalled?.version && item.characterId === c.id && (!item.state || item.state === 'active'))) throw Error('回想引用不屬於目前自己的記憶版本。');
     }
-    // Reserve the complete subjective recall before optional initial memories or
-    // cognition compete for space. The final transcript contains each body once.
-    input.self.longTerm = input.self.longTerm.filter(item => !handles.some(ref => ref.id === item.id && ref.version === item.version));
-    budgetMemoryInput(input, c, { memories, handles });
-    input.self.longTerm = [...memories, ...input.self.longTerm];
-    if(memoryBytes({input, recalledMemories:handles}) > 88*1024) throw Error('回想後記憶輸入超過 88 KiB，本回合已回復。');
-    visible.shortTerm = (c.shortTerm || []).filter(item => input.self.shortTerm.some(shown => shown.id === item.id && shown.version === item.version));
-    visible.longTerm = (c.longTerm || []).filter(item => input.self.longTerm.some(shown => shown.id === item.id && shown.version === item.version));
-    input.self.arrangements=arrangementsForDecision(c,visible);
-    while(input.self.arrangements.items.length&&memoryBytes({input,recalledMemories:handles})>88*1024)input.self.arrangements.items.pop();
-    finalizeDecisionInput(w,c,input,handles);
-    decisionContext.phoneReferences=input.phones;
-    visible.arrangements={schemaVersion:1,items:input.self.arrangements.items};
-    messages[1].content = JSON.stringify(input);
-    visible.preferences = {schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0};
-    visible.cognition = { ...input.self.cognition, trace: [] };
-    decisionContext.memoryReview = input.self.memoryReview;
-    decisionContext.historyCandidates = input.self.cognition.historyCandidates || [];
-    decisionContext.knownPeople = knownPeopleForDecision(visible, input.contacts.map(person => person.id));
+    continuation=prepared.prepareRecall(memories);
     await recall.beforeContinuation();
     messages.push({role:'assistant',content:raw},{role:'user',content:JSON.stringify({recalledMemories:handles,recallComplete:true,instruction:'回想完整主觀內容已放在 self.longTerm；回想已結束；先重新排列意圖，再完成唯一最終行動。禁止第二輪回想。'})});
     continue;
