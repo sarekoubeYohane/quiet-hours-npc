@@ -74,3 +74,11 @@ node tooling/verification/browser-life-integration.mjs
 需求、長活動、睡眠、喜好、習慣及私有追溯各有獨立 API／SQLite 案例，預設 `pnpm test` 收錄於 `tests/run-activities.mjs`。各基線、參數／容量、相容及回退政策見[自主生活工程契約](../../docs/design/autonomous-life.md)；正式付費驗收另依[有限交接流程](../../docs/verification/autonomous-life-live-runbook.md)取得授權。
 
 #186／#201：`browser-method-reassessment.mjs` 以同一真實 WorldApp／API／SQLite 世界完成15次既有UI推進，串接耗盡餐點的來源評估／免費重試、另一NPC自主回覆、替代食物真正攝取、舊茶→新茶→部分份量及別名免費續用、已知咖啡館有限飲水來源。桌機與390px分析、重載／原ID重送零派送、容量量測輸出 `docs/verification/assets/method-reassessment/`。模型、時鐘為明示fixture，原小時額度／HTTP期限不變；不能用它宣稱正式loop已解。詳見[跨回合報告](../../docs/verification/method-reassessment-201-2026-10-27.md)及[整合契約](../../docs/design/method-reassessment-integration.md)。
+
+## 完整回歸相容性（2026-11-03）
+
+舊活動案例須在 transport 回覆的作者位置明示使用 `tests/pursuit-fixture.cjs` 的 `fixtureDecision(input, candidate)`；不在共用 fetch interceptor 自動修復回覆，也不改產品 parser。非空意圖須明示 adopt；空增量保留既有方向。新版 v3 回覆直接維持原樣，錯誤 JSON／非法候選仍須原樣到達相應負向驗證。
+
+直接 POST 付費推進須帶 `X-World-Time-Policy: round-v1`；租約到期反例須超過現行 430 秒。物件斷言應以身份或測試領域選取，不能依整個陣列只有茶杯／餐點的假設忽略正常手機啟用。`nonPhoneObjects` 只用於舊餐具案例的檢視與斷言，不從保存世界刪除手機。
+
+所有 browser runner 尊重 `BROWSER_ARTIFACT_DIR`，完整回歸請指定新的隔離目錄，避免覆蓋既有歷史證據。`browser-model-key-retention.mjs` 使用兩個隔離 Chromium context、假 Key 與固定時鐘，驗證兩服務固定14天、替換、跨context讀取、重載、分服務清除與到期，沒有模型派送。它的登入為 fixture，真實驗證登入24小時與重新登入的契約由 auth API／Workers 測試承接，不能用context當成部署後雙瀏覽器驗收。

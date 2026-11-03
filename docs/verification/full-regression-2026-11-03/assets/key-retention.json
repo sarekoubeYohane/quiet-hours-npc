@@ -1,0 +1,24 @@
+{
+  "fixture": true,
+  "auth": "fixed authenticated owner; real login/24h covered by auth API tests",
+  "evidence": [
+    {
+      "mode": "openai",
+      "provider": "openai",
+      "initialExpiresAt": 1793289600000,
+      "sharedAcrossContexts": true,
+      "reloadDoesNotRenew": true
+    },
+    {
+      "mode": "ai",
+      "provider": "openrouter",
+      "initialExpiresAt": 1793289600000,
+      "sharedAcrossContexts": true,
+      "reloadDoesNotRenew": true
+    }
+  ],
+  "replacementExpiresAt": 1793293200000,
+  "clearIsServiceScoped": true,
+  "expiry": true,
+  "modelDispatches": 0
+}

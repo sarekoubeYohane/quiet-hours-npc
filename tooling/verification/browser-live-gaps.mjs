@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -23,9 +24,9 @@ setModelResponder(request=>{
   const input=JSON.parse(request.messages[1].content);
   assert.doesNotMatch(JSON.stringify(input),/operationEvidence|fixture-key/);
   if(input.contractVersion==='world-adjudication.v1'){
-    assert.equal(input.actor.id,actor);adjudication++;return completion(candidate);
+    assert.equal(input.actor.id,actor);adjudication++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),candidate));
   }
-  npc++;return completion(input.self.id===actor?decision:rest);
+  npc++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),input.self.id===actor?decision:rest));
 });
 const snapshots=[];
 let browser;
@@ -78,7 +79,7 @@ try {
     assert.deepEqual({npc,adjudication},counts);
     await selectAI();return after;
   };
-  await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+  await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
   await page.goto(url);await nav('設定');
   await page.getByRole('button',{name:'進入最小驗收場景',exact:true}).click();
   await act(page.getByRole('button',{name:'確認進入驗收',exact:true}),'enter-acceptance');

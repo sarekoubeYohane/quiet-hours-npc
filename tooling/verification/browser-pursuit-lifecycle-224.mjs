@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -17,7 +18,7 @@ setModelResponder(request=>{
  else if(calls===3)value=decision(input,{focus:'vera:design',type:'work',target:'craft-challenge',content:'依研究構思自己的設計',duration:30,choice:'switch'});
  else if(calls===4){assert.equal(input.self.intents.find(n=>n.id==='vera:design').status,'active');value=decision(input,{updates:[assess(input,'vera:design','satisfied','ready'),assess(input,'vera:direction','active','enough')]});}
  else {assert.equal(input.self.intents.find(n=>n.id==='vera:direction').progress,'enough');assert.equal(input.self.intents.find(n=>n.id==='vera:design').status,'satisfied');value=decision(input);}
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
 });
 let browser;
 try{
@@ -25,7 +26,7 @@ try{
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
  await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- const api=async body=>{const response=await page.request.post(url+'/api/world',{data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
+ const api=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
  await api({operation:'set-model-key',mode:'openai',key:'fixture-key'});
  for(let round=0;round<6;round++){
   await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');

@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -84,7 +85,7 @@ globalThis.fetch=async(url,init)=>{
  modelCalls++;
  const request=JSON.parse(init.body);
  modelRequests.push(request);
- const response=modelFault?new Response('{}',{status:modelFault}):modelResponder?await modelResponder(request, modelCalls, init.signal):Response.json({model:request.model,usage:{prompt_tokens:1000,completion_tokens:200},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]})},finish_reason:'stop'}]});
+ const response=modelFault?new Response('{}',{status:modelFault}):modelResponder?await modelResponder(request, modelCalls, init.signal):Response.json({model:request.model,usage:{prompt_tokens:1000,completion_tokens:200},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:90,intents:[]}))},finish_reason:'stop'}]});
  transportFrames.push({requestBody:init.body,responseBody:await response.clone().text()});return response;
 };
 const entry=join(directory,'entry.jsx');

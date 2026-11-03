@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {url,server,store,load,setModelResponder,modelRequests} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
@@ -9,7 +10,7 @@ try{
  const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',worldContext:world.contextId,...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});
  let choice;
- setModelResponder(async()=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(choice)}}]}));
+ setModelResponder(async(fixtureRequest)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(fixtureRequest.messages[1].content),choice))}}]}));
  const decision=extra=>({type:'rest',target:'',content:'休息一會兒',mood:'平靜',durationMinutes:15,intents:[],...extra});
  const advance=async()=>{const r=await post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());};
  for(let day=0;day<3;day++){

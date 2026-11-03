@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -13,7 +14,7 @@ setModelResponder(request=>{
  const value={contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:'owner:quiet',pursuitUpdates:calls===1?[{operation:'upsert',id:'owner:quiet',version:0,node:{id:'owner:quiet',content:'照顧自己的精神',context:'',kind:'intent',scope:'先讓自己安靜休息一會兒',satisfaction:null,intensity:'medium',importance:'medium',urgency:'low',parents:[{id:'owner:direction',version:1}]},references:[],reason:'依自己的想法承接休息'}]:[],action:{type:'rest',target:'',content:'安靜休息',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'照顧自己的精神',knownResults:[],choice:'new',method:'安靜休息',change:{kind:'none',detail:''},reason:'仍想照顧自己',selectedAction:{type:'rest',target:''},intentIds:['owner:quiet']},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]};
  value.pursuitCandidates=calls===1?[{id:'owner:candidate:quiet',kind:'intent',content:'照顧自己的精神',scope:'先讓自己安靜休息一會兒',satisfaction:null,references:[]}]:[];
  value.pursuitSelection={adoptions:calls===1?[{candidateId:'owner:candidate:quiet',pursuitId:'owner:quiet'}]:[],declinedCandidateIds:[],focus:calls===1?{kind:'candidate',id:'owner:candidate:quiet',version:0}:{kind:'existing',id:'owner:quiet',version:1},reason:'我現在願意照顧自己的精神'};
- return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
 });
 let browser;
 try{
@@ -22,7 +23,7 @@ try{
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
  await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
  for(let round=0;round<2;round++){
   await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');

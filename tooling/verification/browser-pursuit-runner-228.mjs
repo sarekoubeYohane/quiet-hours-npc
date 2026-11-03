@@ -23,7 +23,7 @@ try {
   assert.match(await page.getByRole('region',{name:'人物檔案',exact:true}).innerText(),/本人認為已滿足/);
   await page.setViewportSize({width:390,height:844});await nav('分析');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:outputPath('mobile-reloaded.png'),fullPage:true});
-  const after=await read();assert.deepEqual(after.world,before.world);assert.equal((await page.request.post(url+'/api/world',{data:{operation:'advance'}})).status(),403);assert.deepEqual(errors,[]);
+  const after=await read();assert.deepEqual(after.world,before.world);assert.equal((await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'advance'}})).status(),403);assert.deepEqual(errors,[]);
   const summary={result:'PASS',fileSQLite:true,realWorldApp:true,reloadedAnalysis:true,reloadedProfile:true,mobile390NoOverflow:true,worldUnchanged:true,advanceForbidden:true,paidProviderCalls:0,turn:after.world.turn,totalEngineCalls:after.world.aiUsage.totalCalls,actualMealObjects:after.world.objects.filter(object=>object.id==='bread-stock:1').length};
   await writeFile(outputPath('summary.json'),JSON.stringify(summary,null,2)+'\n');console.log(JSON.stringify(summary));
 } finally {await browser?.close();server.close();}

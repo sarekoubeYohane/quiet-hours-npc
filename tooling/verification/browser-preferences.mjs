@@ -1,10 +1,11 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {url,server,store,load,modelRequests,setModelResponder} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
 
-process.env.BROWSER_ARTIFACT_DIR=resolve('docs/verification/assets/life-preferences-178');
+process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/life-preferences-178');
 await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
 const initial=load('world').seedWorld();
 initial.adjudication={provider:'openai',model:'fixture-world'};store.install(initial);
@@ -13,7 +14,7 @@ setModelResponder(body=>{
  const input=JSON.parse(body.messages[1].content),source=input.self.shortTerm[0];
  const common={id:'quiet-moment',version:stage===0?0:1,references:[{kind:'short',id:source.id,version:source.version}],reason:stage===0?'這次經歷讓我想保留安靜片刻。':'我已重新考慮這個偏好。'};
  const update=stage===0?{...common,operation:'upsert',topic:'安靜片刻',context:'一個人時',text:'我喜歡有一段不被打擾的時間。'}:{...common,operation:'withdraw'};
- return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:input.self.id==='cass'?[update]:[]})}}]});
+ return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(body.messages[1].content),{type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:input.self.id==='cass'?[update]:[]}))}}]});
 });
 let browser;
 try {

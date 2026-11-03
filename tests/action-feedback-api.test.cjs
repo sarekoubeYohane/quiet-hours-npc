@@ -86,6 +86,26 @@ test('free routine reuse retains known broken utensil context while private supp
  assert.deepEqual(values[0],values[1]);
 });
 
+test('regional free proposals retain known broken-vessel context without inferring causes from private supply or grants',async()=>{
+ const values=[];
+ for(const variant of [0,1]){
+  const s=await scenario({decision:{...proposal,type:'propose',target:'cafe',content:'泡茶',purpose:'泡茶',durationMinutes:15},modify:w=>{
+   // Keep this public device identical while varying only hidden supply/grant facts.
+   w.objects.push({...vessel('feedback-phone'),kind:'phone',holder:'owner',state:{condition:'sound'}});
+   w.routineRules=[{id:'known-tea',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner']}];
+   const cup=w.objects.find(o=>o.id==='cup-a');cup.state.condition='broken';cup.stateTransitions.condition=['broken','sound'];
+   w.objects=w.objects.filter(o=>o.id!=='cup-b');cup.owner='private-owner';cup.allowedTo=variant?['owner']:['private-list'];
+   w.supplies=[{id:'tea-leaves',label:'茶葉',region:'cafe-front',remaining:variant,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',initialState:{}}];
+  }});
+  try{
+   await advance(s);s.choose(rest);await advance(s);const input=s.inputs.filter(entry=>entry.input.self)[1].input;
+   assert.equal(s.counts().judgments,0);assert.match(input.self.activity,/器具.*損壞/);assert.ok(feedback(input).at(-1).text.includes('cup-a'));assert.doesNotMatch(JSON.stringify(input),/private-owner|private-list|材料已用完|allowedTo/);assert.ok(input.supplies.every(supply=>!Object.hasOwn(supply,'remaining')));
+   values.push({activity:input.self.activity,feedback:feedback(input).map(m=>({time:m.time,text:m.text}))});
+  }finally{s.restore();}
+ }
+ assert.deepEqual(values[0],values[1]);
+});
+
 test('unsubmitted results roll back, replay adds no experience or model calls, and legacy worlds never reconstruct feedback from traces',async()=>{
  const store=load('store');
  for(const fault of ['throwBeforeNextSave','conflictOnNextSave',null]){

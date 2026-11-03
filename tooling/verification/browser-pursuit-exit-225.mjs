@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -18,14 +19,14 @@ setModelResponder(request=>{
   else if(npc===3)value=decision(input,{updates:[assess(input,'owner:replacement','satisfied','ready'),edit(input,'owner:replacement',{scope:'只保留已投入部分，不繼續做到全部完成',satisfaction:'本人覺得目前這一部分已足夠'})],type:'pause',content:'我明示縮小範圍並暫停實際進度'});
   else {const ended=input.self.intents.find(node=>node.id==='owner:replacement');assert.equal(ended.status,'satisfied');assert.equal(ended.scope,'只保留已投入部分，不繼續做到全部完成');assert.ok(input.self.pausedActivity);value=decision(input);}
  }
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
 });
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1280,height:1100},reducedMotion:'reduce'}),errors=[];page.setDefaultTimeout(15000);page.on('pageerror',error=>errors.push(String(error)));
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- const api=async body=>{const response=await page.request.post(url+'/api/world',{data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
+ const api=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
  await api({operation:'set-model-key',key:'fixture-key'});
  let origin;
  for(let round=0;round<4;round++){

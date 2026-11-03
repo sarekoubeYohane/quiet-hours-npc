@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -16,13 +17,13 @@ try{
   const w=await load('acceptance-scene').enterAcceptanceScene(load('world').seedWorld());w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-adjudicator'};
   if(scenario==='denied-full-cup')w.objects.find(o=>o.id==='acceptance-cup').state.contents='tea';
   store.install(w);let npc=0,judgments=0;
-  setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(scenario==='no-progress'?{status:'unsupported',completionMinutes:null,effects:[],stages:[],check:null,routine:null}:scenario==='denied-full-cup'?{status:'denied',completionMinutes:null,effects:[],stages:[],check:null,routine:null,explanation:{summary:'fixture杯中原有茶；這只是模型自述。',facts:[{reference:'objects.acceptance-cup.state.contents',value:'tea'}]}}:approved);}npc++;return completion(proposal);});
+  setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),scenario==='no-progress'?{status:'unsupported',completionMinutes:null,effects:[],stages:[],check:null,routine:null}:scenario==='denied-full-cup'?{status:'denied',completionMinutes:null,effects:[],stages:[],check:null,routine:null,explanation:{summary:'fixture杯中原有茶；這只是模型自述。',facts:[{reference:'objects.acceptance-cup.state.contents',value:'tea'}]}}:approved));}npc++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),proposal));});
   const context=await browser.newContext({reducedMotion:'reduce',viewport:{width:1280,height:1000}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));page.setDefaultTimeout(15000);
   await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
   const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
   const read=async id=>(await(await page.request.get(url+'/api/world'+(id?'?operationId='+encodeURIComponent(id):''))).json());
   try{
-   await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
    await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
    const wireStart=transportFrames.length;
    const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,await response.text());
@@ -34,14 +35,14 @@ try{
    if(scenario==='no-progress')assert.equal(trace.dispatches.length,2);
    if(scenario==='rule-reuse'){
     // A second real operation uses an already approved method; only program checks decide reuse.
-    setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(approved);}npc++;return completion({...proposal,content:'清洗杯子',purpose:'清洗',target:'acceptance-cup'});});
+    setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),approved));}npc++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),{...proposal,content:'清洗杯子',purpose:'清洗',target:'acceptance-cup'}));});
     const current=store.snapshot();const cup=current.objects.find(o=>o.id==='acceptance-cup');cup.state.contents='dirty';cup.stateTransitions.contents.push('dirty');for(const drink of current.objects.filter(o=>o.state.vessel===cup.id)){drink.lifecycle='consumed';drink.revision++;}store.replaceCommittedWorld(current);
     await page.reload();await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');const second=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const secondResponse=await second;assert.equal(secondResponse.status(),200,await secondResponse.text());const recent=await read();const reused=await read(recent.decisionTraces.records[0].operationId);reuseTrace=reused.decisionTrace;reuseTrace.dispatches.forEach((dispatch,index)=>{assert.equal(dispatch.requestBody,transportFrames[wireStart+trace.dispatches.length+index].requestBody);assert.equal(dispatch.responseBody,transportFrames[wireStart+trace.dispatches.length+index].responseBody);});assert.equal(judgments,1);assert.ok(reused.decisionTrace.steps.some(step=>step.kind==='rule-selection'&&step.data.branch==='program-result'));
    }
    await page.reload();await nav('分析');const panel=page.getByRole('region',{name:'決策追溯',exact:true});await panel.waitFor();await panel.getByText('實際模型派送',{exact:true}).waitFor();
    assert.ok((await panel.innerText()).includes('世界已提交'));assert.ok((await panel.innerText()).includes('最後已知階段'));
    await panel.getByText('實際送出的請求本文',{exact:true}).first().click();assert.ok((await panel.innerText()).includes('gpt-6-luna'));
-   const beforeCalls={npc,judgments};const replay=await page.request.post(url+'/api/world',{data:operation});assert.equal(replay.status(),200);assert.deepEqual({npc,judgments},beforeCalls);assert.deepEqual((await read(operation.operationId)).decisionTrace,trace);assert.deepEqual(errors,[]);
+   const beforeCalls={npc,judgments};const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:operation});assert.equal(replay.status(),200);assert.deepEqual({npc,judgments},beforeCalls);assert.deepEqual((await read(operation.operationId)).decisionTrace,trace);assert.deepEqual(errors,[]);
    await panel.scrollIntoViewIfNeeded();await page.screenshot({path:outputPath(scenario+'.png'),fullPage:false});
    await writeFile(outputPath(scenario+'.json'),JSON.stringify({fixture:true,scenario,trace,reuseTrace,checks:{wireBytes:true,reload:true,private:true,sameIdZeroDispatch:true,reuseWireBytes:!!reuseTrace},reuseTraceBytes:reuseTrace?Buffer.byteLength(JSON.stringify(reuseTrace)):null,traceBytes:Buffer.byteLength(JSON.stringify(trace))},null,2)+'\n');
    console.log(`PASS decision trace Chromium ${scenario}; actual bytes, SQLite reload, UI, same-ID no new dispatch; fixture only`);
