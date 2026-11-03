@@ -7,7 +7,7 @@ export type ModelKeyStatus = Record<ModelProvider, { configured: boolean; expire
 export class ModelKeyError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
 }
-const lifetime = 24 * 60 * 60 * 1000;
+const lifetime = 14 * 24 * 60 * 60 * 1000;
 function scope() {
   if (!['local', 'test', 'production'].includes(env.APP_ENV || '') || !env.AUTH_ORIGIN) throw new ModelKeyError('Key 保存服務尚未設定完成。', 503);
   return JSON.stringify([env.APP_ENV, env.AUTH_ORIGIN]);

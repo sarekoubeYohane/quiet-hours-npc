@@ -78,27 +78,35 @@ test('logout revokes only that login; another login can use the key until an exp
   assert.equal((await advance(second)).status, 400);
 });
 
-test('key expires at 24 hours independently of newer sessions; reads never extend its lifetime', async () => {
-  reset(); const originalNow = Date.now, base = originalNow(); Date.now = () => base;
+for (const [mode, provider] of [['openai', 'openai'], ['ai', 'openrouter']]) test(`${provider}: 14-day key survives a 24-hour login expiry and reads/use do not extend it`, async () => {
+  reset(); const originalNow = Date.now, base = originalNow(), originalFetch = global.fetch;
+  Date.now = () => base;
   try {
     const first = await signIn();
-    await save(first);
-    const expiresAt = (await status(first)).modelKeys.openai.expiresAt;
-    assert.equal(expiresAt, base + 86400000);
-    Date.now = () => base + 3600000;
+    await save(first, mode);
+    const expiresAt = (await status(first)).modelKeys[provider].expiresAt;
+    assert.equal(expiresAt, base + 1209600000);
+    Date.now = () => base + 86400000 - 1;
+    assert.equal((await status(first)).modelKeys[provider].expiresAt, expiresAt);
+    Date.now = () => base + 86400000;
+    global.fetch = async () => { throw Error('expired-login-must-not-dispatch'); };
+    assert.equal((await post(first, { operation: 'advance', mode, minutes: 15, model: 'gpt-6-luna' })).status, 401);
     const second = await signIn();
+    assert.equal((await status(second)).modelKeys[provider].expiresAt, expiresAt);
+    let calls = 0;
+    global.fetch = async (_url, init) => { calls++; return modelReply(init); };
+    assert.equal((await post(second, { operation: 'advance', mode, minutes: 15, model: 'gpt-6-luna' })).status, 200);
+    assert.ok(calls > 0);
+    assert.equal((await status(second)).modelKeys[provider].expiresAt, expiresAt);
     Date.now = () => expiresAt - 1;
-    assert.equal((await status(second)).modelKeys.openai.expiresAt, expiresAt);
+    const latest = await signIn();
+    assert.equal((await status(latest)).modelKeys[provider].expiresAt, expiresAt);
     Date.now = () => expiresAt;
-    assert.equal((await status(second)).modelKeys.openai.configured, false);
-    const original = global.fetch;
+    assert.equal((await status(latest)).modelKeys[provider].configured, false);
     global.fetch = async () => { throw Error('expired-key-must-not-dispatch'); };
-    try {
-      assert.equal((await advance(second)).status, 400);
-      assert.equal((await status(second)).world.turn, 0);
-      assert.equal((await post(second, { operation: 'advance', mode: 'demo', minutes: 15 })).status, 200);
-    } finally { global.fetch = original; }
-  } finally { Date.now = originalNow; }
+    assert.equal((await post(latest, { operation: 'advance', mode, minutes: 15, model: 'gpt-6-luna' })).status, 400);
+    assert.equal((await post(latest, { operation: 'advance', mode: 'demo', minutes: 15 })).status, 200);
+  } finally { Date.now = originalNow; global.fetch = originalFetch; }
 });
 
 test('keys are isolated by account, provider, environment and origin', async () => {
@@ -178,14 +186,18 @@ test('malformed configuration JSON never echoes submitted key fragments', async 
   assert.ok(!(await response.text()).includes(fakeKey));
 });
 
-test('replacement starts a new 24-hour lifetime and OpenRouter uses its own saved key', async () => {
+test('replacement starts a new 14-day lifetime and OpenRouter uses its own saved key', async () => {
   reset(); const now = Date.now, base = now(); Date.now = () => base;
   try {
     const cookie = await signIn(); await save(cookie);
     Date.now = () => base + 3600000;
     await save(cookie, 'openai', 'replacement-fake-key');
+    await save(cookie, 'ai', 'initial-router-key');
+    assert.equal((await status(cookie)).modelKeys.openrouter.expiresAt, base + 3600000 + 1209600000);
+    Date.now = () => base + 7200000;
     await save(cookie, 'ai', 'router-fake-key');
-    assert.equal((await status(cookie)).modelKeys.openai.expiresAt, base + 3600000 + 86400000);
+    assert.equal((await status(cookie)).modelKeys.openrouter.expiresAt, base + 7200000 + 1209600000);
+    assert.equal((await status(cookie)).modelKeys.openai.expiresAt, base + 3600000 + 1209600000);
     await post(cookie, { operation: 'clear-model-key', mode: 'openai' });
     const original = global.fetch;
     global.fetch = async (url, init) => {
@@ -203,9 +215,9 @@ test('expiry between provider dispatches stops new calls without counting an uns
   const original = global.fetch;
   try {
     const cookie = await signIn(); await save(cookie);
-    Date.now = () => base + 3600000;
+    Date.now = () => base + 1209600000 - 1;
     const newerLogin = await signIn(); let calls = 0;
-    global.fetch = async (_url, init) => { calls++; Date.now = () => base + 86400000; return modelReply(init); };
+    global.fetch = async (_url, init) => { calls++; Date.now = () => base + 1209600000; return modelReply(init); };
     const response = await advance(newerLogin);
     assert.equal(response.status, 502);
     const body = await status(newerLogin);
@@ -227,4 +239,62 @@ test('provider JSON errors and sensitive model output never enter responses or w
       assert.ok(!JSON.stringify(await status(cookie)).includes(fakeKey));
     } finally { global.fetch = original; }
   }
+});
+
+for (const [mode, provider] of [['openai', 'openai'], ['ai', 'openrouter']]) test(`${provider}: an existing 24-hour key keeps its expiry until explicitly saved again`, async () => {
+  reset(); const now = Date.now, base = now(); Date.now = () => base;
+  const originalFetch = global.fetch;
+  try {
+    const { createCipheriv } = require('node:crypto');
+    const scope = JSON.stringify(['local', origin]), expiresAt = base + 86400000;
+    const nonce = Buffer.alloc(12, 1);
+    const cipher = createCipheriv('aes-256-gcm', Buffer.from(fixture.env.MODEL_KEY_ENCRYPTION_SECRET, 'hex'), nonce);
+    cipher.setAAD(Buffer.from(JSON.stringify(['model-key-v1', scope, 'github:123', provider, expiresAt])));
+    const ciphertext = Buffer.concat([cipher.update(fakeKey, 'utf8'), cipher.final()]).toString('base64');
+    await fixture.env.DB.prepare('INSERT INTO account_model_keys (scope, owner, provider, ciphertext, nonce, tag, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(scope, 'github:123', provider, ciphertext, nonce.toString('base64'), cipher.getAuthTag().toString('base64'), expiresAt).run();
+    Date.now = () => base + 3600000;
+    const second = await signIn();
+    assert.equal((await status(second)).modelKeys[provider].expiresAt, expiresAt);
+    await post(second, { operation: 'set-adjudication', mode: 'demo', adjudication: { provider, model: 'gpt-6-luna' } });
+    global.fetch = async (_url, init) => modelReply(init);
+    assert.equal((await post(second, { operation: 'advance', mode, model: 'gpt-6-luna', minutes: 15 })).status, 200);
+    assert.equal((await status(second)).modelKeys[provider].expiresAt, expiresAt);
+    Date.now = () => expiresAt;
+    assert.equal((await status(second)).modelKeys[provider].configured, false);
+    assert.equal((await post(second, { operation: 'advance', mode, model: 'gpt-6-luna', minutes: 15 })).status, 400);
+    assert.equal((await save(second, mode, fakeKey)).status, 200);
+    assert.equal((await status(second)).modelKeys[provider].expiresAt, base + 1296000000);
+  } finally { Date.now = now; global.fetch = originalFetch; }
+});
+
+for (const provider of ['openai', 'openrouter']) test(`${provider}: adjudication stops when its key expires after the NPC decision`, async () => {
+  reset(); const now = Date.now, base = now(); Date.now = () => base;
+  const originalFetch = global.fetch;
+  try {
+    const first = await signIn();
+    await save(first, provider === 'openai' ? 'openai' : 'ai');
+    Date.now = () => base + 1209600000 - 1;
+    const cookie = await signIn();
+    // OpenRouter adjudication expires independently of the newer OpenAI NPC key.
+    if (provider === 'openrouter') {
+      await save(cookie);
+      await post(cookie, { operation: 'set-adjudication', mode: 'demo', adjudication: { provider, model: 'gpt-6-luna' } });
+    }
+    let calls = 0;
+    global.fetch = async (_url, init) => {
+      calls++;
+      Date.now = () => base + 1209600000;
+      return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content), { type: 'propose', target: 'cafe', content: '泡一杯茶', purpose: '飲用', mood: '平靜', durationMinutes: 15, intents: [] })) } }] });
+    };
+    const response = await advance(cookie);
+    assert.equal(response.status, 502);
+    assert.match((await response.json()).error, /Key 已到期／清除/);
+    const body = await status(cookie);
+    assert.equal(calls, 1);
+    assert.equal(body.world.turn, 0);
+    assert.equal(body.world.aiUsage.totalCalls, 1);
+    assert.equal(body.world.aiUsage.totalInputTokens, 10);
+    assert.equal(body.modelKeys[provider].configured, false);
+  } finally { Date.now = now; global.fetch = originalFetch; }
 });

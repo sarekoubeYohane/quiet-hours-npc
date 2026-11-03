@@ -6,6 +6,8 @@
 
 2026-10-09 使用者修訂 T5：改為同帳號、同環境跨瀏覽器共用 Key；登出只結束該登入，Key 留到 24 小時到期或手動清除。此項修訂優先於 #26 原始的工作階段範圍，詳見 [帳號模型 Key](account-model-keys.md)。Issue 的原文與狀態仍待同步，不表示已完成雲端驗收。
 
+2026-11-03 修訂現行 T5：本站保存期限為保存或替換成功後固定 14 天，舊 Key 保留原到期時間；登入仍為 24 小時。上段保留歷史決定，現行規則見 [帳號模型 Key](account-model-keys.md)。
+
 | 工作 | GitHub Issue | 阻擋項目 |
 | --- | --- | --- |
 | T0 帳號、OAuth App 與秘密前置作業（使用者本人建立） | [#21](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/21) | 無 |
@@ -13,7 +15,7 @@
 | T2 GitHub 登入取代 ChatGPT 登入，僅允許站主帳號 | [#23](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/23) | #21、#22 |
 | T3 多頁面操作不互蓋：操作冪等與依序處理 | [#24](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/24) | 無 |
 | T4 每人每環境獨立世界與手動重置 | [#25](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/25) | #23 |
-| T5 模型 Key 綁定帳號與環境，最長 24 小時 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) | #23 |
+| T5 模型 Key 綁定帳號與環境，固定保存 14 天 | [#26](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/26) | #23 |
 | T6 每日真實用量的跨環境帳本 | [#27](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/27) | #23 |
 | T7 CI 通過後自動部署測試站：固定網址、序列化、失敗不部署 | [#28](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/28) | #21、#23 |
 | T8 伺服器端共用自動推進排程與前景頁面偵測 | [#29](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/29) | #24、#26 |
@@ -47,7 +49,7 @@
 - **T2 #23**：三環境以 GitHub OAuth 登入，伺服器端工作階段，身分鍵為 GitHub 穩定使用者 id，白名單只放站主；移除 Sites header 信任與模擬登入。
 - **T3 #24**：操作帶識別碼，重送不重複提交也不重複呼叫模型；租約競爭時等待重試；回到前景重新讀取。
 - **T4 #25**：每人每環境獨立世界跨部署保留；手動重置只影響自己的世界，不清除用量。
-- **T5 #26**：模型 Key 加密綁定帳號與環境，同帳號跨瀏覽器共用，最長 24 小時；登出只結束該登入，Key 到期或手動清除後失效。Key 不進世界資料、日誌、錯誤回應。
+- **T5 #26**：模型 Key 加密綁定帳號與環境，同帳號跨瀏覽器共用，保存或替換成功後固定保存 14 天；登出只結束該登入，Key 到期或手動清除後失效。Key 不進世界資料、日誌、錯誤回應。
 - **T6 #27**：每日真實用量及跨環境帳本（Asia/Taipei 日界），測試站與正式站共用帳本 D1，本機獨立；依 #78 取消固定每日 144 次硬上限，玩家預算可調或無上限，站主付費服務獨立保護。本次 #81 未實作完整每日帳本。
 - **T7 #28**：main 合併後檢查通過才部署測試站，序列化，migration 相容守門，固定 workers.dev 網址，頁面顯示環境與提交。
 - **T8 #29**：每個世界一個伺服器端自動推進排程，多頁不加速，用經驗證啟動者帳號的 Key，心跳偵測前景，離線即停且不補跑；決策模式改為世界層級設定。啟動者登入與排程權限仍按 T8 驗證，不能以 Key 尚未到期取代登入。

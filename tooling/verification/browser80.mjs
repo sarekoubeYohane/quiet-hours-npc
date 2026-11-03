@@ -29,8 +29,8 @@ try {
  await page.getByRole('button',{name:'開始自動',exact:true}).waitFor();
  await page.reload();await navigate(page,'設定');await page.getByLabel('每小時 AI 呼叫上限',{exact:true}).waitFor();assert.equal(await page.getByLabel('每小時 AI 呼叫上限',{exact:true}).inputValue(),'unlimited');
  await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();
- await page.locator('input[type=password]').fill('fixture-key');await page.getByRole('button',{name:'保存 Key（24 小時）',exact:true}).click();
- await page.getByRole('button',{name:'替換 Key（24 小時）',exact:true}).waitFor();
+ await page.locator('input[type=password]').fill('fixture-key');await page.getByRole('button',{name:'保存 Key（14 天）',exact:true}).click();
+ await page.getByRole('button',{name:'替換 Key（14 天）',exact:true}).waitFor();
  page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'開始自動',exact:true}).click();await page.getByRole('button',{name:'開始自動',exact:true}).waitFor();
  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'開始自動',exact:true}).click();await page.getByRole('button',{name:'暫停自動',exact:true}).waitFor();
  await page.getByRole('button',{name:'暫停自動',exact:true}).click();
