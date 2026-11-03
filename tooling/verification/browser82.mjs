@@ -7,7 +7,7 @@ const initial=load('world').seedWorld();initial.adjudication={provider:'openai',
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage();await page.addInitScript(()=>{Date.now=()=>Date.parse('2026-10-15T16:00:00Z');});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
- await page.goto(url);await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await page.getByPlaceholder('貼上你的 API Key，然後按保存',{exact:true}).fill('fixture-key');await page.getByRole('button',{name:'保存 Key（24 小時）',exact:true}).click();await page.getByRole('button',{name:'替換 Key（24 小時）',exact:true}).waitFor();
+ await page.goto(url);await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await page.getByPlaceholder('貼上你的 API Key，然後按保存',{exact:true}).fill('fixture-key');await page.getByRole('button',{name:'保存 Key（14 天）',exact:true}).click();await page.getByRole('button',{name:'替換 Key（14 天）',exact:true}).waitFor();
  const panel=page.getByRole('region',{name:'已發生費用估算'});
  const open=async()=>{await navigate(page,'設定');const summary=panel.locator('summary').filter({hasText:'自訂模型單價'});if(!(await summary.evaluate(el=>el.parentElement.open)))await summary.click();};await open();
  const read=async()=>page.request.get(url+'/api/world').then(r=>r.json());

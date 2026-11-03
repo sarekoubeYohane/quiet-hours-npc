@@ -46,7 +46,7 @@ try{
  const replayBody=requests.filter(request=>request.operation==='advance').at(-1);const beforeReplay=modelRequests.length;const replay=await page.request.post(url+'/api/world',{data:replayBody});assert.equal(replay.status(),200);assert.equal(modelRequests.length,beforeReplay);assert.equal((await replay.json()).world.objects[0].lifecycle,'consumed');
  console.log('PASS #93 settled operation replay preserves consumed identity without further paid requests');
  await page.getByRole('button',{name:'清除裁定服務 Key',exact:true}).click();await page.getByLabel('裁定服務 API Key',{exact:true}).fill('replacement-fixture-secret');
- const keySave=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='set-model-key');await page.getByRole('button',{name:'保存裁定服務 Key（24 小時）',exact:true}).click();assert.equal((await keySave).status(),200);await page.waitForFunction(()=>document.querySelector('input[aria-label="裁定服務 API Key"]')?.value==='');
+ const keySave=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='set-model-key');await page.getByRole('button',{name:'保存裁定服務 Key（14 天）',exact:true}).click();assert.equal((await keySave).status(),200);await page.waitForFunction(()=>document.querySelector('input[aria-label="裁定服務 API Key"]')?.value==='');
  assert.doesNotMatch(JSON.stringify(await (await page.request.get(url+'/api/world')).json()),/replacement-fixture-secret/);assert.equal(modelRequests.length,4);
  console.log('PASS #93 adjudication provider key can be replaced using existing encrypted storage without disclosure or paid validation');
 
