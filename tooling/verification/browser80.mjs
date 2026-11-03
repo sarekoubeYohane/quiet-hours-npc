@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import {url,server} from './browser-fixture.mjs';
+import {url,server,store,load} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
 const navigate=(page,name)=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
+const initial=load('world').seedWorld();initial.adjudication={provider:'openai',model:'fixture-world'};store.install(initial);
 let browser;
 try {
  browser=await launchBrowser();
@@ -29,7 +30,7 @@ try {
  await page.getByRole('button',{name:'開始自動',exact:true}).waitFor();
  await page.reload();await navigate(page,'設定');await page.getByLabel('每小時 AI 呼叫上限',{exact:true}).waitFor();assert.equal(await page.getByLabel('每小時 AI 呼叫上限',{exact:true}).inputValue(),'unlimited');
  await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();
- await page.locator('input[type=password]').fill('fixture-key');await page.getByRole('button',{name:'保存 Key（14 天）',exact:true}).click();
+ await page.locator('input[type=password]').first().fill('fixture-key');await page.getByRole('button',{name:'保存 Key（14 天）',exact:true}).click();
  await page.getByRole('button',{name:'替換 Key（14 天）',exact:true}).waitFor();
  page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'開始自動',exact:true}).click();await page.getByRole('button',{name:'開始自動',exact:true}).waitFor();
  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'開始自動',exact:true}).click();await page.getByRole('button',{name:'暫停自動',exact:true}).waitFor();

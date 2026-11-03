@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {url,server,store,load,modelRequests,setModelResponder} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
-process.env.BROWSER_ARTIFACT_DIR=resolve('docs/verification/assets/arrangement-cues-191');
+process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/arrangement-cues-191');
 await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
 const initial=load('world').seedWorld();initial.characters=initial.characters.filter(c=>c.id==='owner');initial.adjudication={provider:'openai',model:'fixture-world'};store.install(initial);
 let stage=0;
 setModelResponder(body=>{
  const input=JSON.parse(body.messages[1].content),source=input.self.shortTerm[0];
  const update={operation:'upsert',id:'tea-later',version:stage===0?0:1,text:'稍後與 Vera 討論茶的香氣',condition:{kind:'time',minute:initial.minute+30},references:[{kind:'short',id:source.id,version:source.version}],reason:'我想自行安排稍後的事'};
- return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify({type:stage===0?'rest':'continue',target:'',content:'',mood:'平靜',durationMinutes:stage===0?120:15,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[],arrangementUpdates:stage===0?[update]:[]})}}]});
+ return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:stage===0?'rest':'continue',target:'',content:'',mood:'平靜',durationMinutes:stage===0?120:15,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[],arrangementUpdates:stage===0?[update]:[]}))}}]});
 });
 let browser;
 try{

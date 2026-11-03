@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -19,7 +20,7 @@ setModelResponder(request=>{
   if(calls===3){assert.equal(input.self.intents.filter(n=>!n.parents.length)[0].id,'vera:gift');const shared=input.self.intents.find(n=>n.id==='vera:shared');assert.equal(shared.parents.find(p=>p.id==='vera:direction').order,1);assert.equal(shared.parents.find(p=>p.id==='vera:gift').order,0);}
   value=decision(input,{updates,focus:'vera:shared',type:'continue',content:'依原進度繼續',duration:60});
  }
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
 });
 let browser;
 try{
@@ -27,7 +28,7 @@ try{
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
  await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- const api=async body=>{const response=await page.request.post(url+'/api/world',{data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
+ const api=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
  await api({operation:'set-model-key',mode:'openai',key:'fixture-key'});
  let startedAt,until;
  for(let round=0;round<3;round++){

@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -29,7 +30,7 @@ setModelResponder(request => {
   let value;
   if (input.contractVersion === 'world-adjudication.v1') { adjudication++; value = candidate; }
   else { npc++; value = decision; }
-  return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
+  return Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value)) } }] });
 });
 let browser;
 const snapshots = [];
@@ -58,7 +59,7 @@ try {
     snapshots.push({ name, world: { minute: saved.world.minute, objects: saved.world.objects, naturalChanges: saved.world.naturalChanges }, evidence: saved.operation.evidence });
     return saved;
   };
-  await page.request.post(url + '/api/world', { data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
+  await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v1'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
   await page.goto(url);
   await nav('設定');
   await page.getByRole('combobox', { name: '決策方式', exact: true }).click();

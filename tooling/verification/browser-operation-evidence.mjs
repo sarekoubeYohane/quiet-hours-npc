@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -27,9 +28,9 @@ try {
       if(input.contractVersion==='world-adjudication.v1') {
         adjudication++;
         if(scenario==='transport-failure')return Response.json({error:{message:'fixture unavailable'}},{status:503});
-        return completion({...approved,completionMinutes:scenario==='contradictory'?5:null});
+        return completion(fixtureDecision(JSON.parse(request.messages[1].content),{...approved,completionMinutes:scenario==='contradictory'?5:null}));
       }
-      npc++;return completion(proposal);
+      npc++;return completion(fixtureDecision(JSON.parse(request.messages[1].content),proposal));
     });
     const context=await browser.newContext({reducedMotion:'reduce',viewport:{width:1280,height:1000}});
     const page=await context.newPage();const errors=[];
@@ -41,7 +42,7 @@ try {
     };
     const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
     try {
-      await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+      await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
       await page.goto(url);await nav('設定');
       await page.getByRole('combobox',{name:'決策方式',exact:true}).click();
       await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
@@ -57,8 +58,8 @@ try {
       assert.equal(evidence.deployment.name,'local');
       assert.deepEqual(evidence.counts,{npc:1,adjudication:1});
       const decision=evidence.dispatches.find(d=>d.task==='npc');
-      assert.equal(decision.candidate.value.content,proposal.content);
-      assert.equal(decision.candidate.value.target,'acceptance-tea-kit');
+      assert.equal(decision.candidate.value.action.content,proposal.content);
+      assert.equal(decision.candidate.value.action.target,'acceptance-tea-kit');
       assert.equal(decision.candidate.value.durationMinutes,15);
       assert.deepEqual(decision.candidate.value.timeIntent,proposal.timeIntent);
       const ruling=evidence.dispatches.find(d=>d.task==='adjudication');

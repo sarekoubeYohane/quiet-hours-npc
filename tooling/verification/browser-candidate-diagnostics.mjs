@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {url,server,store,load,requests,setModelResponder} from './browser-fixture.mjs';
 import {launchBrowser} from './browser-runtime.mjs';
@@ -11,12 +12,12 @@ try{
  browser=await launchBrowser();
  for(const [kind,label] of cases){
   const w=load('world').seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};store.install(w);
-  setModelResponder(()=>Response.json({usage:{prompt_tokens:7,completion_tokens:2},choices:[{message:{content:kind==='json'?'{BROKEN-SYNTHETIC':JSON.stringify({...decision,memorySelections:[{id:kind==='format'?w.characters[0].shortTerm[0].id:'UNKNOWN-SYNTHETIC',version:1,reason:kind==='format'?'':'保留'}]})}}]}));
+  setModelResponder((fixtureRequest)=>Response.json({usage:{prompt_tokens:7,completion_tokens:2},choices:[{message:{content:kind==='json'?'{BROKEN-SYNTHETIC':JSON.stringify(fixtureDecision(JSON.parse(fixtureRequest.messages[1].content),{...decision,memorySelections:[{id:kind==='format'?w.characters[0].shortTerm[0].id:'UNKNOWN-SYNTHETIC',version:1,reason:kind==='format'?'':'保留'}]}))}}]}));
   const context=await browser.newContext({viewport:{width:1280,height:1000},reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(20000);
   try{
-   await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
    const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna'};
-   const failed=await page.request.post(url+'/api/world',{data:op});assert.equal(failed.status(),502);
+   const failed=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:op});assert.equal(failed.status(),502);
    const read=async()=>(await(await page.request.get(url+'/api/world?operationId='+encodeURIComponent(op.operationId))).json());
    const saved=await read();assert.equal(saved.decisionTrace.outcome,'rolled-back');
    if(kind==='legacy'||kind==='unknown-code'){

@@ -26,7 +26,7 @@ try{
   }
   return read();
  };
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await configure();
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await configure();
  const seen=[];
  const checkpoint=async(name,saved)=>{
   seen.push({name,minute:saved.minute,turn:saved.turn});

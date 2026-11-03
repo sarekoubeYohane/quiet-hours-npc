@@ -12,7 +12,7 @@ try {
  browser=await launchBrowser();const page=await browser.newPage({reducedMotion:'reduce'});
  const errors=[];page.on('pageerror',error=>errors.push(String(error)));
  const send=async body=>{
-  const response=await page.request.post(url+'/api/world',{data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',minutes:15,...body}});
+  const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',minutes:15,...body}});
   assert.equal(response.status(),200);return response.json();
  };
  await send({operation:'direct',target:'owner',action:{type:'work',target:'craft-expert-challenge',content:'分析頁驗證髮飾'}});

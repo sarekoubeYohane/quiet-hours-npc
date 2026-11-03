@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -15,7 +16,7 @@ setModelResponder(request=>{
   const source=input.self.shortTerm.find(item=>item.text.includes('行動回饋'));
   value={contractVersion:'npc-decision.v2',action,mood:'平靜',durationMinutes:15,timeIntent:{kind:npc===1?'completion':'open-ended',maxMinutes:null},intents:[{id:'food',content:'照顧自己的飲食',context:'等待可知的新線索',intensity:'medium',importance:'medium',urgency:'low'}],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',reconfirmBodyConsequences:false,preferenceUpdates:[],habitCandidates:[],methodAssessment:{purpose:'照顧自己的飲食',knownResults:source?[{kind:'short',id:source.id,version:source.version}]:[],choice:npc===1?'new':'wait',method:action.content,change:{kind:npc===1?'not-applicable':'condition',detail:npc===1?'':'等到新消息再決定'},reason:source?'目前只知道上次尚未執行，未得知受阻原因。':'自行尋找可行來源，不要求別人配合。',selectedAction:{type:action.type,target:action.target},intentIds:['food']}};
  }
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value,{adopt:value.intents||[]}))}}]});
 });
 let browser;
 try{
@@ -24,7 +25,7 @@ try{
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
  await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
  await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
  for(let i=0;i<2;i++){
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');
@@ -36,7 +37,7 @@ try{
  const input=JSON.parse(JSON.parse(trace.dispatches[0].requestBody).messages[1].content);assert.ok(input.self.lastKnownState.entries.some(item=>item.reference.id===step.data.methodAssessment.knownResults[0].id));
  await nav('分析');const panel=page.getByRole('region',{name:'決策追溯',exact:true});await panel.getByText('實際模型派送',{exact:true}).waitFor();
  await panel.getByText('本次目的、方法評估、意圖與行動（主觀自述，非成果證據）',{exact:true}).click();assert.match(await panel.innerText(),/等到新消息再決定/);assert.match(await panel.innerText(),/world|世界已提交/);
- const before={npc,judgments};assert.equal((await page.request.post(url+'/api/world',{data:op})).status(),200);assert.deepEqual({npc,judgments},before);assert.deepEqual(errors,[]);
+ const before={npc,judgments};assert.equal((await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:op})).status(),200);assert.deepEqual({npc,judgments},before);assert.deepEqual(errors,[]);
  await panel.getByText('本次目的、方法評估、意圖與行動（主觀自述，非成果證據）',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:outputPath('assessment.png')});
  await writeFile(outputPath('summary.json'),JSON.stringify({fixture:true,npc,judgments,checks:{actualUI:true,sqliteReload:true,actualNextMessages:true,sourceRef:true,sameIdZeroDispatch:true},inputBytes:Buffer.byteLength(JSON.stringify(input)),assessmentBytes:Buffer.byteLength(JSON.stringify(step.data.methodAssessment))},null,2)+'\n');
  console.log('PASS method assessment Chromium: UI/API/SQLite/next messages, two NPC calls and one judgment, replay zero; fixture only');

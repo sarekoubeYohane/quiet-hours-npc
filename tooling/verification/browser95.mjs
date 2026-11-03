@@ -25,7 +25,7 @@ try {
  await page.evaluate(()=>document.fonts.ready);
  const dayFilter=await map.locator('.pixel-map').evaluate(element=>getComputedStyle(element).filter);
  await map.screenshot({path:outputPath('browser95-day.png')});
- const post=async body=>{await page.request.post(url+'/__fixture',{data:{advanceMs:1}});const response=await page.request.post(url+'/api/world',{data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}});assert.equal(response.status(),200,await response.text());return (await response.json()).world;};
+ const post=async body=>{await page.request.post(url+'/__fixture',{data:{advanceMs:1}});const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}});assert.equal(response.status(),200,await response.text());return (await response.json()).world;};
  const refresh=async()=>{await Promise.all([page.waitForResponse(response=>response.url().endsWith('/api/world')&&response.request().method()==='GET'),page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));})]);await page.waitForFunction(minute=>document.querySelector('.map-time')?.textContent.includes(`${String(Math.floor(minute%1440/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`),store.snapshot().minute);};
  await post({operation:'direct',action:{type:'work',target:'tidy'}});
  await post({operation:'advance',minutes:15});
@@ -85,7 +85,7 @@ try {
  console.log('PASS #95 real 17:45→18:00 API round switches day to night independently of observer timezone');
 
  await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:375,height:812});
- await page.route('**/pixel/**',route=>route.abort());await page.reload();await map.waitFor();
+ await page.route(/\/(?:pixel|characters)\//,route=>route.abort());await page.reload();await map.waitFor();
  await map.locator('.map-error').waitFor();await map.locator('.pixel-sprite-fallback').first().waitFor();
  await map.locator('.pixel-location button').filter({hasText:'店主'}).click();
  assert.equal(await map.locator('[data-character-id="owner"]').getAttribute('aria-pressed'),'true');

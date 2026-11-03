@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -27,7 +28,7 @@ setModelResponder(request=>{
   value={status:'accepted',completionMinutes:15,effects,stages:[],branches:null,check:null,routine:null};
   if(step===0)value={...value,effects:[],check:{difficulty:12,ability:'拿穩杯子'},branches:[{outcomes:['critical-success','success','mixed'],effects:[],stages:[]},{outcomes:['failure','critical-failure'],effects,stages:[]}]};
  }else{npc++;value={type:'propose',target:step===0?'borrowed-cup':'held-cup',content:step===0?'拿穩借來的杯子時手滑':'不等待物主許可，直接操作面前的杯子',purpose:'操作物件',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]};}
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),value))}}]});
 });
 let browser;
 try{
@@ -36,7 +37,7 @@ try{
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
  const read=async id=>{const response=await page.request.get(url+'/api/world'+(id?'?operationId='+encodeURIComponent(id):''));assert.equal(response.status(),200);return response.json();};
  const selectAI=async()=>{await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');};
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await selectAI();
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await selectAI();
  const advance=async()=>{
   const clock=await(await page.request.post(url+'/__fixture',{data:{advanceMs:1000}})).json();await page.evaluate(now=>{Date.now=()=>now;},clock.now);
   const pending=page.waitForResponse(response=>response.url().endsWith('/api/world')&&response.request().method()==='POST'&&JSON.parse(response.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,(await response.json()).error);await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');const id=requests.filter(request=>request.operation==='advance').at(-1).operationId;return read(id);

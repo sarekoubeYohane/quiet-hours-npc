@@ -276,7 +276,7 @@ function feedbackExcerpt(text:string):string {
 // counters, permission lists and private decision traces are never sources.
 export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution):void {
  const label=action?`${action.type} ${action.target||''} ${action.content||''}`.trim().slice(0,240):'先前活動';
- const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||action?.type==='work'&&action.target==='tea'&&object.kind==='utensil').slice(0,4);
+ const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||object.kind==='utensil'&&(action?.type==='work'&&action.target==='tea'||action?.type==='propose'&&(action.target===c.location||action.target===regionOf(c)))).slice(0,4);
  let state='';
  for(const object of relevant){
   const entry=`${object.label.slice(0,80)} [${object.id}]：${JSON.stringify(object.state)}`;

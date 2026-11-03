@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -30,7 +31,7 @@ setModelResponder(request=>{
  if(judgment)adjudication++;else npc++;
  const stage=stages[step];
  const reply=judgment?{status:'accepted',completionMinutes:15,effects:stage.effects,stages:[],branches:null,check:null,routine:null}:input.self.id==='owner'?{type:'propose',target:stage.target,content:stage.content,purpose:'材料處理',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]}:{type:'rest',target:'',content:'安靜休息',purpose:'休息',mood:'平靜',durationMinutes:90,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[]};
- return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(reply)}}]});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(request.messages[1].content),reply))}}]});
 });
 let browser;
 try{
@@ -38,7 +39,7 @@ try{
  await page.addInitScript(now=>{Date.now=()=>now;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
  const read=async id=>{const response=await page.request.get(url+'/api/world'+(id?'?operationId='+encodeURIComponent(id):''));assert.equal(response.status(),200);return response.json();};
- await page.request.post(url+'/api/world',{data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
  await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
  const advance=async()=>{
   const clock=await(await page.request.post(url+'/__fixture',{data:{advanceMs:1000}})).json();await page.evaluate(now=>{Date.now=()=>now;},clock.now);

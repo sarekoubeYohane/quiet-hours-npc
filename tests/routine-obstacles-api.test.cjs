@@ -28,6 +28,23 @@ test('known broken utensil gives a knowable obstruction across fresh worded oper
  }finally{s.restore();}
 });
 
+test('free proposals retain known broken-vessel feedback without revealing an unknown vessel',async()=>{
+ for(const visibility of ['known','unknown','hidden','hidden-with-other-broken']){
+  const known=visibility==='known';
+  const s=await fixture(w=>{if(visibility==='unknown')w.objects[0].knownTo=[];if(visibility.startsWith('hidden'))w.objects[0].stateExposure={condition:'hidden'};if(visibility==='hidden-with-other-broken')w.objects.push({...cup(),id:'other-cup'});});try{
+   s.decision({type:'propose',target:visibility==='hidden-with-other-broken'?'cup':'cafe',content:'泡一杯茶',purpose:'泡茶',mood:'平靜',durationMinutes:30,intents:[]});
+   assert.equal((await s.post({operation:'advance',minutes:15})).status,200);
+   const w=await s.read(),actor=w.characters.find(c=>c.id==='owner');
+   if(known)assert.match(actor.activity,/器具.*損壞/);
+   else assert.doesNotMatch(actor.activity,/器具.*損壞/);
+   const feedback=actor.shortTerm.filter(item=>item.text.includes('行動回饋')).at(-1)?.text||'';
+   if(known)assert.match(feedback,/器具.*損壞/);
+   else assert.doesNotMatch(feedback,/器具.*損壞/);
+   assert.equal(w.objects[0].state.contents,'empty');
+  }finally{s.restore();}
+ }
+});
+
 test('an activity keeps earlier water but cannot finish after an actual utensil break, and the NPC chooses its own next method',async()=>{
  const s=await fixture(w=>{w.objects[0].state.condition='sound';});try{
   await s.post({operation:'advance',minutes:15});let w=await s.read();assert.equal(w.objects[0].state.contents,'water');

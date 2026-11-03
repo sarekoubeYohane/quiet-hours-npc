@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -19,11 +20,11 @@ const rest = { type: 'rest', target: '', content: '', mood: '平靜', durationMi
 const proposal = target => ({ type: 'propose', target, content: '依當下條件處理餐點或杯子', purpose: '生活驗收', mood: '平靜', durationMinutes: 15, intents: [] });
 const completion = value => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(value) } }] });
 let actor = 'cass', choice = proposal('acceptance-meal');
-let candidate = { status: 'accepted', effects: [{ kind: 'materialize', supplyId: 'acceptance-meal', expectedRemaining: 1 }], check: null };
+let candidate = { status: 'accepted', completionMinutes: 15, effects: [{ kind: 'materialize', supplyId: 'acceptance-meal', expectedRemaining: 1 }], check: null };
 setModelResponder(request => {
   assert.doesNotMatch(JSON.stringify(request), /ORIGINAL-STORY-ONLY/);
   const input = JSON.parse(request.messages[1].content);
-  return completion(input.contractVersion === 'world-adjudication.v1' ? candidate : input.self.id === actor ? choice : rest);
+  return completion(fixtureDecision(JSON.parse(request.messages[1].content),input.contractVersion === 'world-adjudication.v1' ? candidate : input.self.id === actor ? choice : rest));
 });
 
 let browser;
@@ -60,9 +61,9 @@ try {
     await page.getByRole('option', { name: 'GPT-6.1 Sol', exact: true }).click();
     await nav('觀察');
   };
-  const setEffects = effects => { candidate = { status: 'accepted', effects, check: null }; };
+  const setEffects = effects => { candidate = { status: 'accepted', completionMinutes: 15, effects, check: null }; };
   try {
-    await page.request.post(url + '/api/world', { data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
+    await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v1'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
     await page.goto(url); await nav('設定');
     await page.getByRole('button', { name: '進入最小驗收場景', exact: true }).click();
     await page.getByRole('button', { name: '取消', exact: true }).click();
@@ -117,7 +118,7 @@ try {
     console.log('PASS autonomous grant, borrow/carry/wash/return keeps same cup');
 
     choice = { ...rest, type: 'work', target: 'tea', content: '用已獲准的杯子泡茶', durationMinutes: 60 };
-    candidate = { status: 'accepted', effects: [], check: null, stages: [
+    candidate = { status: 'accepted', completionMinutes: 60, effects: [], check: null, stages: [
       { afterMinutes: 30, preconditions: [{ objectId: 'acceptance-cup', revision: 7, region: 'cafe-front', holder: null, state: { contents: 'empty' } }], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 7, key: 'contents', value: 'water' }] },
       { afterMinutes: 60, preconditions: [{ objectId: 'acceptance-cup', revision: 8, region: 'cafe-front', holder: null, state: { contents: 'water' } }], effects: [{ kind: 'state', objectId: 'acceptance-cup', expectedRevision: 8, key: 'contents', value: 'tea' }] },
     ] };

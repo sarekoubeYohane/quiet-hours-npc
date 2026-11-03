@@ -1,3 +1,4 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
 import assert from 'node:assert/strict';
 import {url,server,store,load} from './browser-fixture.mjs';
 import {launchBrowser,outputPath} from './browser-runtime.mjs';
@@ -30,13 +31,13 @@ try{
  console.log('PASS #82 zero/fractional prices, cancel, real usage cost, changed-price immutable history');
  await page.reload();await navigate(page,'分析');await page.getByRole('region',{name:'已發生費用估算'}).waitFor();await open();await navigate(page,'分析');await panel.locator('summary').filter({hasText:'已發生用量與當時價格依據'}).click();assert.match(await panel.innerText(),/second fixture price/);assert.match(await panel.innerText(),/0.00375/);
  await page.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await settle();await navigate(page,'分析');
- const makeResponse=(usage,content=action)=>Response.json({usage,choices:[{message:{content:JSON.stringify(content)},finish_reason:'stop'}]});
- globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200,prompt_tokens_details:{cached_tokens:500}});await interrupt();await round();await navigate(page,'分析');assert.match(await panel.innerText(),/部分估算/);assert.match(await panel.innerText(),/1 次價格、快取單價或用量不完整/);
+ const makeResponse=(usage,content,input)=>Response.json({usage,choices:[{message:{content:JSON.stringify(fixtureDecision(input,content))},finish_reason:'stop'}]});
+ globalThis.fetch=async(_url,init)=>makeResponse({prompt_tokens:1000,completion_tokens:200,prompt_tokens_details:{cached_tokens:500}},action,JSON.parse(JSON.parse(init.body).messages[1].content));await interrupt();assert.equal((await round()).status(),200);await navigate(page,'分析');assert.match(await panel.innerText(),/部分估算/);assert.match(await panel.innerText(),/1 次價格、快取單價或用量不完整/);
  console.log('PASS #82 reload preserves source/date/history and identifiable cache without price is partial');
- globalThis.fetch=async()=>makeResponse(undefined);await interrupt();await round();await navigate(page,'分析');assert.match(await panel.innerText(),/2 次價格、快取單價或用量不完整/);
- globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200},{type:'invalid'});await interrupt();const failed=await round();await navigate(page,'分析');assert.equal(failed.status(),502);assert.equal((await read()).world.aiUsage.totalCalls,5);assert.match(await panel.innerText(),/0.005/);
+ globalThis.fetch=async(_url,init)=>makeResponse(undefined,action,JSON.parse(JSON.parse(init.body).messages[1].content));await interrupt();assert.equal((await round()).status(),200);await navigate(page,'分析');assert.match(await panel.innerText(),/2 次價格、快取單價或用量不完整/);
+ globalThis.fetch=async(_url,init)=>makeResponse({prompt_tokens:1000,completion_tokens:200},{type:'invalid'},JSON.parse(JSON.parse(init.body).messages[1].content));await interrupt();const failed=await round();await navigate(page,'分析');assert.equal(failed.status(),502);assert.equal((await read()).world.aiUsage.totalCalls,5);assert.match(await panel.innerText(),/0.005/);
  console.log('PASS #82 missing usage unknown, failure retains incurred known cost');
- globalThis.fetch=async()=>makeResponse({prompt_tokens:1000,completion_tokens:200});await navigate(page,'設定');await page.getByRole('combobox',{name:'OpenAI 模型',exact:true}).click();await page.getByRole('option',{name:'GPT-6.1 Sol',exact:true}).click();await interrupt();await round();await navigate(page,'分析');assert.match(await panel.innerText(),/3 次價格、快取單價或用量不完整/);console.log('PASS #82 mixed model actual dispatch with unknown price never free');
+ globalThis.fetch=async(_url,init)=>makeResponse({prompt_tokens:1000,completion_tokens:200},action,JSON.parse(JSON.parse(init.body).messages[1].content));await navigate(page,'設定');await page.getByRole('combobox',{name:'OpenAI 模型',exact:true}).click();await page.getByRole('option',{name:'GPT-6.1 Sol',exact:true}).click();await interrupt();assert.equal((await round()).status(),200);await navigate(page,'分析');assert.match(await panel.innerText(),/3 次價格、快取單價或用量不完整/);console.log('PASS #82 mixed model actual dispatch with unknown price never free');
  const mixed=store.snapshot();mixed.aiUsage.totalCalls++;mixed.aiUsage.calls++;store.replaceCommittedWorld(mixed);await refresh();assert.match(await panel.innerText(),/4 次價格、快取單價或用量不完整/);
  assert.match(await panel.innerText(),/站主共用服務另外計量：費用未知/);assert.deepEqual(errors,[]);await page.screenshot({path:outputPath('browser82.png'),fullPage:true});
  console.log('PASS #82 legacy/mixed unknown remains partial, owner cost separated unknown, no browser page errors');
