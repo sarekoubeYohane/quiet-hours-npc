@@ -6,7 +6,7 @@ import OperationEvidenceDetails from '@/components/operation-evidence';
 import DecisionTraces from '@/components/decision-traces';
 import type { OperationEvidence, OperationSummary, ReplayAdvance } from '@/lib/operation-evidence';
 import { RoutineStatus } from '@/components/routine-status';
-import { useCallback,useEffect,useRef,useState } from 'react';
+import { useCallback,useEffect,useRef,useState,type ReactNode } from 'react';
 import { Moon,Play,Pause,MessageSquare,MapPin,Brain,Clock,Loader2,Eye,Radio,Check,RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select,SelectTrigger,SelectValue,SelectContent,SelectItem } from '@/components/ui/select';
@@ -40,7 +40,7 @@ const reasonLabel=(reason?:StopReason)=>reason?({player:'玩家預算',owner:'�
 type OwnerUsage={enabled?:boolean;month?:string;ownerUnits?:Record<'embedding'|'index'|'search',number>;knownEmbeddingInputTokens?:number};
 function Picker({value,onChange,items,label,disabled=false}:{value:string;onChange:(v:string)=>void;items:{value:string;label:string}[];label:string;disabled?:boolean}){return <Select value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger className="picker" aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{items.map(i=><SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent></Select>;}
 function Initial({c,small=false}:{c:Character;small?:boolean}){return <span className={`initial ${small?'small':''}`} style={{color:c.color,borderColor:c.color+'55',background:c.color+'14'}}><PixelSprite id={c.id}/></span>;}
-export default function WorldApp({signInPath,displayName,environment}:{signInPath:string;displayName:string;environment:EnvironmentView}){
+export default function WorldApp({signInPath,displayName,environment,templateNavigation}:{signInPath:string;displayName:string;environment:EnvironmentView;templateNavigation?:ReactNode}){
 const [world,setWorld]=useState<World|null>(null),[selected,setSelected]=useState('cass'),[busy,setBusy]=useState(false),[error,setError]=useState('');
 const [adjudicationFailure,setAdjudicationFailure]=useState<AdjudicationFailure>();
 const [operationEvidence,setOperationEvidence]=useState<OperationEvidence>(),[recentOperations,setRecentOperations]=useState<OperationSummary[]>([]),[evidenceScope,setEvidenceScope]=useState('');
@@ -155,8 +155,8 @@ const adjudicationStatus=savedAdjudication?modelKeys[savedAdjudication.provider]
 const adjudicationReady=!!(savedAdjudication?.model.trim()&&adjudicationStatus?.configured&&adjudicationStatus.expiresAt);
 const canAdvance=!!world&&!busy&&!pendingOperation&&!playing&&!signInRequired&&(mode==='demo'||!!(keyReady&&model.trim()&&adjudicationReady));
 const builtNote=environment.builtAtLabel!=='unknown'?` · 建置於 ${environment.builtAtLabel}`:'';
-return <main>{pendingOperation&&<section className="panel" role="status"><p>有一個尚未確認結果的操作；重試會沿用原本的識別碼。</p><Button disabled={busy||signInRequired} onClick={()=>void act('resume')}>重試未完成操作</Button></section>}<header className="topbar"><button type="button" onClick={()=>setPage('observation')} className="brand"><span className="brand-mark"><Moon size={21}/></span><span>Quiet Hours<small>NPC 觀察室</small></span></button><div className="header-right"><span className="environment-badge" title={`目前環境與建置的提交短碼${builtNote}`}>{environment.caption}</span><span className="edition">{displayName} · 已登入</span><form method="post" action="/api/auth/logout" onSubmit={()=>{stopAuto();setKey('');}}><Button variant="ghost" type="submit">登出</Button></form></div></header>
-<nav className="world-navigation" aria-label="觀察室分頁">{([{id:'observation',label:'觀察'},{id:'settings',label:'設定'},{id:'analysis',label:'分析'}] as const).map(item=><Button key={item.id} variant={page===item.id?'default':'ghost'} aria-current={page===item.id?'page':undefined} onClick={()=>setPage(item.id)}>{item.label}</Button>)}<a href="/scene-templates">場景範本</a></nav>
+return <main>{pendingOperation&&<section className="panel" role="status"><p>有一個尚未確認結果的操作；重試會沿用原本的識別碼。</p><Button disabled={busy||signInRequired} onClick={()=>void act('resume')}>重試未完成操作</Button></section>}<header className="topbar"><button type="button" onClick={()=>setPage('observation')} className="brand"><span className="brand-mark"><Moon size={21}/></span><span>Quiet Hours<small>NPC 觀察室</small></span></button><div className="header-right">{templateNavigation}<span className="environment-badge" title={`目前環境與建置的提交短碼${builtNote}`}>{environment.caption}</span><span className="edition">{displayName} · 已登入</span><form method="post" action="/api/auth/logout" onSubmit={()=>{stopAuto();setKey('');}}><Button variant="ghost" type="submit">登出</Button></form></div></header>
+<nav className="world-navigation" aria-label="觀察室分頁">{([{id:'observation',label:'觀察'},{id:'settings',label:'設定'},{id:'analysis',label:'分析'}] as const).map(item=><Button key={item.id} variant={page===item.id?'default':'ghost'} aria-current={page===item.id?'page':undefined} onClick={()=>setPage(item.id)}>{item.label}</Button>)}</nav>
 {adjudicationFailure&&<AdjudicationFailureDetails failure={adjudicationFailure}/>}
 {page==='analysis'&&<OperationEvidenceDetails key={`${evidenceScope}:${world?.contextId}`} evidence={operationEvidence} recent={recentOperations} disabled={busy||pendingOperation||playing||automatic||signInRequired} onReplay={payload=>act('advance',undefined,undefined,undefined,payload)}/>}
 {page==='analysis'&&world&&<DecisionTraces key={`trace:${evidenceScope}:${world.contextId}:${traceFocusOperationId||operationEvidence?.operationId}`} operationId={traceFocusOperationId||operationEvidence?.operationId} lastResponse={traceResponseStatus}/>}
