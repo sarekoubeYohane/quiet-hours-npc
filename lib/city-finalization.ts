@@ -42,8 +42,7 @@ export function applyCitySpace(draft: CityDraft, base: CityPreview['places'][num
 
   for (const room of extras.rooms) {
     if (rooms.some(item=>item.id===room.id) ||
-        (room.privateFor && !draft.characters.some(actor=>actor.templateId===room.privateFor &&
-          (actor.homeId===base.id || actor.ownedPlaceIds?.includes(base.id))))) {
+        (room.privateFor && !draft.characters.some(actor=>actor.templateId===room.privateFor))) {
       issues.push(base.name+'有重複的房間或未綁定的私人房間。');
       continue;
     }

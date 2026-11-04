@@ -216,6 +216,7 @@ test('the actual app previews and confirms editable opening associations with tw
     await click('初始化場所');
     const generatedRooms = document.querySelector('[aria-label="城市預覽"]');
     assert.match(generatedRooms.textContent,/澄的臥室.*杉的臥室/);
+    assert.ok([...generatedRooms.querySelectorAll('[aria-label="有效進出權限"] li')].some(row=>/澄的臥室.*沿用建築/.test(row.textContent)));
     await fill('河畔北屋物件 1 名稱','確認的水杯');
     const grantPerson=document.querySelector('[aria-label="授權人物"]');
     const grantPlace=document.querySelector('[aria-label="授權場所"]');
@@ -232,6 +233,7 @@ test('the actual app previews and confirms editable opening associations with tw
     await fill('澄的住處',home.options[2].value);
     assert.equal(button('開始世界').disabled,true);
     await click('預覽城市');
+    assert.equal(button('開始世界').disabled,false,document.querySelector('[role="alert"]')?.textContent);
     await click('開始世界');
     const { world } = await read();
     assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
@@ -447,9 +449,10 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
       assert.deepEqual(input.places.map(place=>place.id),['home']);
       const own = input.person.name==='澄';
       assert.doesNotMatch(JSON.stringify(input),own?/杉的私人房間|杉的秘密物件|杉的個人背景/:/澄的私人房間|澄的個人背景/);
-      candidate = {rooms:[],objects:[
+      candidate = {rooms:[{placeId:'home',id:'shared-room',name:'共用工作區',private:false}],objects:[
         object('front','小桌',[{key:'顏色',value:own?'淺色':'深色'}]),
         object('front','台燈',[{key:'電源',value:'開啟'}]),
+        object('shared-room','工具箱'),
         object(own?'room-a':'room-b',own?'澄的書':'杉的床'),
         object(own?'room-b':'room-a','企圖寫入他人的房間'),
         object('front','城市外物品',[],'unselected'),
@@ -457,12 +460,14 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     } else {
       assert.equal(input.stage,'heavenly-city-finalization');
       const table = input.generated.spaces.find(space=>space.placeId==='home').objects.find(item=>item.name==='小桌');
+      const workroom = input.generated.spaces.find(space=>space.placeId==='home').rooms.find(room=>room.name==='共用工作區');
       candidate = {spaces:[{
         placeId:'home',
         rooms:[],
         objects:[{id:table.id,roomId:'front',name:'小桌',state:[{key:'顏色',value:'深色'}]}],
         connections:[
           {id:'front-b',name:'通往杉房間的門',rooms:['front','room-b'],state:'closed'},
+          {id:'front-workroom',name:'通往共用工作區',rooms:['front',workroom.id],state:'open'},
           {id:'changed',name:'覆蓋原門',rooms:['front','room-a'],state:'blocked'},
           {id:'breach',name:'覆蓋明示不通行',rooms:['room-a','room-b'],state:'open'},
         ],
@@ -486,15 +491,23 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     assert.equal(after.world.turn,before.world.turn);
     assert.deepEqual(after.world.characters,before.world.characters);
     assert.equal(after.world.aiUsage.totalCalls,3);
+    await response(await send(route,{operation:'set-budget',operationId:id(),mode:'demo',limits:{calls:5,tokens:null}}),200);
+    const budgeted = await read();
+    const capped = await response(await send(route,{...operation,operationId:id(),expectedVersion:budgeted.version}),429);
+    assert.equal(capped.finalizedCity,undefined);
+    assert.deepEqual(calls.slice(3).map(input=>input.stage),['npc-city-description','npc-city-description']);
+    const latest = await read();
+    assert.equal(latest.world.aiUsage.totalCalls,5);
+    assert.deepEqual(latest.world.characters,before.world.characters);
     const approved = finalized.finalizedCity;
     const generated = approved.finalization.spaces.find(space=>space.placeId==='home');
-    assert.deepEqual(generated.objects.map(item=>item.name).sort(),['小桌','杉的床','澄的書'].sort());
+    assert.deepEqual(generated.objects.map(item=>item.name).sort(),['小桌','工具箱','杉的床','澄的書'].sort());
     assert.equal(generated.objects.find(item=>item.name==='小桌').state.顏色,'深色');
     generated.objects.find(item=>item.name==='小桌').name = '最後確認的小桌';
-    const previewed = await response(await send(route,{...operation,operation:'preview-city',city:approved,expectedVersion:after.version}),200);
+    const previewed = await response(await send(route,{...operation,operation:'preview-city',city:approved,expectedVersion:latest.version}),200);
     assert.deepEqual(previewed.preview.issues,[]);
     assert.match(JSON.stringify(previewed.preview),/最後確認的小桌/);
-    const start = { ...operation,operation:'start-city',operationId:id(),city:approved,expectedVersion:after.version };
+    const start = { ...operation,operation:'start-city',operationId:id(),city:approved,expectedVersion:latest.version };
     await response(await send(route,start),200);
     const {world} = await read();
     assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
@@ -503,6 +516,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     assert.equal(world.objects.filter(item=>item.label==='最後確認的小桌').length,1);
     assert.equal(world.objects.find(item=>item.label==='台燈').state.電源,'關閉');
     assert.equal(world.objects.find(item=>item.label==='杉的床').region,world.characters[1].region);
+    assert.equal(world.configuration.regions.filter(room=>room.name==='共用工作區').length,1);
     assert.equal(world.configuration.locations.length,3);
     assert.ok(world.configuration.doors.some(door=>door.name==='原有門'));
     assert.ok(world.configuration.doors.some(door=>door.name==='通往杉房間的門'&&world.scene.doors[door.id]==='closed'));
@@ -512,7 +526,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
       {locations:['place:north','place:south'],minutes:35},
       {locations:['place:home','place:north'],minutes:45},
     ]);
-    assert.equal(calls.length,3);
+    assert.equal(calls.length,5);
     assert.deepEqual((await response(await places.GET(),200)).templates.find(item=>item.id===house.id),house);
   } finally {
     global.fetch = originalFetch;

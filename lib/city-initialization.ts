@@ -44,7 +44,6 @@ const heavenlyShape = object({
 });
 
 type Dispatch = (task:string,messages:ModelMessage[],schema:object)=>Promise<string>;
-type Place = CityPreview['places'][number];
 function parseState(entries: z.infer<typeof stateRows>) {
   const result = Object.fromEntries(entries.map(({key,value})=>[key,value]));
   if (Object.keys(result).length!==entries.length) throw Error('場所描述有重複狀態。');
