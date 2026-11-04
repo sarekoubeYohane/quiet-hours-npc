@@ -19,8 +19,9 @@ export default function CityFinalizationEditor({ draft, sourceRooms, names, onCh
   draft:CityDraft;sourceRooms:Map<string,FinalizedRoom[]>;names:Map<string,string>;onChange:(draft:CityDraft)=>void;
 }) {
   const finalization = draft.finalization ?? {spaces:[],walks:[]};
-  function saveSpace(space:CitySpace, characters = draft.characters) {
-    onChange({...draft,characters,finalization:{...finalization,spaces:[...finalization.spaces.filter(item=>item.placeId!==space.placeId),space]}});
+  function saveSpace(space:CitySpace, characters = draft.characters, removedRoom?:string) {
+    const accessGrants = removedRoom ? draft.accessGrants?.filter(grant=>grant.placeId!==space.placeId||grant.roomId!==removedRoom) : draft.accessGrants;
+    onChange({...draft,characters,accessGrants,finalization:{...finalization,spaces:[...finalization.spaces.filter(item=>item.placeId!==space.placeId),space]}});
   }
   function saveWalks(walks:CityWalk[]) {
     onChange({...draft,finalization:{...finalization,walks}});
