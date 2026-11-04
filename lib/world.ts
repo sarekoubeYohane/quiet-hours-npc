@@ -1,3 +1,4 @@
+import { entryPermission } from './city-access';
 import { connectingDoor, defaultRegion, homeLocation, worldDoors, worldLocations, worldRegions, type WorldConfiguration } from './world-configuration';
 import { applyPhoneAction, phoneForActor, deliverPhoneMessage } from './phones';
 import { initialDirection, currentDirections } from './pursuits';
@@ -24,7 +25,7 @@ export type Habit={activityKey?:string;activityLabel?:string;evidenceIds?:string
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
 export type Character={profile?:import('./character-templates').CharacterTemplateFields;profileSource?:{id:string;version:number};pursuitArchived?:{id:string;version:number}[];pursuitArchivedDropped?:number;pursuitTrace?:import('./pursuits').PursuitTrace[];pursuitTraceDropped?:number;focusIntentId?:string|null;arrangements?:import('./arrangements').ArrangementState;pausedActivity?:import('./paused-activities').PausedActivity;needs?:BodyNeeds;preferences?:import('./preferences').PreferenceState;physical?:PhysicalState;id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;observationSequence?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];routineCapabilities?:import('./routine-rules').RoutineOperation[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];habitEvidence?:HabitEvidence[];habitEvidenceDropped?:number;eventHabits?:EventHabit[];intents?:Intent[];control?:OwnerControl};
-export type WorldEvent={id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string;externalChanges?:ExternalConsequence[]};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
+export type WorldEvent={entryPermission?:{regionId:string;allowed:boolean};id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string;externalChanges?:ExternalConsequence[]};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
 export type World={configuration?:WorldConfiguration;pursuitVersion?:1;pursuitContext?:string;phones?:import('./phones').PhoneState;bodyReconfirmation?:{attempts:{signature:string;minute:number}[];dropped:number};naturalChangesDropped?:number;naturalChanges?:import('./natural-changes').NaturalChange[];branchTrialScopes?:Record<string,string[]>;routineAudit?:{turn:number;actorId:string;location?:string;ruleId:string;result:"approved"|"reused"|"blocked"|"exception"|"confirmed";reason?:string}[];routineRules?:RoutineRule[];routinePlaces?:RoutinePlace[];contextId?:string;acceptance?:{id:'daily-life-v1';original?:World;snapshot?:{format:'gzip-base64-v1';data:string};originalSavedDecisions?:number};freeTrials?:Record<string,Resolution>;supplies?:SceneSupply[];objects?:WorldObject[];adjudication?:{provider:'openai'|'openrouter';model:string};minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
 export type Action={type:'phone'|'pause'|'resume'|'abandon'|'propose'|'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string;purpose?:string};
 export function pendingInterventions(w:World,c:Character){
@@ -185,6 +186,10 @@ else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
   {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:undefined);
+if(a.type==='move'&&!options.dryRun){
+  const permission=entryPermission(w,c.id,c.location,regionOf(c));
+  if(permission)w.events.at(-1)!.entryPermission=permission;
+}
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){

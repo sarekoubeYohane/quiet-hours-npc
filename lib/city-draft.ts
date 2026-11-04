@@ -1,4 +1,5 @@
 import type { CharacterTemplateFields } from './character-templates';
+import type { EntryGrant, EntryPreview } from './entry-rules';
 
 export const openingDescriptionMaxLength = 1600;
 export const cityLimits = { places: 8, characters: 8, objects: 512, backgroundPeople: 8, relationships: 32 };
@@ -18,6 +19,7 @@ export type CityDraft = {
   backgroundPeople?: { id: string; name: string }[];
   relationships?: OpeningRelationship[];
   finalization?: CityFinalization;
+  accessGrants?: EntryGrant[];
 };
 export type CityPreview = {
   places: { id:string; name:string; templateName:string; rooms:FinalizedRoom[]; objects:(FinalizedObject & {room:string})[]; connections:FinalizedConnection[] }[];
@@ -28,6 +30,7 @@ export type CityPreview = {
   }[];
   backgroundPeople?: { id: string; name: string }[];
   relationships?: { from: string; to: string; description: string }[];
+  access?: EntryPreview[];
   issues: string[];
   missingStarts?: number;
 };

@@ -52,7 +52,7 @@ export default function CityFinalizationEditor({ draft, sourceRooms, names, onCh
           },draft.characters.map(actor=>({...actor,
             ...(actor.placeId===place.id&&actor.roomId===room.id?{roomId:''}:{}),
             ...(actor.homeId===place.id&&actor.homeRoomId===room.id?{homeRoomId:undefined}:{}),
-          })))}>移除補充房間</Button>
+          })),room.id)}>移除補充房間</Button>
         </div>)}
         <Button type="button" variant="outline" disabled={space.rooms.length>=20}
           onClick={()=>saveSpace({...space,rooms:[...space.rooms,{id:newId(),name:'新房間'}]})}>新增房間</Button>

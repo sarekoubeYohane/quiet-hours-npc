@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { entryRules } from './entry-rules';
 import { assertBoundedState } from './adjudication-contract';
 
 const identifier = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
@@ -15,6 +16,7 @@ const objectState = z.custom<Record<string, string>>(value => {
 export const sceneTemplateDraft = z.object({
   name,
   note: z.string().max(600),
+  access: z.object({ building: z.enum(entryRules), rooms: z.record(identifier, z.enum(entryRules)) }).strict().optional(),
   rooms: z.array(z.object({ id: identifier, name }).strict()).min(1).max(20),
   connections: z.array(z.object({
     id: identifier, name, rooms: z.tuple([identifier, identifier]),
@@ -32,7 +34,7 @@ export type SceneTemplate = SceneTemplateDraft & {
 export const sceneTemplateSave = sceneTemplateDraft.extend({
   id: identifier.optional(),
   version: z.number().int().positive().safe().optional(),
-}).superRefine(({ id, version, rooms, connections, objects }, context) => {
+}).superRefine(({ id, version, rooms, connections, objects, access }, context) => {
   const roomIds = new Set(rooms.map(room => room.id));
   const invalid =
     (id === undefined) !== (version === undefined) ||
@@ -41,7 +43,8 @@ export const sceneTemplateSave = sceneTemplateDraft.extend({
     new Set(connections.map(connection => connection.id)).size !== connections.length ||
     new Set(connections.map(connection => [...connection.rooms].sort().join(':'))).size !== connections.length ||
     connections.some(({ rooms: [a, b] }) => a === b || !roomIds.has(a) || !roomIds.has(b)) ||
-    objects.some(object => !roomIds.has(object.roomId));
+    objects.some(object => !roomIds.has(object.roomId)) ||
+    Object.keys(access?.rooms ?? {}).some(roomId => !roomIds.has(roomId));
 
   if (invalid) context.addIssue({
     code: z.ZodIssueCode.custom,

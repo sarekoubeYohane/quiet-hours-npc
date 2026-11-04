@@ -45,10 +45,6 @@ const heavenlyShape = object({
 
 type Dispatch = (task:string,messages:ModelMessage[],schema:object)=>Promise<string>;
 type Place = CityPreview['places'][number];
-type PreviewWithAccess = CityPreview & { access?: {
-  placeId:string; roomId?:string; rule:string; allowed:{characterTemplateId:string}[];
-}[] };
-
 function parseState(entries: z.infer<typeof stateRows>) {
   const result = Object.fromEntries(entries.map(({key,value})=>[key,value]));
   if (Object.keys(result).length!==entries.length) throw Error('場所描述有重複狀態。');
@@ -61,16 +57,25 @@ function readReply<T>(schema:z.ZodType<T>,raw:string):T {
   return schema.parse(JSON.parse(raw));
 }
 
-function personPlaces(draft:CityDraft,preview:PreviewWithAccess,actor:CityDraft['characters'][number]) {
+function personPlaces(draft:CityDraft,preview:CityPreview,actor:CityDraft['characters'][number]) {
   const familiar = new Set([actor.homeId,...(actor.ownedPlaceIds??[]),...(actor.workplaceIds??[])]);
   return preview.places.filter(place=>familiar.has(place.id)).map(place=>{
     const rooms = place.rooms.filter(room=>{
-      const access = preview.access?.find(item=>item.placeId===place.id&&item.roomId===room.id);
-      if (access&&access.rule!=='public'&&!access.allowed.some(person=>person.characterTemplateId===actor.templateId)) return false;
-
-      if (room.privateFor) return room.privateFor===actor.templateId;
       const assigned = draft.characters.filter(person=>person.homeId===place.id&&person.homeRoomId===room.id);
-      if (assigned.length) return assigned.some(person=>person.templateId===actor.templateId);
+      if ((room.privateFor&&room.privateFor!==actor.templateId) ||
+          (assigned.length&&!assigned.some(person=>person.templateId===actor.templateId))) return false;
+      const directlyKnown = room.privateFor===actor.templateId || assigned.length>0 ||
+        (actor.placeId===place.id&&actor.roomId===room.id);
+      const access = preview.access?.find(item=>item.placeId===place.id&&item.roomId===room.id);
+      if (access) {
+        if (access.rule==='private'&&!directlyKnown) return false;
+        const roleAllowed = (access.rule==='residents'&&actor.homeId===place.id) ||
+          (access.rule==='workers'&&actor.workplaceIds?.includes(place.id));
+        const granted = draft.accessGrants?.some(grant=>grant.placeId===place.id&&
+          grant.characterTemplateId===actor.templateId&&(grant.roomId===room.id||(!grant.roomId&&access.inherited)));
+        if (access.rule!=='public'&&!roleAllowed&&!granted&&!access.allowed.some(person=>person.characterTemplateId===actor.templateId)) return false;
+      }
+      if (directlyKnown) return true;
       if (/臥室|卧室|私人|bedroom|private/i.test(room.name)) {
         return draft.characters.filter(person=>person.homeId===place.id).length===1 && actor.homeId===place.id &&
           preview.characters.find(person=>person.templateId===actor.templateId)?.bedroomId===room.id;
