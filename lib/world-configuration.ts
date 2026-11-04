@@ -1,4 +1,5 @@
 import type { Character, World } from './world';
+import type { EffectiveEntryRule } from './entry-rules';
 
 export type Location = { id: string; name: string; note?: string };
 export type Region = { id: string; location: string; name: string };
@@ -13,6 +14,7 @@ export type WorldConfiguration = {
   bedrooms?: Record<string, string>;
   ownerships?: Record<string, string[]>;
   workplaces?: Record<string, string[]>;
+  access?: Record<string, EffectiveEntryRule>;
   backgroundPeople?: { id: string; name: string }[];
 };
 

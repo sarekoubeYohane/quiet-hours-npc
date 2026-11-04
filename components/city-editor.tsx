@@ -9,6 +9,7 @@ import type { World } from '@/lib/world';
 import { readWorldResponse } from '@/lib/world-response';
 import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
 import OpeningPeopleEditor from './opening-people-editor';
+import { CityAccessEditor, CityAccessPreview } from './city-access-editor';
 
 type CityContext = { worldContext?: string; expectedVersion: number; operationScope: string };
 type LoadedTemplates = { scenes: SceneTemplate[]; characters: CharacterTemplate[] };
@@ -70,7 +71,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       ownedPlaceIds:person.ownedPlaceIds?.filter(id=>!removed.has(id)),
       workplaceIds:person.workplaceIds?.filter(id=>!removed.has(id)),
     }));
-    edit({ ...draft, places, characters });
+    edit({ ...draft, places, characters, accessGrants:draft.accessGrants?.filter(grant=>!removed.has(grant.placeId)) });
   }
 
   function toggleCharacter(template: CharacterTemplate) {
@@ -79,7 +80,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       : [...draft.characters,{templateId:template.id,version:template.version,placeId:'',roomId:''}];
     const relationships = draft.relationships?.filter(item=>characters.some(person=>person.templateId===item.from) &&
       (item.targetType==='background'||characters.some(person=>person.templateId===item.to)));
-    edit({ ...draft, characters, relationships });
+    edit({ ...draft, characters, relationships, accessGrants:draft.accessGrants?.filter(grant=>characters.some(person=>person.templateId===grant.characterTemplateId)) });
   }
 
   function changeCharacter(id: string, update: Partial<CityDraft['characters'][number]>) {
@@ -209,6 +210,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
         </div>;
       })}
       <OpeningPeopleEditor draft={draft} names={new Map(templates.characters.map(template=>[template.id,template.fields.name]))} onChange={edit}/>
+      <CityAccessEditor draft={draft} scenes={templates.scenes} names={new Map(templates.characters.map(template=>[template.id,template.fields.name]))} onChange={edit}/>
       <h2>自然語言整理</h2>
       <label>已明示的開局關聯<textarea aria-label="自然語言開局關聯" value={openingDescription} maxLength={openingDescriptionMaxLength}
         onChange={event=>setOpeningDescription(event.target.value)}/></label>
@@ -225,6 +227,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       <ul>{result.preview.characters.map((person,index)=><li key={index}>{person.name} · {person.place||'未指定場所'} · {person.room||'未指定房間'}{person.home&&' · 住在'+person.home}{person.bedroom&&'（'+person.bedroom+'）'}{person.ownedPlaces?.length?' · 擁有'+person.ownedPlaces.join('、'):''}{person.workplaces?.length?' · 工作於'+person.workplaces.join('、'):''}</li>)}</ul>
       {!!result.preview.backgroundPeople?.length && <p>背景人物 · {result.preview.backgroundPeople.map(person=>person.name).join('、')}</p>}
       <ul>{result.preview.relationships?.map((item,index)=><li key={index}>{item.from} → {item.to} · {item.description}</li>)}</ul>
+      <CityAccessPreview preview={result.preview}/>
       {result.version!==expectedVersion && <p role="status">世界版本已變更，請重新預覽。</p>}
     </section>}
     <Button disabled={editingDisabled||!result||!!result.preview.issues.length||result.version!==expectedVersion}

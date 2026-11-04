@@ -204,9 +204,16 @@ test('the actual app previews and confirms editable opening associations with tw
     await fill('關聯 1 人物',from.options[1].value);
     await fill('關聯 1 對象',to.options[to.options.length-1].value);
     await fill('關聯 1 描述','教我修鐘');
+    const grantPerson=document.querySelector('[aria-label="授權人物"]');
+    const grantPlace=document.querySelector('[aria-label="授權場所"]');
+    assert.ok(grantPerson && grantPlace, 'the app exposes individual entry grants');
+    await fill('授權人物',grantPerson.options[1].value);
+    await fill('授權場所',grantPlace.options[2].value);
+    await click('新增個別授權');
     await click('預覽城市');
     assert.equal(button('開始世界').disabled,false);
     assert.match(document.querySelector('[aria-label="城市預覽"]').textContent,/河畔北屋.*河畔南屋/);
+    assert.match(document.querySelector('[aria-label="有效進出權限"]').textContent,/河畔南屋.*澄/);
     assert.equal((await read()).world.turn,0);
     await fill('場所 2 名稱','林間南屋');
     await fill('澄的住處',home.options[2].value);

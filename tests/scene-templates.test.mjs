@@ -104,6 +104,8 @@ test('the actual editor saves, reopens and changes a multi-room scene template',
     await enter('房間 1 名稱', '閱覽室');
     await click('新增房間');
     await enter('房間 2 名稱', '儲物室');
+    await enter('建築預設進出權限', 'residents');
+    await enter('房間 2 進出權限', 'workers');
     await click('新增連接');
     await enter('連接 1 名稱', '儲物門');
     await click('新增文字物件');
@@ -116,6 +118,8 @@ test('the actual editor saves, reopens and changes a multi-room scene template',
     await click('重新讀取場景範本');
     await click('雨巷書房');
     assert.equal(document.querySelector('[aria-label="房間 2 名稱"]').value, '儲物室');
+    assert.equal(document.querySelector('[aria-label="建築預設進出權限"]').value, 'residents');
+    assert.equal(document.querySelector('[aria-label="房間 2 進出權限"]').value, 'workers');
     assert.equal(document.querySelector('[aria-label="物件 1 名稱"]').value, '木椅');
     assert.equal(document.querySelector('[aria-label="物件 1 狀態 1 值"]').value, '橡木');
     await enter('物件 1 名稱', '木桌');

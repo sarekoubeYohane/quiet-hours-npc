@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { stateChangeLimits } from '@/lib/adjudication-limits';
+import { entryRules, entryRuleLabels, type EntryRule } from '@/lib/entry-rules';
 import type { SceneTemplate } from '@/lib/scene-templates';
 
 type Room = SceneTemplate['rooms'][number];
@@ -140,14 +141,34 @@ export default function SceneTemplateEditor() {
           onChange={event => setDraft({ ...draft, name: event.target.value })}/></label>
         <label>場所描述<textarea maxLength={600} value={draft.note}
           onChange={event => setDraft({ ...draft, note: event.target.value })}/></label>
+        <label>建築預設進出權限<select aria-label="建築預設進出權限" value={draft.access?.building ?? 'public'}
+          onChange={event => setDraft({ ...draft, access: { building:event.target.value as EntryRule, rooms:draft.access?.rooms ?? {} } })}>
+          {entryRules.map(rule => <option key={rule} value={rule}>{entryRuleLabels[rule]}</option>)}
+        </select></label>
         <h2>房間</h2>
         {draft.rooms.map((room, index) => <div className="scene-template-controls" key={room.id}>
           <label>房間 {index + 1} 名稱<input aria-label={'房間 ' + (index + 1) + ' 名稱'} required maxLength={80} value={room.name}
             onChange={event => setDraft({ ...draft, rooms: changeById(draft.rooms, room.id, { name: event.target.value }) })}/></label>
+          <label>進出權限<select aria-label={'房間 ' + (index + 1) + ' 進出權限'} value={draft.access && Object.hasOwn(draft.access.rooms,room.id) ? draft.access.rooms[room.id] : ''}
+            onChange={event => {
+              const rules = { ...draft.access?.rooms };
+              if (event.target.value) rules[room.id] = event.target.value as EntryRule;
+              else delete rules[room.id];
+              setDraft({ ...draft, access: { building:draft.access?.building ?? 'public', rooms:rules } });
+            }}>
+            <option value="">沿用建築</option>
+            {entryRules.map(rule => <option key={rule} value={rule}>{entryRuleLabels[rule]}</option>)}
+          </select></label>
           <button type="button" disabled={draft.rooms.length === 1 ||
             draft.connections.some(connection => connection.rooms.includes(room.id)) ||
             draft.objects.some(object => object.roomId === room.id)}
-            onClick={() => setDraft({ ...draft, rooms: draft.rooms.filter(item => item.id !== room.id) })}>移除房間 {index + 1}</button>
+            onClick={() => {
+              const access = draft.access && {
+                ...draft.access,
+                rooms:Object.fromEntries(Object.entries(draft.access.rooms).filter(([id]) => id !== room.id)),
+              };
+              setDraft({ ...draft, rooms: draft.rooms.filter(item => item.id !== room.id), access });
+            }}>移除房間 {index + 1}</button>
         </div>)}
         <button type="button" disabled={draft.rooms.length >= 20}
           onClick={() => setDraft({ ...draft, rooms: [...draft.rooms, newRoom()] })}>新增房間</button>

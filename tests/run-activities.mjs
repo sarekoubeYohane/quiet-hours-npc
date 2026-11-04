@@ -109,7 +109,7 @@ try {
   allTests.push('tests/pursuit-lifecycle-api.test.cjs');
   allTests.push('tests/pursuit-exit-api.test.cjs','tests/pursuit-new-waiting-api.test.cjs');
   allTests.push('tests/pursuit-review-api.test.cjs');
-  allTests.push('tests/npc-input-equivalence.test.cjs', 'tests/city-creation-api.test.cjs');
+  allTests.push('tests/npc-input-equivalence.test.cjs', 'tests/city-creation-api.test.cjs', 'tests/city-access-api.test.cjs');
   allTests.push('tests/character-generation-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });

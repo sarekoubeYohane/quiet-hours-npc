@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { prepareCityAccess } from './city-access';
+import { maxEntryGrants } from './entry-rules';
 import { characterPresets, listCharacterTemplates } from './character-template-store';
 import { listSceneTemplates } from './scene-template-store';
 import { cityLimits, type CityDraft, type CityPreview } from './city-draft';
@@ -21,6 +23,7 @@ export const cityDraftSchema = z.object({
   backgroundPeople: z.array(z.object({
     id: instanceId, name: z.string().trim().min(1).max(60).refine(value => new TextEncoder().encode(value).length <= 128),
   }).strict()).max(cityLimits.backgroundPeople).optional(),
+  accessGrants: z.array(z.object({ placeId: instanceId, roomId: templateId.optional(), characterTemplateId: templateId }).strict()).max(maxEntryGrants).optional(),
   relationships: z.array(z.object({
     from: templateId, to: templateId, targetType: z.enum(['character','background']),
     description: z.string().trim().min(1).max(256).refine(value => new TextEncoder().encode(value).length <= 256),
@@ -190,6 +193,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     });
     preview.relationships.push({ from:from.name, to:target?.name ?? backgroundName!, description:relationship.description });
   }
+  prepareCityAccess(draft, preview, configuration, people, scenes);
   if (preview.issues.length) return { preview };
   // Initial first-person knowledge comes from the actual room. Later opening
   // cognition may add familiar areas; it should never copy an entire city.
