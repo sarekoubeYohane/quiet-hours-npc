@@ -10,6 +10,10 @@ export type WorldConfiguration = {
   doors: Door[];
   sceneSources?: Record<string, { id:string; version:number; name:string; shared:boolean }>;
   residences?: Record<string, string>;
+  bedrooms?: Record<string, string>;
+  ownerships?: Record<string, string[]>;
+  workplaces?: Record<string, string[]>;
+  backgroundPeople?: { id: string; name: string }[];
 };
 
 // Legacy saves omit configuration. Keep their layout and residence mapping as
