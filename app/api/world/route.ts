@@ -1,3 +1,5 @@
+import { initializeCity } from '@/lib/city-initialization';
+import { requestModel, type ModelService } from '@/lib/model-adapter';
 import { readOpeningDescription, suggestOpeningRelationships } from '@/lib/opening-relationship-generation';
 import { cityDraftSchema, prepareCity } from '@/lib/city-creation';
 import { generateCharacterFields, readCharacterGeneration } from '@/lib/character-generation';
@@ -192,10 +194,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   let journal: Journal = { floor: 0, results: {} }, operationId = '';
   try {
     const raw = await request.text();
-    if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
+    if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
     let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
+    if (raw.length > 16000 && !['preview-city','start-city','suggest-opening-relationships','initialize-city'].includes(b.operation || '')) return reply({error:'輸入過長。'},400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
       if (!['ai', 'openai'].includes(b.mode || '')) return reply({ error: '請選擇要設定 Key 的模型服務。' }, 400);
       const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
@@ -205,7 +208,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -219,7 +222,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return reply({error:'請填寫裁定服務與模型。'},400);
     const generatingCharacter = b.operation === 'generate-character-template';
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
-    const generatingSetup = generatingCharacter || suggestingOpening;
+    const initializingCity = b.operation === 'initialize-city';
+    const generatingSetup = generatingCharacter || suggestingOpening || initializingCity;
+    const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
+    if (!cityOperation && raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
+    if (initializingCity && b.operationScope !== id) return reply({ error:'請重新讀取城市後再初始化。' },400);
     const openingDescription = suggestingOpening ? readOpeningDescription(b.openingDescription) : undefined;
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {
       return reply({ error: '請重新讀取城市並提供有效的開局關聯描述。' }, 400);
@@ -231,7 +238,6 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
-    const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening;
     const city = cityOperation ? cityDraftSchema.safeParse(b.city) : undefined;
     if (city && !city.success) return reply({error:'請確認城市配置及場所、人物數量。'}, 400);
     if (b.operation === 'preview-city' && city?.success) {
@@ -268,14 +274,17 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     let openingPreview: Awaited<ReturnType<typeof prepareCity>>['preview'] | undefined;
-    if (suggestingOpening && city?.success) {
+    if ((suggestingOpening || initializingCity) && city?.success) {
       if (b.expectedVersion !== version) return reply({ error:'原世界已變更，請重新讀取後再整理。' }, 409);
       if (world.configuration || world.acceptance) return reply({ error:'目前世界無法另建城市。' }, 400);
       const { preview } = await prepareCity(id, city.data, world);
+      if (initializingCity && preview.issues.length > (preview.missingStarts ?? 0)) {
+        return reply({ error:preview.issues.join(' '), preview },400);
+      }
       if (!preview.places.length || !preview.characters.length || preview.places.length !== city.data.places.length ||
           preview.characters.length !== city.data.characters.length ||
-          !(openingDescription || preview.characters.some(actor => actor.fields.background.trim()) ||
-            city.data.characters.some(actor => actor.homeDescription || actor.workDescription))) {
+          (suggestingOpening && !(openingDescription || preview.characters.some(actor => actor.fields.background.trim()) ||
+            city.data.characters.some(actor => actor.homeDescription || actor.workDescription)))) {
         return reply({ error:'請選擇有效的場所及人物，並提供已有的開局設定或關聯描述。' }, 400);
       }
       openingPreview = preview;
@@ -378,39 +387,56 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
     let generatedCharacter: Awaited<ReturnType<typeof generateCharacterFields>> | undefined;
     let suggestedOpening: Awaited<ReturnType<typeof suggestOpeningRelationships>> | undefined;
+    let finalizedCity: Awaited<ReturnType<typeof initializeCity>> | undefined;
+    let finalizationPreview: typeof openingPreview;
     if (generatingSetup) {
       try {
         const config = world.adjudication!;
-        const task = characterGeneration ? 'character-generation' : 'opening-relationships';
         const usage = world.aiUsage = currentUsage(world);
-        if (budgetReached(usage, limits)) throw new BudgetExceeded();
-        await verifyLease();
-        if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
-          recallBudgetDatabase(), id, 'chat', operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
-        ))).replayed) throw Error('付費請求結果不明，禁止重送。');
-        const key = await workWait(readModelKey(id, config.provider));
-        await verifyLease();
         const price = world.modelPrices?.find(value => value.provider === config.provider && value.model === config.model);
-        let reportCost: ReturnType<typeof beginCost> | undefined;
-        const options: Parameters<typeof generateCharacterFields>[2] = {
-          signal: modelSignal(),
-          requestId: operationId + ':' + task,
-          observer: decisionTrace.observer('adjudication', undefined, world, config.provider, config.model, key),
-          fetcher: (url, init) => {
-            traceWorld(trace, 'model-dispatch');
-            usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-            reportCost = beginCost(usage, config.provider, config.model, price, 'adjudication');
-            return fetch(url, init);
-          },
-          onUsage: tokens => { accountUsage(usage, tokens); reportCost?.(tokens); },
+        const runSetup = async <T,>(task:string, invoke:(service:ModelService,options:Parameters<typeof requestModel>[3])=>Promise<T>) => {
+          if (budgetReached(usage, limits)) throw new BudgetExceeded();
+          await verifyLease();
+          if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
+            recallBudgetDatabase(), id, 'chat', operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
+          ))).replayed) throw Error('付費請求結果不明，禁止重送。');
+          const key = await workWait(readModelKey(id, config.provider));
+          await verifyLease();
+          let reportCost: ReturnType<typeof beginCost> | undefined;
+          const result = await invoke({ ...config, key }, {
+            signal: modelSignal(),
+            requestId: operationId + ':' + task,
+            observer: decisionTrace!.observer('adjudication', undefined, world, config.provider, config.model, key),
+            fetcher: (url, init) => {
+              traceWorld(trace, 'model-dispatch');
+              usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
+              reportCost = beginCost(usage, config.provider, config.model, price, 'adjudication');
+              return fetch(url, init);
+            },
+            onUsage: tokens => { accountUsage(usage, tokens); reportCost?.(tokens); },
+          });
+          await verifyLease();
+          return result;
         };
-        if (characterGeneration) generatedCharacter = await generateCharacterFields(characterGeneration, { ...config, key }, options);
-        else if (openingPreview && city?.success && openingDescription !== undefined) {
-          suggestedOpening = await suggestOpeningRelationships(city.data, openingPreview, openingDescription, { ...config, key }, options);
+        if (characterGeneration) {
+          generatedCharacter = await runSetup('character-generation',(service,options)=>generateCharacterFields(characterGeneration,service,options));
+        } else if (openingPreview && city?.success) {
+          const draft = city.data;
+          if (initializingCity) {
+            finalizedCity = await initializeCity(draft,openingPreview,(task,messages,schema)=>
+              runSetup(task,(service,options)=>requestModel(service,messages,schema,{...options,maxOutputTokens:4096})));
+            const validated = cityDraftSchema.safeParse(finalizedCity);
+            if (!validated.success) throw Error('場所定稿超出城市容量。');
+            const {preview} = await workWait(prepareCity(id,validated.data,world));
+            if (preview.issues.length > (preview.missingStarts ?? 0)) throw Error('場所定稿無法套用。');
+            finalizationPreview = preview;
+          } else if (openingDescription !== undefined) {
+            const preview = openingPreview;
+            suggestedOpening = await runSetup('opening-relationships',(service,options)=>suggestOpeningRelationships(draft,preview,openingDescription,service,options));
+          }
         }
-        await verifyLease();
       } catch (error) {
-        failure = error instanceof BudgetExceeded ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
+        failure = error instanceof BudgetExceeded ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
       }
     } else if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {
@@ -565,7 +591,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const usage = currentUsage(world);
     const result: OperationResult = failure
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
-      : { status: 200, body: { world:worldForClient(world), version: version + 1, limitReached: (b.mode !== 'demo' || generatingSetup) && budgetReached(usage, limits), ...(generatedCharacter ? { generatedCharacter } : {}), ...(suggestedOpening ? { suggestedOpening } : {}) } };
+      : { status: 200, body: { world:worldForClient(world), version: version + 1, limitReached: (b.mode !== 'demo' || generatingSetup) && budgetReached(usage, limits), ...(generatedCharacter ? { generatedCharacter } : {}), ...(suggestedOpening ? { suggestedOpening } : {}), ...(finalizedCity ? { finalizedCity, preview:finalizationPreview } : {}) } };
     decisionTrace?.step('world-candidate',undefined,{outcome:failure?'rolled-back':'candidate',failure:failure?.message});
     candidateWorld=world;
     decisionTrace?.step('commit-start',undefined,{candidateOutcome:failure?'rolled-back':'committed',candidateVersion:version+1});

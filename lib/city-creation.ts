@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { characterPresets, listCharacterTemplates } from './character-template-store';
 import { listSceneTemplates } from './scene-template-store';
 import { cityLimits, type CityDraft, type CityPreview } from './city-draft';
+import { applyCitySpace, cityFinalizationSchema, cityWalksForPreview } from './city-finalization';
 import { initialDirection } from './pursuits';
 import { normalizeWorld, type Character, type World } from './world';
 import type { WorldObject } from './world-effects';
@@ -25,6 +26,7 @@ export const cityDraftSchema = z.object({
     from: templateId, to: templateId, targetType: z.enum(['character','background']),
     description: z.string().trim().min(1).max(256).refine(value => new TextEncoder().encode(value).length <= 256),
   }).strict()).max(cityLimits.relationships).optional(),
+  finalization: cityFinalizationSchema.optional(),
 }).strict();
 
 const palette = ['#eb9e79', '#a2bdf0', '#d4c485', '#a5c9b3'];
@@ -67,11 +69,12 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   const [scenes, savedCharacters] = await Promise.all([listSceneTemplates(owner), listCharacterTemplates(owner)]);
   const characters = [...characterPresets(), ...savedCharacters];
   const configuration: NonNullable<World['configuration']> = {
-    locations: [], regions: [], doors: [], residences: {}, bedrooms: {}, ownerships: {}, workplaces: {}, sceneSources: {},
+    locations: [], regions: [], doors: [], residences: {}, bedrooms: {}, ownerships: {}, workplaces: {}, sceneSources: {}, privateRooms:{}, blockedRoomConnections:[],
   };
   const preview: CityPreview = { places: [], characters: [], issues: [] };
   const people: Character[] = [];
   const objects: WorldObject[] = [];
+  const doorStates: Record<string,'open'|'closed'> = {};
   if (!draft.places.length) preview.issues.push('至少選擇一個場所。');
   if (!draft.characters.length) preview.issues.push('至少選擇一位人物。');
   const placeIds = new Set<string>();
@@ -90,25 +93,36 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     const location = locationKey(place.id);
     configuration.locations.push({ id: location, name: place.name, note: source.note });
     configuration.sceneSources![location] = { id:source.id, version:source.version, name:source.name, shared:source.shared };
-    configuration.regions.push(...source.rooms.map(room => ({
-      id: roomKey(location, room.id), location, name: room.name,
+    const space = applyCitySpace(draft, {
+      id:place.id, name:place.name, templateName:source.name, rooms:source.rooms,
+      objects:source.objects.map(object=>({...object,room:source.rooms.find(room=>room.id===object.roomId)!.name})),
+      connections:source.connections.map(connection=>({...connection,state:'open'})),
+    }, preview.issues);
+    preview.places.push(space);
+    configuration.regions.push(...space.rooms.map(room => ({
+      id:roomKey(location,room.id), location, name:room.name,
     })));
-    configuration.doors.push(...source.connections.map(connection => ({
-      id: location + ':door:' + connection.id, name: connection.name,
-      regions: [roomKey(location, connection.rooms[0]), roomKey(location, connection.rooms[1])] as [string,string],
-    })));
-    objects.push(...source.objects.map(object => {
+    for (const connection of space.connections) {
+      const regions:[string,string] = [roomKey(location,connection.rooms[0]),roomKey(location,connection.rooms[1])];
+      if (connection.state==='blocked') configuration.blockedRoomConnections!.push(regions);
+      else {
+        const id = location+':door:'+connection.id;
+        configuration.doors.push({id,name:connection.name,regions});
+        doorStates[id] = connection.state;
+      }
+    }
+    objects.push(...space.objects.map(object => {
       const id = location + ':object:' + object.id;
       return {
         id, source:id, label:object.name, region:roomKey(location, object.roomId), holder:null, owner:'world',
         revision:1, state:{ ...object.state }, lifecycle:'active' as const, kind:'furnishing', knownTo:[], allowedTo:[],
       };
     }));
-    preview.places.push({
-      id: place.id, name: place.name, templateName: source.name, rooms: source.rooms,
-      objects: source.objects.map(object => ({name: object.name, room: source.rooms.find(room=>room.id===object.roomId)!.name})),
-    });
   }
+  preview.walks = cityWalksForPreview(draft,preview);
+  if (draft.finalization) configuration.walks = preview.walks.map(walk=>({
+    locations:[locationKey(walk.places[0]),locationKey(walk.places[1])],minutes:walk.minutes,
+  }));
   if (objects.length > cityLimits.objects) preview.issues.push('城市文字物件超出目前容量，請減少場所數量。');
 
   const selected = new Set<string>();
@@ -127,8 +141,10 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     }
     const { fields } = template;
     const home = preview.places.find(candidate => candidate.id === selection.homeId);
+    const generatedBedroom = home && unique(home.rooms.filter(item=>item.privateFor===selection.templateId));
     const bedroom = selection.homeRoomId ? home?.rooms.find(item => item.id === selection.homeRoomId)
-      : home && ownBedroom.test(fields.startLocation.trim()) ? unique(home.rooms.filter(item => /臥室|卧室|bedroom/i.test(item.name))) : undefined;
+      : generatedBedroom ?? (home && ownBedroom.test(fields.startLocation.trim()) ?
+        unique(home.rooms.filter(item => !item.privateFor && /臥室|卧室|bedroom/i.test(item.name))) : undefined);
     const roles = (ids: string[] | undefined, role: string) => [...new Set(ids)].flatMap(id => {
       const assigned = preview.places.find(candidate => candidate.id === id);
       if (!assigned) preview.issues.push(fields.name + '指定的' + role + '不在本次城市。');
@@ -139,12 +155,13 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     const { place, room } = resolveStart(selection, fields.startLocation, preview.places, home, bedroom, workplaces);
     preview.characters.push({
       templateId: template.id, name:fields.name, place:place?.name??'', room:room?.name??'', home:home?.name,
-      bedroom:bedroom?.name, ownedPlaces:owned.map(item=>item.name), workplaces:workplaces.map(item=>item.name), fields,
+      bedroom:bedroom?.name, bedroomId:bedroom?.id, ownedPlaces:owned.map(item=>item.name), workplaces:workplaces.map(item=>item.name), fields,
     });
     if (selection.homeId && !home) preview.issues.push(fields.name + '的住處不在本次城市。');
     if (selection.homeRoomId && !bedroom) preview.issues.push(fields.name + '的私人房間需要位於住處。');
     if (!place || !room) {
       preview.issues.push(fields.name + '需要有效的起始地點與房間。');
+      preview.missingStarts = (preview.missingStarts ?? 0) + 1;
       continue;
     }
     const id = 'npc:' + (people.length + 1);
@@ -164,6 +181,10 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     if (owned.length) configuration.ownerships![id] = owned.map(item=>locationKey(item.id));
     if (workplaces.length) configuration.workplaces![id] = workplaces.map(item=>locationKey(item.id));
   }
+  for (const place of preview.places) for (const room of place.rooms) {
+    const actor = room.privateFor && byTemplate.get(room.privateFor);
+    if (actor) configuration.privateRooms![roomKey(locationKey(place.id),room.id)] = actor.id;
+  }
   const backgroundPeople = new Map((draft.backgroundPeople ?? []).map(person => [person.id, person.name]));
   if (backgroundPeople.size !== (draft.backgroundPeople?.length ?? 0)) preview.issues.push('每位背景人物都需要獨立的身分。');
   configuration.backgroundPeople = [...backgroundPeople].map(([id,name]) => ({ id:'background:' + id, name }));
@@ -175,7 +196,8 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     const backgroundName = relationship.targetType === 'background' ? backgroundPeople.get(relationship.to) : undefined;
     const targetId = target?.id ?? (backgroundName ? 'background:' + relationship.to : undefined);
     if (!from || !targetId || from.id === targetId) {
-      if (from || !selected.has(relationship.from)) preview.issues.push('請為開局關聯指定本次人物或背景人物。');
+      const validTarget = relationship.targetType === 'character' ? selected.has(relationship.to) && relationship.from !== relationship.to : !!backgroundName;
+      if (!selected.has(relationship.from) || !validTarget) preview.issues.push('請為開局關聯指定本次人物或背景人物。');
       continue;
     }
     const cognition = from.cognition ??= { beliefs:[], relationshipTags:[], trace:[] };
@@ -200,6 +222,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   const world = normalizeWorld({
     configuration, minute, turn:0, lastMode:'demo', contextId:crypto.randomUUID(),
     pursuitVersion:1, pursuitContext:crypto.randomUUID(), characters:people, events:[], objects,
+    scene:{doors:doorStates,noise:{},occluded:[]},
     aiUsage:previous.aiUsage && { ...structuredClone(previous.aiUsage), savedDecisions:0 },
     adjudication:previous.adjudication, modelPrices:previous.modelPrices, playerBudget:previous.playerBudget,
   });

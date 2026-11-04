@@ -9,6 +9,7 @@ import type { World } from '@/lib/world';
 import { readWorldResponse } from '@/lib/world-response';
 import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
 import OpeningPeopleEditor from './opening-people-editor';
+import CityFinalizationEditor from './city-finalization-editor';
 
 type CityContext = { worldContext?: string; expectedVersion: number; operationScope: string };
 type LoadedTemplates = { scenes: SceneTemplate[]; characters: CharacterTemplate[] };
@@ -70,7 +71,11 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       ownedPlaceIds:person.ownedPlaceIds?.filter(id=>!removed.has(id)),
       workplaceIds:person.workplaceIds?.filter(id=>!removed.has(id)),
     }));
-    edit({ ...draft, places, characters });
+    const finalization = draft.finalization && {
+      spaces:draft.finalization.spaces.filter(space=>!removed.has(space.placeId)),
+      walks:draft.finalization.walks.filter(walk=>walk.places.every(id=>!removed.has(id))),
+    };
+    edit({ ...draft, places, characters, finalization });
   }
 
   function toggleCharacter(template: CharacterTemplate) {
@@ -86,15 +91,15 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
     edit({ ...draft, characters: draft.characters.map(person=>person.templateId===id?{...person,...update}:person) });
   }
 
-  async function suggestOpening() {
+  async function generate(operation:'suggest-opening-relationships'|'initialize-city') {
     setWorking(true);
     setResult(undefined);
     setError('');
     try {
-      const input = JSON.stringify({ city:draft, openingDescription });
+      const input = JSON.stringify({ operation, city:draft, openingDescription });
       if (pendingSuggestion.current?.input !== input) {
         pendingSuggestion.current = {input,payload:JSON.stringify({
-          ...context, expectedVersion, operation:'suggest-opening-relationships', mode:'demo',
+          ...context, expectedVersion, operation, mode:'demo',
           operationId:Date.now()+':'+crypto.randomUUID(), city:draft, openingDescription,
         })};
       }
@@ -102,17 +107,19 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
         method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json',[timePolicyHeader]:roundTimePolicy.version},
         signal:AbortSignal.timeout(roundClientMs), body:pendingSuggestion.current.payload,
       });
-      const body = await readWorldResponse<{suggestedOpening?:CityDraft;world?:World;version?:number;error?:string;operationSettled?:boolean;retryable?:boolean;operationUncertain?:boolean}>(response);
+      const body = await readWorldResponse<{suggestedOpening?:CityDraft;finalizedCity?:CityDraft;preview?:CityPreview;world?:World;version?:number;error?:string;operationSettled?:boolean;retryable?:boolean;operationUncertain?:boolean}>(response);
       if (body.operationSettled || (!body.retryable && !body.operationUncertain)) pendingSuggestion.current = null;
       if (typeof body.version === 'number') {
         const version = body.version;
         setExpectedVersion(current=>Math.max(current,version));
         onMeteredResult(body);
       }
-      if (!response.ok || !body.suggestedOpening) throw Error(body.error || '無法整理開局關聯。');
-      edit(body.suggestedOpening);
+      const generated = operation==='initialize-city'?body.finalizedCity:body.suggestedOpening;
+      if (!response.ok || !generated) throw Error(body.error || '無法更新開局配置。');
+      edit(generated);
+      if (body.preview && typeof body.version==='number') setResult({preview:body.preview,version:body.version});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '無法整理開局關聯。');
+      setError(cause instanceof Error ? cause.message : '無法更新開局配置。');
     } finally {
       setWorking(false);
     }
@@ -166,6 +173,8 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
         const scene = templates.scenes.find(scene=>scene.id===place?.templateId);
         const home = draft.places.find(place=>place.id===person?.homeId);
         const homeScene = templates.scenes.find(scene=>scene.id===home?.templateId);
+        const startRooms = [...(scene?.rooms??[]),...(draft.finalization?.spaces.find(space=>space.placeId===place?.id)?.rooms??[])];
+        const homeRooms = [...(homeScene?.rooms??[]),...(draft.finalization?.spaces.find(space=>space.placeId===home?.id)?.rooms??[])];
         return <div className="city-person" key={template.id}>
           <label><input type="checkbox" aria-label={'選用'+name} checked={!!person} disabled={!person&&draft.characters.length>=cityLimits.characters} onChange={()=>toggleCharacter(template)}/>{name}</label>
           {person && <>
@@ -178,7 +187,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
             <label>起始房間<select aria-label={name+'的起始房間'} value={person.roomId} disabled={!scene}
               onChange={event=>changeCharacter(template.id,{roomId:event.target.value})}>
               <option value="">請選擇</option>
-              {scene?.rooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}
+              {startRooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}
             </select></label>
             <label>住處<select aria-label={name+'的住處'} value={person.homeId??''}
               onChange={event=>changeCharacter(template.id,{homeId:event.target.value||undefined,homeRoomId:undefined})}>
@@ -188,7 +197,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
             <label>住處的私人房間<select aria-label={name+'的私人房間'} value={person.homeRoomId??''} disabled={!homeScene}
               onChange={event=>changeCharacter(template.id,{homeRoomId:event.target.value||undefined})}>
               <option value="">依起點描述</option>
-              {homeScene?.rooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}
+              {homeRooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}
             </select></label>
             <label>既有住處描述<input aria-label={name+'的既有住處描述'} maxLength={300} value={person.homeDescription??''}
               onChange={event=>changeCharacter(template.id,{homeDescription:event.target.value})}/></label>
@@ -213,18 +222,23 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       <label>已明示的開局關聯<textarea aria-label="自然語言開局關聯" value={openingDescription} maxLength={openingDescriptionMaxLength}
         onChange={event=>setOpeningDescription(event.target.value)}/></label>
       <p>使用天上意志模型整理已填描述，計入玩家 AI 用量。可在開始前修改建議。</p>
-      <Button type="button" variant="outline" disabled={!draft.places.length||!draft.characters.length} onClick={()=>void suggestOpening()}>用 AI 整理開局關聯</Button>
+      <Button type="button" variant="outline" disabled={!draft.places.length||!draft.characters.length} onClick={()=>void generate('suggest-opening-relationships')}>用 AI 整理開局關聯</Button>
+      <CityFinalizationEditor draft={draft} sourceRooms={new Map(draft.places.map(place=>[place.id,templates.scenes.find(scene=>scene.id===place.templateId)?.rooms??[]]))}
+        names={new Map(templates.characters.map(template=>[template.id,template.fields.name]))} onChange={edit}/>
+      <p>初始化會請各人物描述熟悉的場所，再由天上意志整理，計入玩家 AI 用量。</p>
+      <Button type="button" variant="outline" disabled={!draft.places.length||!draft.characters.length} onClick={()=>void generate('initialize-city')}>初始化場所</Button>
       <Button onClick={()=>void preview()}>預覽城市</Button>
     </fieldset>}
     {result && <section aria-label="城市預覽">
       <h2>城市預覽</h2>
       {result.preview.issues.length>0 && <ul role="alert">{result.preview.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}
       <ul>{result.preview.places.map(place=><li key={place.id}>{place.name} · {place.rooms.map(room=>room.name).join('、')}
-        <ul>{place.objects.map((object,index)=><li key={index}>{object.room} · {object.name}</li>)}</ul>
+        <ul>{place.objects.map(object=><li key={object.id}>{object.room} · {object.name}{Object.entries(object.state).map(([key,value])=>' · '+key+' '+value)}</li>)}</ul>
       </li>)}</ul>
       <ul>{result.preview.characters.map((person,index)=><li key={index}>{person.name} · {person.place||'未指定場所'} · {person.room||'未指定房間'}{person.home&&' · 住在'+person.home}{person.bedroom&&'（'+person.bedroom+'）'}{person.ownedPlaces?.length?' · 擁有'+person.ownedPlaces.join('、'):''}{person.workplaces?.length?' · 工作於'+person.workplaces.join('、'):''}</li>)}</ul>
       {!!result.preview.backgroundPeople?.length && <p>背景人物 · {result.preview.backgroundPeople.map(person=>person.name).join('、')}</p>}
       <ul>{result.preview.relationships?.map((item,index)=><li key={index}>{item.from} → {item.to} · {item.description}</li>)}</ul>
+      <ul>{result.preview.walks?.map(walk=><li key={walk.places.join(':')}>{walk.places.map(id=>result.preview.places.find(place=>place.id===id)?.name).join(' ↔ ')} · {walk.minutes===null?'不通行':walk.minutes+' 分鐘'}</li>)}</ul>
       {result.version!==expectedVersion && <p role="status">世界版本已變更，請重新預覽。</p>}
     </section>}
     <Button disabled={editingDisabled||!result||!!result.preview.issues.length||result.version!==expectedVersion}

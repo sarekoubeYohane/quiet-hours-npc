@@ -145,6 +145,14 @@ test('the actual app previews and confirms editable opening associations with tw
   global.fetch = (url, options) => {
     if (String(url).startsWith('https://api.openai.com/')) {
       const input = JSON.parse(JSON.parse(options.body).messages[1].content);
+      if (input.stage==='npc-city-description' || input.stage==='heavenly-city-finalization') {
+        const north = input.places.find(place=>place.name==='河畔北屋');
+        const south = input.places.find(place=>place.name==='河畔南屋');
+        const reply = input.stage==='npc-city-description'
+          ? {rooms:north?[{placeId:north.id,id:'own',name:'臥室',private:true}]:[],objects:north?[{placeId:north.id,roomId:'living-room',name:'生成水杯',state:[]}]:[]}
+          : {spaces:[],walks:[{places:[north.id,south.id],minutes:20}]};
+        return Promise.resolve(Response.json({usage:{prompt_tokens:4,completion_tokens:2},choices:[{message:{content:JSON.stringify(reply)}}]}));
+      }
       const actor = input.people.find(item=>item.name==='杉');
       const [north,south] = input.places;
       return Promise.resolve(Response.json({usage:{prompt_tokens:4,completion_tokens:2},choices:[{message:{content:JSON.stringify({
@@ -188,6 +196,7 @@ test('the actual app previews and confirms editable opening associations with tw
     }
     const home=document.querySelector('[aria-label="澄的住處"]');
     await fill('澄的住處',home.options[1].value);
+    await fill('杉的住處',home.options[1].value);
     const location=document.querySelector('[aria-label="杉的起始場所"]');
     await fill('杉的起始場所',location.options[1].value);
     const room=document.querySelector('[aria-label="杉的起始房間"]');
@@ -204,6 +213,10 @@ test('the actual app previews and confirms editable opening associations with tw
     await fill('關聯 1 人物',from.options[1].value);
     await fill('關聯 1 對象',to.options[to.options.length-1].value);
     await fill('關聯 1 描述','教我修鐘');
+    await click('初始化場所');
+    const generatedRooms = document.querySelector('[aria-label="城市預覽"]');
+    assert.match(generatedRooms.textContent,/澄的臥室.*杉的臥室/);
+    await fill('河畔北屋物件 1 名稱','確認的水杯');
     await click('預覽城市');
     assert.equal(button('開始世界').disabled,false);
     assert.match(document.querySelector('[aria-label="城市預覽"]').textContent,/河畔北屋.*河畔南屋/);
@@ -221,6 +234,9 @@ test('the actual app previews and confirms editable opening associations with tw
     assert.deepEqual(world.configuration.ownerships[world.characters[1].id],[world.configuration.locations[1].id]);
     assert.deepEqual(world.configuration.workplaces[world.characters[1].id],[world.configuration.locations[0].id]);
     assert.equal(world.configuration.backgroundPeople[0].name,'老師');
+    assert.equal(world.objects.filter(item=>item.label==='確認的水杯').length,1);
+    assert.equal(world.configuration.walks[0].minutes,20);
+    assert.deepEqual(new Set(Object.values(world.configuration.privateRooms)),new Set(world.characters.map(actor=>actor.id)));
     assert.match(document.querySelector('[aria-label="世界像素地圖"]').textContent,/台燈.*關閉/);
   } finally {
     await React.act(async()=>root.unmount());
@@ -375,6 +391,122 @@ test('metered opening suggestions bind only evidenced associations to selected i
     const preview = await response(await send(route,{...operation,operation:'preview-city',expectedVersion:after.version,city:result}),200);
     assert.deepEqual(preview.preview.issues,[]);
     assert.deepEqual(preview.preview.characters[0].workplaces,['乙店']);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('paid city initialization scopes NPC drafts, preserves explicit facts, and saves the editable final arrangement without a round', async () => {
+  const initial = seedWorld();
+  initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
+  store.install(initial);
+  const fields = (name, background) => ({...blankCharacterTemplateFields(),name,background,startLocation:'自己的臥室'});
+  const first = (await response(await send(people,{id:crypto.randomUUID(),version:0,fields:fields('澄','澄的個人背景')}),200)).template;
+  const second = (await response(await send(people,{id:crypto.randomUUID(),version:0,fields:fields('杉','杉的個人背景')}),200)).template;
+  const house = (await response(await send(places,{
+    name:'住宅組合', note:'原有住宅備註',
+    rooms:[{id:'front',name:'客廳'},{id:'room-a',name:'澄的私人房間'},{id:'room-b',name:'杉的私人房間'}],
+    connections:[{id:'original',name:'原有門',rooms:['front','room-a']}],
+    objects:[{id:'lamp',roomId:'front',name:'台燈',state:{電源:'關閉'}},{id:'secret',roomId:'room-b',name:'杉的秘密物件',state:{}}],
+  }),201)).template;
+  const other = (await response(await places.GET(),200)).templates.find(place=>place.name==='住宅');
+  await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled-city-init'}),200);
+  const before = await read();
+  const city = {
+    places:[
+      {id:'home',templateId:house.id,version:house.version,name:'共住住宅'},
+      {id:'north',templateId:other.id,version:other.version,name:'北屋'},
+      {id:'south',templateId:other.id,version:other.version,name:'南屋'},
+    ],
+    characters:[
+      {templateId:first.id,version:first.version,placeId:'',roomId:'',homeId:'home',homeRoomId:'room-a'},
+      {templateId:second.id,version:second.version,placeId:'',roomId:'',homeId:'home',homeRoomId:'room-b'},
+    ],
+    finalization:{
+      spaces:[{placeId:'home',rooms:[],objects:[],connections:[{id:'manual-block',name:'指定不通行',rooms:['room-a','room-b'],state:'blocked'}]}],
+      walks:[{places:['home','south'],minutes:null},{places:['north','south'],minutes:35}],
+    },
+  };
+  const operation = {operation:'initialize-city',operationId:id(),mode:'demo',city,
+    expectedVersion:before.version,operationScope:before.operationScope,worldContext:before.world.contextId};
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (_url, request) => {
+    const input = JSON.parse(JSON.parse(request.body).messages[1].content);
+    calls.push(input);
+    const object = (roomId,name,state=[],placeId='home') => ({placeId,roomId,name,state});
+    let candidate;
+    if (input.stage==='npc-city-description') {
+      assert.deepEqual(input.places.map(place=>place.id),['home']);
+      const own = input.person.name==='澄';
+      assert.doesNotMatch(JSON.stringify(input),own?/杉的私人房間|杉的秘密物件|杉的個人背景/:/澄的私人房間|澄的個人背景/);
+      candidate = {rooms:[],objects:[
+        object('front','小桌',[{key:'顏色',value:own?'淺色':'深色'}]),
+        object('front','台燈',[{key:'電源',value:'開啟'}]),
+        object(own?'room-a':'room-b',own?'澄的書':'杉的床'),
+        object(own?'room-b':'room-a','企圖寫入他人的房間'),
+        object('front','城市外物品',[],'unselected'),
+      ]};
+    } else {
+      assert.equal(input.stage,'heavenly-city-finalization');
+      const table = input.generated.spaces.find(space=>space.placeId==='home').objects.find(item=>item.name==='小桌');
+      candidate = {spaces:[{
+        placeId:'home',
+        rooms:[],
+        objects:[{id:table.id,roomId:'front',name:'小桌',state:[{key:'顏色',value:'深色'}]}],
+        connections:[
+          {id:'front-b',name:'通往杉房間的門',rooms:['front','room-b'],state:'closed'},
+          {id:'changed',name:'覆蓋原門',rooms:['front','room-a'],state:'blocked'},
+          {id:'breach',name:'覆蓋明示不通行',rooms:['room-a','room-b'],state:'open'},
+        ],
+      }],walks:[
+        {places:['home','north'],minutes:45},
+        {places:['home','south'],minutes:5},
+        {places:['north','south'],minutes:5},
+        {places:['home','unselected'],minutes:1},
+      ]};
+    }
+    return Response.json({usage:{prompt_tokens:5,completion_tokens:3},choices:[{message:{content:JSON.stringify(candidate)}}]});
+  };
+  try {
+    store.throwAfterNextSave();
+    const finalized = await response(await send(route,operation),200);
+    assert.equal(calls.length,3);
+    assert.deepEqual((await response(await send(route,operation),200)).finalizedCity,finalized.finalizedCity);
+    assert.equal(calls.length,3);
+    const after = await read();
+    assert.equal(after.world.minute,before.world.minute);
+    assert.equal(after.world.turn,before.world.turn);
+    assert.deepEqual(after.world.characters,before.world.characters);
+    assert.equal(after.world.aiUsage.totalCalls,3);
+    const approved = finalized.finalizedCity;
+    const generated = approved.finalization.spaces.find(space=>space.placeId==='home');
+    assert.deepEqual(generated.objects.map(item=>item.name).sort(),['小桌','杉的床','澄的書'].sort());
+    assert.equal(generated.objects.find(item=>item.name==='小桌').state.顏色,'深色');
+    generated.objects.find(item=>item.name==='小桌').name = '最後確認的小桌';
+    const previewed = await response(await send(route,{...operation,operation:'preview-city',city:approved,expectedVersion:after.version}),200);
+    assert.deepEqual(previewed.preview.issues,[]);
+    assert.match(JSON.stringify(previewed.preview),/最後確認的小桌/);
+    const start = { ...operation,operation:'start-city',operationId:id(),city:approved,expectedVersion:after.version };
+    await response(await send(route,start),200);
+    const {world} = await read();
+    assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
+    assert.notEqual(world.characters[0].region,world.characters[1].region);
+    assert.deepEqual(world.events,[]);
+    assert.equal(world.objects.filter(item=>item.label==='最後確認的小桌').length,1);
+    assert.equal(world.objects.find(item=>item.label==='台燈').state.電源,'關閉');
+    assert.equal(world.objects.find(item=>item.label==='杉的床').region,world.characters[1].region);
+    assert.equal(world.configuration.locations.length,3);
+    assert.ok(world.configuration.doors.some(door=>door.name==='原有門'));
+    assert.ok(world.configuration.doors.some(door=>door.name==='通往杉房間的門'&&world.scene.doors[door.id]==='closed'));
+    assert.deepEqual(world.configuration.blockedRoomConnections,[['place:home:room:room-a','place:home:room:room-b']]);
+    assert.deepEqual(world.configuration.walks,[
+      {locations:['place:home','place:south'],minutes:null},
+      {locations:['place:north','place:south'],minutes:35},
+      {locations:['place:home','place:north'],minutes:45},
+    ]);
+    assert.equal(calls.length,3);
+    assert.deepEqual((await response(await places.GET(),200)).templates.find(item=>item.id===house.id),house);
   } finally {
     global.fetch = originalFetch;
   }

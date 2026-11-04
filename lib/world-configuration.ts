@@ -11,6 +11,9 @@ export type WorldConfiguration = {
   sceneSources?: Record<string, { id:string; version:number; name:string; shared:boolean }>;
   residences?: Record<string, string>;
   bedrooms?: Record<string, string>;
+  privateRooms?: Record<string, string>;
+  blockedRoomConnections?: [string,string][];
+  walks?: { locations:[string,string]; minutes:number|null }[];
   ownerships?: Record<string, string[]>;
   workplaces?: Record<string, string[]>;
   backgroundPeople?: { id: string; name: string }[];
