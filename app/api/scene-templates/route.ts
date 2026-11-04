@@ -1,0 +1,65 @@
+import { getGitHubUser } from '@/lib/auth';
+import { database } from '@/lib/store';
+import { sceneTemplateDraft, sceneTemplateSave, sharedSceneTemplates, type SceneTemplate } from '@/lib/scene-templates';
+
+export const dynamic = 'force-dynamic';
+
+type StoredSceneTemplate = { id: string; version: number; body: string };
+
+function reply(body: object, status = 200) {
+  return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+}
+
+function readTemplate({ id, version, body }: StoredSceneTemplate): SceneTemplate {
+  return { ...sceneTemplateDraft.parse(JSON.parse(body)), id, version, shared: false };
+}
+
+export async function GET() {
+  try {
+    const user = await getGitHubUser();
+    if (!user) return reply({ error: '請先登入觀察室。' }, 401);
+    const { results } = await database().prepare(
+      'SELECT id, version, body FROM scene_templates WHERE owner = ? ORDER BY id'
+    ).bind(user.userId).all<StoredSceneTemplate>();
+    return reply({ templates: [...sharedSceneTemplates, ...results.map(readTemplate)] });
+  } catch {
+    return reply({ error: '暫時無法讀取場景範本。' }, 503);
+  }
+}
+
+export async function POST(request: Request) {
+  if (request.headers.get('origin') !== new URL(request.url).origin) {
+    return reply({ error: '請從觀察室操作。' }, 403);
+  }
+  try {
+    const user = await getGitHubUser();
+    if (!user) return reply({ error: '請先登入觀察室。' }, 401);
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > 128 * 1024) return reply({ error: '場景範本資料過大。' }, 413);
+    const parsed = sceneTemplateSave.safeParse(parseJson(text));
+    if (!parsed.success) return reply({ error: '請確認場所名稱、房間、連接及物件資料。' }, 400);
+
+    const { id, version, ...draft } = parsed.data;
+    const body = JSON.stringify(draft);
+    if (id) {
+      const row = await database().prepare(
+        'UPDATE scene_templates SET version = version + 1, body = ? WHERE owner = ? AND id = ? AND version = ? RETURNING id, version, body'
+      ).bind(body, user.userId, id, version).first<StoredSceneTemplate>();
+      return row
+        ? reply({ template: readTemplate(row) })
+        : reply({ error: '場景範本已變更或無法編輯，請重新讀取。' }, 409);
+    }
+
+    const row = await database().prepare(
+      'INSERT INTO scene_templates (owner, id, version, body) VALUES (?, ?, 1, ?) RETURNING id, version, body'
+    ).bind(user.userId, crypto.randomUUID(), body).first<StoredSceneTemplate>();
+    if (!row) return reply({ error: '暫時無法保存場景範本。' }, 503);
+    return reply({ template: readTemplate(row) }, 201);
+  } catch {
+    return reply({ error: '暫時無法保存場景範本。' }, 503);
+  }
+}
+
+function parseJson(text: string): unknown {
+  try { return JSON.parse(text); } catch { return undefined; }
+}
