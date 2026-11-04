@@ -10,6 +10,25 @@ import { habitsForDecision } from './habits';
 import { canResumeActivity } from './activity-lifecycle';
 import { phoneForActor } from './phones';
 import { arrangementCuesForDecision } from './arrangement-cues';
+
+type ActivityHint = {kind:'object'|'scene';target:string;content:string};
+
+// Use only fields already projected to this actor. Authority-side conditions
+// such as locks, private rules and effect eligibility cannot rank or hide ideas.
+function activityHintsFor(view: Pick<ReturnType<typeof perception>,'objects'|'scene'|'self'>): ActivityHint[] {
+ const here = view.scene.region;
+ if (!here) return [];
+ const hints:ActivityHint[] = view.objects.filter(object=>object.region===here.id||object.holder===view.self.id).slice(0,6).map(object=>{
+  const knownState = Object.keys(object.state).sort()[0];
+  const content = knownState
+   ? `檢視「${object.label}」已察覺的「${knownState}」，再依所見嘗試調整或整理。`
+   : `嘗試檢查或整理眼前的「${object.label}」。`;
+  return {kind:'object',target:object.id,content};
+ });
+ hints.push({kind:'scene',target:here.id,content:`仔細查看「${here.name}」附近可接觸的細節。`});
+ return hints;
+}
+
 export function normalDecisionInput(w:World,c:Character,modelKey:string){
  const resumable=canResumeActivity(w,c,modelKey);
  const perceived=perception(w,{...c,memories:c.memories.slice(-12),habits:undefined,control:c.control?{...c.control,experiences:undefined}:undefined});
@@ -18,7 +37,7 @@ export function normalDecisionInput(w:World,c:Character,modelKey:string){
  self.intents=pursuitsForDecision(c);
  Object.assign(self.pursuitCapacity,{archivable:(c.intents||[]).filter(n=>n.status!=='active').map(({id,version})=>({id,version})),archivedCount:c.pursuitArchived?.length||0,archivedGap:c.pursuitArchivedDropped||0});
  perceived.self.relationships=relationshipsProjection(perceived.self.cognition.relationshipTags);
- const input=budgetMemoryInput({contractVersion:'npc-decision.v3',pursuitContext:w.pursuitContext,...perceived,self,knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
+ const input=budgetMemoryInput({contractVersion:'npc-decision.v3',pursuitContext:w.pursuitContext,...perceived,self,...(w.configuration?{activityHints:activityHintsFor(perceived)}:{}),knownMethods:knownRoutineMethods(w,c),knownControlExperiences:c.control?.mode==='autonomous'?c.control.experiences:undefined,currentActivity:c.plan?{timeIntent:c.plan.timeIntent,elapsedMinutes:Math.max(0,w.minute-c.plan.startedAt),remainingMinutes:Math.max(0,c.plan.until-w.minute),canContinueExisting:resumable,canPause:c.plan.resumable===true&&!c.pausedActivity}:null,learnedHabits:habitsForDecision(w,c)},c);
  return finalizeDecisionInput(w,c,input);
 }
 
@@ -55,6 +74,7 @@ export function boundDecisionRequest(w:World,c:Character,input:ReturnType<typeof
   finalizeDecisionInput(w,c,input,recalled.length?recalled:undefined);
  };
  while(!fits()){
+  if(input.activityHints?.length){input.activityHints.pop();omitted('activityHints');continue;}
   if(input.self.openingKnowledge){delete input.self.openingKnowledge;omitted('openingKnowledge');continue;}
   if(input.self.lastKnownState&&!recalled.length){delete input.self.lastKnownState;omitted('lastKnownState');continue;}
   if(input.self.memories.length){input.self.memories=[];omitted('compatibilityMemories');continue;}

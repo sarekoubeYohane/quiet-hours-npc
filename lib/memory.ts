@@ -257,7 +257,9 @@ function lastKnownState(short: ReturnType<typeof memoryProjection>, long: Memory
   state.omitted = accounts.length - state.entries.length;
   return state;
 }
-export function budgetMemoryInput<T extends { self: { openingKnowledge?:import('./opening-knowledge').OpeningKnowledge; arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState; plan?: {action: {target?: string}}; intents?: {content:string;context:string}[]; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T & { self: { openingKnowledge?:import('./opening-knowledge').OpeningKnowledge; arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState } } {
+export function budgetMemoryInput<T extends { self: { openingKnowledge?:import('./opening-knowledge').OpeningKnowledge; arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState; plan?: {action: {target?: string}}; intents?: {content:string;context:string}[]; preferences?: {items:Preference[];capacity:number}; shortTerm: unknown[]; longTerm: MemoryProjection | undefined; memories: unknown[]; observations: unknown[]; relationships: Record<string, string>; cognition?: { beliefs: Belief[]; relationshipTags: RelationshipTag[]; historyCandidates?: unknown[]; reviewCandidates?: { kind: 'belief' | 'relationship'; id: string; version: number }[] }; memoryReview?: MemoryReview[] }; activityHints?:unknown[]; knownControlExperiences?: unknown[]; learnedHabits?: unknown[]; pendingInterventions: unknown[] }>(input: T, character?: Character, recalledMemories?: unknown): T & { self: { openingKnowledge?:import('./opening-knowledge').OpeningKnowledge; arrangements?:{items:Arrangement[];capacity:number}; lastKnownState?: LastKnownState } } {
+  const activityHints = input.activityHints;
+  if (activityHints) delete input.activityHints;
   const openingKnowledge = input.self.openingKnowledge;
   if (openingKnowledge) delete input.self.openingKnowledge;
   input.self.lastKnownState = undefined;
@@ -335,7 +337,14 @@ export function budgetMemoryInput<T extends { self: { openingKnowledge?:import('
   // Leave canonical sources intact under capacity pressure; the view is a
   // duplicate that may be omitted, and explicitly records its source gap.
   if (available >= 512) input.self.lastKnownState = lastKnownState(input.self.shortTerm as ReturnType<typeof memoryProjection>, input.self.longTerm, topics, available, (recalledMemories as { memories?: MemoryProjection } | undefined)?.memories || []);
-  Object.assign(input,{projectionGaps:{longTerm:candidates.length-(input.self.longTerm?.length||0),beliefs:beliefs.length-(cognition?.beliefs.length||0),relationships:tags.length-(cognition?.relationshipTags.length||0),preferences:preferences.length-(input.self.preferences?.items.length||0),habits:tendencies.length-(input.learnedHabits?.length||0),...(openingKnowledge&&!input.self.openingKnowledge?{openingKnowledge:1}:{})}});
+  if (activityHints) {
+    input.activityHints = [];
+    for (const hint of activityHints) {
+      input.activityHints.push(hint);
+      if (memoryBytes(payload()) > budgetBytes) input.activityHints.pop();
+    }
+  }
+  Object.assign(input,{projectionGaps:{longTerm:candidates.length-(input.self.longTerm?.length||0),beliefs:beliefs.length-(cognition?.beliefs.length||0),relationships:tags.length-(cognition?.relationshipTags.length||0),preferences:preferences.length-(input.self.preferences?.items.length||0),habits:tendencies.length-(input.learnedHabits?.length||0),...(openingKnowledge&&!input.self.openingKnowledge?{openingKnowledge:1}:{}),...(activityHints&&activityHints.length!==(input.activityHints?.length||0)?{activityHints:activityHints.length-(input.activityHints?.length||0)}:{})}});
   return input;
 }
 export function validateMemoryState(c: Character) {
