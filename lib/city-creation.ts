@@ -1,3 +1,4 @@
+import { seedOpeningKnowledge } from './opening-knowledge';
 import { z } from 'zod';
 import { prepareCityAccess } from './city-access';
 import { maxEntryGrants } from './entry-rules';
@@ -118,7 +119,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
       const id = location + ':object:' + object.id;
       return {
         id, source:id, label:object.name, region:roomKey(location, object.roomId), holder:null, owner:'world',
-        revision:1, state:{ ...object.state }, lifecycle:'active' as const, kind:'furnishing', knownTo:[], allowedTo:[],
+        revision:1, state:{ ...object.state }, ...(object.hidden?{hiddenAtOpening:true}:{}), lifecycle:'active' as const, kind:'furnishing', knownTo:[], allowedTo:[],
       };
     }));
   }
@@ -217,12 +218,8 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   }
   prepareCityAccess(draft, preview, configuration, people, scenes);
   if (preview.issues.length) return { preview };
-  // Initial first-person knowledge comes from the actual room. Later opening
-  // cognition may add familiar areas; it should never copy an entire city.
-  for (const object of objects) {
-    object.knownTo = people.filter(actor=>actor.region===object.region).map(actor=>actor.id);
-    object.allowedTo = [...object.knownTo];
-  }
+  seedOpeningKnowledge(configuration,people,objects,minute);
+  for (const person of preview.characters) person.openingKnowledge = byTemplate.get(person.templateId)?.openingKnowledge;
   const world = normalizeWorld({
     configuration, minute, turn:0, lastMode:'demo', contextId:crypto.randomUUID(),
     pursuitVersion:1, pursuitContext:crypto.randomUUID(), characters:people, events:[], objects,

@@ -196,6 +196,7 @@ export default function SceneTemplateEditor() {
               onChange={event => updateObject(object.id, { name: event.target.value })}/></label>
             <label>所在房間<RoomSelect label={'物件 ' + (index + 1) + ' 所在房間'} rooms={draft.rooms} value={object.roomId}
               onChange={roomId => updateObject(object.id, { roomId })}/></label>
+            <label><input type="checkbox" checked={!!object.hidden} onChange={event=>updateObject(object.id,{hidden:event.target.checked||undefined})}/>開局不讓人物知道此物件</label>
             <button type="button" onClick={() => setDraft({ ...draft, objects: draft.objects.filter(item => item.id !== object.id) })}>
               移除物件 {index + 1}
             </button>

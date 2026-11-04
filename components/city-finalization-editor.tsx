@@ -62,6 +62,7 @@ export default function CityFinalizationEditor({ draft, sourceRooms, names, onCh
             <label>物件 {index+1} 名稱<input aria-label={place.name+'物件 '+(index+1)+' 名稱'} value={object.name} maxLength={80}
               onChange={event=>change({name:event.target.value})}/></label>
             <RoomPicker label={'物件 '+(index+1)+' 的房間'} rooms={rooms} value={object.roomId} onChange={roomId=>change({roomId})}/>
+            <label><input type="checkbox" checked={!!object.hidden} onChange={event=>change({hidden:event.target.checked||undefined})}/>開局不讓人物知道此物件</label>
             {Object.entries(object.state).map(([key,value])=><label key={key}>{key}
               <input value={value} maxLength={stateChangeLimits.maxValueLength}
                 onChange={event=>change({state:{...object.state,[key]:event.target.value}})}/>

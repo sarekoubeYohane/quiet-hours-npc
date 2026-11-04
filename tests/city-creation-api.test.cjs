@@ -228,12 +228,16 @@ test('the actual app previews and confirms editable opening associations with tw
     assert.equal(button('開始世界').disabled,false);
     assert.match(document.querySelector('[aria-label="城市預覽"]').textContent,/河畔北屋.*河畔南屋/);
     assert.match(document.querySelector('[aria-label="有效進出權限"]').textContent,/河畔南屋.*澄/);
+    assert.match(document.querySelector('[aria-label="澄的初始認知"]').textContent,/確認的水杯/);
+    assert.match(document.querySelector('[aria-label="杉的初始認知"]').textContent,/確認的水杯/);
     assert.equal((await read()).world.turn,0);
     await fill('場所 2 名稱','林間南屋');
     await fill('澄的住處',home.options[2].value);
     assert.equal(button('開始世界').disabled,true);
     await click('預覽城市');
     assert.equal(button('開始世界').disabled,false,document.querySelector('[role="alert"]')?.textContent);
+    assert.doesNotMatch(document.querySelector('[aria-label="澄的初始認知"]').textContent,/確認的水杯/);
+    assert.match(document.querySelector('[aria-label="杉的初始認知"]').textContent,/確認的水杯/);
     await click('開始世界');
     const { world } = await read();
     assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
@@ -528,6 +532,115 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     ]);
     assert.equal(calls.length,5);
     assert.deepEqual((await response(await places.GET(),200)).templates.find(item=>item.id===house.id),house);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('opening familiarity is built from the edited final city and remains actor-private in the next actual model calls', async () => {
+  const initial = seedWorld();
+  initial.adjudication={provider:'openai',model:'gpt-6.1-sol'};
+  store.install(initial);
+  const fields = (name,background) => ({...blankCharacterTemplateFields(),name,personality:'安靜',background,startLocation:'自己的臥室'});
+  const cheng = (await response(await send(people,{id:crypto.randomUUID(),version:0,fields:fields('澄','澄自己的設定')}),200)).template;
+  const shan = (await response(await send(people,{id:crypto.randomUUID(),version:0,fields:fields('杉','杉的私密人物資料')}),200)).template;
+  const home = (await response(await send(places,{
+    name:'親友住宅',note:'',rooms:[{id:'common',name:'公共客廳'},{id:'bedroom',name:'臥室'},{id:'vault',name:'保密收藏室'}],
+    connections:[{id:'secret-door',name:'收藏室專用門',rooms:['bedroom','vault']}],
+    objects:[{id:'private',name:'不可預知的私物',roomId:'vault',state:{}},
+      {id:'hidden-drawer',name:'未發現的抽屜物件',roomId:'common',state:{},hidden:true}],
+    access:{building:'residents',rooms:{vault:'private'}},
+  }),201)).template;
+  const park = (await response(await send(places,{name:'公園',note:'',rooms:[{id:'entrance',name:'公園入口'}],connections:[],objects:[]}),201)).template;
+  await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled-opening-knowledge'}),200);
+  const before = await read();
+  const city = {
+    places:[
+      {id:'old',templateId:home.id,version:home.version,name:'舊住處'},
+      {id:'new',templateId:home.id,version:home.version,name:'新住處'},
+      {id:'park',templateId:park.id,version:park.version,name:'明示公園'},
+    ],
+    characters:[
+      {templateId:cheng.id,version:cheng.version,placeId:'',roomId:'',homeId:'old',homeRoomId:'bedroom'},
+      {templateId:shan.id,version:shan.version,placeId:'park',roomId:'entrance',homeId:'old'},
+    ],
+    accessGrants:[
+      {placeId:'old',characterTemplateId:cheng.id},
+      {placeId:'old',roomId:'vault',characterTemplateId:cheng.id},
+    ],
+  };
+  const requests = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, request) => {
+    const input = JSON.parse(JSON.parse(request.body).messages[1].content);
+    requests.push(input);
+    let reply;
+    if (input.stage==='npc-city-description') {
+      assert.doesNotMatch(JSON.stringify(input),/未發現的抽屜物件|不可預知的私物|保密收藏室/);
+      const marker = input.person.name==='澄'?'澄的候選顏色':'杉的候選顏色';
+      reply = {rooms:[],objects:[{placeId:'old',roomId:'common',name:'舊屋共用鐘',state:[{key:'顏色',value:marker}]}]};
+    } else if (input.stage==='heavenly-city-finalization') {
+      const clock = input.generated.spaces.find(space=>space.placeId==='old').objects[0];
+      reply={spaces:[{placeId:'old',rooms:[],connections:[],objects:[
+        {id:clock.id,roomId:clock.roomId,name:clock.name,state:[{key:'顏色',value:'確認後的銅色'}]},
+      ]}],walks:[]};
+    } else {
+      reply=fixtureDecision(input,{type:'rest',target:'',content:''});
+    }
+    return Response.json({usage:{prompt_tokens:6,completion_tokens:4},choices:[{message:{content:JSON.stringify(reply)}}]});
+  };
+  try {
+    const scope = {operationScope:before.operationScope,worldContext:before.world.contextId};
+    const setup = { ...scope,expectedVersion:before.version,operation:'initialize-city',operationId:id(),mode:'demo',city };
+    const generated = await response(await send(route,setup),200);
+    assert.equal(requests.length,3);
+    assert.deepEqual((await read()).world.events,before.world.events);
+    const draft = generated.finalizedCity;
+    draft.finalization.spaces.push({placeId:'new',rooms:[],connections:[],objects:[
+      {id:'basket',name:'新居定稿提籃',roomId:'common',state:{位置:'窗邊'}},
+      {id:'secret-note',name:'新居隱藏筆記',roomId:'bedroom',state:{},hidden:true},
+    ]});
+    const preview = async value => (await response(await send(route,{
+      ...scope,operation:'preview-city',mode:'demo',expectedVersion:generated.version,city:value,
+    }),200)).preview;
+    const old = await preview(draft);
+    assert.deepEqual(old.issues,[]);
+    assert.match(JSON.stringify(old.characters[0].openingKnowledge),/舊屋共用鐘/);
+    assert.match(JSON.stringify(old.characters[1].openingKnowledge),/舊屋共用鐘/);
+
+    draft.characters[0].homeId='new';
+    const edited = await preview(draft);
+    assert.deepEqual(edited.issues,[]);
+    assert.equal(edited.characters[0].place,'新住處');
+    assert.equal(edited.characters[1].place,'明示公園');
+    assert.match(JSON.stringify(edited.characters[0].openingKnowledge),/新居定稿提籃/);
+    assert.doesNotMatch(JSON.stringify(edited.characters[0].openingKnowledge),/舊屋共用鐘|保密收藏室|不可預知的私物|新居隱藏筆記/);
+    assert.deepEqual(edited.characters[1].openingKnowledge,old.characters[1].openingKnowledge);
+    assert.equal(requests.length,3);
+
+    await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',expectedVersion:generated.version,city:draft}),200);
+    const {world} = await read();
+    const [first,second] = world.characters;
+    assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
+    assert.equal(first.location,'place:new');
+    assert.equal(second.location,'place:park');
+    assert.deepEqual(world.events,[]);
+    assert.ok(world.configuration.access['place:old:room:vault'].allowedActorIds.includes(first.id));
+    assert.ok(!world.configuration.access['place:new:room:vault'].allowedActorIds.includes(first.id));
+    assert.equal(world.objects.find(item=>item.label==='舊屋共用鐘').state.顏色,'確認後的銅色');
+    assert.deepEqual(world.objects.find(item=>item.label==='新居隱藏筆記').knownTo,[]);
+
+    await response(await send(route,{operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+    const decisions = requests.filter(input=>input.contractVersion==='npc-decision.v3');
+    assert.equal(decisions.length,2);
+    const firstInput = JSON.stringify(decisions.find(input=>input.self.name==='澄'));
+    const secondInput = JSON.stringify(decisions.find(input=>input.self.name==='杉'));
+    assert.match(firstInput,/新居定稿提籃/);
+    assert.match(secondInput,/舊屋共用鐘.*確認後的銅色/);
+    assert.ok(decisions.find(input=>input.self.name==='澄').scene.exits.some(exit=>exit.name==='一扇門'&&!exit.destination));
+    assert.doesNotMatch(firstInput,/舊屋共用鐘|杉的私密人物資料|保密收藏室|收藏室專用門|不可預知的私物|候選顏色|新居隱藏筆記|未發現的抽屜物件/);
+    assert.doesNotMatch(secondInput,/新居定稿提籃|澄自己的設定|保密收藏室|不可預知的私物|候選顏色|未發現的抽屜物件/);
+    assert.equal((await read()).world.turn,1);
   } finally {
     global.fetch = originalFetch;
   }

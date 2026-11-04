@@ -85,7 +85,7 @@ function personPlaces(draft:CityDraft,preview:CityPreview,actor:CityDraft['chara
     return {
       id:place.id,name:place.name,canDescribePrivate:actor.homeId===place.id||!!actor.ownedPlaceIds?.includes(place.id),
       rooms:rooms.map(({id,name})=>({id,name})),
-      objects:place.objects.filter(item=>visible.has(item.roomId)).map(({roomId,name,state})=>({roomId,name,state})),
+      objects:place.objects.filter(item=>!item.hidden&&visible.has(item.roomId)).map(({roomId,name,state})=>({roomId,name,state})),
     };
   });
 }

@@ -24,7 +24,7 @@ export const cityFinalizationSchema = z.object({
   spaces:z.array(z.object({
     placeId,
     rooms:z.array(finalRoomSchema).max(20),
-    objects:z.array(z.object({ id:localId, roomId:localId, name:label, state }).strict()).max(80),
+    objects:z.array(z.object({ id:localId, roomId:localId, name:label, state, hidden:z.boolean().optional() }).strict()).max(80),
     connections:z.array(finalConnectionSchema).max(40),
   }).strict()).max(cityLimits.places),
   walks:z.array(cityWalkSchema).max(28),

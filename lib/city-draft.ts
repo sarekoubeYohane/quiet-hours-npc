@@ -1,3 +1,4 @@
+import type { OpeningKnowledge } from './opening-knowledge';
 import type { CharacterTemplateFields } from './character-templates';
 import type { EntryGrant, EntryPreview } from './entry-rules';
 
@@ -5,7 +6,7 @@ export const openingDescriptionMaxLength = 1600;
 export const cityLimits = { places: 8, characters: 8, objects: 512, backgroundPeople: 8, relationships: 32 };
 export type OpeningRelationship = { from: string; to: string; targetType: 'character' | 'background'; description: string };
 export type FinalizedRoom = { id:string; name:string; privateFor?:string };
-export type FinalizedObject = { id:string; roomId:string; name:string; state:Record<string,string> };
+export type FinalizedObject = { id:string; roomId:string; name:string; state:Record<string,string>; hidden?:boolean };
 export type FinalizedConnection = { id:string; name:string; rooms:[string,string]; state:'open'|'closed'|'blocked' };
 export type CityWalk = { places:[string,string]; minutes:number|null };
 export type CitySpace = { placeId:string; rooms:FinalizedRoom[]; objects:FinalizedObject[]; connections:FinalizedConnection[] };
@@ -26,7 +27,7 @@ export type CityPreview = {
   walks?: CityWalk[];
   characters: {
     templateId: string; name: string; place: string; room: string; home?: string; fields: CharacterTemplateFields;
-    bedroom?: string; bedroomId?:string; ownedPlaces?: string[]; workplaces?: string[];
+    bedroom?: string; bedroomId?:string; openingKnowledge?:OpeningKnowledge; ownedPlaces?: string[]; workplaces?: string[];
   }[];
   backgroundPeople?: { id: string; name: string }[];
   relationships?: { from: string; to: string; description: string }[];

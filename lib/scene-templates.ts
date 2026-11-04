@@ -21,7 +21,7 @@ export const sceneTemplateDraft = z.object({
   connections: z.array(z.object({
     id: identifier, name, rooms: z.tuple([identifier, identifier]),
   }).strict()).max(40),
-  objects: z.array(z.object({ id: identifier, name, roomId: identifier, state: objectState }).strict()).max(80),
+  objects: z.array(z.object({ id: identifier, name, roomId: identifier, state: objectState, hidden:z.boolean().optional() }).strict()).max(80),
 }).strict();
 
 export type SceneTemplateDraft = z.infer<typeof sceneTemplateDraft>;

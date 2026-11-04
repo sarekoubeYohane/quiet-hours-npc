@@ -1,3 +1,4 @@
+import { canIdentifyOpeningDestination } from './opening-knowledge';
 import { isSleeping, isSleepStimulus } from './needs';
 import { knownExternalState, type PhysicalState } from './world-state';
 import { addExperience } from './memory';
@@ -215,13 +216,17 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
 export function knownScene(world: World, character: Character) {
   const here = regionOf(character);
   return { region: worldRegions(world).find(r => r.id === here), external:canSee(world,character,here)?knownExternalState(world.scene?.external?.[here]):undefined,
-    exits: worldDoors(world).filter(d => d.regions.includes(here)).map(d => ({ id: d.id, name: d.name, state: world.scene?.doors[d.id] || 'open', destination: worldRegions(world).find(r => r.id === d.regions.find(id => id !== here)) })),
+    exits: worldDoors(world).filter(door=>door.regions.includes(here)).map(door=>{
+      const destination = worldRegions(world).find(room=>room.id===door.regions.find(id=>id!==here));
+      const known = destination && canIdentifyOpeningDestination(world,character,destination);
+      return {id:door.id,name:known?door.name:'一扇門',state:world.scene?.doors[door.id]||'open',destination:known?destination:undefined};
+    }),
   };
 }
 
 export function observationTargets(world: World, character: Character) {
   const scene = knownScene(world, character);
-  return { regions: [scene.region!, ...scene.exits.map(exit => exit.destination!)], people: world.characters.filter(c => c.id !== character.id).map(c => ({ id: c.id, name: c.name })) };
+  return { regions: [scene.region!, ...scene.exits.flatMap(exit=>exit.destination?[exit.destination]:[])], people: world.characters.filter(c => c.id !== character.id).map(c => ({ id: c.id, name: c.name })) };
 }
 export function validateProbe(world: World, character: Character, target?: string) {
   if (!target) return;

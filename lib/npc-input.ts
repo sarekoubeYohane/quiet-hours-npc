@@ -55,6 +55,7 @@ export function boundDecisionRequest(w:World,c:Character,input:ReturnType<typeof
   finalizeDecisionInput(w,c,input,recalled.length?recalled:undefined);
  };
  while(!fits()){
+  if(input.self.openingKnowledge){delete input.self.openingKnowledge;omitted('openingKnowledge');continue;}
   if(input.self.lastKnownState&&!recalled.length){delete input.self.lastKnownState;omitted('lastKnownState');continue;}
   if(input.self.memories.length){input.self.memories=[];omitted('compatibilityMemories');continue;}
   if(input.knownControlExperiences?.length){input.knownControlExperiences=[];omitted('compatibilityControl');continue;}

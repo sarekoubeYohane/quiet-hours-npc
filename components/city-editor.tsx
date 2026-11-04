@@ -237,7 +237,14 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
       <ul>{result.preview.places.map(place=><li key={place.id}>{place.name} · {place.rooms.map(room=>room.name).join('、')}
         <ul>{place.objects.map(object=><li key={object.id}>{object.room} · {object.name}{Object.entries(object.state).map(([key,value])=>' · '+key+' '+value)}</li>)}</ul>
       </li>)}</ul>
-      <ul>{result.preview.characters.map((person,index)=><li key={index}>{person.name} · {person.place||'未指定場所'} · {person.room||'未指定房間'}{person.home&&' · 住在'+person.home}{person.bedroom&&'（'+person.bedroom+'）'}{person.ownedPlaces?.length?' · 擁有'+person.ownedPlaces.join('、'):''}{person.workplaces?.length?' · 工作於'+person.workplaces.join('、'):''}</li>)}</ul>
+      <ul>{result.preview.characters.map(person=><li key={person.templateId}>
+        {person.name} · {person.place||'未指定場所'} · {person.room||'未指定房間'}{person.home&&' · 住在'+person.home}{person.bedroom&&'（'+person.bedroom+'）'}{person.ownedPlaces?.length?' · 擁有'+person.ownedPlaces.join('、'):''}{person.workplaces?.length?' · 工作於'+person.workplaces.join('、'):''}
+        {person.openingKnowledge && <details aria-label={person.name+'的初始認知'}>
+          <summary>{person.name}的初始認知</summary>
+          <p>熟悉房間 · {person.openingKnowledge.rooms.map(room=>room.name).join('、')}</p>
+          {!!person.openingKnowledge.objects.length && <p>熟悉物件 · {person.openingKnowledge.objects.map(object=>object.name).join('、')}</p>}
+        </details>}
+      </li>)}</ul>
       {!!result.preview.backgroundPeople?.length && <p>背景人物 · {result.preview.backgroundPeople.map(person=>person.name).join('、')}</p>}
       <ul>{result.preview.relationships?.map((item,index)=><li key={index}>{item.from} → {item.to} · {item.description}</li>)}</ul>
       <ul>{result.preview.walks?.map(walk=><li key={walk.places.join(':')}>{walk.places.map(id=>result.preview.places.find(place=>place.id===id)?.name).join(' ↔ ')} · {walk.minutes===null?'不通行':walk.minutes+' 分鐘'}</li>)}</ul>
