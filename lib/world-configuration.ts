@@ -5,6 +5,9 @@ export type Location = { id: string; name: string; note?: string };
 export type Region = { id: string; location: string; name: string };
 export type Door = { id: string; name: string; regions: [string, string] };
 
+export const cityLocationId = (placeId: string) => 'place:' + placeId;
+export const cityRegionId = (locationId: string, roomId: string) => locationId + ':room:' + roomId;
+
 export type WorldConfiguration = {
   locations: Location[];
   regions: Region[];

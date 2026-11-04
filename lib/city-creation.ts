@@ -9,6 +9,8 @@ import { applyCitySpace, cityFinalizationSchema, cityWalksForPreview } from './c
 import { initialDirection } from './pursuits';
 import { normalizeWorld, type Character, type World } from './world';
 import type { WorldObject } from './world-effects';
+import { worldObjectCapacity } from './adjudication-limits';
+import { cityLocationId as locationKey, cityRegionId as roomKey } from './world-configuration';
 
 const instanceId = z.string().regex(/^[a-zA-Z0-9_-]{1,24}$/);
 const templateId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
@@ -34,8 +36,6 @@ export const cityDraftSchema = z.object({
 }).strict();
 
 const palette = ['#eb9e79', '#a2bdf0', '#d4c485', '#a5c9b3'];
-const roomKey = (placeId: string, roomId: string) => placeId + ':room:' + roomId;
-const locationKey = (placeId: string) => 'place:' + placeId;
 type Place = CityPreview['places'][number];
 type Room = Place['rooms'][number];
 
@@ -100,7 +100,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     const space = applyCitySpace(draft, {
       id:place.id, name:place.name, templateName:source.name, rooms:source.rooms,
       objects:source.objects.map(object=>({...object,room:source.rooms.find(room=>room.id===object.roomId)!.name})),
-      connections:source.connections.map(connection=>({...connection,state:'open'})),
+      connections:source.connections.map(connection=>({...connection,state:connection.state??'open'})),
     }, preview.issues);
     preview.places.push(space);
     configuration.regions.push(...space.rooms.map(room => ({
@@ -124,10 +124,12 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     }));
   }
   preview.walks = cityWalksForPreview(draft,preview);
-  if (draft.finalization) configuration.walks = preview.walks.map(walk=>({
+  configuration.walks = preview.walks.map(walk=>({
     locations:[locationKey(walk.places[0]),locationKey(walk.places[1])],minutes:walk.minutes,
   }));
-  if (objects.length > cityLimits.objects) preview.issues.push('城市文字物件超出目前容量，請減少場所數量。');
+  if (objects.length + draft.characters.length > worldObjectCapacity) {
+    preview.issues.push('城市文字物件與人物手機合計超出容量，請減少場所數量。');
+  }
 
   const selected = new Set<string>();
   const byTemplate = new Map<string, Character>();

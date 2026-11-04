@@ -1,5 +1,5 @@
 import { confirmsBodyConsequences } from './needs';
-import { adjudicationLimits } from './adjudication-limits';
+import { adjudicationLimits, worldObjectCapacity } from './adjudication-limits';
 import { bindWorldRoutine } from './routine-world-programs';
 import type { RoutineWorldProgram } from './routine-world-contract';
 import { bindRoutineProgram } from './routine-programs';
@@ -274,7 +274,7 @@ export function bindRoutine(w:World,c:Character,a:Action,duration:number,approva
   let supply:SceneSupply|undefined=explicit.find(s=>s.remaining>0&&emptyRoutineVessel(s.initialState)&&s.knownTo.includes(c.id)&&s.allowedTo.includes(c.id)&&supportsRoutineDrink(s.stateTransitions?.contents,contents));
   if(explicit.length&&!supply)return reject('explicit-vessel-source-not-usable');
   if(!supply){
-   if((w.objects?.length||0)>=512||(w.supplies?.length||0)>=512)throw new EffectValidationError('具體物件已達保存容量。',{reason:'object_capacity'});
+   if((w.objects?.length||0)>=worldObjectCapacity||(w.supplies?.length||0)>=512)throw new EffectValidationError('具體物件已達保存容量。',{reason:'object_capacity'});
    supply=w.supplies?.find(s=>s.background?.ruleId===rule!.id&&s.region===region&&s.kind==='utensil'&&'contents' in s.initialState);
    if(!supply){supply={id:`supply:${crypto.randomUUID()}`,label:'日常茶杯',region,remaining:1,owner:c.id,knownTo:[c.id],allowedTo:[c.id],kind:'utensil',initialState:{contents:'empty'},stateTransitions:{contents:['empty','water','tea','coffee','dirty']},background:{ruleId:rule.id,sequence:0}};(w.supplies??=[]).push(supply);}
   }
@@ -299,7 +299,7 @@ function backgroundSupply(w:World,c:Character,r:RoutineRule,region:string,label:
  const id=`supply:${crypto.randomUUID()}`;
  let supply=kind==='food'&&state.vessel?undefined:w.supplies?.find(s=>s.background?.ruleId===r.id&&s.region===region&&s.label===label&&s.kind===kind&&s.allowedTo.includes(c.id));
  if(!supply){
-  if((w.objects?.length||0)>=512||(w.supplies?.length||0)>=512)throw new EffectValidationError('具體物件已達保存容量。',{reason:'object_capacity'});
+  if((w.objects?.length||0)>=worldObjectCapacity||(w.supplies?.length||0)>=512)throw new EffectValidationError('具體物件已達保存容量。',{reason:'object_capacity'});
   supply={id,label,region,remaining:1,owner:c.id,knownTo:[c.id],allowedTo:[c.id],kind,initialState:state,background:{ruleId:r.id,sequence:0}};
   (w.supplies??=[]).push(supply);
  }

@@ -1,3 +1,4 @@
+import { worldObjectCapacity } from './adjudication-limits';
 import type { Character,World } from './world';
 import type { WorldObject } from './world-effects';
 import type { FormationEffect, FormationInput, ObjectSource, Quantity } from './world-formation-contract';
@@ -33,7 +34,7 @@ export function applyFormation(effect:FormationEffect,context:FormationContext):
  if(effect.kind==='separate'){
   const parent=sourceObject({objectId:effect.objectId,expectedRevision:effect.expectedRevision,quantity:effect.quantity,disposition:'consumed'},context,effect.access),quantity=amountOf(parent,fail);
   if(effect.quantity.amount>=quantity.amount)fail('separate_quantity','獨立細分必須留下原整體的其餘份量。');
-  freshIdentity(effect.outputId,context);if((w.objects?.length||0)>=512)fail('object_capacity','具體物件已達保存容量。');
+  freshIdentity(effect.outputId,context);if((w.objects?.length||0)>=worldObjectCapacity)fail('object_capacity','具體物件已達保存容量。');
   const source:ObjectSource={type:'object',id:parent.id,revision:parent.revision,amount:effect.quantity.amount,unit:effect.quantity.unit,owner:parent.owner};
   const child:WorldObject={id:effect.outputId,source:parent.id,sources:[source],quantity:{...effect.quantity},formation:{operation:'separate',at:w.minute,inputs:[parent.id]},label:parent.label,region:parent.region,holder:parent.holder,owner:parent.owner,...(parent.coOwners?{coOwners:[...parent.coOwners]}:{}),revision:1,state:{...parent.state},...(parent.stateExposure?{stateExposure:{...parent.stateExposure}}:{}),lifecycle:'active',kind:parent.kind,...(parent.consumable===undefined?{}:{consumable:parent.consumable}),knownTo:[...parent.knownTo],allowedTo:[...parent.allowedTo],...(parent.stateTransitions?{stateTransitions:structuredClone(parent.stateTransitions)}:{})};
   if(effect.access==='physical')context.retainPhysical(parent,c,w.minute,'separate',parent.holder,context.hasPermission(parent,c.id));
@@ -41,7 +42,7 @@ export function applyFormation(effect:FormationEffect,context:FormationContext):
  }
  const inputs=effect.inputs.map(input=>({input,object:sourceObject(input,context,effect.access)}));
  if(effect.operation==='partition'&&effect.inputs[0].quantity.amount!==amountOf(inputs[0].object,fail).amount)fail('partition_quantity','分拆須承接完整原物，不能留下另一件完整原物。');
- if((w.objects?.length||0)+effect.outputs.length>512)fail('object_capacity','具體物件已達保存容量。');
+ if((w.objects?.length||0)+effect.outputs.length>worldObjectCapacity)fail('object_capacity','具體物件已達保存容量。');
  for(const output of effect.outputs)freshIdentity(output.id,context);
  const units=new Set([...effect.inputs.map(input=>input.quantity.unit),...effect.outputs.map(output=>output.quantity.unit)]);
  if(units.size===1&&effect.outputs.reduce((sum,output)=>sum+output.quantity.amount,0)>effect.inputs.reduce((sum,input)=>sum+input.quantity.amount,0))fail('quantity_creation','相同單位的產量不能大於來源消耗。');

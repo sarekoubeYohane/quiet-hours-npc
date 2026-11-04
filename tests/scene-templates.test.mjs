@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { build } = require(require.resolve('esbuild', { paths: [require.resolve('vite')] }));
 let owner = 'producer';
 let storageUnavailable = false;
+let loseSaveResponse = false;
 const origin = 'https://test.invalid';
 const sqlite = new DatabaseSync(':memory:');
 sqlite.exec(await readFile('drizzle/0007_scene_templates.sql', 'utf8'));
@@ -19,7 +20,14 @@ const database = {
     return { bind(...params) {
       return {
         async all() { return { results: sqlite.prepare(sql).all(...params) }; },
-        async first() { return sqlite.prepare(sql).get(...params) ?? null; },
+        async first() {
+          const row = sqlite.prepare(sql).get(...params) ?? null;
+          if (loseSaveResponse && /^(INSERT|UPDATE) /.test(sql)) {
+            loseSaveResponse = false;
+            throw Error('fixture lost committed response');
+          }
+          return row;
+        },
       };
     } };
   },
@@ -49,6 +57,29 @@ const send = (method, body, requestOrigin = origin) => {
   }));
 };
 
+test('retrying a scene create or edit across a save failure preserves identity and increments only once', async () => {
+  const body = {id:crypto.randomUUID(),version:0,name:'可重送場所',note:'',
+    rooms:[{id:'first',name:'前室'},{id:'back',name:'後室'}],
+    connections:[{id:'door',name:'房門',rooms:['first','back'],state:'closed'}],objects:[]};
+  for (const version of [0,1]) {
+    const request = {...body,version,name:version ? '編輯後的場所' : body.name};
+    storageUnavailable = true;
+    try { assert.equal((await send('POST',request)).status,503); }
+    finally { storageUnavailable = false; }
+    const before = (await (await send('GET')).json()).templates.find(item=>item.id===body.id);
+    assert.equal(before?.version,version||undefined);
+    loseSaveResponse = true;
+    assert.equal((await send('POST',request)).status,503);
+    const replay = await send('POST',request);
+    assert.equal(replay.status,version ? 200 : 201);
+    const saved = (await replay.json()).template;
+    assert.deepEqual(saved,{...request,version:version+1,shared:false});
+    const list = (await (await send('GET')).json()).templates.filter(item=>item.id===body.id);
+    assert.deepEqual(list,[saved]);
+    assert.equal((await send('POST',{...request,name:'競爭寫入'})).status,409);
+  }
+});
+
 test('scene templates save rooms, connections and every explicitly listed object and can be reloaded', async () => {
   const body = {
     name: '河畔住宅', note: '面向河流',
@@ -60,7 +91,7 @@ test('scene templates save rooms, connections and every explicitly listed object
       { id: 'lamp', name: '台燈', roomId: 'front', state: { 電源: '關閉' } },
     ],
   };
-  const created = await send('POST', body);
+  const created = await send('POST', {...body,id:crypto.randomUUID(),version:0});
   assert.equal(created.status, 201, await created.clone().text());
   const { template } = await created.json();
   const list = await (await send('GET')).json();
@@ -108,6 +139,7 @@ test('the actual editor saves, reopens and changes a multi-room scene template',
     await enter('房間 2 進出權限', 'workers');
     await click('新增連接');
     await enter('連接 1 名稱', '儲物門');
+    await enter('連接 1 初始通行狀態', 'blocked');
     await click('新增文字物件');
     await enter('物件 1 名稱', '木椅');
     await click('新增狀態');
@@ -118,6 +150,7 @@ test('the actual editor saves, reopens and changes a multi-room scene template',
     await click('重新讀取場景範本');
     await click('雨巷書房');
     assert.equal(document.querySelector('[aria-label="房間 2 名稱"]').value, '儲物室');
+    assert.equal(document.querySelector('[aria-label="連接 1 初始通行狀態"]').value, 'blocked');
     assert.equal(document.querySelector('[aria-label="建築預設進出權限"]').value, 'residents');
     assert.equal(document.querySelector('[aria-label="房間 2 進出權限"]').value, 'workers');
     assert.equal(document.querySelector('[aria-label="物件 1 名稱"]').value, '木椅');
@@ -141,7 +174,7 @@ test('rejected and failed edits preserve the saved template and its account scop
   const { id: sharedId, version: sharedVersion, shared: isShared, ...draft } = shared;
   assert.equal(isShared, true);
   assert.equal((await send('POST', { ...draft, id: sharedId, version: sharedVersion })).status, 409);
-  const created = await send('POST', { ...draft, name: '製作者的私有副本' });
+  const created = await send('POST', { ...draft, name: '製作者的私有副本',id:crypto.randomUUID(),version:0 });
   assert.equal(created.status, 201);
   const { template } = await created.json();
   const { shared: privateFlag, ...update } = template;

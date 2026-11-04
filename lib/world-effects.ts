@@ -9,7 +9,7 @@ import { scheduleNaturalChange, invalidateNaturalChanges, type ScheduleNaturalEf
 import { applyWorldStateChange, worldTargetSnapshot, commitWorldChanges, stateConditionsHold, worldObjectContinuityProblem, type StateCondition, type ExternalConsequence } from './world-state';
 export { applyBoundedStateChanges, commitWorldChanges } from './world-state';
 import { effectCandidateSchema, effectRules, validObjectKind } from './adjudication-contract';
-import { physicalEffectLimits } from './adjudication-limits';
+import { physicalEffectLimits, worldObjectCapacity } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
 import type { Action, ActivityPlan, Character, World } from './world';
 import { canSee, regionOf, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
@@ -153,7 +153,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    if(!s||s.remaining!==e.expectedRemaining||!Number.isSafeInteger(s.remaining)||s.remaining<=0||(s.pending&&(physical||phaseIndex===null))||(s.availableAt!==undefined&&w.minute<s.availableAt)||!s.knownTo.includes(c.id)||!physical&&!s.allowedTo.includes(c.id)||s.region!==regionOf(c)||physical&&!canSee(w,c,s.region))fail('supply_precondition','裁定供應前提無效。');
    if(!validQuantity(s.quantity??{amount:1,unit:'item'})||s.consumable!==undefined&&typeof s.consumable!=='boolean')fail('quantity_precondition','供應份量或消耗能力無法安全承接。');
    if(!validObjectKind(s.kind))fail('object_kind','物件種類超出有界資料契約。');
-   if((w.objects?.length||0)>=512)fail('object_capacity','具體物件已達保存容量。');
+   if((w.objects?.length||0)>=worldObjectCapacity)fail('object_capacity','具體物件已達保存容量。');
    const id=materializedObjectId(s);
    if(w.objects?.some(o=>o.id===id))fail('identity_used','供應身份已被使用。');
    const o:WorldObject={id,source:s.id,sources:[{type:'supply',id:s.id,revision:null,amount:s.quantity?.amount??1,unit:s.quantity?.unit??'item',owner:s.owner}],quantity:{...(s.quantity??{amount:1,unit:'item'})},consumable:s.consumable??s.kind==='food',formation:{operation:'materialize',at:w.minute,inputs:[s.id]},...(s.coOwners?{coOwners:[...s.coOwners]}:{}),label:s.label,region:s.region,holder:c.id,owner:s.owner,revision:1,state:{...s.initialState},...(s.stateExposure?{stateExposure:{...s.stateExposure}}:{}),lifecycle:'active',kind:s.kind,knownTo:[...s.knownTo],allowedTo:[...s.allowedTo],...(s.stateTransitions?{stateTransitions:structuredClone(s.stateTransitions)}:{})};

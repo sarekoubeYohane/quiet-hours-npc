@@ -12,7 +12,7 @@ const { seedWorld } = load('world');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
-  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(body),
+  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
 }));
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
 const response = async (result, status) => {

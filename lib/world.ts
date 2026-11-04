@@ -13,7 +13,7 @@ import type { CostLedger, ModelPrice } from './costs';
 import { cognitiveProjection, type CognitiveState } from './cognition';
 import { MemoryValidationError, memoryProjection, recallableMemoryProjection, normalizeMemory, type ShortMemory, type LongMemory, type MemoryTrace, type MemoryReview } from './memory';
 import { decisionObservations, type AttentionCondition, type AttentionDiagnostic } from './attention';
-import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownScene, type PerceptionTrace, normalizePerception, regionOf, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
+import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownDoor, knownScene, type PerceptionTrace, normalizePerception, regionOf, canSee, type Observation, type SceneState, type CurrentSensoryState, type PerceptionTrial } from './perception';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string}&Partial<import('./pursuits').PursuitFields>;
@@ -146,7 +146,9 @@ return;
 else if(a.type==='door'){
 const door=worldDoors(w).find(x=>x.id===a.target);if(!door||!door.regions.includes(fromRegion)||!['open','close'].includes(content))throw Error('門操作無效');
 normalizePerception(w);const next=content==='open'?'open':'closed';if(w.scene!.doors[door.id]===next)throw Error('門已是指定狀態');
-w.scene!.doors[door.id]=next;c.activity=`${next==='open'?'打開':'關上'}${door.name}。`;text=`${c.name} ${c.activity}`;audience=witnesses;
+const verb=next==='open'?'打開':'關上';
+c.activity=`${verb}${knownDoor(w,c,door).name}。`;
+w.scene!.doors[door.id]=next;text=`${c.name} ${verb}${door.name}。`;audience=witnesses;
 }
 else if(a.type==='say'||a.type==='shout'){if(!content)throw Error('說話內容不能為空');if(a.target==='observer'){audience=[c.id];c.activity='回覆了觀察者。';text=`${c.name} 回覆你：「${content}」`;}else{if(!target||target.id===c.id||(target.location!==c.location||!canSee(w,c,regionOf(target))))throw Error('只能向同地點的人說話');audience=witnesses;c.activity=`正在與 ${target.name} 說話。`;text=`${c.name} 對 ${target.name} ${a.type==='shout'?'大聲喊道':'說'}：「${content}」`;}}
 else if(a.type==='persuade'){
@@ -222,7 +224,7 @@ else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return
 else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
-  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:undefined);
+  {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:a.type==='door'?`${c.name} ${c.activity}`:undefined);
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){

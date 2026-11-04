@@ -33,6 +33,20 @@ node --test tests/character-templates.test.mjs tests/scene-templates.test.mjs
 | T11 活動提示與自由 | 44 | 真正 NPC 請求有本地可知活動提示，自由方法仍經裁定點亮台燈。相同提示因實際條件不同而允許或拒絕的反例由活動提示案例覆蓋。[活動提示](city-activity-hints-250.md) |
 | T12 保存與隔離 | 45 | 瀏覽器旅程注入開始前保存故障及已提交但回應遺失，核對版本衝突、重送、用量、人物及場所未重複、第二帳號看不到自訂範本與城市。舊世界歷史備存另在城市 API 驗證。[城市](city-creation-242.md) |
 
+## 程式碼審查後續
+
+- 場景保存採草稿 UUID 與版本。SQLite 測試覆蓋新增與修改的提交前故障、提交後遺失回應、重送及競爭寫入。
+- 新手動城市沒有已確認道路時保存空道路清單，跨場所移動須有可走的路。既有存檔缺少道路欄位時沿原本的移動相容路徑。場景範本可明示門的開啟、關閉或不通行，舊範本未設定的連接沿用開啟。生成不能覆蓋明示狀態。
+- 開關未知的門、聽到門邊聲音或從門口看見他人，依各角色可知內容提供名稱。API 測試開啟受限房門，檢查操作者與旁觀者後續真正送入模型的內容。
+- 開局為每位人物保留手機的物件容量。API 測試驗證兩位角色加 510 個場景物件可進入正常回合，加 511 個時預覽與開始會拒絕。場所／房間識別碼與城市操作的請求長度判斷分別沿用同一組定義。
+
+可用上方 Chromium 腳本重跑跨切片旅程，並用下列命令重跑審查回歸。
+
+```sh
+node --test tests/scene-templates.test.mjs
+node tests/run-activities.mjs tests/city-creation-api.test.cjs tests/city-access-api.test.cjs tests/city-travel-api.test.cjs tests/perception-api.test.cjs
+```
+
 ## 環境與相容性
 
 - 本機瀏覽器路徑使用固定身分與控制時鐘，沒有執行正式 OAuth 或部署。受控模型驗證產品採納、拒絕、輸入隔離及用量保存，真實模型的描述品質未驗收。

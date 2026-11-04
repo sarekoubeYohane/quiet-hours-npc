@@ -14,7 +14,7 @@ const { fixtureDecision } = require('./pursuit-fixture.cjs');
 
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
-  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(body),
+  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === places ? {id:crypto.randomUUID(),version:0,...body} : body),
 }));
 const id = () => Date.now() + ':' + crypto.randomUUID();
 const response = async (result, status) => {
@@ -23,6 +23,121 @@ const response = async (result, status) => {
   return body;
 };
 const read = async () => response(await route.GET(), 200);
+
+test('a new manual city saves closed and blocked connections and does not invent an instant route', async () => {
+  const initial = seedWorld();
+  initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
+  store.install(initial);
+  const original = await read();
+  const person = (await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name:'青石'}}),200)).template;
+  const scene = (await response(await send(places,{id:crypto.randomUUID(),version:0,name:'三室屋',note:'',
+    rooms:[{id:'front',name:'客廳'},{id:'private',name:'私室'},{id:'sealed',name:'封閉房間'}],
+    connections:[
+      {id:'private-door',name:'私人門',rooms:['front','private'],state:'closed'},
+      {id:'sealed-door',name:'封閉通道',rooms:['front','sealed'],state:'blocked'},
+    ],objects:[],
+  }),201)).template;
+  const city = {places:['one','two'].map(placeId=>({id:placeId,templateId:scene.id,version:1,name:placeId})),
+    characters:[{templateId:person.id,version:1,placeId:'one',roomId:'front'}]};
+  const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
+  const preview = (await response(await send(route,{...scope,operation:'preview-city',mode:'demo',city}),200)).preview;
+  assert.deepEqual(preview.places[0].connections.map(connection=>connection.state),['closed','blocked']);
+  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  const stored = (await read()).world;
+  assert.deepEqual(stored.configuration.walks,[]);
+  assert.equal(stored.scene.doors['place:one:door:private-door'],'closed');
+  assert.deepEqual(stored.configuration.blockedRoomConnections[0],['place:one:room:front','place:one:room:sealed']);
+  assert.equal(stored.scene.doors['place:one:door:sealed-door'],undefined);
+  await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled'}),200);
+  const transport = global.fetch;
+  let attempts = 0;
+  global.fetch = async (_url, request) => {
+    const input = JSON.parse(JSON.parse(request.body).messages[1].content);
+    attempts++;
+    return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(
+      fixtureDecision(input,{type:'move',target:'place:two',content:''}),
+    )}}]});
+  };
+  try {
+    await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+    assert.equal(attempts,1);
+    assert.equal((await read()).world.characters[0].location,'place:one');
+  } finally { global.fetch = transport; }
+});
+
+test('city setup reserves capacity for the phones needed by the first round', async () => {
+  store.install(seedWorld());
+  const original = await read();
+  const templates = [];
+  for (const name of ['丁楊','翁柳']) {
+    templates.push((await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name}}),200)).template);
+  }
+  const createScene = async count => (await response(await send(places,{id:crypto.randomUUID(),version:0,name:'器材室',note:'',
+    rooms:[{id:'front',name:'前室'}],connections:[],objects:Array.from({length:count},(_,index)=>({
+      id:'item-'+index,name:'器材 '+index,roomId:'front',state:{},
+    })),
+  }),201)).template;
+  const room = await createScene(73);
+  const smaller = await createScene(72);
+  const city = {places:Array.from({length:7},(_,index)=>({id:'hall-'+index,templateId:room.id,version:1,name:'場所 '+index})),
+    characters:templates.map((person,index)=>({templateId:person.id,version:1,placeId:'hall-'+index,roomId:'front'}))};
+  const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
+  const preview = async () => (await response(await send(route,{...scope,operation:'preview-city',mode:'demo',city}),200)).preview;
+  assert.match((await preview()).issues.join(' '),/容量/);
+  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),400);
+  city.places.at(-1).templateId = smaller.id;
+  assert.deepEqual((await preview()).issues,[]);
+  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  const round = await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'demo',minutes:15}),200);
+  assert.equal(round.world.turn,1);
+  assert.equal(round.world.objects.length,512);
+  assert.equal(round.world.objects.filter(object=>object.kind==='phone').length,2);
+});
+
+test('opening an unidentified door keeps its private name out of the actor and witness decision payloads', async () => {
+  const initial = seedWorld();
+  initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
+  store.install(initial);
+  const original = await read();
+  const templates = [];
+  for (const name of ['岑一','岑二','岑三']) {
+    templates.push((await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name}}),200)).template);
+  }
+  const scene = (await response(await send(places,{id:crypto.randomUUID(),version:0,name:'會客處',note:'',
+    rooms:[{id:'front',name:'客廳'},{id:'private',name:'受限密室'}],
+    access:{building:'public',rooms:{private:'private'}},
+    connections:[{id:'door',name:'密室的專名門',rooms:['front','private'],state:'closed'}],objects:[],
+  }),201)).template;
+  const city = {places:[{id:'house',templateId:scene.id,version:1,name:'會客處'}],
+    characters:templates.map((person,index)=>({templateId:person.id,version:1,placeId:'house',roomId:index===2?'private':'front'}))};
+  const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
+  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled'}),200);
+  const transport = global.fetch;
+  let opening = true;
+  const prompts = [];
+  global.fetch = async (_url, request) => {
+    const input = JSON.parse(JSON.parse(request.body).messages[1].content);
+    prompts.push(input);
+    const action = opening && input.self.name==='岑一'
+      ? {type:'door',target:'place:house:door:door',content:'open'}
+      : {type:'rest',target:'',content:''};
+    return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,action))}}]});
+  };
+  try {
+    const next = () => send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15});
+    await response(await next(),200);
+    opening = false;
+    await response(await next(),200);
+    const stored = (await read()).world;
+    assert.match(stored.events.find(event=>event.kind==='door').text,/密室的專名門/);
+    for (const name of ['岑一','岑二']) {
+      const decision = prompts.findLast(input=>input.self.name===name);
+      assert.doesNotMatch(JSON.stringify(decision),/密室的專名門|受限密室/);
+      assert.match(JSON.stringify(decision),/一扇門/);
+    }
+  } finally { global.fetch = transport; }
+});
 
 test('the saved city preview starts one isolated world with two new people and distinct copies of a scene', async () => {
   const legacy = seedWorld();
@@ -419,7 +534,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
   const house = (await response(await send(places,{
     name:'住宅組合', note:'原有住宅備註',
     rooms:[{id:'front',name:'客廳'},{id:'room-a',name:'澄的私人房間'},{id:'room-b',name:'杉的私人房間'}],
-    connections:[{id:'original',name:'原有門',rooms:['front','room-a']}],
+    connections:[{id:'original',name:'原有門',rooms:['front','room-a'],state:'closed'}],
     objects:[{id:'lamp',roomId:'front',name:'台燈',state:{電源:'關閉'}},{id:'secret',roomId:'room-b',name:'杉的秘密物件',state:{}}],
   }),201)).template;
   const other = (await response(await places.GET(),200)).templates.find(place=>place.name==='住宅');
@@ -523,6 +638,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     assert.equal(world.configuration.regions.filter(room=>room.name==='共用工作區').length,1);
     assert.equal(world.configuration.locations.length,3);
     assert.ok(world.configuration.doors.some(door=>door.name==='原有門'));
+    assert.equal(world.scene.doors['place:home:door:original'],'closed');
     assert.ok(world.configuration.doors.some(door=>door.name==='通往杉房間的門'&&world.scene.doors[door.id]==='closed'));
     assert.deepEqual(world.configuration.blockedRoomConnections,[['place:home:room:room-a','place:home:room:room-b']]);
     assert.deepEqual(world.configuration.walks,[

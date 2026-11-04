@@ -12,19 +12,19 @@ type ObjectDraft = Omit<SceneTemplate['objects'][number], 'state'> & {
   state: { id: string; key: string; value: string }[];
 };
 type Draft = Omit<SceneTemplate, 'id' | 'version' | 'shared' | 'objects'> & {
-  id?: string;
-  version?: number;
+  id: string;
+  version: number;
   objects: ObjectDraft[];
 };
 
 const newRoom = (): Room => ({ id: crypto.randomUUID(), name: '' });
-const emptyDraft = (): Draft => ({ name: '', note: '', rooms: [newRoom()], connections: [], objects: [] });
+const emptyDraft = (): Draft => ({ id:crypto.randomUUID(), version:0, name: '', note: '', rooms: [newRoom()], connections: [], objects: [] });
 
 function editTemplate(template: SceneTemplate): Draft {
   const { id, version, shared, objects, ...draft } = template;
   return {
     ...draft,
-    ...(shared ? {} : { id, version }),
+    ...(shared ? { id:crypto.randomUUID(), version:0 } : { id, version }),
     objects: objects.map(object => ({
       ...object,
       state: Object.entries(object.state).map(([key, value]) => ({ id: crypto.randomUUID(), key, value })),
@@ -136,7 +136,7 @@ export default function SceneTemplateEditor() {
     {error && <p role="alert">{error}</p>}
     {draft && <form onSubmit={save}>
       <fieldset disabled={busy}>
-        <legend>{draft.id ? '編輯場景範本' : '新場景範本'}</legend>
+        <legend>{draft.version ? '編輯場景範本' : '新場景範本'}</legend>
         <label>場所名稱<input aria-label="場所名稱" required maxLength={80} value={draft.name}
           onChange={event => setDraft({ ...draft, name: event.target.value })}/></label>
         <label>場所描述<textarea maxLength={600} value={draft.note}
@@ -176,6 +176,10 @@ export default function SceneTemplateEditor() {
         {draft.connections.map((connection, index) => <div className="scene-template-controls" key={connection.id}>
           <label>連接 {index + 1} 名稱<input aria-label={'連接 ' + (index + 1) + ' 名稱'} required maxLength={80} value={connection.name}
             onChange={event => updateConnection(connection.id, { name: event.target.value })}/></label>
+          <label>初始通行狀態<select aria-label={'連接 ' + (index + 1) + ' 初始通行狀態'} value={connection.state ?? 'open'}
+            onChange={event => updateConnection(connection.id, { state: event.target.value as Connection['state'] })}>
+            <option value="open">開啟</option><option value="closed">關閉</option><option value="blocked">不通行</option>
+          </select></label>
           <label>起點<RoomSelect label={'連接 ' + (index + 1) + ' 起點'} rooms={draft.rooms} value={connection.rooms[0]}
             onChange={room => updateConnection(connection.id, { rooms: [room, connection.rooms[1]] })}/></label>
           <label>終點<RoomSelect label={'連接 ' + (index + 1) + ' 終點'} rooms={draft.rooms} value={connection.rooms[1]}

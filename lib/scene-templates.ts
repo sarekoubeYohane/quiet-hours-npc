@@ -19,7 +19,7 @@ export const sceneTemplateDraft = z.object({
   access: z.object({ building: z.enum(entryRules), rooms: z.record(identifier, z.enum(entryRules)) }).strict().optional(),
   rooms: z.array(z.object({ id: identifier, name }).strict()).min(1).max(20),
   connections: z.array(z.object({
-    id: identifier, name, rooms: z.tuple([identifier, identifier]),
+    id: identifier, name, rooms: z.tuple([identifier, identifier]), state: z.enum(['open','closed','blocked']).optional(),
   }).strict()).max(40),
   objects: z.array(z.object({ id: identifier, name, roomId: identifier, state: objectState, hidden:z.boolean().optional() }).strict()).max(80),
 }).strict();
@@ -32,12 +32,12 @@ export type SceneTemplate = SceneTemplateDraft & {
 };
 
 export const sceneTemplateSave = sceneTemplateDraft.extend({
-  id: identifier.optional(),
-  version: z.number().int().positive().safe().optional(),
+  id: identifier,
+  version: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1),
 }).superRefine(({ id, version, rooms, connections, objects, access }, context) => {
   const roomIds = new Set(rooms.map(room => room.id));
   const invalid =
-    (id === undefined) !== (version === undefined) ||
+    (version === 0 && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) ||
     roomIds.size !== rooms.length ||
     new Set(objects.map(object => object.id)).size !== objects.length ||
     new Set(connections.map(connection => connection.id)).size !== connections.length ||

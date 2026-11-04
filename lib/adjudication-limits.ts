@@ -1,5 +1,7 @@
 import type { RoutineOperation } from './routine-rules';
 
+export const worldObjectCapacity = 512;
+
 export const adjudicationLimits = {
  statuses: ['accepted','denied','unsupported'],
  difficulties: [8,12,16],

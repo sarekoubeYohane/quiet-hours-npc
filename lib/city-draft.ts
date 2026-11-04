@@ -3,7 +3,7 @@ import type { CharacterTemplateFields } from './character-templates';
 import type { EntryGrant, EntryPreview } from './entry-rules';
 
 export const openingDescriptionMaxLength = 1600;
-export const cityLimits = { places: 8, characters: 8, objects: 512, backgroundPeople: 8, relationships: 32 };
+export const cityLimits = { places: 8, characters: 8, backgroundPeople: 8, relationships: 32 };
 export type OpeningRelationship = { from: string; to: string; targetType: 'character' | 'background'; description: string };
 export type FinalizedRoom = { id:string; name:string; privateFor?:string };
 export type FinalizedObject = { id:string; roomId:string; name:string; state:Record<string,string>; hidden?:boolean };

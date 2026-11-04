@@ -198,7 +198,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
-    if (raw.length > 16000 && !['preview-city','start-city','suggest-opening-relationships','initialize-city'].includes(b.operation || '')) return reply({error:'輸入過長。'},400);
+    const suggestingOpening = b.operation === 'suggest-opening-relationships';
+    const initializingCity = b.operation === 'initialize-city';
+    const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
+    if (!cityOperation && raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
       if (!['ai', 'openai'].includes(b.mode || '')) return reply({ error: '請選擇要設定 Key 的模型服務。' }, 400);
       const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
@@ -221,11 +224,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return reply({error:'請填寫裁定服務與模型。'},400);
     const generatingCharacter = b.operation === 'generate-character-template';
-    const suggestingOpening = b.operation === 'suggest-opening-relationships';
-    const initializingCity = b.operation === 'initialize-city';
     const generatingSetup = generatingCharacter || suggestingOpening || initializingCity;
-    const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
-    if (!cityOperation && raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
     if (initializingCity && b.operationScope !== id) return reply({ error:'請重新讀取城市後再初始化。' },400);
     const openingDescription = suggestingOpening ? readOpeningDescription(b.openingDescription) : undefined;
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {

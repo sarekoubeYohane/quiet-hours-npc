@@ -1,5 +1,5 @@
 import type { CityDraft, CityPreview } from './city-draft';
-import type { WorldConfiguration } from './world-configuration';
+import { cityLocationId, cityRegionId, type WorldConfiguration } from './world-configuration';
 import type { Character, World } from './world';
 import type { SceneTemplate } from './scene-templates';
 import type { EffectiveEntryRule, EntryGrant, EntryPreview, EntryRule } from './entry-rules';
@@ -25,7 +25,7 @@ export function prepareCityAccess(
   const access: Record<string, EffectiveEntryRule> = {};
   const visible: EntryPreview[] = [];
   for (const place of preview.places) {
-    const locationId = 'place:' + place.id;
+    const locationId = cityLocationId(place.id);
     const source = scenes.find(scene => scene.id === configuration.sceneSources?.[locationId]?.id);
     const building = source?.access?.building ?? 'public';
 
@@ -50,7 +50,7 @@ export function prepareCityAccess(
     for (const room of place.rooms) {
       const rules = source?.access?.rooms;
       const override = rules && Object.hasOwn(rules, room.id) ? rules[room.id] : undefined;
-      assignment({ placeId: place.id, roomId: room.id }, locationId + ':room:' + room.id, override ?? building, !override);
+      assignment({ placeId: place.id, roomId: room.id }, cityRegionId(locationId,room.id), override ?? building, !override);
     }
   }
   if (visible.length) {
