@@ -19,3 +19,17 @@ export const characterTemplateFieldNames = Object.keys(characterTemplateFields) 
 export function blankCharacterTemplateFields(): CharacterTemplateFields {
   return Object.fromEntries(characterTemplateFieldNames.map(name => [name, ''])) as CharacterTemplateFields;
 }
+
+export const characterDescriptionMaxLength = 2400;
+
+export function readCharacterTemplateFields(value: unknown): CharacterTemplateFields | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return;
+  const submitted = value as Record<string, unknown>;
+  const accepted = blankCharacterTemplateFields();
+  for (const field of characterTemplateFieldNames) {
+    const input = submitted[field];
+    if (typeof input !== 'string' || input.length > characterTemplateFields[field].maxLength) return;
+    accepted[field] = input;
+  }
+  return accepted;
+}

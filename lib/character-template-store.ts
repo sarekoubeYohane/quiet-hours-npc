@@ -1,7 +1,7 @@
 import { database } from '@/lib/store';
 import { seedWorld } from '@/lib/world';
 import { worldLocations } from '@/lib/world-configuration';
-import { blankCharacterTemplateFields, characterTemplateFieldNames, characterTemplateFields, type CharacterTemplate, type CharacterTemplateFields } from '@/lib/character-templates';
+import { blankCharacterTemplateFields, readCharacterTemplateFields, type CharacterTemplate, type CharacterTemplateFields } from '@/lib/character-templates';
 
 type Row = { id: string; version: number; fields: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -33,15 +33,9 @@ export function readCharacterTemplateSave(value: unknown) {
   if (typeof value !== 'object' || value === null || !('id' in value) || !('version' in value) || !('fields' in value)) return;
   const { id, version, fields } = value;
   if (typeof id !== 'string' || !UUID.test(id) || typeof version !== 'number' || !Number.isSafeInteger(version) ||
-      version < 0 || version >= Number.MAX_SAFE_INTEGER || typeof fields !== 'object' || fields === null || Array.isArray(fields)) return;
-  const submitted = fields as Record<string, unknown>;
-  const accepted = blankCharacterTemplateFields();
-  for (const field of characterTemplateFieldNames) {
-    const input = submitted[field];
-    if (typeof input !== 'string' || input.length > characterTemplateFields[field].maxLength) return;
-    accepted[field] = input;
-  }
-  if (!accepted.name.trim()) return;
+      version < 0 || version >= Number.MAX_SAFE_INTEGER) return;
+  const accepted = readCharacterTemplateFields(fields);
+  if (!accepted?.name.trim()) return;
   return { id, version, fields: accepted };
 }
 
