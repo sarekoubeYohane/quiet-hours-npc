@@ -170,7 +170,12 @@
 .city-scene-objects{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.75rem;margin:1rem}
 .city-scene-objects section{min-width:0;padding:.75rem;background:#192436;border:1px solid #344354;border-radius:.3rem}
 .city-scene-objects h4{margin-top:.5rem;color:#b9c8de}
-.city-location-cards{grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))}
-.city-location-cards .pixel-location{background:linear-gradient(160deg,#243752,#172433 75%);min-height:7rem}
-.city-location-cards .pixel-location button .pixel-sprite{width:1.35rem;height:1.35rem;position:relative;inset:auto;border-radius:.25rem}
-.city-location-cards .pixel-location button .pixel-sprite-fallback{width:100%;height:100%}
+.city-observation-scene .pixel-location{background:linear-gradient(160deg,#243752,#172433 75%);min-height:7rem}
+.city-observation-scene .pixel-location button .pixel-sprite{width:1.35rem;height:1.35rem;position:relative;inset:auto;border-radius:.25rem}
+.city-observation-scene .pixel-location button .pixel-sprite-fallback{width:100%;height:100%}
+
+.city-scene-picker{display:flex;gap:.7rem;align-items:center;margin:0 1rem .75rem}
+.city-observation-scene{padding:.75rem;border:1px solid #344354;border-radius:.3rem;background:linear-gradient(#1621379c,#111b2be8),url('/pixel/night-map.png') center/cover;min-height:14rem}
+.city-observation-scene>h2,.city-travel-list{margin:.5rem 1rem}
+.city-travel-list button{padding:.3rem .65rem;border:1px solid #58687f;border-radius:.3rem}
+.city-observation-scene .pixel-location{display:block}

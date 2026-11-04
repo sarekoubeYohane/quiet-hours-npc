@@ -17,7 +17,7 @@ import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownSc
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string}&Partial<import('./pursuits').PursuitFields>;
-export type ActivityPlan={pursuitOrigin?:{at:number;pursuits:{id:string;version:number}[]};pursuitIds?:string[];resumable?:boolean;sleep?:{elapsedMinutes:number;naturalWakeAt?:number;stimulusWakeAt?:number};bodyActivity?:import('./needs').BodyActivity;selectedResult?:import('./world-effects').SelectedResult;timeIntent?:import('./activities').TimeIntent;action:Action;startedAt:number;until:number;attention:string;modelKey:string;phases?:{stages:ActivityPhase[];cursor:number;origin:string}};
+export type ActivityPlan={journey?:{location:string;region:string};pursuitOrigin?:{at:number;pursuits:{id:string;version:number}[]};pursuitIds?:string[];resumable?:boolean;sleep?:{elapsedMinutes:number;naturalWakeAt?:number;stimulusWakeAt?:number};bodyActivity?:import('./needs').BodyActivity;selectedResult?:import('./world-effects').SelectedResult;timeIntent?:import('./activities').TimeIntent;action:Action;startedAt:number;until:number;attention:string;modelKey:string;phases?:{stages:ActivityPhase[];cursor:number;origin:string}};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number;costs?:CostLedger};
 export type EventHabit={key:string;triggerKey:string;triggerLabel:string;activityKey:string;activityLabel:string;location:string;observedDays:number[];lastSeen:number;proposedAt:number;links:{trigger:{id:string;version:number};action:{id:string;version:number};evidenceId:string}[]};
 export type HabitEvidence={confirmedIdentity?:import('./world-effects').ActivityIdentity;semanticGap?:boolean;id:string;version:1;time:number;location:string;activityKey:string;activityLabel:string;eventId?:string;memory?:{id:string;version:number};started:true};
@@ -89,22 +89,59 @@ if(tags.includes('非常擅長說服'))return 4;
 if(tags.includes('擅長說服'))return 2;
 return 0;
 }
+export function movementTarget(w:World,c:Character,target:Action['target']) {
+ const region=worldRegions(w).find(item=>item.id===target);
+ const destination=worldLocations(w).find(item=>item.id===(region?.location||target));
+ if(!destination)throw Error('目的地無效');
+ const fromRegion=regionOf(c),nextRegion=region?.id||defaultRegion(destination.id,w);
+ let walkMinutes:number|undefined;
+ if(destination.id===c.location){
+  const door=connectingDoor(w,fromRegion,nextRegion);
+  if(!door||(w.scene?.doors[door.id]||'open')!=='open')throw Error('目的地無效或門尚未開啟');
+ }else{
+  if(region&&region.id!==defaultRegion(destination.id,w))throw Error('請先前往場所入口');
+  const entrance=defaultRegion(c.location,w);
+  if(fromRegion!==entrance){
+   const exit=connectingDoor(w,fromRegion,entrance);
+   if(!exit||(w.scene?.doors[exit.id]||'open')!=='open')throw Error('請先打開通往出口的門');
+  }
+  if(w.configuration?.walks){
+   const walk=w.configuration.walks.find(item=>item.locations.includes(c.location)&&item.locations.includes(destination.id));
+   if(!walk?.minutes)throw Error('沒有可步行的直接路線。');
+   walkMinutes=walk.minutes;
+  }
+ }
+ return {location:destination.id,region:nextRegion,name:walkMinutes===undefined ? region?.name||destination.name : destination.name,walkMinutes};
+}
+
+export function moveHeldObjects(w:World,c:Character,region:string){
+ for(const object of w.objects||[])if(object.lifecycle==='active'&&object.holder===c.id){
+  object.region=region;object.revision++;
+ }
+}
+
+export function completeMovement(w:World,c:Character,destination:{location:string;region:string;name:string},action:Action,fromRegion=regionOf(c)){
+ const from=c.location;
+ c.location=destination.location;c.region=destination.region;
+ moveHeldObjects(w,c,destination.region);
+ c.activity=`剛走到${destination.name}。`;
+ if(typeof action.mood==='string')c.mood=action.mood.slice(0,20);
+ record(w,c.id,`${c.name} 步行前往${destination.name}，在這段時間結束時抵達。`,'move',[c.id],
+   {from,to:c.location,fromRegion,toRegion:destination.region,target:action.target});
+ const permission=entryPermission(w,c.id,c.location,destination.region);
+ if(permission)w.events.at(-1)!.entryPermission=permission;
+}
+
 export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;const fromRegion=regionOf(c);
-const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?(a.type==='message'?a.content:a.content.trim().slice(0,500)):'',witnesses=w.characters.filter(x=>x.location===c.location).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
+const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?(a.type==='message'?a.content:a.content.trim().slice(0,500)):'',witnesses=w.characters.filter(x=>x.location===c.location&&!x.plan?.journey).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
 if(a.type==='phone'){
 applyPhoneAction(w,c,a,!!options.dryRun);if(options.dryRun)return;c.activity='操作了手機。';text=`${c.name} 操作了手機。`;
 }
 else if(a.type==='move'){
-const region=worldRegions(w).find(x=>x.id===a.target),dest=worldLocations(w).find(x=>x.id===(region?.location||a.target));
-if(!dest)throw Error('目的地無效');const nextRegion=region?.id||defaultRegion(dest.id,w);
-if(dest.id===c.location){const door=connectingDoor(w,fromRegion,nextRegion);if(!door||(w.scene?.doors[door.id]||'open')!=='open')throw Error('目的地無效或門尚未開啟');}
-else {
-if(region&&region.id!==defaultRegion(dest.id,w))throw Error('請先前往場所入口');
-if(fromRegion!==defaultRegion(from,w)){const exit=connectingDoor(w,fromRegion,defaultRegion(from,w));if(!exit||(w.scene?.doors[exit.id]||'open')!=='open')throw Error('請先打開通往出口的門');}
-}
-for(const object of w.objects||[])if(object.lifecycle==='active'&&object.holder===c.id){object.region=nextRegion;object.revision++;}
-audience=[...new Set([...witnesses,...w.characters.filter(x=>x.location===dest.id).map(x=>x.id)])];c.location=dest.id;c.region=nextRegion;c.activity=`剛走到${region?.name||dest.name}。`;text=`${c.name} 步行前往${region?.name||dest.name}，在這段時間結束時抵達。`;
+const destination=movementTarget(w,c,a.target);
+if(!options.dryRun)completeMovement(w,c,destination,a);
+return;
 }
 else if(a.type==='door'){
 const door=worldDoors(w).find(x=>x.id===a.target);if(!door||!door.regions.includes(fromRegion)||!['open','close'].includes(content))throw Error('門操作無效');
@@ -186,10 +223,6 @@ else throw Error('未知行動');
 if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
   {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:undefined);
-if(a.type==='move'&&!options.dryRun){
-  const permission=entryPermission(w,c.id,c.location,regionOf(c));
-  if(permission)w.events.at(-1)!.entryPermission=permission;
-}
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);
 if(attemptKey)w.events.at(-1)!.attemptKey=attemptKey;
 if(project){

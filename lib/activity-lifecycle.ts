@@ -1,9 +1,10 @@
+import { worldLocations } from './world-configuration';
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
 import { invalidateNaturalChanges } from './natural-changes';
 import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActivityPhase, validateResultBranches, discardPendingSupplies, effectSupplyReferenceIds, EffectValidationError } from './world-effects';
-import { record, resolve, type Character, type World } from './world';
-import { regionOf, PerceptionCapacityError } from './perception';
+import { completeMovement, moveHeldObjects, movementTarget, record, resolve, type Character, type World } from './world';
+import { regionOf, transitRegion, PerceptionCapacityError } from './perception';
 import type { ActivityDecision } from './activities';
 
 // This module mutates only the current round candidate. Model dispatch, NPC
@@ -85,10 +86,44 @@ export function discardLegacyActivity(world:World,character:Character):void {
  }
 }
 
+export function finishJourney(world:World,character:Character):void{
+ const plan=character.plan;
+ if(!plan?.journey||world.minute<plan.until)return;
+ const {journey,action}=plan;
+ const name=worldLocations(world).find(location=>location.id===journey.location)!.name;
+ cancelActivity(world,character);
+ completeMovement(world,character,{...journey,name},action,transitRegion(character));
+ invalidateNaturalChanges(world);
+}
+
 export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
  const {minutes,modelKey,attention,ai}=options;
  let confirmedProfile:BodyActivity|undefined;
  cancelActivity(world,character);
+ if(decision.action.type==='move'&&world.configuration?.walks){
+  const destination=movementTarget(world,character,decision.action.target);
+  const duration=destination.walkMinutes;
+  if(duration!==undefined){
+   if(decision.timeIntent?.kind==='completion'&&decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes){
+    recordActionResult(world,character,decision.action,`這段步行需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未出發。`,'blocked');
+    return false;
+   }
+   if(duration<=minutes)completeMovement(world,character,destination,decision.action);
+   else{
+    const fromRegion=regionOf(character),from=character.location;
+    character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,
+      journey:{location:destination.location,region:destination.region}};
+    character.activity=`正在前往${destination.name}。`;
+    if(typeof decision.action.mood==='string')character.mood=decision.action.mood.slice(0,20);
+    const road=transitRegion(character);
+    moveHeldObjects(world,character,road);
+    record(world,character.id,`${character.name} 開始步行前往${destination.name}。`,'depart',[character.id],
+      {from,to:from,fromRegion,toRegion:road});
+   }
+   invalidateNaturalChanges(world);
+   return true;
+  }
+ }
   if(requiresWorldEffects(decision.action)){
     if(!decision.freeCandidate){
       if(ai)throw Error('物件行動缺少裁定。');

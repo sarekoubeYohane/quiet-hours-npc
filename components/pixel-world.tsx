@@ -15,6 +15,58 @@ export function PixelSprite({ id, className = '' }: { id: string; className?: st
   </span>;
 }
 
+function ConfiguredScene({world,selected,onSelect}:{world:World;selected:string;onSelect:(id:string)=>void}) {
+  const [placeId,setPlaceId]=useState('');
+  const places=worldLocations(world);
+  const place=places.find(item=>item.id===placeId) ?? places[0];
+  const rooms=worldRegions(world).filter(room=>room.location===place?.id);
+  const roomIds=new Set(rooms.map(room=>room.id));
+  const doors=worldDoors(world).filter(door=>door.regions.every(id=>roomIds.has(id)));
+  const local=world.characters.filter(person=>person.location===place?.id&&!person.plan?.journey);
+  const travelers=world.characters.filter(person=>person.plan?.journey);
+  if(!place)return null;
+  return <>
+    <label className="city-scene-picker">觀看場所
+      <select aria-label="觀看場所" value={place.id} onChange={event=>setPlaceId(event.target.value)}>
+        {places.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+      </select>
+    </label>
+    <section className="city-observation-scene" aria-label="目前觀看場所">
+      <h2>{place.name}</h2>
+      <div className="city-scene-objects" aria-label="場所文字物件">
+        {rooms.map(room=>{
+          const occupants=local.filter(person=>characterRegion(person)===room.id);
+          const objects=world.objects?.filter(object=>object.region===room.id&&object.lifecycle==='active'&&object.holder===null);
+          return <section className="pixel-location" key={room.id} aria-label={room.name}>
+            <h3>{room.name}</h3>
+            <div>{occupants.map(person=><button key={person.id} type="button" onClick={()=>onSelect(person.id)}
+              aria-pressed={selected===person.id} className={selected===person.id?'active':''}>
+              <PixelSprite id={person.id}/><strong>{person.name}</strong>
+              <small>{room.name} · {person.activity || '活動內容未記錄'}</small>
+            </button>)}
+              {!occupants.length&&<span className="empty-place">此刻沒有人</span>}
+            </div>
+            {!!objects?.length&&<ul>{objects.map(object=><li key={object.id}>
+              {object.label}{Object.entries(object.state).map(([key,value])=><small key={key}> · {key}：{value}</small>)}
+            </li>)}</ul>}
+          </section>;
+        })}
+      </div>
+      {!!doors.length&&<div className="map-door-status">{doors.map(door=><span key={door.id}>
+        {door.name}：{world.scene?.doors[door.id]==='closed'?'關閉':'開啟'}
+      </span>)}</div>}
+    </section>
+    {!!travelers.length&&<section className="city-travel-list" aria-label="移動途中">
+      <h3>移動途中</h3>
+      <ul>{travelers.map(person=><li key={person.id}>
+        <button type="button" onClick={()=>onSelect(person.id)} aria-pressed={selected===person.id}>
+          {person.name} · 前往{places.find(item=>item.id===person.plan?.journey?.location)?.name}
+        </button>
+      </li>)}</ul>
+    </section>}
+  </>;
+}
+
 export default function PixelWorld({ world, selected, onSelect, onPlayingChange }: {
   world: World; selected: string; onSelect: (id: string) => void; onPlayingChange: (playing: boolean) => void;
 }) {
@@ -101,17 +153,10 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
       })}
       <span className="map-playback">{playing ? <MessageCircle size={14}/> : <Pause size={14}/>} {playing ? `${actor?.name || ''} 的行動` : '點角色查看狀態'}</span>
     </div>}
-    <div className="map-door-status">{doors.map(door => <span key={door.id}>{door.name}：{world.scene?.doors[door.id] === 'closed' ? '關閉' : '開啟'}（{door.regions.map(id => regions.find(region => region.id === id)?.name || id).join(' ↔ ')}）</span>)}<span>分區邊界為示意；角色位置與門狀態來自世界。</span></div>
-    <div className={`pixel-locations${world.configuration?' city-location-cards':''}`}>{places.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}>{world.configuration?<PixelSprite id={c.id}/>:<span style={{background:c.color}}/>}<strong>{c.name}</strong><small>{regions.find(region => region.id === characterRegion(c))?.name || c.location} · {c.activity || '活動內容未記錄'}</small></button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
-    {world.configuration && <div className="city-scene-objects" aria-label="場所文字物件">
-      {places.map(place=><section key={place.id}><h3>{place.name}</h3>
-        {regions.filter(room=>room.location===place.id).map(room=><div key={room.id}><h4>{room.name}</h4>
-          <ul>{world.objects?.filter(object=>object.region===room.id&&object.lifecycle==='active'&&object.holder===null).map(object=><li key={object.id}>
-            {object.label}{Object.entries(object.state).map(([key,value])=><small key={key}> · {key}：{value}</small>)}
-          </li>)}</ul>
-        </div>)}
-      </section>)}
-    </div>}
+    {world.configuration ? <ConfiguredScene key={world.contextId} world={world} selected={selected} onSelect={onSelect}/> : <>
+      <div className="map-door-status">{doors.map(door => <span key={door.id}>{door.name}：{world.scene?.doors[door.id] === 'closed' ? '關閉' : '開啟'}（{door.regions.map(id => regions.find(region => region.id === id)?.name || id).join(' ↔ ')}）</span>)}<span>分區邊界為示意；角色位置與門狀態來自世界。</span></div>
+      <div className="pixel-locations">{places.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}><span style={{background:c.color}}/><strong>{c.name}</strong><small>{regions.find(region => region.id === characterRegion(c))?.name || c.location} · {c.activity || '活動內容未記錄'}</small></button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
+    </>}
     <div className="scene-caption" aria-live="polite">{active ? `已提交行動回放 · ${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨回合行動。延續活動不重新詢問 AI；當面對話顯示在地圖上。`}</div>
   </section>;
 }
