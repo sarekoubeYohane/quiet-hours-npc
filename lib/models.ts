@@ -1,3 +1,4 @@
+import { phoneMapPrompt } from './phone-map';
 import { pursuitPrompt, updatePursuits } from './pursuits';
 import { pursuitSelectionPrompt, parsePursuitSelection } from './pursuit-selection';
 import { prepareNpcDecision, type NpcDecisionContext } from './npc-decision-preparation';
@@ -93,7 +94,7 @@ messages[0].content+=' self.arrangementCues是你實際可知條件下想起既�
 messages[0].content+=' self.lastKnownState 集中呈現本次仍可見的主觀來源、時間及引用；它不是即時世界真相，不把聽聞、推測或錯誤感知改成事實，也不保證受阻原因。supplies 只表示知道該來源，availability=unknown 不表示仍有庫存；指定那份耗盡不代表整個場所有無其他來源，未得知補充保持未知。';
 messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;
-messages[0].content+=methodAssessmentPrompt+phonePrompt+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
+messages[0].content+=methodAssessmentPrompt+phonePrompt+(w.configuration?phoneMapPrompt:'')+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
 let recalled = false;
 for (;;) {
