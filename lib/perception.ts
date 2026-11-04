@@ -13,7 +13,10 @@ export class PerceptionCapacityError extends Error {}
 // Confirmed by the existing world adjudication/routine binder, never an NPC
 // wording, a clock value or an arbitrary caller-supplied retry token.
 export type DiscoveryMethod = {version:1;kind:'activity'|'routine';key:string};
-export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
+export const transitRegion = (character: Character) => 'transit:' + character.id;
+export function regionOf(character: Character) {
+  return character.plan?.journey ? transitRegion(character) : character.region || defaultRegion(character.location);
+}
 export function normalizePerception(world: World) {
   world.perceptionTrials ??= {};
   world.probeResults ??= {};
@@ -23,11 +26,16 @@ export function normalizePerception(world: World) {
   for (const character of world.characters) {
     if (!worldRegions(world).some(region => region.id === character.region && region.location === character.location)) character.region = defaultRegion(character.location, world);
     character.observations ??= [];
+    if (character.plan?.journey) {
+      delete world.currentSensory.presence[character.id];
+      delete world.currentSensory.activities[character.id];
+      continue;
+    }
     if (!world.currentSensory.presence[character.id]) world.currentSensory.presence[character.id] = { region: regionOf(character), clue: `initial:${character.id}:${regionOf(character)}` };
   }
 }
 export function canSee(world: World, observer: Character, region: string) {
-  if(isSleeping(observer))return false;
+  if(isSleeping(observer)||observer.plan?.journey)return false;
   const own = regionOf(observer);
   if (world.scene?.occluded.includes(region)) return false;
   if (own === region) return true;
@@ -76,6 +84,10 @@ export function eventCandidates(world: World, observer: Character, event: import
   const origin = event.scene.fromRegion || destination;
   const visible = canSee(world, observer, destination);
   const audible = canHear(world, observer, destination);
+  if (event.kind === 'depart') {
+    return canSee(world, observer, origin) ? [{ sense:'sight', kind:'person', text:`${actor.name} 離開了這裡。`,
+      clarity:'clear', source:actor.id, region:origin, direct:true }] : [];
+  }
   if (event.kind === 'move') {
     if (visible) return [{ sense: 'sight', kind: 'person', text: `${actor.name} 來到了${worldRegions(world).find(r => r.id === destination)?.name || '這裡'}。`, clarity: 'clear', source: actor.id, region: destination, direct: true }];
     if (canSee(world, observer, origin)) return [{ sense: 'sight', kind: 'person', text: `${actor.name} 離開了這裡。`, clarity: 'clear', source: actor.id, region: origin, direct: true }];
@@ -220,6 +232,7 @@ export function knownScene(world: World, character: Character) {
 }
 
 export function observationTargets(world: World, character: Character) {
+  if (character.plan?.journey) return {regions:[],people:[]};
   const scene = knownScene(world, character);
   return { regions: [scene.region!, ...scene.exits.map(exit => exit.destination!)], people: world.characters.filter(c => c.id !== character.id).map(c => ({ id: c.id, name: c.name })) };
 }
