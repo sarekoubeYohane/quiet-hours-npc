@@ -18,3 +18,8 @@ export const decisionTraceRetention = sqliteTable('decision_trace_retention', {
   owner: text('owner').primaryKey(), evicted: integer('evicted').notNull().default(0),
 });
 
+
+export const characterTemplates = sqliteTable('character_templates', {
+  owner: text('owner').notNull(), id: text('id').notNull(),
+  version: integer('version').notNull(), fields: text('fields').notNull(),
+}, table => [primaryKey({ columns: [table.owner, table.id] })]);

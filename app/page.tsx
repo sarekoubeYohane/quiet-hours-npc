@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Moon } from 'lucide-react';
 import WorldApp from '@/components/world-app';
 import { currentEnvironment } from '@/lib/environment';
@@ -15,5 +16,5 @@ export default async function Page(){
     <p className="auth-note">請使用已受邀的 GitHub 帳號。登入後會回到這裡。</p>
     <p className="auth-note environment-note">{environment.caption}{environment.builtAtLabel!=='unknown'?` · 建置於 ${environment.builtAtLabel}`:''}</p>
   </section></main>;
-  return <WorldApp signInPath={signInPath} displayName={user.displayName} environment={environment}/>;
+  return <WorldApp signInPath={signInPath} displayName={user.displayName} environment={environment} templateNavigation={<nav aria-label="範本管理"><Link className="auth-retry" href="/character-templates">人物範本</Link></nav>}/>;
 }
