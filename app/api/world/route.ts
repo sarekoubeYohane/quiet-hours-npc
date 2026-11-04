@@ -274,6 +274,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const initialUsage = world.aiUsage && structuredClone(world.aiUsage);
     paidBefore=initialUsage;
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
+    if (world.configuration && ['direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '此世界沒有可直接控制的預設店主。' }, 400);
     if (b.operation === 'direct') {
       try {
         if (b.target !== undefined && b.target !== 'owner') throw Error('只能直接控制咖啡店主');

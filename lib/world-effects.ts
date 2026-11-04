@@ -1,3 +1,4 @@
+import { connectingDoor, worldRegions } from './world-configuration';
 import { changeBodyNeeds, type IngestEffect } from './needs';
 import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
 import { finiteSourceScope } from './routine-materials';
@@ -11,7 +12,7 @@ import { effectCandidateSchema, effectRules, validObjectKind } from './adjudicat
 import { physicalEffectLimits } from './adjudication-limits';
 export { effectCandidateSchema, effectSchema, parseEffectCandidate, scheduleCompletionMinutes } from './adjudication-contract';
 import type { Action, ActivityPlan, Character, World } from './world';
-import { canSee, regionOf, regions, connectingDoor, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
+import { canSee, regionOf, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
 import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
@@ -86,7 +87,7 @@ export function authorityForProposal(w:World,c:Character,action?:Action){
  const eligibleSupplies=(w.supplies||[]).filter(supply=>supplyIds.has(supply.id)).map(supply=>({...supply,materializedObjectId:supply.remaining>0?materializedObjectId(supply):null}));
  const eligibleRestrictions=[...(w.supplies||[]).map(source=>({type:'supply' as const,source})),...(w.objects||[]).map(source=>({type:'object' as const,source}))].flatMap(({type,source})=>{
   const scope=finiteSourceScope(source);
-  return scope?.coverage==='location'&&source.region!==local&&regions.find(region=>region.id===source.region)?.location===c.location?[{type,id:source.id,region:source.region,scope,readOnly:true as const}]:[];
+  return scope?.coverage==='location'&&source.region!==local&&worldRegions(w).find(region=>region.id===source.region)?.location===c.location?[{type,id:source.id,region:source.region,scope,readOnly:true as const}]:[];
  });
  // A bounded authority subset is explicit about omissions, never a complete
  // execution snapshot. Prefer the requested identity and actor's own objects.
@@ -138,8 +139,8 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
    if(e.target.type==='object'&&e.access==='physical'){const o=w.objects!.find(object=>object.id===e.target.id)!;retainPhysicalHistory(o,c,w.minute,'state',o.holder);}
    results.push('已進行這個步驟');
   }else if(e.kind==='displace-body'){
-   const target=w.characters.find(person=>person.id===e.targetId),destination=regions.find(region=>region.id===e.toRegion);
-   const door=connectingDoor(e.expectedRegion,e.toRegion);
+   const target=w.characters.find(person=>person.id===e.targetId),destination=worldRegions(w).find(region=>region.id===e.toRegion);
+   const door=connectingDoor(w,e.expectedRegion,e.toRegion);
    if(!target||!destination||regionOf(target)!==e.expectedRegion||regionOf(target)!==regionOf(c)||(target.physical?.revision||0)!==e.expectedRevision||target.id!==c.id&&!canSee(w,c,regionOf(target))||destination.location!==target.location||!door||(w.scene?.doors[door.id]||'open')!=='open')fail('body_displacement','目前無法把這個身體移到指定位置。');
    target.region=destination.id;target.location=destination.location;
    target.physical={revision:e.expectedRevision+1,state:{...target.physical?.state},exposure:{...target.physical?.exposure}};
@@ -186,7 +187,7 @@ function applyEffects(w:World,c:Character,effects:Effect[],phaseIndex:number|nul
     o.state[e.key]=e.value;results.push(o.stateExposure?.[e.key]==='hidden'?'已進行這個步驟':`${o.label}：${e.key}=${e.value}`);
    }else{
     if(physical&&o.holder===e.toHolder)fail('unchanged_holder','物件已由該持有人持有。');
-    if(e.toRegion!==regionOf(c)||!regions.some(r=>r.id===e.toRegion))fail('remote_transfer','不能跨地點遠端轉移物件。');
+    if(e.toRegion!==regionOf(c)||!worldRegions(w).some(r=>r.id===e.toRegion))fail('remote_transfer','不能跨地點遠端轉移物件。');
     if(e.toHolder!==null&&e.toHolder!==c.id){
      const recipient=w.characters.find(x=>x.id===e.toHolder);
      if(!recipient||regionOf(recipient)!==e.toRegion||!o.allowedTo.includes(recipient.id)||!o.acceptedBy?.includes(recipient.id))fail('recipient_consent','對方尚未同意接收。');
@@ -217,7 +218,7 @@ function abilityAdvantage(c:Character,ability:string):Advantage {
 // candidate cannot obtain a new die by appending unrelated effect references.
 function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:Action):Resolution {
  const target=w.objects?.find(o=>o.id===action.target)||w.supplies?.find(s=>s.id===action.target);
- const person=w.characters.find(person=>person.id===action.target),environment=regions.find(region=>region.id===action.target);
+ const person=w.characters.find(person=>person.id===action.target),environment=worldRegions(w).find(region=>region.id===action.target);
  const localPerson=!!person&&regionOf(person)===regionOf(c)&&(person.id===c.id||canSee(w,c,regionOf(person)));
  const localEnvironment=!!environment&&environment.id===regionOf(c)&&canSee(w,c,environment.id);
  if(!candidate.trialBinding&&(!(target&&target.knownTo.includes(c.id)&&target.region===regionOf(c))&&!localPerson&&!localEnvironment))throw new EffectValidationError('不確定活動需要當前可知的具體對象。',{reason:'branch_subject'});
@@ -425,7 +426,7 @@ function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:Discover
 
 // Only external sensory facts leave the authority batch; reasons stay in receipts.
 export function emitExternalConsequences(w:World,actorId:string,effects:Effect[]):void {
- const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:regions.find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&(e.target.type!=='object'||actorId==='world')?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
+ const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:worldRegions(w).find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&(e.target.type!=='object'||actorId==='world')?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
  if(!externalChanges.length)return;
  const actor=w.characters.find(c=>c.id===actorId),region=actor?regionOf(actor):externalChanges.find(change=>change.target.type==='environment')?.target.id;
  record(w,actorId,actorId==='world'?'已確認的自然變化發生。':'外在狀況發生變化。',actorId==='world'?'natural':'external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges});

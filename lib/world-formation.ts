@@ -2,7 +2,8 @@ import type { Character,World } from './world';
 import type { WorldObject } from './world-effects';
 import type { FormationEffect, FormationInput, ObjectSource, Quantity } from './world-formation-contract';
 import { formationLimits, validQuantity } from './world-formation-contract';
-import { regionOf, regions } from './perception';
+import { regionOf } from './perception';
+import { worldRegions } from './world-configuration';
 
 type FormationContext={world:World;actor:Character;hasPermission:(object:WorldObject,actorId:string)=>boolean;canReach:(world:World,actor:Character,object:WorldObject)=>boolean;retainPhysical:(object:WorldObject,actor:Character,minute:number,operation:string,priorHolder:string|null,permitted:boolean)=>void;fail:(reason:string,message:string)=>never};
 const owners=(object:WorldObject)=>[...new Set(object.coOwners?.length?object.coOwners:[object.owner])];
@@ -20,7 +21,7 @@ function sourceObject(input:FormationInput,context:FormationContext,access:'auth
  return object;
 }
 function freshIdentity(id:string,context:FormationContext):void {
- if(context.world.objects?.some(object=>object.id===id)||context.world.supplies?.some(supply=>supply.id===id)||context.world.characters.some(actor=>actor.id===id)||regions.some(region=>region.id===id||region.location===id))context.fail('identity_used','形成身份已被使用。');
+ if(context.world.objects?.some(object=>object.id===id)||context.world.supplies?.some(supply=>supply.id===id)||context.world.characters.some(actor=>actor.id===id)||worldRegions(context.world).some(region=>region.id===id||region.location===id))context.fail('identity_used','形成身份已被使用。');
 }
 function deduct(object:WorldObject,quantity:Quantity,operation:'partition'|'transform'|'separate',context:FormationContext,disposition:'consumed'|'destroyed'='consumed'):void {
  const previous=object.quantity??{amount:1,unit:'item'};

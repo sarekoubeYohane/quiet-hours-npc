@@ -1,7 +1,7 @@
 import type { Character, World } from './world';
 import { record } from './world';
 import type { PhoneData } from './phones';
-import { regions } from './perception';
+import { worldRegions } from './world-configuration';
 import { isSleeping } from './needs';
 import { MemoryValidationError, memoryBytes } from './memory';
 
@@ -25,7 +25,7 @@ export function emitPhoneNotification(w:World,device:PhoneData,source:{kind:Phon
   if(index<0)throw new MemoryValidationError('手機通知待處理紀錄已滿，請明示處理或刪除對應資料。');
   device.notifications!.splice(index,1);device.notificationHistoryDropped=(device.notificationHistoryDropped||0)+1;
  }
- const location=regions.find(r=>r.id===object.region)?.location;if(!location)throw new MemoryValidationError('手機通知位置無效。');
+ const location=worldRegions(w).find(r=>r.id===object.region)?.location;if(!location)throw new MemoryValidationError('手機通知位置無效。');
  record(w,'device','一部手機發出一聲提示音。','phone-notification',[],{from:location,to:location,fromRegion:object.region,toRegion:object.region,target:object.id});
  const event=w.events.at(-1)!;
  const notification:PhoneNotification={id:crypto.randomUUID(),...source,key,generation,emittedAt:w.minute,eventId:event.id,exposures:(event.perception||[]).map(p=>({actorId:p.characterId,status:p.status,observationIds:p.observations.map(o=>o.id)}))};

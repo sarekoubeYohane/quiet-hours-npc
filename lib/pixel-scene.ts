@@ -1,5 +1,5 @@
 import type { Character, WorldEvent } from './world';
-import { regions } from './perception';
+import { worldRegions } from './world-configuration';
 
 export type Point = { x: number; y: number };
 export const spriteIndex: Record<string, number> = { cass: 0, vera: 1, kris: 2, owner: 3 };
@@ -13,8 +13,8 @@ const doors: Record<string, Point> = {
   'kris-home': { x: 28.5, y: 35.5 }, 'vera-home': { x: 72, y: 35.5 }, cafe: { x: 50, y: 56 },
 };
 export function characterRegion(character: Pick<Character, 'location' | 'region'>): string {
-  return regions.find(region => region.id === character.region && region.location === character.location)?.id
-    || regions.find(region => region.location === character.location)?.id || character.location;
+  return character.region
+    || worldRegions().find(region => region.location === character.location)?.id || character.location;
 }
 export function position(character: Pick<Character, 'id' | 'location' | 'region'>): Point {
   const choices = spots[characterRegion(character)] || spots[character.location];

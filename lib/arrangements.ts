@@ -1,6 +1,7 @@
 import type { Character, Intent, World } from './world';
 import { MemoryValidationError, memoryBytes, type ShortMemory } from './memory';
-import { regions } from './perception';
+import { observationTargets } from './perception';
+import { worldRegions } from './world-configuration';
 import { conditionKey, type ArrangementCueState } from './arrangement-cues';
 import type { PreferenceReference } from './preferences';
 
@@ -39,9 +40,10 @@ export function validArrangementCondition(value:ArrangementCondition){
 }
 export function validateArrangementConditionScope(w:World,c:Character,condition:ArrangementCondition){
   if(condition.kind==='event'&&condition.source&&!w.characters.some(p=>p.id===condition.source))throw new MemoryValidationError('安排人物未知');
-  if(condition.kind!=='time'&&condition.region&&!regions.some(r=>r.id===condition.region)){
-   // Static scene regions are checked against the same known scene projection.
-   const knownRegions=new Set([c.region,c.location,...w.characters.filter(p=>p.id===c.id).map(p=>p.region)]);
+  if(condition.kind!=='time'&&condition.region){
+   const regions=w.configuration?observationTargets(w,c).regions:worldRegions(w);
+   const observations=w.configuration?c.observations?.map(item=>item.region)||[]:[];
+   const knownRegions=new Set([c.region,c.location,...regions.map(region=>region.id),...observations]);
    if(!knownRegions.has(condition.region))throw new MemoryValidationError('安排區域未知');
   }
 }

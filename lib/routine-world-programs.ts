@@ -1,7 +1,8 @@
 import { confirmsBodyConsequences } from './needs';
 import { routineMaterialSourceMatches, routineOrdinarySourceMatches } from './routine-materials';
 import { checkRoutineMethod, matchesRoutineMethod, routineWorldLimits, type RoutineWorldApproval, type RoutineWorldProgram, type RoutineBinding } from './routine-world-contract';
-import { regionOf, canSee, regions } from './perception';
+import { regionOf, canSee } from './perception';
+import { worldRegions } from './world-configuration';
 import { worldTargetSnapshot } from './world-state';
 import { canPhysicallyReachObject, hasObjectPermission, commitActivityPhase, effectReferenceIds, discardPendingSupplies, effectSupplyReferenceIds, type Effect, type EffectCandidate, EffectValidationError, type ActivityPhase, type WorldObject } from './world-effects';
 import { rebindRoutineEffects, rememberRoutineSource, routineSourcePremise, routineSourceLimits, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutinePhaseBindings } from './routine-world-bindings';
@@ -46,7 +47,7 @@ function bindRoles(w:World,c:Character,action:Action,program:RoutineWorldProgram
    return actual;
   }
   const finite=currentRule.finiteSourceBindings?.some(entry=>entry.operation===program.operation&&entry.roles.includes(binding.role));
-  const concrete=(w.objects||[]).some(object=>(discovering||object.knownTo.includes(c.id))&&regions.some(region=>region.id===object.region&&region.location===c.location)&&!fromRenewableBackground(object)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(object,binding):object.kind===bg.kind||object.kind===binding.kind));
+  const concrete=(w.objects||[]).some(object=>(discovering||object.knownTo.includes(c.id))&&worldRegions(w).some(region=>region.id===object.region&&region.location===c.location)&&!fromRenewableBackground(object)&&(binding.sourceRole==='material'?routineMaterialSourceMatches(object,binding):object.kind===bg.kind||object.kind===binding.kind));
   report(binding,{check:'background-substitution',finite:!!finite,concrete,allowed:!finite&&!concrete});
   if(finite||concrete)throw new RoutineUnavailable('已知具體材料或器具已耗盡、損毀、移走或無法操作；日常背景不會補回。');
   const initialState=Object.fromEntries(bg.initialState.map(({key,value})=>[key,value])),exposure=Object.fromEntries(bg.initialState.map(({key,exposure})=>[key,exposure]));

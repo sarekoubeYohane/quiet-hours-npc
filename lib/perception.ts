@@ -3,18 +3,9 @@ import { knownExternalState, type PhysicalState } from './world-state';
 import { addExperience } from './memory';
 import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
 import type { Character, World } from './world';
+import { connectingDoor, defaultRegion, worldDoors, worldRegions } from './world-configuration';
 import { falsePerception, type FalsePerceptionDiagnostic } from './false-perception';
 
-export type Region = { id: string; location: string; name: string };
-export type Door = { id: string; name: string; regions: [string, string] };
-// Layout is replaceable data; sensory rules do not depend on room names or counts.
-export const regions: Region[] = [
-  { id: 'kris-home-main', location: 'kris-home', name: '室內' },
-  { id: 'vera-home-main', location: 'vera-home', name: '室內' },
-  { id: 'cafe-front', location: 'cafe', name: '前台' },
-  { id: 'cafe-storeroom', location: 'cafe', name: '儲藏室' },
-];
-export const doors: Door[] = [{ id: 'cafe-door', name: '儲藏室門', regions: ['cafe-front', 'cafe-storeroom'] }];
 export type CurrentSensoryState = { presence: Record<string, { region: string; clue: string }>; activities: Record<string, { clue: string; region: string; action: import('./world').Action }> };
 export type SceneState = { doors: Record<string, 'open' | 'closed'>; noise: Record<string, 'quiet' | 'loud'>; occluded: string[]; external?:Record<string,PhysicalState> };
 export type Observation = { id: string; time: number; sense: 'sight' | 'hearing' | 'touch'; kind: 'person' | 'speech' | 'sound' | 'door' | 'activity'; text: string; clarity: 'clear' | 'vague'; source?: string; objectId?: string; supplyId?: string; region?: string; urgency?: 'danger' | 'strong' | 'direct' };
@@ -22,27 +13,25 @@ export class PerceptionCapacityError extends Error {}
 // Confirmed by the existing world adjudication/routine binder, never an NPC
 // wording, a clock value or an arbitrary caller-supplied retry token.
 export type DiscoveryMethod = {version:1;kind:'activity'|'routine';key:string};
-export function defaultRegion(location: string) { return regions.find(region => region.location === location)!.id; }
 export function regionOf(character: Character) { return character.region || defaultRegion(character.location); }
 export function normalizePerception(world: World) {
   world.perceptionTrials ??= {};
   world.probeResults ??= {};
   world.currentSensory ??= { presence: {}, activities: {} };
   world.scene ??= { doors: {}, noise: {}, occluded: [] };
-  for (const door of doors) world.scene.doors[door.id] ??= 'open';
+  for (const door of worldDoors(world)) world.scene.doors[door.id] ??= 'open';
   for (const character of world.characters) {
-    if (!regions.some(region => region.id === character.region && region.location === character.location)) character.region = defaultRegion(character.location);
+    if (!worldRegions(world).some(region => region.id === character.region && region.location === character.location)) character.region = defaultRegion(character.location, world);
     character.observations ??= [];
     if (!world.currentSensory.presence[character.id]) world.currentSensory.presence[character.id] = { region: regionOf(character), clue: `initial:${character.id}:${regionOf(character)}` };
   }
 }
-export function connectingDoor(from: string, to: string) { return doors.find(door => door.regions.includes(from) && door.regions.includes(to)); }
 export function canSee(world: World, observer: Character, region: string) {
   if(isSleeping(observer))return false;
   const own = regionOf(observer);
   if (world.scene?.occluded.includes(region)) return false;
   if (own === region) return true;
-  const door = connectingDoor(own, region);
+  const door = connectingDoor(world, own, region);
   return !!door && (world.scene?.doors[door.id] || 'open') === 'open';
 }
 
@@ -55,7 +44,7 @@ function sensoryCandidateIdentity(candidate: SensoryCandidate) {
   return [candidate.sense, candidate.kind, candidate.text, candidate.source, candidate.region, ...(candidate.objectId ? [{ objectId: candidate.objectId }] : candidate.supplyId ? [{ supplyId: candidate.supplyId }] : [])];
 }
 export function canHear(world: World, observer: Character, region: string) {
-  return regionOf(observer) === region || !!connectingDoor(regionOf(observer), region);
+  return regionOf(observer) === region || !!connectingDoor(world, regionOf(observer), region);
 }
 export function eventCandidates(world: World, observer: Character, event: import('./world').WorldEvent): SensoryCandidate[] {
   if(event.scene?.externalChanges){
@@ -70,14 +59,14 @@ export function eventCandidates(world: World, observer: Character, event: import
         if(target.id===observer.id&&consequence.exposure!=='hidden')clues.push({sense:'touch',kind:'activity',text:`自己的身體狀況有變化：${text}。`,clarity:'clear',region:regionOf(target),urgency:'direct',direct:true});
         else if(consequence.exposure==='public'&&canSee(world,observer,regionOf(target)))clues.push({sense:'sight',kind:'activity',text:`${target.name} 的外在狀況：${text}。`,clarity:'clear',source:target.id,region:regionOf(target),direct:true});
       }else if(consequence.target.type==='environment'&&consequence.exposure==='public'&&canSee(world,observer,consequence.target.id)){
-        clues.push({sense:'sight',kind:'activity',text:`${regions.find(r=>r.id===consequence.target.id)?.name||consequence.target.id}：${consequence.changes.map(change=>`${change.key}：${change.value}`).join('，')}。`,clarity:'clear',region:consequence.target.id,direct:true});
+        clues.push({sense:'sight',kind:'activity',text:`${worldRegions(world).find(r=>r.id===consequence.target.id)?.name||consequence.target.id}：${consequence.changes.map(change=>`${change.key}：${change.value}`).join('，')}。`,clarity:'clear',region:consequence.target.id,direct:true});
       }
     }
     return clues;
   }
   if(event.kind==='phone-notification'){
     const region=event.scene?.toRegion;if(!region||!canHear(world,observer,region))return [];
-    const here=regionOf(observer),door=connectingDoor(here,region);
+    const here=regionOf(observer),door=connectingDoor(world, here,region);
     if(here!==region&&door&&(world.scene?.doors[door.id]||'open')==='closed')return [];
     return [{sense:'hearing',kind:'sound',text:'附近一部手機響了一聲提示音。',clarity:'vague',region,direct:false,interference:world.scene?.noise[here]==='loud'?'strong':here===region?'weak':'medium'}];
   }
@@ -88,23 +77,23 @@ export function eventCandidates(world: World, observer: Character, event: import
   const visible = canSee(world, observer, destination);
   const audible = canHear(world, observer, destination);
   if (event.kind === 'move') {
-    if (visible) return [{ sense: 'sight', kind: 'person', text: `${actor.name} 來到了${regions.find(r => r.id === destination)?.name || '這裡'}。`, clarity: 'clear', source: actor.id, region: destination, direct: true }];
+    if (visible) return [{ sense: 'sight', kind: 'person', text: `${actor.name} 來到了${worldRegions(world).find(r => r.id === destination)?.name || '這裡'}。`, clarity: 'clear', source: actor.id, region: destination, direct: true }];
     if (canSee(world, observer, origin)) return [{ sense: 'sight', kind: 'person', text: `${actor.name} 離開了這裡。`, clarity: 'clear', source: actor.id, region: origin, direct: true }];
     const clues: SensoryCandidate[] = [];
-    const doorway = connectingDoor(here, destination);
+    const doorway = connectingDoor(world, here, destination);
     if (world.scene?.occluded.includes(destination) && (here === destination || doorway && world.scene.doors[doorway.id] === 'open')) clues.push({ sense: 'sight', kind: 'person', text: '遮擋處有人影晃過。', clarity: 'vague', region: destination, direct: false, interference: 'medium' });
     if (audible || canHear(world, observer, origin)) clues.push({ sense: 'hearing', kind: 'sound', text: '附近傳來腳步聲。', clarity: 'vague', direct: world.scene?.noise[here] !== 'loud', interference: 'medium' });
     return clues;
   }
   if (event.kind === 'door') {
-    const door = doors.find(d => d.id === event.scene?.target);
+    const door = worldDoors(world).find(d => d.id === event.scene?.target);
     if (!door?.regions.includes(here)) return [];
     const state = world.scene?.doors[door.id] === 'closed' ? '關上' : '打開';
     return [{ sense: visible ? 'sight' : 'hearing', kind: 'door', text: `${door.name}${state}了。`, clarity: 'clear', region: here, ...(visible ? { source: actor.id } : {}), direct: true }];
   }
   if (['say', 'shout', 'attempt'].includes(event.kind) && event.scene.content && event.scene.target !== 'observer') {
     if (!audible) return [];
-    const doorway = connectingDoor(here, destination);
+    const doorway = connectingDoor(world, here, destination);
     const content = event.scene.content;
     const clear = world.scene?.noise[here] !== 'loud' && (here === destination || !!doorway && world.scene?.doors[doorway.id] === 'open');
     const strong = event.kind === 'shout';
@@ -209,11 +198,11 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   }
   // Entering a region or opening its door reveals current visible people, never old events.
   if (event.kind === 'move' || event.kind === 'door') {
-    const affected = world.characters.filter(c => c.id === event.actor || doors.find(d => d.id === event.scene?.target)?.regions.includes(regionOf(c)));
+    const affected = world.characters.filter(c => c.id === event.actor || worldDoors(world).find(d => d.id === event.scene?.target)?.regions.includes(regionOf(c)));
     for (const character of affected) {
       const visible = world.characters.filter(other => other.id !== character.id && canSee(world, character, regionOf(other)));
       for (const other of visible) {
-        const observation: Observation = { id: `${event.id}:${character.id}:present:${other.id}`, time: world.minute, sense: 'sight', kind: 'person', text: `看見 ${other.name} 在${regions.find(r => r.id === regionOf(other))?.name}。`, clarity: 'clear', source: other.id, region: regionOf(other) };
+        const observation: Observation = { id: `${event.id}:${character.id}:present:${other.id}`, time: world.minute, sense: 'sight', kind: 'person', text: `看見 ${other.name} 在${worldRegions(world).find(r => r.id === regionOf(other))?.name}。`, clarity: 'clear', source: other.id, region: regionOf(other) };
         saveObservation(world, character, observation);
         let trace = event.perception.find(t => t.characterId === character.id);
         if (!trace) { trace = { characterId: character.id, status: 'direct', observations: [], reason: '場景變化後直接看見' }; event.perception.push(trace); }
@@ -225,8 +214,8 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
 }
 export function knownScene(world: World, character: Character) {
   const here = regionOf(character);
-  return { region: regions.find(r => r.id === here), external:canSee(world,character,here)?knownExternalState(world.scene?.external?.[here]):undefined,
-    exits: doors.filter(d => d.regions.includes(here)).map(d => ({ id: d.id, name: d.name, state: world.scene?.doors[d.id] || 'open', destination: regions.find(r => r.id === d.regions.find(id => id !== here)) })),
+  return { region: worldRegions(world).find(r => r.id === here), external:canSee(world,character,here)?knownExternalState(world.scene?.external?.[here]):undefined,
+    exits: worldDoors(world).filter(d => d.regions.includes(here)).map(d => ({ id: d.id, name: d.name, state: world.scene?.doors[d.id] || 'open', destination: worldRegions(world).find(r => r.id === d.regions.find(id => id !== here)) })),
   };
 }
 
@@ -246,13 +235,13 @@ export function objectObservationCandidates(world: World, character: Character, 
   return (world.objects || []).filter(object => (!ids || ids.includes(object.id)) && object.lifecycle === 'active' && canSee(world, character, object.region) &&
     (object.holder === null || world.characters.some(holder => holder.id === object.holder && regionOf(holder) === object.region)))
     .map(object => ({ sense: 'sight', kind: 'activity', objectId: object.id, region: object.region, clarity: 'clear',
-      text: `看見${regions.find(region => region.id === object.region)?.name || '附近'}有${object.label}。`,
+      text: `看見${worldRegions(world).find(region => region.id === object.region)?.name || '附近'}有${object.label}。`,
       direct: false, interference: 'medium' }));
 }
 export function supplyObservationCandidates(world: World, character: Character, ids?: string[]): SensoryCandidate[] {
   if ((world.supplies?.length || 0) > 512) throw new PerceptionCapacityError('供應探索超過世界供應容量；未截斷執行依據。');
   return (world.supplies || []).filter(supply => (!ids || ids.includes(supply.id)) && !supply.pending && (supply.availableAt === undefined || supply.availableAt <= world.minute) && canSee(world, character, supply.region))
-    .map(supply => ({ sense: 'sight', kind: 'activity', supplyId: supply.id, region: supply.region, clarity: 'clear', text: '查看'+(regions.find(region => region.id === supply.region)?.name || '附近')+'，辨識到'+supply.label+'這個來源。', direct: false, interference: 'medium' }));
+    .map(supply => ({ sense: 'sight', kind: 'activity', supplyId: supply.id, region: supply.region, clarity: 'clear', text: '查看'+(worldRegions(world).find(region => region.id === supply.region)?.name || '附近')+'，辨識到'+supply.label+'這個來源。', direct: false, interference: 'medium' }));
 }
 // Call only after the activity's facts commit; information does not transfer
 // possession, rights, quantities or an object's physical revision.
@@ -274,10 +263,10 @@ export function probeCurrent(world: World, character: Character, event: import('
     if (other.id === character.id || target && target !== other.id && target !== region) continue;
     if (sense === 'sight') {
       const visible = canSee(world, character, region);
-      const doorway = connectingDoor(here, region);
+      const doorway = connectingDoor(world, here, region);
       const silhouette = world.scene?.occluded.includes(region) && (here === region || doorway && world.scene.doors[doorway.id] === 'open');
       if (!visible && !silhouette) continue;
-      candidates.push({ sense, kind: 'person', text: visible ? `看見 ${other.name} 在${regions.find(r => r.id === region)?.name}。` : '遮擋處有人影晃動。', clarity: visible ? 'clear' : 'vague', ...(visible ? { source: other.id, region } : {}), direct: visible, interference: 'medium' });
+      candidates.push({ sense, kind: 'person', text: visible ? `看見 ${other.name} 在${worldRegions(world).find(r => r.id === region)?.name}。` : '遮擋處有人影晃動。', clarity: visible ? 'clear' : 'vague', ...(visible ? { source: other.id, region } : {}), direct: visible, interference: 'medium' });
       clues.push(world.currentSensory!.presence[other.id].clue);
     } else {
       const activity = world.currentSensory?.activities[other.id];
