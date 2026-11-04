@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 const require = createRequire(import.meta.url);
 const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('vite')] }));
@@ -29,15 +29,17 @@ async function loadEntry(entry, context) {
   return compiled.exports;
 }
 
-async function fixture() {
-  const context = { owner: 'account-a', env: {} };
+async function fixture({ withWorld = false } = {}) {
+  const context = { owner: 'account-a', env: { APP_ENV: 'local', AUTH_ORIGIN: 'https://test.invalid', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) } };
   const route = await loadEntry('app/api/character-templates/route.ts', context);
   const db = new DatabaseSync(':memory:');
-  db.exec(await readFile('drizzle/0006_character_templates.sql', 'utf8'));
+  const worldRoute = withWorld && await loadEntry('app/api/world/route.ts', context);
+  const migrations = withWorld ? (await readdir('drizzle')).filter(name => name.endsWith('.sql')).sort() : ['0006_character_templates.sql'];
+  for (const name of migrations) db.exec(await readFile('drizzle/' + name, 'utf8'));
   context.env.DB = {
     prepare(sql) {
       return { bind(...values) {
-        const statement = db.prepare(sql);
+        const statement = db.prepare(sql.replaceAll("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)", String(Date.now())));
         return {
           async all() { return { results: statement.all(...values) }; },
           async first() {
@@ -60,7 +62,14 @@ async function fixture() {
     }));
     return { status: response.status, body: await response.json() };
   }
-  return { db, context, request };
+  async function worldRequest(payload) {
+    const url = 'https://test.invalid/api/world';
+    return payload === undefined ? worldRoute.GET(new Request(url)) : worldRoute.POST(new Request(url, {
+      method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
+      body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...payload }),
+    }));
+  }
+  return { db, context, request, worldRequest };
 }
 
 test('two new characters persist privately, presets are read-only, and updates cannot erase newer data', async () => {
@@ -117,7 +126,12 @@ test('two new characters persist privately, presets are read-only, and updates c
 });
 
 test('the editor creates, edits, and reopens two custom characters through the real save route', async () => {
-  const { db, request } = await fixture();
+  const { db, request, worldRequest } = await fixture({ withWorld: true });
+  const key = 'test-editor-provider-key';
+  assert.equal((await worldRequest({ operation: 'set-model-key', mode: 'openai', key })).status, 200);
+  assert.equal((await worldRequest({ operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } })).status, 200);
+  let candidate = '{bad reply';
+  let paidCalls = 0;
   const { Window } = await import('happy-dom');
   const window = new Window({ url: 'https://test.invalid' });
   for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'Event']) {
@@ -129,6 +143,13 @@ test('the editor creates, edits, and reopens two custom characters through the r
   const root = createRoot(window.document.body.appendChild(window.document.createElement('div')));
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith('https://api.openai.com/')) {
+      assert.equal(options.headers.Authorization, 'Bearer ' + key);
+      assert.match(JSON.parse(options.body).messages.at(-1).content, /出生在河邊/);
+      paidCalls++;
+      return Response.json({ usage: { prompt_tokens: 5, completion_tokens: 3 }, choices: [{ message: { content: candidate } }] });
+    }
+    if (url === '/api/world') return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
     assert.equal(url, '/api/character-templates');
     const result = await request(options?.body ? JSON.parse(options.body) : undefined);
     return Response.json(result.body, { status: result.status });
@@ -158,6 +179,21 @@ test('the editor creates, edits, and reopens two custom characters through the r
     await click('新建人物');
     await fill('name', '柳生');
     await fill('personality', '安靜');
+    await fill('preferences', '沒有');
+    await fill('characterDescription', '她出生在河邊，喜歡研究時鐘。');
+    await click('用 AI 生成空白欄位');
+    assert.match(window.document.querySelector('[role="alert"]').textContent, /原設定已保留/);
+    assert.equal(window.document.querySelector('[name="personality"]').value, '安靜');
+    assert.equal(window.document.querySelector('[name="background"]').value, '');
+
+    candidate = JSON.stringify({ personality: '擴寫安靜', preferences: '咖啡', background: '在河畔學修鐘。' });
+    await click('用 AI 生成空白欄位');
+    assert.equal(window.document.querySelector('[name="background"]').value, '在河畔學修鐘。');
+    assert.equal(window.document.querySelector('[name="personality"]').value, '安靜');
+    assert.equal(window.document.querySelector('[name="preferences"]').value, '沒有');
+    assert.deepEqual((await request()).body.templates, []);
+    assert.equal(paidCalls, 2);
+    await fill('background', '在河畔跟外公學修鐘。');
     await click('保存人物範本');
     await click('新建人物');
     await fill('name', '庭冬');
@@ -165,7 +201,7 @@ test('the editor creates, edits, and reopens two custom characters through the r
     await click('保存人物範本');
     await click('柳生');
     assert.equal(window.document.querySelector('[name="personality"]').value, '安靜');
-    assert.equal(window.document.querySelector('[name="background"]').value, '');
+    assert.equal(window.document.querySelector('[name="background"]').value, '在河畔跟外公學修鐘。');
     await fill('appearance', '灰綠外套');
     await click('保存人物範本');
 
