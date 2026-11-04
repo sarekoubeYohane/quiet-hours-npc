@@ -162,3 +162,15 @@
 .scene-template-editor button:disabled { opacity: .55; }
 .scene-template-preview { min-height: 180px; padding: 16px; border-radius: 6px; background: linear-gradient(#111b2bad, #111b2bde), url('/pixel/night-map.png') center / cover; color: #f2f4f8; }
 .scene-template-preview ul { padding-left: 20px; list-style-type: disc; }
+.city-editor{display:grid;gap:1rem;max-width:56rem;margin:1.25rem auto;padding:1.25rem}
+.city-editor fieldset,.city-editor .city-person{display:grid;gap:.75rem}
+.city-editor fieldset{border:1px solid #344354;padding:1rem}
+.city-editor label{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.city-editor input:not([type=checkbox]),.city-editor select{border:1px solid #344354;padding:.35rem .5rem;background:#101827;color:inherit}
+.city-scene-objects{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.75rem;margin:1rem}
+.city-scene-objects section{min-width:0;padding:.75rem;background:#192436;border:1px solid #344354;border-radius:.3rem}
+.city-scene-objects h4{margin-top:.5rem;color:#b9c8de}
+.city-location-cards{grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))}
+.city-location-cards .pixel-location{background:linear-gradient(160deg,#243752,#172433 75%);min-height:7rem}
+.city-location-cards .pixel-location button .pixel-sprite{width:1.35rem;height:1.35rem;position:relative;inset:auto;border-radius:.25rem}
+.city-location-cards .pixel-location button .pixel-sprite-fallback{width:100%;height:100%}

@@ -14,7 +14,7 @@ const sources=(await readdir('lib')).filter(x=>x.endsWith('.ts')).map(x=>[`lib/$
 sources.push(['app/api/world/route.ts','route']);
 for (const [source,output] of sources) {
  const result=ts.transpileModule(await readFile(source,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2023,module:ts.ModuleKind.CommonJS}});
- const code=result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g,'require("./$1.cjs")').replace('require("cloudflare:workers")','require("./cloudflare-workers.cjs")');
+ const code=result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g,'require("./$1.cjs")').replace('require("zod")', `require(${JSON.stringify(require.resolve('zod'))})`).replace('require("cloudflare:workers")','require("./cloudflare-workers.cjs")');
  await writeFile(join(directory,`${output}.cjs`),code);
 }
   // Test fixtures are generated only in a temporary directory, never included in the Worker.

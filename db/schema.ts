@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
-export const worlds = sqliteTable('worlds', {owner:text('owner').primaryKey(),state:text('state').notNull(),operations:text('operations').notNull().default('{"floor":0,"results":{}}'),version:integer('version').notNull().default(0),lockedUntil:integer('locked_until').notNull().default(0)});
+export const worlds = sqliteTable('worlds', {owner:text('owner').primaryKey(),cityStarted:integer('city_started').notNull().default(0),state:text('state').notNull(),operations:text('operations').notNull().default('{"floor":0,"results":{}}'),version:integer('version').notNull().default(0),lockedUntil:integer('locked_until').notNull().default(0)});
 export const authSessions = sqliteTable('auth_sessions', { tokenHash: text('token_hash').primaryKey(), userId: text('user_id').notNull(), displayName: text('display_name').notNull(), expiresAt: integer('expires_at').notNull() });
 export const oauthAttempts = sqliteTable('oauth_attempts', { stateHash: text('state_hash').primaryKey(), verifier: text('verifier').notNull(), expiresAt: integer('expires_at').notNull() });
 export const accountModelKeys = sqliteTable('account_model_keys', {
@@ -30,3 +30,7 @@ export const sceneTemplates = sqliteTable('scene_templates', {
   version: integer('version').notNull(),
   body: text('body').notNull(),
 }, table => [primaryKey({ columns: [table.owner, table.id] })]);
+
+export const worldBeforeCity = sqliteTable('world_before_city', {
+  owner: text('owner').primaryKey(), state: text('state').notNull(), version: integer('version').notNull(),
+});

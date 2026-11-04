@@ -8,6 +8,7 @@ export type WorldConfiguration = {
   locations: Location[];
   regions: Region[];
   doors: Door[];
+  sceneSources?: Record<string, { id:string; version:number; name:string; shared:boolean }>;
   residences?: Record<string, string>;
 };
 

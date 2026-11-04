@@ -1,27 +1,20 @@
 import { getGitHubUser } from '@/lib/auth';
 import { database } from '@/lib/store';
-import { sceneTemplateDraft, sceneTemplateSave, sharedSceneTemplates, type SceneTemplate } from '@/lib/scene-templates';
+import { sceneTemplateSave } from '@/lib/scene-templates';
+
+import { listSceneTemplates, readSceneTemplate, type StoredSceneTemplate } from '@/lib/scene-template-store';
 
 export const dynamic = 'force-dynamic';
 
-type StoredSceneTemplate = { id: string; version: number; body: string };
-
 function reply(body: object, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-}
-
-function readTemplate({ id, version, body }: StoredSceneTemplate): SceneTemplate {
-  return { ...sceneTemplateDraft.parse(JSON.parse(body)), id, version, shared: false };
 }
 
 export async function GET() {
   try {
     const user = await getGitHubUser();
     if (!user) return reply({ error: '請先登入觀察室。' }, 401);
-    const { results } = await database().prepare(
-      'SELECT id, version, body FROM scene_templates WHERE owner = ? ORDER BY id'
-    ).bind(user.userId).all<StoredSceneTemplate>();
-    return reply({ templates: [...sharedSceneTemplates, ...results.map(readTemplate)] });
+    return reply({ templates: await listSceneTemplates(user.userId) });
   } catch {
     return reply({ error: '暫時無法讀取場景範本。' }, 503);
   }
@@ -46,7 +39,7 @@ export async function POST(request: Request) {
         'UPDATE scene_templates SET version = version + 1, body = ? WHERE owner = ? AND id = ? AND version = ? RETURNING id, version, body'
       ).bind(body, user.userId, id, version).first<StoredSceneTemplate>();
       return row
-        ? reply({ template: readTemplate(row) })
+        ? reply({ template: readSceneTemplate(row) })
         : reply({ error: '場景範本已變更或無法編輯，請重新讀取。' }, 409);
     }
 
@@ -54,7 +47,7 @@ export async function POST(request: Request) {
       'INSERT INTO scene_templates (owner, id, version, body) VALUES (?, ?, 1, ?) RETURNING id, version, body'
     ).bind(user.userId, crypto.randomUUID(), body).first<StoredSceneTemplate>();
     if (!row) return reply({ error: '暫時無法保存場景範本。' }, 503);
-    return reply({ template: readTemplate(row) }, 201);
+    return reply({ template: readSceneTemplate(row) }, 201);
   } catch {
     return reply({ error: '暫時無法保存場景範本。' }, 503);
   }

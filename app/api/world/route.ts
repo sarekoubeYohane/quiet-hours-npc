@@ -1,3 +1,4 @@
+import { cityDraftSchema, prepareCity } from '@/lib/city-creation';
 import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, boundUsageReceipts, type UsageReceipt } from '@/lib/usage-recovery';
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
@@ -190,7 +191,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 16000) return reply({ error: '輸入過長。' }, 400);
-    let b: { worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action };
+    let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
@@ -202,7 +203,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -217,6 +218,16 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
+    const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city';
+    const city = cityOperation ? cityDraftSchema.safeParse(b.city) : undefined;
+    if (city && !city.success) return reply({error:'請確認城市配置及場所、人物數量。'}, 400);
+    if (b.operation === 'preview-city' && city?.success) {
+      if (b.worldContext !== world.contextId || b.expectedVersion !== version) return reply({error:'原世界已變更，請重新讀取後再預覽。'}, 409);
+      if (world.configuration || world.acceptance) return reply({error:'目前世界無法另建城市。'}, 400);
+      const {preview} = await prepareCity(id, city.data, world);
+      return reply({ preview, version });
+    }
+
 
     // Legacy request limits remain valid replay payloads, but only set-budget changes policy.
     const limits = b.operation === 'set-budget' ? b.limits! : validBudgetLimits(world.playerBudget) ? world.playerBudget : defaultLimits;
@@ -243,6 +254,15 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
+    let startedCity: World | undefined;
+    if (b.operation === 'start-city' && city?.success) {
+      if (b.expectedVersion !== version) return reply({error:'原世界已變更，請重新預覽後開始。',operationSettled:true}, 409);
+      if (world.configuration || world.acceptance) return reply({error:'目前世界無法另建城市。'}, 400);
+      const candidate = await prepareCity(id, city.data, world);
+      if (!candidate.world) return reply({error:candidate.preview.issues.join(' '), preview:candidate.preview}, 400);
+      startedCity = candidate.world;
+    }
+
     if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
     // An archive can outlive a lost journal receipt. It proves prior acceptance,
     // not the original HTTP result; never turn a diagnostic lookup into a retry.
@@ -260,6 +280,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if(b.operation==='advance'&&b.mode!=='demo'&&request.headers.get(timePolicyHeader)!==roundTimePolicy.version)return reply({error:'回合等待政策已更新，請重新載入觀察室後以原操作識別碼繼續。',clientUpdateRequired:true},426);
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
     if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
+    if (b.operation === 'reset' && world.configuration) return reply({error:'自訂城市已開始，請保留目前的世界。'},400);
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，請明示重置測試世界後再推進；舊世界仍可讀取，用量保留。',worldResetRequired:true},409);
@@ -326,6 +347,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         world = await (b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world));
         journal.floor = Math.max(journal.floor, issuedAt - 1);
       } catch (error) { failure = error instanceof Error ? error : new Error('無法切換驗收場景。'); }
+    } else if (startedCity) {
+      world = startedCity;
+      journal.floor = Math.max(journal.floor, issuedAt - 1);
     } else if (b.operation === 'set-price') {
       savePrice(world,b.price!);
     } else if (b.operation === 'set-adjudication') {
@@ -492,7 +516,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     trimJournal(journal, 8, operationId);
     paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
     traceWorld(trace, 'commit-start');
-    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
+    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ?${startedCity&&!failure?', city_started = 1':''} WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
     if (!saved.meta.changes) {
       commitRejected=true;decisionTrace?.step('commit-conflict',undefined,{worldCommitted:false});await finishTrace('not-committed');
       traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
