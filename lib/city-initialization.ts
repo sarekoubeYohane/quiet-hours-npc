@@ -67,7 +67,7 @@ function personPlaces(draft:CityDraft,preview:CityPreview,actor:CityDraft['chara
         (actor.placeId===place.id&&actor.roomId===room.id);
       const access = preview.access?.find(item=>item.placeId===place.id&&item.roomId===room.id);
       if (access) {
-        if (access.rule==='private'&&!directlyKnown) return false;
+        if (!directlyKnown && (access.rule==='private' || (!access.inherited&&access.rule!=='public'))) return false;
         const roleAllowed = (access.rule==='residents'&&actor.homeId===place.id) ||
           (access.rule==='workers'&&actor.workplaceIds?.includes(place.id));
         const granted = draft.accessGrants?.some(grant=>grant.placeId===place.id&&

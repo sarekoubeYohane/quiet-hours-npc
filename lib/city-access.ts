@@ -38,7 +38,7 @@ export function prepareCityAccess(
           (grant.roomId === scope.roomId || (inherited && !grant.roomId)) &&
           grant.characterTemplateId === actor.profileSource?.id);
       });
-      access[key] = { rule, allowedActorIds: allowed.map(actor => actor.id) };
+      access[key] = { rule, allowedActorIds: allowed.map(actor => actor.id), ...(scope.roomId&&!inherited?{roomOverride:true}:{}) };
       visible.push({
         ...scope, rule, ...(inherited ? { inherited: true } : {}),
         allowed: allowed.flatMap(actor => actor.profileSource

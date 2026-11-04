@@ -30,7 +30,9 @@ function familiarRoom(configuration:WorldConfiguration, actor:Character, region:
   if (!resident&&!worker&&!owner) return false;
   if (personalRoom(configuration,region)) return personalRoom(configuration,region,actor.id);
   if (privateName.test(region.name)) return false;
-  const rule = (configuration.access?.[region.id]??configuration.access?.[region.location])?.rule;
+  const access = configuration.access?.[region.id]??configuration.access?.[region.location];
+  const rule = access?.rule;
+  if (access?.roomOverride && rule!=='public') return false;
   // A grant permits entry. Familiarity comes from the role or actual starting room.
   return !rule || rule==='public' || (rule==='residents'&&resident) || (rule==='workers'&&worker);
 }
