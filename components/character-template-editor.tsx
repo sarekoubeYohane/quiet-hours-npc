@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { blankCharacterTemplateFields, characterDescriptionMaxLength, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields, type CharacterTemplate, type CharacterTemplateField } from '@/lib/character-templates';
+import { initialMemoryCapacityError, blankCharacterTemplateFields, characterDescriptionMaxLength, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields, type CharacterTemplate, type CharacterTemplateField } from '@/lib/character-templates';
 
 import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
 
@@ -24,6 +24,7 @@ export default function CharacterTemplateEditor() {
   const [description, setDescription] = useState('');
   const pendingGeneration = useRef<{ input: string; payload: string }>(null);
   const busy = saving || generating || loading;
+  const memoryError = initialMemoryCapacityError(draft?.fields.initialMemories);
   const hasBlank = draft && characterTemplateFieldNames.some(field => draft.fields[field] === '');
   const hasInput = description.trim() || (draft && characterTemplateFieldNames.some(field => draft.fields[field].trim()));
   const [feedback, setFeedback] = useState('');
@@ -64,7 +65,7 @@ export default function CharacterTemplateEditor() {
   }
 
   async function generate() {
-    if (!draft || busy || !hasBlank || !hasInput) return;
+    if (!draft || busy || !hasBlank || !hasInput || memoryError) return;
     setGenerating(true);
     setError('');
     setFeedback('');
@@ -109,7 +110,7 @@ export default function CharacterTemplateEditor() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft || busy) return;
+    if (!draft || busy || memoryError) return;
     setSaving(true);
     setError('');
     setFeedback('');
@@ -178,7 +179,7 @@ export default function CharacterTemplateEditor() {
                 onChange={event => setDescription(event.target.value)} />
             </label>
             <p className="hint">生成使用觀察室的天上意志模型設定，計入玩家 AI 用量。已填欄位會原樣保留。</p>
-            <Button type="button" variant="outline" disabled={busy || !hasBlank || !hasInput} onClick={() => void generate()}>
+            <Button type="button" variant="outline" disabled={busy || !hasBlank || !hasInput || !!memoryError} onClick={() => void generate()}>
               {generating ? '正在生成人物草稿…' : '用 AI 生成空白欄位'}
             </Button>
           </fieldset>
@@ -190,12 +191,15 @@ export default function CharacterTemplateEditor() {
                   {label}
                   {field === 'name' || field === 'startLocation'
                     ? <input name={field} maxLength={maxLength} required={field === 'name'} value={draft.fields[field]} onChange={event => update(field, event.target.value)} />
-                    : <textarea name={field} maxLength={maxLength} rows={3} value={draft.fields[field]} onChange={event => update(field, event.target.value)} />}
+                    : <textarea aria-invalid={field === 'initialMemories' && !!memoryError} aria-describedby={field === 'initialMemories' ? 'initial-memory-capacity' : undefined} name={field} maxLength={maxLength} rows={3} value={draft.fields[field]} onChange={event => update(field, event.target.value)} />}
                 </label>
               );
             })}
           </fieldset>
-          <Button type="submit" disabled={busy || !draft.fields.name.trim()}>保存人物範本</Button>
+          <p id="initial-memory-capacity" className={memoryError ? 'error' : 'hint'} role={memoryError ? 'alert' : undefined}>
+            {memoryError || '初始記憶上限為 4,096 UTF-8 bytes，且不超過 2,400 字元；一般中文字每字約 3 bytes。'}
+          </p>
+          <Button type="submit" disabled={busy || !!memoryError || !draft.fields.name.trim()}>保存人物範本</Button>
         </form>
       )}
       {feedback && <p role="status">{feedback}</p>}

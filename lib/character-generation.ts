@@ -1,4 +1,4 @@
-import { characterDescriptionMaxLength, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields } from './character-templates';
+import { CharacterTemplateValidationError, initialMemoryCapacityError, characterDescriptionMaxLength, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields } from './character-templates';
 import { requestModel, type ModelService } from './model-adapter';
 
 export function readCharacterGeneration(value: unknown) {
@@ -40,5 +40,7 @@ export async function generateCharacterFields(input: Generation, service: ModelS
     if (typeof value !== 'string' || value.length > characterTemplateFields[field].maxLength) throw invalid();
     result[field] = value;
   }
+  const memoryError = initialMemoryCapacityError(result.initialMemories);
+  if (memoryError) throw new CharacterTemplateValidationError(memoryError);
   return result;
 }
