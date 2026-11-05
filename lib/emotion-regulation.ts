@@ -1,3 +1,4 @@
+import { appendMentalHistory } from './mental-history';
 import type { Character } from './world';
 import { MemoryValidationError } from './memory';
 
@@ -19,5 +20,5 @@ export function applyEmotionRegulation(actor:Character,value:EmotionRegulation|u
  if(state.lastRegulationChoice===choiceId)throw new MemoryValidationError('同次完整選擇不能再次調節');
  const cost=state.policy.regulationCost;if(state.value<cost)throw new MemoryValidationError('精神電量不足額，未支付也未取得調節結果');
  const before=state.value,moodBefore=actor.mood;state.value-=cost;actor.mood=value.mood;state.lastRegulationChoice=choiceId;
- state.history.push({kind:'regulation',from:minute,minute,reason:value.reason,effort:value.effort,before,after:state.value,awakeMinutes:0,moodBefore,moodAfter:actor.mood});state.dropped+=Math.max(0,state.history.length-32);state.history=state.history.slice(-32);
+ appendMentalHistory(state,{kind:'regulation',from:minute,minute,reason:value.reason,effort:value.effort,before,after:state.value,awakeMinutes:0,moodBefore,moodAfter:actor.mood});
 }
