@@ -1,4 +1,4 @@
-import { collectProcessSlices, type ProcessSlice } from './mental-process';
+import { collectProcessSlices, processFeelingForDecision, type ProcessSlice } from './mental-process';
 import type { Character, World } from './world';
 import { activeBodyMinutes } from './needs';
 
@@ -22,9 +22,9 @@ export function activateMentalEnergy(world:World,policy?:MentalEnergyPolicy):voi
  if(!policy)return;
  for(const actor of world.characters)if(!actor.mentalEnergy)actor.mentalEnergy={version:1,policy:structuredClone(policy),value:policy.initial,activatedAt:world.minute,updatedAt:world.minute,history:[],dropped:0};
 }
-export function mentalEnergyFeeling(actor:Character):{feeling:string;canRegulate:boolean}|undefined {
+export function mentalEnergyFeeling(actor:Character):{feeling:string;canRegulate:boolean;activityFeeling?:ReturnType<typeof processFeelingForDecision>}|undefined {
  const s=actor.mentalEnergy;if(!s)return;
- return {feeling:s.value<s.policy.lowAt?'心力有些吃緊，可以考慮照顧自己；仍可自行取捨。':'心裡還有餘裕。',canRegulate:s.value>=s.policy.regulationCost};
+ return {feeling:s.value<s.policy.lowAt?'心力有些吃緊，可以考慮照顧自己；仍可自行取捨。':'心裡還有餘裕。',canRegulate:s.value>=s.policy.regulationCost,...(processFeelingForDecision(actor)?{activityFeeling:processFeelingForDecision(actor)}:{})};
 }
 export type MentalInterval={from:number;to:number;before:number;sleepMinutes:number;process:ProcessSlice[]};
 export function mentalIntervals(world:World,to:number):Map<string,MentalInterval>{

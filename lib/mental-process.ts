@@ -47,3 +47,6 @@ export function collectProcessSlices(actor:Character,from:number,to:number):Proc
  process.updatedAt=to;
  return slices;
 }
+
+/** Only the actor's subjective appraisal leaves the observer accounting state. */
+export function processFeelingForDecision(actor:Character){const process=actor.plan?.mentalProcess;return process?.assessment?{...process.assessment,effectiveAt:process.effectiveAt}:undefined;}

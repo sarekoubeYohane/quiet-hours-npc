@@ -10,6 +10,7 @@ await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
 const world=load('world').seedWorld();
 world.characters=world.characters.filter(c=>c.id==='owner');
 world.contextId='browser-process-260';
+world.adjudication={provider:'openai',model:'fixture-world'};
 const policy={version:1,kind:'test',id:'browser-process-260',initial:10,maximum:30,awakePerHour:0,regulationCost:4,lowAt:4,process:{slotMinutes:20,levels:[0,6,12],multipliers:[1],seed:1}};
 load('cloudflare-workers').env.MENTAL_ENERGY_TEST_POLICY=JSON.stringify(policy);
 store.install(world);
