@@ -13,7 +13,7 @@ export function mergeFeelingOrigins(items:{feelingOrigins?:FeelingOrigin[]}[]):F
 /** Eligibility is shared by the visible offer and backend authority validation. */
 export function eligibleFeelingOrigin(actor:Character,origin:FeelingOrigin,minute:number):boolean {
  const state=actor.mentalEnergy;
- return !!state?.policy.experience&&origin.actorId===actor.id&&origin.version===1&&origin.at>=state.activatedAt&&origin.at<=minute&&origin.at+feelingSourceMinutes>minute&&!state.experiences?.receipts.some(r=>r.source===origin.id);
+ return !!state?.policy.experience&&origin.actorId===actor.id&&origin.version===1&&origin.at>=state.activatedAt&&origin.at<=minute&&origin.at+feelingSourceMinutes>minute&&!state.experiences?.receipts.some(r=>r.source===origin.id)&&!state.controlAssessments?.sources.some(r=>r.id===origin.id);
 }
 export function offeredFeelingSources(actor:Character,origins:FeelingOrigin[]|undefined):string[]{return (origins||[]).filter(o=>eligibleFeelingOrigin(actor,o,actor.mentalEnergy?.updatedAt??0)).map(o=>o.id);}
 export function visibleFeelingSources(items:{feelingSources?:string[]}[]):string[]{return [...new Set(items.flatMap(m=>m.feelingSources||[]))];}

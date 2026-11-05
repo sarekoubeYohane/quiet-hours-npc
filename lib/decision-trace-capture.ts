@@ -5,7 +5,7 @@ import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redac
 
 export function traceActorSnapshot(actor:Character) {
   return structuredClone({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan,
-    arrangements:actor.arrangements,observationSequence:actor.observationSequence,needs:actor.needs,preferences:actor.preferences,habits:actor.habits,habitEvidence:actor.habitEvidence,habitEvidenceDropped:actor.habitEvidenceDropped,
+    mentalEnergy:actor.mentalEnergy,arrangements:actor.arrangements,observationSequence:actor.observationSequence,needs:actor.needs,preferences:actor.preferences,habits:actor.habits,habitEvidence:actor.habitEvidence,habitEvidenceDropped:actor.habitEvidenceDropped,
     focusIntentId:actor.focusIntentId,pursuitArchived:actor.pursuitArchived,pursuitArchivedDropped:actor.pursuitArchivedDropped,pursuitTrace:actor.pursuitTrace,pursuitTraceDropped:actor.pursuitTraceDropped,eventHabits:actor.eventHabits,pausedActivity:actor.pausedActivity,intents:actor.intents});
 }
 
@@ -47,7 +47,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
   const step=(kind:string,actorId:string|undefined,data:unknown,source='program')=>{
     steps.push({kind,actorId,source,data:omitContent()?{gap:'trace-content-omitted'}:structuredClone(data),at:Date.now()});trace.lastKnownStage=kind;
   };
-  const observer=(task:'npc'|'adjudication',actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver):ModelObserver=>{
+  const observer=(task:'npc'|'adjudication'|'feelings',actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver):ModelObserver=>{
     secrets.add(key);let active:Record<string,unknown>|undefined;
     return async(event:ModelObservation)=>{
       await legacy?.(event);

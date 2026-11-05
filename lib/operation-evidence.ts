@@ -10,7 +10,7 @@ export const operationEvidenceBytes = 64 * 1024;
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 export type CandidateEvidence = { status: 'captured' | 'invalid-json' | 'omitted'; value?: Record<string, unknown>; truncated: boolean; redacted: boolean };
-export type DispatchEvidence = { sequence: number; task: 'npc' | 'adjudication'; actorId: string; requestId: string; provider: string; model: string; usage: TokenUsage | null; candidate?: CandidateEvidence };
+export type DispatchEvidence = { sequence: number; task: 'npc' | 'adjudication' | 'feelings'; actorId: string; requestId: string; provider: string; model: string; usage: TokenUsage | null; candidate?: CandidateEvidence };
 export type ReplayAdvance = { operation: 'advance'; operationId: string; worldContext?: string; mode: string; model?: string; minutes: number };
 export type OperationEvidence = {
   schemaVersion: 1 | 2; operationId: string; requestId: string; contextId?: string;
@@ -18,7 +18,7 @@ export type OperationEvidence = {
   operation: string; baseVersion: number; resultVersion?: number;
   outcome: 'committed' | 'rolled-back' | 'not-committed';
   replay?: ReplayAdvance;
-  counts: { npc: number; adjudication: number }; dispatches: DispatchEvidence[];
+  counts: { npc: number; adjudication: number; feelings?: number }; dispatches: DispatchEvidence[];
   result?: Record<string, unknown>; truncated: boolean; redacted: boolean;
 };
 export type OperationSummary = { operationId: string; operation?: string; status: number; requestId?: string; version?: number; evidenceAvailable: boolean };
@@ -92,7 +92,7 @@ export function createOperationEvidence(context: {
     if(typeof value.key==='string' && sensitiveDiagnosticKey.test(value.key)){for(const field of ['value','from'])if(Object.hasOwn(selected,field)){selected[field]='<REDACTED>';evidence.redacted=true;}}
     return selected;
   };
-  const capture = (raw:string,task:'npc'|'adjudication'): CandidateEvidence => {
+  const capture = (raw:string,task:'npc'|'adjudication'|'feelings'): CandidateEvidence => {
     // Do not retain arbitrary malformed text: it may be a private transcript.
     if(raw.length>32768 || new TextEncoder().encode(raw).length>32768){evidence.truncated=true;return {status:'omitted',truncated:true,redacted:false};}
     let parsed:unknown;
@@ -101,19 +101,20 @@ export function createOperationEvidence(context: {
     const previousTruncated=evidence.truncated,previousRedacted=evidence.redacted;
     evidence.truncated=false;evidence.redacted=false;
     // Private NPC response fields are intentionally excluded, not a failed capture.
+    if(task==='feelings')return {status:'captured',value:{contractVersion:parsed.contractVersion},truncated:false,redacted:false};
     const source=task==='npc'?Object.fromEntries(Object.keys(proposalShape).filter(key=>Object.hasOwn(parsed,key)).map(key=>[key,parsed[key]])):parsed;
     const value=project(source,task==='npc'?proposalShape:candidateShape) as Record<string,unknown>;
     const captured={status:'captured' as const,value,truncated:evidence.truncated,redacted:evidence.redacted};
     evidence.truncated ||= previousTruncated;evidence.redacted ||= previousRedacted;
     return captured;
   };
-  const observer = (task:'npc'|'adjudication',actorId:string,provider:string,model:string,key:string):ModelObserver => {
+  const observer = (task:'npc'|'adjudication'|'feelings',actorId:string,provider:string,model:string,key:string):ModelObserver => {
     secrets.add(key);
     let active:DispatchEvidence|undefined;
     return (event:ModelObservation) => {
       if(event.kind==='dispatch') {
-        evidence.counts[task]++;
-        active={sequence:evidence.counts.npc+evidence.counts.adjudication,task,actorId,requestId:event.requestId||'',provider,model,usage:null};
+        evidence.counts[task]=(evidence.counts[task]||0)+1;
+        active={sequence:evidence.counts.npc+evidence.counts.adjudication+(evidence.counts.feelings||0),task,actorId,requestId:event.requestId||'',provider,model,usage:null};
         if(evidence.dispatches.length<32)evidence.dispatches.push(active);else evidence.truncated=true;
       } else if(active && event.kind==='usage') {
         const usage=event.usage;
