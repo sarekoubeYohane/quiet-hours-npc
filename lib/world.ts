@@ -5,7 +5,7 @@ import { initialDirection, currentDirections } from './pursuits';
 import { arrangementsForDecision } from './arrangements';
 import { pausedProjection } from './paused-activities';
 import { preferencesForDecision } from './preferences';
-import { mentalEnergyFeeling } from './mental-energy';
+import { mentalEnergyFeeling, applyLegacyMood } from './mental-energy';
 import { bodyFeelings, type BodyNeeds } from './needs';
 import { knownExternalState, type PhysicalState, type ExternalConsequence } from './world-state';
 import type { RoutineRule, RoutinePlace } from './routine-rules';
@@ -126,7 +126,7 @@ export function completeMovement(w:World,c:Character,destination:{location:strin
  c.location=destination.location;c.region=destination.region;
  moveHeldObjects(w,c,destination.region);
  c.activity=`剛走到${destination.name}。`;
- if(!c.mentalEnergy&&typeof action.mood==='string')c.mood=action.mood.slice(0,20);
+ applyLegacyMood(c,action.mood);
  record(w,c.id,`${c.name} 步行前往${destination.name}，在這段時間結束時抵達。`,'move',[c.id],
    {from,to:c.location,fromRegion,toRegion:destination.region,target:action.target});
  const permission=entryPermission(w,c.id,c.location,destination.region);
@@ -223,7 +223,7 @@ audience=witnesses;
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
 else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return;c.activity=content==='hearing'?'專注聆聽附近的動靜。':'仔細查看附近的情況。';text=`${c.name} ${c.activity}`;}
 else throw Error('未知行動');
-if(!c.mentalEnergy&&typeof a.mood==='string')c.mood=a.mood.slice(0,20);
+applyLegacyMood(c,a.mood);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
   {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:a.type==='door'?`${c.name} ${c.activity}`:undefined);
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);

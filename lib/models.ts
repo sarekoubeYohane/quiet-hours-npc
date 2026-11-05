@@ -94,7 +94,7 @@ const messages: { role: string; content: string }[] = [{role:'system',content:ac
 messages[0].content+=' self.noticeOpportunities只是你實際取得的新主觀線索的一次考慮機會，可能模糊或誤認，不能由handle推知真正來源、裝置、寄件人或正文。依實際所見所聽自行判斷，若想查看手機再主動list/read。可continue或自行暫停／改序，忽略不代表已讀。未展示缺口不表示已處理，不額外開手機決策。';
 messages[0].content+=' self.arrangementCues是你實際可知條件下想起既有安排的一次考慮機會；不強制行動、完成、意圖置頂或改變活動，可continue、延期或放下。相同條件不每輪提醒。';
 messages[0].content+=' self.lastKnownState 集中呈現本次仍可見的主觀來源、時間及引用；它不是即時世界真相，不把聽聞、推測或錯誤感知改成事實，也不保證受阻原因。supplies 只表示知道該來源，availability=unknown 不表示仍有庫存；指定那份耗盡不代表整個場所有無其他來源，未得知補充保持未知。';
-if(c.mentalEnergy)messages[0].content+='精神電量只呈現本人感受與是否負擔得起一次調節；心力吃緊時可考慮照顧自己，仍可自主續做，不必停工、換活動或放下追求。 '+feelingPrompt;
+if(c.mentalEnergy)messages[0].content+='精神電量只呈現本人感受與是否負擔得起一次調節；心力吃緊時可考慮照顧自己，仍可自主續做，不必停工、換活動或放下追求。 '+(c.mentalEnergy.policy.experience?feelingPrompt:'');
 messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;
 if(w.configuration)messages[0].content+=' activityHints 是從本人可知環境整理出的可嘗試方法。你可選用、修改、忽略，或自由提出其他方法。場景提示可用 observe，物件方法可用 propose。提示不表示條件成立、得到許可或行動成功，結果依實際裁定。';

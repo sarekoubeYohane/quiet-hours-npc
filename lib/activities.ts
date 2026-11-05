@@ -1,5 +1,5 @@
 import { applyFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
-import { activateMentalEnergy, mentalIntervals, settleMentalInterval, type MentalEnergyPolicy } from './mental-energy';
+import { applyLegacyMood, activateMentalEnergy, mentalIntervals, settleMentalInterval, type MentalEnergyPolicy } from './mental-energy';
 import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
 import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
 import { normalDecisionInput } from './npc-input';
@@ -209,7 +209,7 @@ export async function advanceActivities(world: World, options: {
         throw Error('沒有可延續的原活動，請選擇新行動。');
       }
       if (decision.intents) character.intents = decision.intents;
-      if (!character.mentalEnergy && typeof decision.action.mood === 'string') character.mood = decision.action.mood;
+      applyLegacyMood(character,decision.action.mood);
       character.plan!.attention = attentionMarker(world, character);
       bindActivityPursuit(character,decision);
       progressActivity(world,character,'chosen');

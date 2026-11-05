@@ -1,4 +1,4 @@
-import { feelingOrigin, mergeFeelingOrigins, validFeelingOrigins, type FeelingOrigin } from './mental-experiences';
+import { feelingOrigin, offeredFeelingSources, mergeFeelingOrigins, validFeelingOrigins, type FeelingOrigin } from './mental-experiences';
 import { shortMemoryTextMaxBytes } from './memory-limits';
 import { arrangementsForDecision, validateArrangements, type Arrangement } from './arrangements';
 import { validatePreferences, type Preference } from './preferences';
@@ -151,7 +151,7 @@ export function consumeMemories(c: Character) {
   validateMemoryState(c);
 }
 export function memoryProjection(c: Character) {
-  return (c.shortTerm || []).map(({ id, version, time, text, source, controlled, feelingOrigins }) => ({ id, version, time, text, source, ...(feelingOrigins?.length?{feelingSources:feelingOrigins.map(o=>o.id)}:{}), ...(controlled ? { controlled: true } : {}) }));
+  return (c.shortTerm || []).map(({ id, version, time, text, source, controlled, feelingOrigins }) => ({ id, version, time, text, source, ...(feelingOrigins?.length?{feelingSources:offeredFeelingSources(c,feelingOrigins)}:{}), ...(controlled ? { controlled: true } : {}) }));
 }
 function sourceProjection(source: MemorySource): MemorySource {
   return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.object ? { object: source.object } : {}), ...(source.supply ? { supply: source.supply } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
@@ -160,7 +160,7 @@ function rememberedSources(item: LongMemory): RememberedSource[] {
   return item.rememberedSources ?? [{ id: item.id, version: item.version, source: item.source }];
 }
 export function recallableMemoryProjection(c: Character) {
-  return (c.longTerm || []).filter(item => !item.state || item.state === 'active').map(item => ({ id: item.id, version: item.version, time: item.time, text: item.text, ...(item.feelingOrigins?.length?{feelingSources:item.feelingOrigins.map(o=>o.id)}:{}), kind: item.kind || 'episode', state: 'active' as const, source: sourceProjection(item.source), rememberedSources: rememberedSources(item).map(ref => ({ id: ref.id, version: ref.version, source: sourceProjection(ref.source) })), ...(item.unresolved?.length ? { unresolved: item.unresolved.map(({ id, version }) => ({ id, version })) } : {}) }));
+  return (c.longTerm || []).filter(item => !item.state || item.state === 'active').map(item => ({ id: item.id, version: item.version, time: item.time, text: item.text, ...(item.feelingOrigins?.length?{feelingSources:offeredFeelingSources(c,item.feelingOrigins)}:{}), kind: item.kind || 'episode', state: 'active' as const, source: sourceProjection(item.source), rememberedSources: rememberedSources(item).map(ref => ({ id: ref.id, version: ref.version, source: sourceProjection(ref.source) })), ...(item.unresolved?.length ? { unresolved: item.unresolved.map(({ id, version }) => ({ id, version })) } : {}) }));
 }
 export type MemoryProjection = ReturnType<typeof recallableMemoryProjection>;
 export type MemoryReview = MemoryRef & { kind: 'short' | 'long' | 'trace'; required?: boolean };

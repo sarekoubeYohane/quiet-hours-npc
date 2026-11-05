@@ -42,3 +42,6 @@ export function settleMentalInterval(actor:Character,interval:MentalInterval,add
  s.value=value;s.updatedAt=interval.to;
  if(interval.to>interval.from){s.history.push({kind:'natural',from:interval.from,minute:interval.to,reason:awakeMinutes?'清醒世界時間自然消耗':'實際睡眠暫停自然消耗',before:interval.before,after:value,awakeMinutes});s.dropped+=Math.max(0,s.history.length-32);s.history=s.history.slice(-32);}
 }
+
+/** Legacy worlds retain their old mood contract; active energy requires sourced writers. */
+export function applyLegacyMood(actor:Character,mood:unknown):void {if(!actor.mentalEnergy&&typeof mood==='string')actor.mood=mood.slice(0,20);}

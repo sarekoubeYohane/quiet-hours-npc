@@ -1,4 +1,4 @@
-import { settleMentalInterval, type MentalInterval } from './mental-energy';
+import { applyLegacyMood, settleMentalInterval, type MentalInterval } from './mental-energy';
 import { worldLocations } from './world-configuration';
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
@@ -115,7 +115,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,
       journey:{location:destination.location,region:destination.region}};
     character.activity=`正在前往${destination.name}。`;
-    if(!character.mentalEnergy&&typeof decision.action.mood==='string')character.mood=decision.action.mood.slice(0,20);
+    applyLegacyMood(character,decision.action.mood);
     const road=transitRegion(character);
     moveHeldObjects(world,character,road);
     record(world,character.id,`${character.name} 開始步行前往${destination.name}。`,'depart',[character.id],

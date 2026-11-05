@@ -7,7 +7,7 @@ import type { WorldObject } from './world-effects';
 import { canSee, regionOf } from './perception';
 import { addExperience, MemoryValidationError } from './memory';
 
-export type PhoneRecord={feelingContentVersion?:number;id:string;version:number;text:string;createdAt:number;updatedAt:number;sharedWith:string[];readers:{actorId:string;at:number;version:number;feelingContentVersion?:number;feelingOrigin?:FeelingOrigin}[]};
+export type PhoneRecord={authorId?:string;feelingContentVersion?:number;id:string;version:number;text:string;createdAt:number;updatedAt:number;sharedWith:string[];readers:{actorId:string;at:number;version:number;feelingContentVersion?:number;feelingOrigin?:FeelingOrigin}[]};
 export type PhoneMessage=PhoneRecord&{from:string;to:string;deliveredAt:number};
 export type PhoneData={objectId:string;mapReads?:PhoneMapRead[];notifications?:PhoneNotification[];notificationDedup?:PhoneNotificationDedup[];notificationHistoryDropped?:number;memos:PhoneRecord[];calendar?:PhoneCalendarRecord[];inbox?:PhoneMessage[];inboxActivatedAt?:number;screen:{collection:string;id:string;version:number}[];presentations?:{actorId:string;memoryId:string;collection:string;id:string;version:number}[]};
 export type PhoneState={schemaVersion:1;activatedAt:number;devices:PhoneData[]};
@@ -91,7 +91,8 @@ export function canReadPhoneRecord(c:Character,o:WorldObject,d:PhoneData,collect
 export function notePhoneReading(w:World,c:Character,r:PhoneRecord,label:string){
  const previous=r.readers.find(reader=>reader.actorId===c.id);
  if(c.mentalEnergy)r.feelingContentVersion??=r.version;
- const origin=c.mentalEnergy?(previous&&previous.feelingContentVersion===r.feelingContentVersion&&previous.feelingOrigin?previous.feelingOrigin:feelingOrigin(c,crypto.randomUUID(),w.minute)):undefined;
+ const author=r.authorId??('from' in r?String(r.from):undefined);
+ const origin=c.mentalEnergy&&author&&author!==c.id?(previous&&previous.feelingContentVersion===r.feelingContentVersion&&previous.feelingOrigin?previous.feelingOrigin:feelingOrigin(c,crypto.randomUUID(),w.minute)):undefined;
  r.readers=r.readers.filter(reader=>reader.actorId!==c.id);r.readers.push({actorId:c.id,at:w.minute,version:r.version,...(origin?{feelingContentVersion:r.feelingContentVersion,feelingOrigin:origin}:{})});
  addExperience(c,w.minute,`我在手機上實際讀到${label} ${r.id} v${r.version}「${r.text}」。`,undefined,undefined,origin?[origin]:undefined);
  return origin;
@@ -135,8 +136,8 @@ export function applyPhoneAction(w:World,c:Character,a:Action,dryRun=false){
  if(operation==='share'&&(typeof p.reader!=='string'||!w.characters.some(actor=>actor.id===p.reader)||!r!.sharedWith.includes(p.reader)&&r!.sharedWith.length>=phoneLimits.sharedReaders))throw new MemoryValidationError('分享讀者無效或超限。');
  if(operation==='display'&&d.screen.length>=phoneLimits.screen&&!d.screen.some(s=>s.collection===collection&&s.id===p.id))throw new MemoryValidationError('可讀畫面已滿，未覆蓋既有項目。');
  if(dryRun)return;
- if(operation==='create'){if(collection==='calendar')d.calendar=records as PhoneCalendarRecord[];records.push({id:p.id,version:1,text:p.text as string,createdAt:w.minute,updatedAt:w.minute,sharedWith:[],readers:[]});}
- else if(operation==='update'){r!.text=p.text as string;r!.version++;r!.feelingContentVersion=r!.version;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
+ if(operation==='create'){if(collection==='calendar')d.calendar=records as PhoneCalendarRecord[];records.push({authorId:c.id,id:p.id,version:1,text:p.text as string,createdAt:w.minute,updatedAt:w.minute,sharedWith:[],readers:[]});}
+ else if(operation==='update'){r!.text=p.text as string;r!.authorId=c.id;r!.version++;if(c.mentalEnergy||r!.feelingContentVersion!==undefined)r!.feelingContentVersion=r!.version;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='delete'){if(collection==='inbox')cancelPhoneRecordNotifications(d,'message',p.id,w.minute,{deleted:true});if(collection==='calendar'){cancelPhoneRecordNotifications(d,'reminder',p.id,w.minute,{deleted:true});d.calendar=d.calendar?.filter(item=>item.id!==p.id);}else if(collection==='memos')d.memos=d.memos.filter(item=>item.id!==p.id);else d.inbox=d.inbox?.filter(item=>item.id!==p.id);d.presentations=d.presentations?.filter(item=>item.collection!==collection||item.id!==p.id);d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='share'){if(!r!.sharedWith.includes(p.reader as string))r!.sharedWith.push(p.reader as string);r!.version++;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='reminder'){r!.version++;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
