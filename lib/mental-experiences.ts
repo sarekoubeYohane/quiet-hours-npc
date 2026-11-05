@@ -2,11 +2,11 @@ import type { Character } from './world';
 import { MemoryValidationError } from './memory';
 export type FeelingOrigin={id:string;actorId:string;version:1;at:number;kind:'experience'|'result'};
 export type FeelingUpdate={source:string;direction:'positive'|'negative'|'neutral';level:0|1|2;reason:string;mood:string|null};
-export type PreparedFeelingUpdate=FeelingUpdate & {originAt:number};
-export type FeelingReceipt=FeelingUpdate & {at:number;expiresAt:number;before:number;after:number;moodBefore:string;moodAfter:string};
+export type PreparedFeelingUpdate=FeelingUpdate & {originAt:number;originKind:FeelingOrigin['kind']};
+export type FeelingReceipt=FeelingUpdate & {originKind?:FeelingOrigin['kind'];at:number;expiresAt:number;before:number;after:number;moodBefore:string;moodAfter:string};
 /** Fixed engineering window and capacity; these are not product reward values. */
 export const feelingSourceMinutes=7*1440, feelingReceiptCapacity=256;
-export const feelingPrompt=' 頂層mood只是舊欄位相容建議，不會自行改寫心情；自然變化須用feelingUpdates的合法來源。feelingUpdates只評估本次shortTerm/longTerm明示feelingSources的新經歷。每項只提供source、direction=positive/negative/neutral、level=0/1/2、reason與mood（自然情緒文字或null表示不改變）。方向與等級依自己的喜好、關係及感受，不由動作名稱、成功或身體需求恢復推定。自然情緒和補耗電可分開，零電量也可自然好轉。不得靠自我安撫、想開、回想或重述舊成果冒充新自然來源；主動心理努力需另外的付費契約。只能引用明示來源，不猜隱藏消息；同一來源只評估一次，無新感受回傳空陣列。未列來源或舊資料的來源缺口不代表可以補造歷史。feelingUpdates與其餘心理更新共用四項及8KiB工作量。';
+export const feelingPrompt=' 頂層mood只是舊欄位相容建議，不會自行改寫心情；自然變化須用feelingUpdates的合法來源。成果只引用真正已發生且本人可知的result來源；提案、預告完成、外在成功標籤或追求狀態改寫本身都不發獎，失敗可有收穫而成功也可能耗神。結果與過程是不同事實，同一份感受不得改名重領；補足電量不會完成、取消或復活追求，仍可自主續做、延期或明示放下。feelingUpdates只評估本次shortTerm/longTerm明示feelingSources的新經歷。每項只提供source、direction=positive/negative/neutral、level=0/1/2、reason與mood（自然情緒文字或null表示不改變）。方向與等級依自己的喜好、關係及感受，不由動作名稱、成功或身體需求恢復推定。自然情緒和補耗電可分開，零電量也可自然好轉。不得靠自我安撫、想開、回想或重述舊成果冒充新自然來源；主動心理努力需另外的付費契約。只能引用明示來源，不猜隱藏消息；同一來源只評估一次，無新感受回傳空陣列。未列來源或舊資料的來源缺口不代表可以補造歷史。feelingUpdates與其餘心理更新共用四項及8KiB工作量。';
 export function feelingOrigin(actor:Character,id:string,at:number,kind:FeelingOrigin['kind']='experience'):FeelingOrigin{return {id,actorId:actor.id,version:1,at,kind};}
 export function validFeelingOrigins(origins:FeelingOrigin[]|undefined,actorId:string):boolean{return origins===undefined||Array.isArray(origins)&&origins.length<=8&&new Set(origins.map(o=>o.id)).size===origins.length&&origins.every(o=>o&&Object.keys(o).sort().join(',')==='actorId,at,id,kind,version'&&o.actorId===actorId&&typeof o.id==='string'&&o.id.length>0&&o.id.length<=128&&o.version===1&&Number.isFinite(o.at)&&['experience','result'].includes(o.kind));}
 export function mergeFeelingOrigins(items:{feelingOrigins?:FeelingOrigin[]}[]):FeelingOrigin[]{const origins=[...new Map(items.flatMap(m=>m.feelingOrigins||[]).map(o=>[o.id,o])).values()];if(origins.length>8)throw new MemoryValidationError('心理來源合併超過工程容量，未改寫來源。');return origins;}
@@ -29,7 +29,7 @@ export function parseFeelingUpdates(actor:Character,value:unknown,visibleSources
  const origin=origins.find(o=>o.id===u.source&&o.actorId===actor.id&&o.version===1);
  if(!visibleSources.includes(u.source)||!origin||!eligibleFeelingOrigin(actor,origin,minute))throw new MemoryValidationError('自然感受只能引用本次可見、有效且未結算的本人來源');
  }
- return (value as FeelingUpdate[]).map(u=>({...u,originAt:origins.find(o=>o.id===u.source)!.at}));
+ return (value as FeelingUpdate[]).map(u=>({...u,originAt:origins.find(o=>o.id===u.source)!.at,originKind:origins.find(o=>o.id===u.source)!.kind}));
 }
 export function applyFeelingUpdates(actor:Character,updates:PreparedFeelingUpdate[],minute:number){
  const state=actor.mentalEnergy;if(!state)return;

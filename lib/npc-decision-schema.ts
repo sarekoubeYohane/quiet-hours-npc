@@ -1,3 +1,4 @@
+import { emotionRegulationSchema } from './emotion-regulation';
 import { processFeelingSchema } from './mental-process';
 import { feelingUpdatesSchema } from './mental-experiences';
 import { pursuitUpdatesSchema } from './pursuits';
@@ -25,6 +26,7 @@ export const methodAssessmentSchema = { type:'object', properties:{
 },required:['purpose','knownResults','choice','method','change','reason','selectedAction','intentIds'],additionalProperties:false};
 
 export const actionSchema = { type: 'object', properties: {
+  emotionRegulation:emotionRegulationSchema,
   processFeeling:processFeelingSchema,
   feelingUpdates:feelingUpdatesSchema([]),
   contractVersion: { type: 'string', enum: [npcContractVersion] },
@@ -47,14 +49,14 @@ export const actionSchema = { type: 'object', properties: {
   preferenceUpdates: preferenceUpdatesSchema,
   habitCandidates:habitCandidateSchema,
   cognitiveUpdates: cognitiveUpdatesSchema, interpretation: { type: 'string', maxLength: 256 },
-}, required: ['processFeeling','feelingUpdates', 'methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'pursuitCandidates', 'pursuitSelection', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
+}, required: ['emotionRegulation','processFeeling','feelingUpdates', 'methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'pursuitCandidates', 'pursuitSelection', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
 
-export function decisionWireSchema(allowedTypes:string[], short:Parameters<typeof memorySelectionSchemaFor>[0], sources?:string[], processEnabled=false) {
-  const fields=Object.fromEntries(Object.entries(actionSchema.properties).filter(([key])=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[]),...(processEnabled?[]:['processFeeling'])].includes(key)));
+export function decisionWireSchema(allowedTypes:string[], short:Parameters<typeof memorySelectionSchemaFor>[0], sources?:string[], regulation=false, processEnabled=false) {
+  const fields=Object.fromEntries(Object.entries(actionSchema.properties).filter(([key])=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[]),...(processEnabled?[]:['processFeeling']),...(regulation?[]:['emotionRegulation'])].includes(key)));
   const branch=(types:string[],proposal:boolean)=>({type:'object',properties:{
     type:{type:'string',enum:types},target:actionSchema.properties.target,
     content:{...actionSchema.properties.content,...(proposal?{minLength:1,pattern:'\\S'}:{})},
     purpose:{...actionSchema.properties.purpose,...(proposal?{minLength:1,pattern:'\\S'}:{})},
   },required:['type','target','content','purpose'],additionalProperties:false});
-  return {type:'object',properties:{...fields,...(sources===undefined?{}:{feelingUpdates:feelingUpdatesSchema(sources)}),action:{anyOf:[branch(['propose'],true),branch(allowedTypes.filter(type=>type!=='propose'),false)]},memorySelections:memorySelectionSchemaFor(short)},required:[...actionSchema.required.filter(key=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[]),...(processEnabled?[]:['processFeeling'])].includes(key)),'action'],additionalProperties:false};
+  return {type:'object',properties:{...fields,...(sources===undefined?{}:{feelingUpdates:feelingUpdatesSchema(sources)}),action:{anyOf:[branch(['propose'],true),branch(allowedTypes.filter(type=>type!=='propose'),false)]},memorySelections:memorySelectionSchemaFor(short)},required:[...actionSchema.required.filter(key=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[]),...(processEnabled?[]:['processFeeling']),...(regulation?[]:['emotionRegulation'])].includes(key)),'action'],additionalProperties:false};
 }

@@ -275,7 +275,7 @@ function feedbackExcerpt(text:string):string {
 // proposal association in the existing bounded short-term memory/event channel.
 // Only the existing NPC projection is consulted; authority reasons, inventory
 // counters, permission lists and private decision traces are never sources.
-export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution):void {
+export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution,feelingKind?:import('./world').WorldEvent['feelingKind'],feelingSourceId?:string):void {
  const label=action?`${action.type} ${action.target||''} ${action.content||''}`.trim().slice(0,240):'先前活動';
  const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||object.kind==='utensil'&&(action?.type==='work'&&action.target==='tea'||action?.type==='propose'&&(action.target===c.location||action.target===regionOf(c)))).slice(0,4);
  let state='';
@@ -286,7 +286,7 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  const context=relevant.some(object=>object.kind==='utensil'&&object.state.condition==='broken')?' 已知的器具已損壞。':'';
  c.activity=summary+context;
  const text=feedbackExcerpt(`${c.name} 行動回饋（原提案，非已發生成果：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
- record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text);
+ record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
 }
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean}):boolean{
  if(candidate.branches){
@@ -356,10 +356,10 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   if(!['success','critical-success'].includes(resolution.outcome)){recordActionResult(w,c,action,'嘗試尚未完成，這次沒有新增成果。','blocked');return false;}
  }
  commitWorldChanges(w,clone);
- emitExternalConsequences(w,c.id,candidate.effects);
+ const feelingSourceId=emitExternalConsequences(w,c.id,candidate.effects,'result');
  const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
- recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution);
+ recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId);
  if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
  return true;
 }
@@ -405,15 +405,15 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
 }
 
 // Validate and commit one phase as a batch; lifecycle owns the phase cursor.
-export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):string[] {
+export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):{results:string[];feelingSourceId?:string} {
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
  const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined,phase.routineSourceScope);
  commitWorldChanges(w,clone);
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
- emitExternalConsequences(w,c.id,phase.effects);
+ const feelingSourceId=emitExternalConsequences(w,c.id,phase.effects,'result');
  if(!options?.validateOnly)commitDiscoveries(w,c,phase.effects,phase.discoveryMethod);
- return results;
+ return {results,feelingSourceId};
 }
 
 function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:DiscoveryMethod):void {
@@ -425,9 +425,10 @@ function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:Discover
 }
 
 // Only external sensory facts leave the authority batch; reasons stay in receipts.
-export function emitExternalConsequences(w:World,actorId:string,effects:Effect[]):void {
+export function emitExternalConsequences(w:World,actorId:string,effects:Effect[],feelingKind?:import('./world').WorldEvent['feelingKind']):string|undefined {
  const externalChanges:ExternalConsequence[]=effects.flatMap(e=>e.kind==='displace-body'?[{target:{type:'body' as const,id:e.targetId},changes:[{key:'位置',value:worldRegions(w).find(region=>region.id===e.toRegion)?.name||e.toRegion}],exposure:'public' as const,movement:{fromRegion:e.expectedRegion,toRegion:e.toRegion}}]:e.kind==='change-state'&&(e.target.type!=='object'||actorId==='world')?[{target:e.target,changes:e.changes.map(({key,value})=>({key,value})),...('exposure' in e?{exposure:e.exposure}:{})}]:[]);
  if(!externalChanges.length)return;
  const actor=w.characters.find(c=>c.id===actorId),region=actor?regionOf(actor):externalChanges.find(change=>change.target.type==='environment')?.target.id;
- record(w,actorId,actorId==='world'?'已確認的自然變化發生。':'外在狀況發生變化。',actorId==='world'?'natural':'external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges});
+ record(w,actorId,actorId==='world'?'已確認的自然變化發生。':'外在狀況發生變化。',actorId==='world'?'natural':'external',[],{from:actor?.location||'',to:actor?.location||'',fromRegion:region,toRegion:region,externalChanges},undefined,undefined,feelingKind);
+ return w.events.at(-1)!.id;
 }

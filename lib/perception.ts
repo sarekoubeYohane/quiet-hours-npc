@@ -163,7 +163,7 @@ export function resolvePerception(world: World, character: Character, eventId: s
   (world.perceptionTrials ??= {})[opportunity] = trial;
   return trial;
 }
-export function remember(world: World, character: Character, text: string, event?: { id: string; actor: string; kind?:string; time?:number;feelingKind?:import('./mental-experiences').FeelingOrigin['kind'] }) {
+export function remember(world: World, character: Character, text: string, event?: { id: string; actor: string; kind?:string; time?:number;feelingSourceId?:string;feelingKind?:import('./mental-experiences').FeelingOrigin['kind'] }) {
   addExperience(character, world.minute, text, undefined, event);
 }
 export function saveObservation(world: World, character: Character, observation: Observation, event?:import('./world').WorldEvent) {
