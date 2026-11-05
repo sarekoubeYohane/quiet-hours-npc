@@ -26,7 +26,7 @@ export type Habit={activityKey?:string;activityLabel?:string;evidenceIds?:string
 export type CraftProject={resultId:string;theme:string;dc:Difficulty;status:'finished-with-variation'|'finished'|'draft'|'unfinished'|'spoiled';target?:string;method?:'initial'|'researched'};
 export type OwnerControl={mode:'autonomous'|'taken-over';pending?:Action;active?:boolean;experiences?:{id?:string;time:number;text:string}[]};
 export type Character={mentalEnergy?:import('./mental-energy').MentalEnergy;openingKnowledge?:import('./opening-knowledge').OpeningKnowledge;profile?:import('./character-templates').CharacterTemplateFields;profileSource?:{id:string;version:number};pursuitArchived?:{id:string;version:number}[];pursuitArchivedDropped?:number;pursuitTrace?:import('./pursuits').PursuitTrace[];pursuitTraceDropped?:number;focusIntentId?:string|null;arrangements?:import('./arrangements').ArrangementState;pausedActivity?:import('./paused-activities').PausedActivity;needs?:BodyNeeds;preferences?:import('./preferences').PreferenceState;physical?:PhysicalState;id:string;name:string;color:string;location:string;region?:string;observations?:Observation[];attentionConditions?:AttentionCondition[];observationCursor?:number;observationSequence?:number;attentionDiagnostics?:AttentionDiagnostic[];mood:string;personality:string;goal:string;activity:string;relationships:Record<string,string>;shortTerm?:ShortMemory[];longTerm?:LongMemory[];memoryTrace?:MemoryTrace[];cognition?:CognitiveState;memories:{id?:string;time:number;text:string}[];routineCapabilities?:import('./routine-rules').RoutineOperation[];abilityTags?:string[];projects?:CraftProject[];craftInsights?:string[];plan?:ActivityPlan;habits?:Habit[];habitEvidence?:HabitEvidence[];habitEvidenceDropped?:number;eventHabits?:EventHabit[];intents?:Intent[];control?:OwnerControl};
-export type WorldEvent={entryPermission?:{regionId:string;allowed:boolean};id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string;externalChanges?:ExternalConsequence[]};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
+export type WorldEvent={feelingKind?:import('./mental-experiences').FeelingOrigin['kind'];entryPermission?:{regionId:string;allowed:boolean};id:string;time:number;actor:string;text:string;kind:string;audience:string[];scene?:{from:string;to:string;fromRegion?:string;toRegion?:string;target?:string;content?:string;externalChanges?:ExternalConsequence[]};perception?:PerceptionTrace[];resolution?:Resolution;attemptKey?:string};
 export type World={configuration?:WorldConfiguration;pursuitVersion?:1;pursuitContext?:string;phones?:import('./phones').PhoneState;bodyReconfirmation?:{attempts:{signature:string;minute:number}[];dropped:number};naturalChangesDropped?:number;naturalChanges?:import('./natural-changes').NaturalChange[];branchTrialScopes?:Record<string,string[]>;routineAudit?:{turn:number;actorId:string;location?:string;ruleId:string;result:"approved"|"reused"|"blocked"|"exception"|"confirmed";reason?:string}[];routineRules?:RoutineRule[];routinePlaces?:RoutinePlace[];contextId?:string;acceptance?:{id:'daily-life-v1';original?:World;snapshot?:{format:'gzip-base64-v1';data:string};originalSavedDecisions?:number};freeTrials?:Record<string,Resolution>;supplies?:SceneSupply[];objects?:WorldObject[];adjudication?:{provider:'openai'|'openrouter';model:string};minute:number;turn:number;characters:Character[];events:WorldEvent[];lastMode:string;scene?:SceneState;currentSensory?:CurrentSensoryState;perceptionTrials?:Record<string,PerceptionTrial>;probeResults?:Record<string,PerceptionTrace>;aiUsage?:AIUsage;modelPrices?:ModelPrice[];playerBudget?:{calls:number|null;tokens:number|null}};
 export type Action={type:'phone'|'pause'|'resume'|'abandon'|'propose'|'move'|'door'|'say'|'shout'|'persuade'|'message'|'rest'|'reflect'|'work'|'observe';target?:string;content?:string;mood?:string;purpose?:string};
 export function pendingInterventions(w:World,c:Character){
@@ -63,8 +63,8 @@ export function seedWorld():World{return normalizeWorld({pursuitVersion:1,pursui
 // a statistic of the old story and start from zero. The daily ledger planned in #27 must live
 // outside the world row so that a reset cannot clear it.
 export function resetWorld(previous:World):World{const fresh=seedWorld();if(previous.adjudication)fresh.adjudication={...previous.adjudication};if(previous.modelPrices)fresh.modelPrices=structuredClone(previous.modelPrices);if(previous.playerBudget)fresh.playerBudget={...previous.playerBudget};if(previous.aiUsage)fresh.aiUsage={...previous.aiUsage,savedDecisions:0};return fresh;}
-export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string){
-const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(scene?{scene}:{}),...(resolution?{resolution}:{})};
+export function record(w:World,actor:string,text:string,kind:string,audience:string[],scene?:WorldEvent['scene'],resolution?:Resolution,actorExperience?:string,feelingKind?:WorldEvent['feelingKind']){
+const event:WorldEvent={id:crypto.randomUUID(),time:w.minute,actor,text,kind,audience,...(feelingKind?{feelingKind}:{}),...(scene?{scene}:{}),...(resolution?{resolution}:{})};
 w.events=[...w.events,event].slice(-300);perceiveEvent(w,event,actorExperience);
 }
 export function perception(w:World,c:Character){
@@ -126,7 +126,7 @@ export function completeMovement(w:World,c:Character,destination:{location:strin
  c.location=destination.location;c.region=destination.region;
  moveHeldObjects(w,c,destination.region);
  c.activity=`剛走到${destination.name}。`;
- if(typeof action.mood==='string')c.mood=action.mood.slice(0,20);
+ if(!c.mentalEnergy&&typeof action.mood==='string')c.mood=action.mood.slice(0,20);
  record(w,c.id,`${c.name} 步行前往${destination.name}，在這段時間結束時抵達。`,'move',[c.id],
    {from,to:c.location,fromRegion,toRegion:destination.region,target:action.target});
  const permission=entryPermission(w,c.id,c.location,destination.region);
@@ -223,7 +223,7 @@ audience=witnesses;
 else if(a.type==='reflect'){if(!content)throw Error('想法不能為空');c.activity='留了一點時間給自己。';text=`${c.name} 心想：「${content}」`;}
 else if(a.type==='observe'){validateProbe(w,c,a.target);if(options.dryRun)return;c.activity=content==='hearing'?'專注聆聽附近的動靜。':'仔細查看附近的情況。';text=`${c.name} ${c.activity}`;}
 else throw Error('未知行動');
-if(typeof a.mood==='string')c.mood=a.mood.slice(0,20);
+if(!c.mentalEnergy&&typeof a.mood==='string')c.mood=a.mood.slice(0,20);
 record(w,c.id,text,resolution?'attempt':a.type,audience,
   {from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target,...(['say','shout','persuade','observe'].includes(a.type)?{content}:{})},resolution,a.type==='message'?`我傳送給 ${target?.name} 的私人訊息：${content}`:a.type==='door'?`${c.name} ${c.activity}`:undefined);
 if(a.type==='observe')probeCurrent(w,c,w.events.at(-1)!);

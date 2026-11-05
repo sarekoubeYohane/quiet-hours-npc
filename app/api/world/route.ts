@@ -344,7 +344,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       try {
         if (b.target !== undefined && b.target !== 'owner') throw Error('只能直接控制咖啡店主');
         const action = b.action;
-        if (!action || typeof action !== 'object' || Object.keys(action).some(k => !['type', 'target', 'content', 'mood'].includes(k)) ||
+        if (!action || typeof action !== 'object' || Object.keys(action).some(k => !['type', 'target', 'content', ...(world.characters.some(c=>c.mentalEnergy)?[]:['mood'])].includes(k)) ||
           (action.content !== undefined && (typeof action.content !== 'string' || action.content.length > 500)) ||
           (action.target !== undefined && typeof action.target !== 'string') ||
           (action.mood !== undefined && (typeof action.mood !== 'string' || action.mood.length > 20))) throw Error('行動格式無效');

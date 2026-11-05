@@ -1,3 +1,4 @@
+import { feelingOrigin, mergeFeelingOrigins, validFeelingOrigins, type FeelingOrigin } from './mental-experiences';
 import { shortMemoryTextMaxBytes } from './memory-limits';
 import { arrangementsForDecision, validateArrangements, type Arrangement } from './arrangements';
 import { validatePreferences, type Preference } from './preferences';
@@ -6,12 +7,12 @@ import type { Character } from './world';
 import type { Observation } from './perception';
 
 export type MemorySource = { kind: 'legacy-unclassified' | 'experience' | 'observation'; person?: string; object?: string; supply?: string; region?: string; sense?: Observation['sense']; clarity?: Observation['clarity'] };
-export type ShortMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; observationSequence?: number; consumed?: boolean; controlled?: boolean };
+export type ShortMemory = { feelingOrigins?:FeelingOrigin[]; id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; eventId?: string; observation?: Observation; observationSequence?: number; consumed?: boolean; controlled?: boolean };
 export type MemoryRef = { id: string; version: number };
 export type RememberedSource = MemoryRef & { source: MemorySource };
 export type MemoryTraceOperation = 'merge' | 'rewrite' | 'forget' | 'forget-source' | 'keep';
 export type MemoryTrace = { id: string; version: number; type: MemoryTraceOperation; from: MemoryRef[]; to?: MemoryRef; reason: string };
-export type LongMemory = { id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; origin: MemoryRef; reason: string; kind?: 'episode' | 'summary'; state?: 'active' | 'superseded' | 'forgotten'; rememberedSources?: RememberedSource[]; origins?: MemoryRef[]; unresolved?: MemoryRef[] };
+export type LongMemory = { feelingOrigins?:FeelingOrigin[]; id: string; characterId: string; version: number; time: number; text: string; source: MemorySource; origin: MemoryRef; reason: string; kind?: 'episode' | 'summary'; state?: 'active' | 'superseded' | 'forgotten'; rememberedSources?: RememberedSource[]; origins?: MemoryRef[]; unresolved?: MemoryRef[] };
 export class MemoryValidationError extends Error {}
 export class MemorySelectionReferenceError extends MemoryValidationError {}
 export class MemorySelectionFormatError extends MemoryValidationError {}
@@ -90,12 +91,14 @@ export function initializeObservationOrder(c:Character){
  // Metadata uses the same FIFO and total capacity as every short experience.
  if(c.shortTerm)boundShort(c);
 }
-export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string }) {
+export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string; kind?:string; time?:number;feelingKind?:FeelingOrigin['kind'] }, origins?:FeelingOrigin[]) {
   normalizeMemory(c);
   const id = observation?.id || crypto.randomUUID();
   if (c.shortTerm!.some(item => item.id === id)) return;
   if(observation){initializeObservationOrder(c);if((c.observationSequence??0)>=Number.MAX_SAFE_INTEGER)throw new MemoryValidationError('感知順序已達工程上界');c.observationSequence=(c.observationSequence??0)+1;}
   const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? observationSource(observation) : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation,observationSequence:c.observationSequence } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
+  const external=c.mentalEnergy&&event&&(event.feelingKind||['intervention','say','shout','result','phone-reading','external','natural','phone-notification'].includes(event.kind||''))&&!(event.actor===c.id&&['say','shout'].includes(event.kind||''));
+  if(origins?.length)item.feelingOrigins=origins;else if(external)item.feelingOrigins=[feelingOrigin(c,event.id,event.time??time,event.feelingKind??(event.kind==='result'?'result':'experience'))];
   validateShort(item);
   c.shortTerm!.push(item); boundShort(c);
 }
@@ -133,7 +136,7 @@ function selectedMemories(c: Character, value: unknown, visibleShort: MemoryRef[
     seen.add(item.id);
     const source = c.shortTerm?.find(m => m.id === item.id && m.version === item.version && m.characterId === c.id);
     if (!source || !visibleShort.some(ref => ref.id === item.id && ref.version === item.version)) throw new MemorySelectionReferenceError('只能選留本次自己的短期經歷版本');
-    if (!result.some(m => m.origin.id === source.id && m.origin.version === source.version)) result.push({ id: crypto.randomUUID(), characterId: c.id, version: 1, time: source.time, text: source.text, source: { ...source.source }, origin: { id: source.id, version: source.version }, reason: item.reason });
+    if (!result.some(m => m.origin.id === source.id && m.origin.version === source.version)) result.push({ id: crypto.randomUUID(), characterId: c.id, version: 1, time: source.time, text: source.text, source: { ...source.source }, origin: { id: source.id, version: source.version }, reason: item.reason, ...(source.feelingOrigins?{feelingOrigins:structuredClone(source.feelingOrigins)}:{}) });
   }
   return result;
 }
@@ -148,7 +151,7 @@ export function consumeMemories(c: Character) {
   validateMemoryState(c);
 }
 export function memoryProjection(c: Character) {
-  return (c.shortTerm || []).map(({ id, version, time, text, source, controlled }) => ({ id, version, time, text, source, ...(controlled ? { controlled: true } : {}) }));
+  return (c.shortTerm || []).map(({ id, version, time, text, source, controlled, feelingOrigins }) => ({ id, version, time, text, source, ...(feelingOrigins?.length?{feelingSources:feelingOrigins.map(o=>o.id)}:{}), ...(controlled ? { controlled: true } : {}) }));
 }
 function sourceProjection(source: MemorySource): MemorySource {
   return { kind: source.kind, ...(source.person ? { person: source.person } : {}), ...(source.object ? { object: source.object } : {}), ...(source.supply ? { supply: source.supply } : {}), ...(source.region ? { region: source.region } : {}), ...(source.sense ? { sense: source.sense } : {}), ...(source.clarity ? { clarity: source.clarity } : {}) };
@@ -157,7 +160,7 @@ function rememberedSources(item: LongMemory): RememberedSource[] {
   return item.rememberedSources ?? [{ id: item.id, version: item.version, source: item.source }];
 }
 export function recallableMemoryProjection(c: Character) {
-  return (c.longTerm || []).filter(item => !item.state || item.state === 'active').map(item => ({ id: item.id, version: item.version, time: item.time, text: item.text, kind: item.kind || 'episode', state: 'active' as const, source: sourceProjection(item.source), rememberedSources: rememberedSources(item).map(ref => ({ id: ref.id, version: ref.version, source: sourceProjection(ref.source) })), ...(item.unresolved?.length ? { unresolved: item.unresolved.map(({ id, version }) => ({ id, version })) } : {}) }));
+  return (c.longTerm || []).filter(item => !item.state || item.state === 'active').map(item => ({ id: item.id, version: item.version, time: item.time, text: item.text, ...(item.feelingOrigins?.length?{feelingSources:item.feelingOrigins.map(o=>o.id)}:{}), kind: item.kind || 'episode', state: 'active' as const, source: sourceProjection(item.source), rememberedSources: rememberedSources(item).map(ref => ({ id: ref.id, version: ref.version, source: sourceProjection(ref.source) })), ...(item.unresolved?.length ? { unresolved: item.unresolved.map(({ id, version }) => ({ id, version })) } : {}) }));
 }
 export type MemoryProjection = ReturnType<typeof recallableMemoryProjection>;
 export type MemoryReview = MemoryRef & { kind: 'short' | 'long' | 'trace'; required?: boolean };
@@ -214,7 +217,7 @@ export function evaluateMemories(c: Character, selections: unknown, operations: 
       continue;
     }
     const updated: LongMemory = ['merge', 'rewrite'].includes(operation.type)
-      ? { ...first, version: first.version + 1, kind: 'summary', state: 'active', text: operation.text, rememberedSources: sources, origins, unresolved: operation.unresolved, reason: operation.reason }
+      ? { ...first, feelingOrigins:mergeFeelingOrigins(items), version: first.version + 1, kind: 'summary', state: 'active', text: operation.text, rememberedSources: sources, origins, unresolved: operation.unresolved, reason: operation.reason }
       : { ...first, version: first.version + 1, state: 'active', ...(operation.text ? { text: operation.text } : {}), source: { kind: first.source.kind, ...(first.source.sense ? { sense: first.source.sense } : {}), ...(first.source.clarity ? { clarity: first.source.clarity } : {}) }, rememberedSources: [], reason: operation.reason };
     if (operation.type !== 'merge' && items.length !== 1) throw new MemoryValidationError('來源遺忘每項只處理一筆記憶');
     for (const item of items) changed.add(item.id);
@@ -362,11 +365,13 @@ export function validateMemoryState(c: Character) {
     if(item.observationSequence!==undefined){if(!item.observation||!Number.isSafeInteger(item.observationSequence)||item.observationSequence<1||observationSequences.has(item.observationSequence)||c.observationSequence!==undefined&&item.observationSequence>c.observationSequence)throw new MemoryValidationError('感知順序無效或重複');observationSequences.add(item.observationSequence);}
     if (item.observation && (item.observation.id !== item.id || item.observation.text !== item.text || item.observation.time !== item.time || item.observation.source !== item.source.person || item.observation.objectId !== item.source.object || item.observation.supplyId !== item.source.supply || item.observation.region !== item.source.region || item.observation.sense !== item.source.sense || item.observation.clarity !== item.source.clarity)) throw new MemoryValidationError('主觀觀察投影不一致');
     if (!boundedId(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || (item.eventId && !boundedId(item.eventId))) throw new MemoryValidationError('短期記憶身份或來源無效');
+    if(!validFeelingOrigins(item.feelingOrigins,c.id))throw new MemoryValidationError('心理來源無效');
     validateShort(item);
   }
   const long = c.longTerm || [], ids = new Set<string>();
   for (const item of long) {
     if (!boundedId(item.id) || ids.has(item.id) || item.characterId !== c.id || !Number.isSafeInteger(item.version) || item.version < 1 || !Number.isFinite(item.time) || !validSource(item.source) || typeof item.text !== 'string' || textBytes(item.text) > 4096 || typeof item.reason !== 'string' || textBytes(item.reason) > 256 || !boundedId(item.origin?.id) || !Number.isSafeInteger(item.origin.version) || item.origin.version < 1) throw new MemoryValidationError('長期記憶格式或文字超限');
+    if(!validFeelingOrigins(item.feelingOrigins,c.id))throw new MemoryValidationError('心理來源無效');
     ids.add(item.id);
     if ((item.kind !== undefined && !['episode', 'summary'].includes(item.kind)) || (item.state !== undefined && !['active', 'superseded', 'forgotten'].includes(item.state)) || (item.origins !== undefined && !validRefs(item.origins)) || (item.unresolved !== undefined && !validRefs(item.unresolved)) || (item.rememberedSources !== undefined && (!Array.isArray(item.rememberedSources) || item.rememberedSources.length > 8 || item.rememberedSources.some(ref => !validRef({ id: ref?.id, version: ref?.version }) || Object.keys(ref).some(key => !['id', 'version', 'source'].includes(key)) || !validSource(ref.source))))) throw new MemoryValidationError('摘要來源、矛盾或狀態格式無效');
   }

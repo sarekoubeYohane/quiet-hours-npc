@@ -2,8 +2,8 @@ import type { Character, World } from './world';
 import { activeBodyMinutes } from './needs';
 
 /** No product balance is defined here. Only explicitly configured isolated tests activate v1. */
-export type MentalEnergyPolicy={version:1;kind:'test';id:string;initial:number;maximum:number;awakePerHour:number;regulationCost:number;lowAt:number};
-export type MentalEnergy={version:1;policy:MentalEnergyPolicy;value:number;activatedAt:number;updatedAt:number;history:{kind:'natural';from:number;minute:number;reason:string;before:number;after:number;awakeMinutes:number}[];dropped:number};
+export type MentalEnergyPolicy={version:1;kind:'test';id:string;initial:number;maximum:number;awakePerHour:number;regulationCost:number;lowAt:number;experience?:{levels:[number,number,number]}};
+export type MentalEnergy={version:1;policy:MentalEnergyPolicy;value:number;activatedAt:number;updatedAt:number;history:{kind:'natural'|'experience';source?:string;moodBefore?:string;moodAfter?:string;from:number;minute:number;reason:string;before:number;after:number;awakeMinutes:number}[];dropped:number;experiences?:{receipts:import('./mental-experiences').FeelingReceipt[];dropped:number}};
 export function readMentalEnergyTestPolicy(environment:{APP_ENV?:string;MENTAL_ENERGY_TEST_POLICY?:string},world:World):MentalEnergyPolicy|undefined {
  // Saved fixture policy remains authoritative, so environment isolation must
  // also protect reads-for-write when the activation binding has been removed.
@@ -13,7 +13,8 @@ export function readMentalEnergyTestPolicy(environment:{APP_ENV?:string;MENTAL_E
  assertMentalEnergyPolicy(p);return p;
 }
 export function assertMentalEnergyPolicy(p:MentalEnergyPolicy):void {
- if(!p||p.version!==1||p.kind!=='test'||typeof p.id!=='string'||!p.id||p.id.length>120||Object.keys(p).sort().join(',')!=='awakePerHour,id,initial,kind,lowAt,maximum,regulationCost,version'||![p.initial,p.maximum,p.awakePerHour,p.regulationCost,p.lowAt].every(Number.isFinite)||p.maximum<=0||p.initial<0||p.initial>p.maximum||p.awakePerHour<0||p.regulationCost<=0||p.regulationCost>p.maximum||p.lowAt<0||p.lowAt>p.maximum)throw Error('精神電量需要完整有效的明示測試政策。');
+ if(!p||p.version!==1||p.kind!=='test'||typeof p.id!=='string'||!p.id||p.id.length>120||Object.keys(p).some(key=>!['version','kind','id','initial','maximum','awakePerHour','regulationCost','lowAt','experience'].includes(key))||![p.initial,p.maximum,p.awakePerHour,p.regulationCost,p.lowAt].every(Number.isFinite)||p.maximum<=0||p.initial<0||p.initial>p.maximum||p.awakePerHour<0||p.regulationCost<=0||p.regulationCost>p.maximum||p.lowAt<0||p.lowAt>p.maximum)throw Error('精神電量需要完整有效的明示測試政策。');
+ if(p.experience!==undefined&&(!p.experience||typeof p.experience!=='object'||Object.keys(p.experience).join(',')!=='levels'||!Array.isArray(p.experience.levels)||p.experience.levels.length!==3||p.experience.levels[0]!==0||!p.experience.levels.every(n=>Number.isFinite(n)&&n>=0)))throw Error('自然感受需要明示測試等級點數。');
 }
 export function activateMentalEnergy(world:World,policy?:MentalEnergyPolicy):void {
  if(!policy)return;
