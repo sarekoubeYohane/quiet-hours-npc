@@ -91,14 +91,14 @@ export function initializeObservationOrder(c:Character){
  // Metadata uses the same FIFO and total capacity as every short experience.
  if(c.shortTerm)boundShort(c);
 }
-export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string; kind?:string; time?:number;feelingKind?:FeelingOrigin['kind'] }, origins?:FeelingOrigin[]) {
+export function addExperience(c: Character, time: number, text: string, observation?: Observation, event?: { id: string; actor: string; kind?:string; time?:number;feelingSourceId?:string;feelingKind?:FeelingOrigin['kind'] }, origins?:FeelingOrigin[]) {
   normalizeMemory(c);
   const id = observation?.id || crypto.randomUUID();
   if (c.shortTerm!.some(item => item.id === id)) return;
   if(observation){initializeObservationOrder(c);if((c.observationSequence??0)>=Number.MAX_SAFE_INTEGER)throw new MemoryValidationError('感知順序已達工程上界');c.observationSequence=(c.observationSequence??0)+1;}
   const item: ShortMemory = { id, characterId: c.id, version: 1, time, text, source: observation ? observationSource(observation) : { kind: 'experience', ...(event ? { person: event.actor, region: c.region || c.location } : {}) }, ...(event ? { eventId: event.id } : {}), ...(observation ? { observation,observationSequence:c.observationSequence } : {}), ...(c.control && (c.control.mode === 'taken-over' || c.control.experiences !== undefined) ? { controlled: true } : {}) };
   const external=c.mentalEnergy&&event&&(event.feelingKind||['intervention','say','shout','result','phone-reading','external','natural','phone-notification'].includes(event.kind||''))&&!(event.actor===c.id&&['say','shout'].includes(event.kind||''));
-  if(origins?.length)item.feelingOrigins=origins;else if(external)item.feelingOrigins=[feelingOrigin(c,event.id,event.time??time,event.feelingKind??(event.kind==='result'?'result':'experience'))];
+  if(origins?.length)item.feelingOrigins=origins;else if(external)item.feelingOrigins=[feelingOrigin(c,event.feelingSourceId??event.id,event.time??time,event.feelingKind??(event.kind==='result'?'result':'experience'))];
   validateShort(item);
   c.shortTerm!.push(item); boundShort(c);
 }
