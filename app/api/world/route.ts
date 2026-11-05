@@ -490,7 +490,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       try {
         let dispatchKey = '';
         await advanceActivities(world, {
-          mentalEnergyPolicy:readMentalEnergyTestPolicy(env),
+          mentalEnergyPolicy:readMentalEnergyTestPolicy(env,world),
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits,

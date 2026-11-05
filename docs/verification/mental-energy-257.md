@@ -10,7 +10,7 @@
 {"version":1,"kind":"test","id":"isolated-energy-257","initial":10,"maximum":20,"awakePerHour":12,"regulationCost":7,"lowAt":10}
 ```
 
-上述全部數字均為測試參數，不是產品平衡。首次成功 `advance` 才保存每位角色的 policy、唯一 value、activatedAt 與 updatedAt。後續環境 binding 更改不覆寫已保存政策；GET 不回填。沿原 operation journal 與世界 JSON 原子提交，沒有新增資料表或獨立時鐘。
+上述全部數字均為測試參數，不是產品平衡。首次成功 `advance` 才保存每位角色的 policy、唯一 value、activatedAt 與 updatedAt。後續環境 binding 更改不覆寫已保存政策；GET 不回填。即使移除 binding，production 也拒絕推進含已保存測試政策的世界；GET 仍可查看。local/test 可依已保存政策繼續，不需重新啟用。沿原 operation journal 與世界 JSON 原子提交，沒有新增資料表或獨立時鐘。
 
 `lib/mental-energy.ts` 的 `mentalIntervals` 使用 `activeBodyMinutes` 取得既有活動的實際睡眠交集；`settleMentalInterval` 結算這一個實際世界區間。首次確認的睡眠沿 `activity-lifecycle` 的實際恢復分鐘，從同區間扣除清醒消耗；從未截斷的區間起值重算，避免零電量後錯誤補發。自然結算紀錄由 `kind=natural` 和 from/to 身份定向替換，32 筆容量僅限制觀察歷史，不限制權威結算時間。
 

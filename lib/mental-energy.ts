@@ -4,9 +4,11 @@ import { activeBodyMinutes } from './needs';
 /** No product balance is defined here. Only explicitly configured isolated tests activate v1. */
 export type MentalEnergyPolicy={version:1;kind:'test';id:string;initial:number;maximum:number;awakePerHour:number;regulationCost:number;lowAt:number};
 export type MentalEnergy={version:1;policy:MentalEnergyPolicy;value:number;activatedAt:number;updatedAt:number;history:{kind:'natural';from:number;minute:number;reason:string;before:number;after:number;awakeMinutes:number}[];dropped:number};
-export function readMentalEnergyTestPolicy(environment:{APP_ENV?:string;MENTAL_ENERGY_TEST_POLICY?:string}):MentalEnergyPolicy|undefined {
+export function readMentalEnergyTestPolicy(environment:{APP_ENV?:string;MENTAL_ENERGY_TEST_POLICY?:string},world:World):MentalEnergyPolicy|undefined {
+ // Saved fixture policy remains authoritative, so environment isolation must
+ // also protect reads-for-write when the activation binding has been removed.
+ if((environment.MENTAL_ENERGY_TEST_POLICY||world.characters.some(actor=>actor.mentalEnergy?.policy.kind==='test'))&&!['local','test'].includes(environment.APP_ENV||''))throw Error('精神電量測試政策只允許隔離 local/test 環境。');
  if(!environment.MENTAL_ENERGY_TEST_POLICY)return;
- if(!['local','test'].includes(environment.APP_ENV||''))throw Error('精神電量測試政策只允許隔離 local/test 環境。');
  const p=JSON.parse(environment.MENTAL_ENERGY_TEST_POLICY) as MentalEnergyPolicy;
  assertMentalEnergyPolicy(p);return p;
 }
