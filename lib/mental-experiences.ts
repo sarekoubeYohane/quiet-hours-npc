@@ -1,3 +1,4 @@
+import { appendMentalHistory } from './mental-history';
 import type { Character } from './world';
 import { MemoryValidationError } from './memory';
 export type FeelingOrigin={id:string;actorId:string;version:1;at:number;kind:'experience'|'result'};
@@ -40,6 +41,6 @@ export function applyFeelingUpdates(actor:Character,updates:PreparedFeelingUpdat
  const before=state.value,moodBefore=actor.mood,magnitude=state.policy.experience!.levels[update.level],delta=update.direction==='negative'?-magnitude:update.direction==='positive'?magnitude:0;
  state.value=Math.max(0,Math.min(state.policy.maximum,before+delta));if(update.mood!==null)actor.mood=update.mood;
  const receipt={...update,at:minute,expiresAt:originAt+feelingSourceMinutes,before,after:state.value,moodBefore,moodAfter:actor.mood};ledger.receipts.push(receipt);
- state.history.push({kind:'experience',minute,from:minute,reason:update.reason,before,after:state.value,awakeMinutes:0,source:update.source,moodBefore,moodAfter:actor.mood});state.dropped+=Math.max(0,state.history.length-32);state.history=state.history.slice(-32);
+ appendMentalHistory(state,{kind:'experience',minute,from:minute,reason:update.reason,before,after:state.value,awakeMinutes:0,source:update.source,moodBefore,moodAfter:actor.mood});
  }
 }

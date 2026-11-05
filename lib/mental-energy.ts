@@ -1,3 +1,4 @@
+import { appendMentalHistory } from './mental-history';
 import { collectProcessSlices, processFeelingForDecision, type ProcessSlice } from './mental-process';
 import type { Character, World } from './world';
 import { activeBodyMinutes } from './needs';
@@ -45,7 +46,7 @@ export function settleMentalInterval(actor:Character,interval:MentalInterval,add
  const previous=s.history.findIndex(entry=>['natural','process'].includes(entry.kind)&&entry.from===interval.from&&entry.minute===interval.to);
  if(previous>=0)s.history.splice(previous,1);
  s.value=value;s.updatedAt=interval.to;
- if(interval.to>interval.from){s.history.push({kind:interval.process.length?'process':'natural',from:interval.from,minute:interval.to,reason:interval.process.length?`實際活動過程：${[...new Set(interval.process.map(p=>p.reason))].join('；')}；與清醒時間共同結算`:awakeMinutes?'清醒世界時間自然消耗':'實際睡眠暫停自然消耗',before:interval.before,after:value,awakeMinutes,...(interval.process.length?{naturalDelta,processDelta,processMinutes:interval.process.reduce((sum,p)=>sum+p.to-p.from,0),processSlots:interval.process.map(p=>({id:p.id,slot:p.slot,draw:p.draw}))}:{})});s.dropped+=Math.max(0,s.history.length-32);s.history=s.history.slice(-32);}
+ if(interval.to>interval.from){appendMentalHistory(s,{kind:interval.process.length?'process':'natural',from:interval.from,minute:interval.to,reason:interval.process.length?`實際活動過程：${[...new Set(interval.process.map(p=>p.reason))].join('；')}；與清醒時間共同結算`:awakeMinutes?'清醒世界時間自然消耗':'實際睡眠暫停自然消耗',before:interval.before,after:value,awakeMinutes,...(interval.process.length?{naturalDelta,processDelta,processMinutes:interval.process.reduce((sum,p)=>sum+p.to-p.from,0),processSlots:interval.process.map(p=>({id:p.id,slot:p.slot,draw:p.draw}))}:{})});}
 }
 
 /** Legacy worlds retain their old mood contract; active energy requires sourced writers. */
