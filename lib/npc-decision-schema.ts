@@ -1,3 +1,4 @@
+import { feelingUpdatesSchema } from './mental-experiences';
 import { pursuitUpdatesSchema } from './pursuits';
 import { pursuitCandidatesSchema, pursuitSelectionSchema } from './pursuit-selection';
 import { arrangementUpdatesSchema } from './arrangements';
@@ -23,6 +24,7 @@ export const methodAssessmentSchema = { type:'object', properties:{
 },required:['purpose','knownResults','choice','method','change','reason','selectedAction','intentIds'],additionalProperties:false};
 
 export const actionSchema = { type: 'object', properties: {
+  feelingUpdates:feelingUpdatesSchema([]),
   contractVersion: { type: 'string', enum: [npcContractVersion] },
   methodAssessment:methodAssessmentSchema,
   reconfirmBodyConsequences:{type:'boolean'},
@@ -43,14 +45,14 @@ export const actionSchema = { type: 'object', properties: {
   preferenceUpdates: preferenceUpdatesSchema,
   habitCandidates:habitCandidateSchema,
   cognitiveUpdates: cognitiveUpdatesSchema, interpretation: { type: 'string', maxLength: 256 },
-}, required: ['methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'pursuitCandidates', 'pursuitSelection', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
+}, required: ['feelingUpdates', 'methodAssessment', 'reconfirmBodyConsequences', 'purpose', 'contractVersion', 'type', 'target', 'content', 'mood', 'durationMinutes', 'timeIntent', 'pursuitContext', 'focusIntentId', 'pursuitUpdates', 'pursuitCandidates', 'pursuitSelection', 'attentionConditions', 'memorySelections', 'cognitiveUpdates', 'interpretation', 'memoryOperations', 'preferenceUpdates', 'habitCandidates', 'arrangementUpdates'], additionalProperties: false };
 
-export function decisionWireSchema(allowedTypes:string[], short:Parameters<typeof memorySelectionSchemaFor>[0]) {
-  const fields=Object.fromEntries(Object.entries(actionSchema.properties).filter(([key])=>!['type','target','content','purpose'].includes(key)));
+export function decisionWireSchema(allowedTypes:string[], short:Parameters<typeof memorySelectionSchemaFor>[0], sources?:string[]) {
+  const fields=Object.fromEntries(Object.entries(actionSchema.properties).filter(([key])=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[])].includes(key)));
   const branch=(types:string[],proposal:boolean)=>({type:'object',properties:{
     type:{type:'string',enum:types},target:actionSchema.properties.target,
     content:{...actionSchema.properties.content,...(proposal?{minLength:1,pattern:'\\S'}:{})},
     purpose:{...actionSchema.properties.purpose,...(proposal?{minLength:1,pattern:'\\S'}:{})},
   },required:['type','target','content','purpose'],additionalProperties:false});
-  return {type:'object',properties:{...fields,action:{anyOf:[branch(['propose'],true),branch(allowedTypes.filter(type=>type!=='propose'),false)]},memorySelections:memorySelectionSchemaFor(short)},required:[...actionSchema.required.filter(key=>!['type','target','content','purpose'].includes(key)),'action'],additionalProperties:false};
+  return {type:'object',properties:{...fields,...(sources===undefined?{}:{feelingUpdates:feelingUpdatesSchema(sources)}),action:{anyOf:[branch(['propose'],true),branch(allowedTypes.filter(type=>type!=='propose'),false)]},memorySelections:memorySelectionSchemaFor(short)},required:[...actionSchema.required.filter(key=>!['type','target','content','purpose',...(sources===undefined?['feelingUpdates']:[])].includes(key)),'action'],additionalProperties:false};
 }
