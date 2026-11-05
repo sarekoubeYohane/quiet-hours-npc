@@ -4,6 +4,7 @@ declare namespace Cloudflare {
     ASSETS?: Fetcher;
     /** Wrangler environment name: local, test or production. */
     APP_ENV?: string;
+    MENTAL_ENERGY_TEST_POLICY?: string;
   }
 }
 

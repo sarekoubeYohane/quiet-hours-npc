@@ -1,3 +1,4 @@
+import { activateMentalEnergy, mentalIntervals, settleMentalInterval, type MentalEnergyPolicy } from './mental-energy';
 import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
 import { hasUnevaluatedPhoneNotification, acknowledgePhoneNotifications } from './phone-notifications';
 import { normalDecisionInput } from './npc-input';
@@ -94,6 +95,7 @@ export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
 
 export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
+  mentalEnergyPolicy?:MentalEnergyPolicy;
   beforeDecision?: () => Promise<void>;
   onActor?: (world:World,character:Character)=>void;
   decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
@@ -108,6 +110,9 @@ export async function advanceActivities(world: World, options: {
   activatePhones(world);
   initializeKnownConditionOrder(world);
   activateBodyNeeds(world);
+  activateMentalEnergy(world,options.mentalEnergyPolicy);
+  const mental=mentalIntervals(world,world.minute+minutes);
+  for(const actor of world.characters){const interval=mental.get(actor.id);if(interval)settleMentalInterval(actor,interval);}
   const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
   const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));
   world.minute += minutes; world.lastMode = mode;
@@ -209,7 +214,7 @@ export async function advanceActivities(world: World, options: {
     }
     if (decision.intents) character.intents = decision.intents;
     try {
-      if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai,bodyMinutes:bodyMinutes.get(character.id),bodyBase:bodyBases.get(character.id)}))continue;
+      if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai,mentalInterval:mental.get(character.id),bodyMinutes:bodyMinutes.get(character.id),bodyBase:bodyBases.get(character.id)}))continue;
       if(character.plan&&!controlledDecision&&ai)bindActivityPursuit(character,decision,true);
       if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from, decision.freeCandidate);
       if(controlledDecision&&character.plan)control!.active=true;
