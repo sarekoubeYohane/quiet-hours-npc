@@ -39,7 +39,7 @@ TDD 記錄（暫存於 `/tmp/quiet-hours-255-context`）：
 - `258-red-self-memo.log` → `258-green-source-offers.log`：自己重讀安撫備忘錄原本發 2 個 aliases，修正後沒有可結算新根。
 - `258-final-offers.log`、`258-external-consequences.log`：settled 源仍保留正文但不再出現在實際下一個 body/schema，以及真實外在後果兩感官同根。
 
-相關回歸先跑 38/38（mental-energy、npc-input-equivalence、phone-memos/inbox、activity-time）；後續 source 修正另外跑上述相關組合。`pnpm typecheck` 通過；lint 與 diff check 結果見本票最後提交紀錄。沒有在本票重跑整份 pnpm test，由 integration 最末統一執行。
+相關回歸先跑 38/38（mental-energy、npc-input-equivalence、phone-memos/inbox、activity-time）；後續 source 修正重跑同組合 **47/47 通過**，記錄為 `258-regression-final.log`。`pnpm typecheck` 通過；`pnpm lint` 為 0 errors、4 個既有 warnings，`git diff --check` 通過。沒有在本票重跑整份 pnpm test，由 integration 最末統一執行。
 
 Chromium 已由 root 執行並目視 [角色面板](assets/mental-experiences-258/energy-panel.png)：既有 WorldApp 中加入介入、下一回合 5→7/10、心情平靜→安心、實際原因與來源；SQLite 重讀與原 ID 回放維持結果。實際 2 個受控 NPC calls、input/output 60/20 tokens、0 次付費模型。[原始證據](assets/mental-experiences-258/evidence.json) 保存實際輸入及檢查值；runner 為 `tooling/verification/browser-mental-experiences.mjs`。
 
