@@ -1,0 +1,63 @@
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {url,server,store,load,requests,setModelResponder} from './browser-fixture.mjs';
+import {launchBrowser,outputPath} from './browser-runtime.mjs';
+
+process.env.BROWSER_ARTIFACT_DIR ||= resolve('docs/verification/assets/mental-process-260');
+await mkdir(process.env.BROWSER_ARTIFACT_DIR,{recursive:true});
+const world=load('world').seedWorld();
+world.characters=world.characters.filter(c=>c.id==='owner');
+world.contextId='browser-process-260';
+world.adjudication={provider:'openai',model:'fixture-world'};
+const policy={version:1,kind:'test',id:'browser-process-260',initial:10,maximum:30,awakePerHour:0,regulationCost:4,lowAt:4,process:{slotMinutes:20,levels:[0,6,12],multipliers:[1],seed:1}};
+load('cloudflare-workers').env.MENTAL_ENERGY_TEST_POLICY=JSON.stringify(policy);
+store.install(world);
+let npc=0;
+const inputs=[];
+setModelResponder(request=>{
+ const input=JSON.parse(request.messages[1].content);inputs.push(input);npc++;
+ assert.equal(input.self.mentalEnergy.value,undefined);
+ assert.equal(input.self.mentalEnergy.policy,undefined);
+ const value=fixtureDecision(input,{type:npc===1?'rest':'continue',target:'',content:'繼續坐著看雨',mood:'舊欄位不改心情',durationMinutes:90,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[],processFeeling:npc===1?{direction:'positive',level:1,reason:'我享受看雨的過程'}:{direction:'negative',level:2,reason:'現在覺得這段過程有負擔'}});
+ return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});
+});
+let browser;
+try{
+ browser=await launchBrowser();
+ const page=await browser.newPage({reducedMotion:'reduce',viewport:{width:1280,height:1000}}),errors=[];
+ page.on('pageerror',error=>errors.push(String(error)));page.setDefaultTimeout(15000);
+ await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
+ const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
+ const read=async()=>(await(await page.request.get(url+'/api/world')).json()).world;
+ const openAI=async()=>{await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');};
+ const advance=async()=>{
+  const clock=await(await page.request.post(url+'/__fixture',{data:{advanceMs:1000}})).json();
+  await page.evaluate(now=>{Date.now=()=>now;},clock.now);
+  const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');
+  await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;
+  assert.equal(response.status(),200,await response.text());
+  await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');return read();
+ };
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await openAI();
+ let saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,10);assert.equal(saved.characters[0].plan.mentalProcess.activeMinutes,0);
+ saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,11.5);assert.equal(npc,1);
+ const processId=saved.characters[0].plan.mentalProcess.id;
+ await page.reload();await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();assert.equal((await read()).characters[0].plan.mentalProcess.id,processId);await openAI();
+ await page.getByRole('textbox',{name:'你想說的話或發生的事'}).fill('想重新考慮現在的感受嗎？');
+ const intervened=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='intervene');
+ await page.getByRole('button',{name:'加入事件',exact:true}).click();assert.equal((await intervened).status(),200);await page.waitForFunction(()=>document.getElementById('intervention')?.value==='');
+ saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,13);assert.equal(saved.characters[0].plan.mentalProcess.assessment.direction,'negative');
+ const priorHistory=structuredClone(saved.characters[0].mentalEnergy.history);
+ saved=await advance();const actor=saved.characters[0];assert.equal(actor.mentalEnergy.value,10);assert.equal(actor.plan.mentalProcess.id,processId);assert.equal(actor.plan.mentalProcess.activeMinutes,45);assert.equal(actor.plan.mentalProcess.draws,3);assert.deepEqual(actor.mentalEnergy.history.slice(0,priorHistory.length),priorHistory);assert.equal(npc,2);
+ await nav('分析');const panel=page.getByRole('heading',{name:'精神電量',exact:true}).locator('..');
+ await panel.getByText('觀察者數值：10/30',{exact:true}).waitFor();await panel.getByText('新評估於',{exact:false}).waitFor();await panel.getByText('最近的精神電量變化',{exact:true}).click();
+ await panel.screenshot({path:outputPath('process-panel.png')});
+ const state=structuredClone(actor),operation=requests.filter(r=>r.operation==='advance').at(-1);
+ const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:operation});assert.equal(replay.status(),200);assert.deepEqual((await replay.json()).world.characters[0],state);assert.equal(npc,2);
+ assert.equal(saved.aiUsage.totalCalls,2);assert.equal(saved.aiUsage.totalInputTokens,60);assert.equal(saved.aiUsage.totalOutputTokens,20);assert.ok(!JSON.stringify(inputs).includes(policy.id));assert.ok(!JSON.stringify(inputs).includes('multipliers'));assert.deepEqual(errors,[]);
+ await writeFile(outputPath('evidence.json'),JSON.stringify({fixture:true,realPaidCalls:0,counts:{npc},checks:{actualUI:true,noPrepayment:true,persistedPartialSlot:true,forwardReappraisal:true,earlierHistoryPreserved:true,sqliteReload:true,sameOperationReplay:true,noPerSlotModelCall:true},actor,inputs},null,2));
+ console.log('PASS #260 Chromium: actual-time process 10→11.5→13, forward negative assessment then 10, saved samples, reload/replay; 2 controlled NPC calls, 0 paid.');
+}finally{await browser?.close();server.close();}
