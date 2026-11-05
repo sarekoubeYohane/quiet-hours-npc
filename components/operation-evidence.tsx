@@ -33,7 +33,7 @@ export default function OperationEvidenceDetails({ evidence, recent, disabled, o
     {!shown&&!message&&<p>尚無操作證據；舊回合不能事後補回原始提案或裁定。</p>}
     {shown&&<>
       <p>{shown.deployment.name} · 版本 {shown.deployment.commit}<br/>操作：{shown.operationId}<br/>請求：{shown.requestId}</p>
-      <p>結果：{({committed:'已提交', 'rolled-back':'回合已回復，保留已知用量', 'not-committed':'未確認世界提交'})[shown.outcome]} · NPC 派送 {shown.counts.npc} 次 · 裁定派送 {shown.counts.adjudication} 次</p>
+      <p>結果：{({committed:'已提交', 'rolled-back':'回合已回復，保留已知用量', 'not-committed':'未確認世界提交'})[shown.outcome]} · NPC 派送 {shown.counts.npc} 次 · 裁定派送 {shown.counts.adjudication} 次 · 接管感受評估派送 {shown.counts.feelings||0} 次</p>
       {(shown.truncated||shown.redacted)&&<p>部分證據已省略、截短或遮蔽，不能視為完整原文。</p>}
       <details><summary>查看操作驗收證據</summary><pre style={style}>{JSON.stringify(shown,null,2)}</pre></details>
       {shown.replay&&<Button variant="outline" disabled={disabled||loading} onClick={()=>void onReplay(shown.replay!)}>重送同一操作（不新增回合）</Button>}
