@@ -1,3 +1,4 @@
+import { CharacterTemplateValidationError, initialMemoryCapacityError } from '@/lib/character-templates';
 import { initializeCity } from '@/lib/city-initialization';
 import { requestModel, type ModelService } from '@/lib/model-adapter';
 import { readOpeningDescription, suggestOpeningRelationships } from '@/lib/opening-relationship-generation';
@@ -230,6 +231,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {
       return reply({ error: '請重新讀取城市並提供有效的開局關聯描述。' }, 400);
     }
+    if (generatingCharacter && b.characterGeneration && typeof b.characterGeneration === 'object' && 'fields' in b.characterGeneration) {
+      const fields = b.characterGeneration.fields;
+      const memoryError = fields && typeof fields === 'object' && 'initialMemories' in fields && initialMemoryCapacityError(fields.initialMemories);
+      if (memoryError) return reply({ error: memoryError, field: 'initialMemories' }, 400);
+    }
     const characterGeneration = generatingCharacter ? readCharacterGeneration(b.characterGeneration) : undefined;
     if (generatingCharacter && (!characterGeneration || b.operationScope !== id)) {
       return reply({ error: '請重新讀取人物範本，並提供描述或已填設定及至少一個空白欄位。' }, 400);
@@ -277,7 +283,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       if (b.expectedVersion !== version) return reply({ error:'原世界已變更，請重新讀取後再整理。' }, 409);
       if (world.configuration || world.acceptance) return reply({ error:'目前世界無法另建城市。' }, 400);
       const { preview } = await prepareCity(id, city.data, world);
-      if (initializingCity && preview.issues.length > (preview.missingStarts ?? 0)) {
+      const invalidMemory = preview.characters.some(actor => initialMemoryCapacityError(actor.fields.initialMemories));
+      if (invalidMemory || (initializingCity && preview.issues.length > (preview.missingStarts ?? 0))) {
         return reply({ error:preview.issues.join(' '), preview },400);
       }
       if (!preview.places.length || !preview.characters.length || preview.places.length !== city.data.places.length ||
@@ -435,7 +442,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           }
         }
       } catch (error) {
-        failure = error instanceof BudgetExceeded ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
+        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
       }
     } else if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {

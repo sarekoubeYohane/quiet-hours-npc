@@ -1,3 +1,4 @@
+import { shortMemoryTextMaxBytes } from './memory-limits';
 import { arrangementsForDecision, validateArrangements, type Arrangement } from './arrangements';
 import { validatePreferences, type Preference } from './preferences';
 import { validateCognition, projectRelationships, relationshipsProjection, type Belief, type RelationshipTag } from './cognition';
@@ -28,7 +29,7 @@ function observationSource(observation: Observation): MemorySource {
   return { kind: 'observation', ...(observation.source ? { person: observation.source } : {}), ...(observation.objectId ? { object: observation.objectId } : {}), ...(observation.supplyId ? { supply: observation.supplyId } : {}), ...(observation.region ? { region: observation.region } : {}), sense: observation.sense, clarity: observation.clarity };
 }
 function validateShort(item: ShortMemory) {
-  if (textBytes(item.text) > 4096) throw new MemoryValidationError('短期經歷超過 4096 bytes；保留原資料，未截斷文字。');
+  if (textBytes(item.text) > shortMemoryTextMaxBytes) throw new MemoryValidationError('短期經歷超過 4096 bytes；保留原資料，未截斷文字。');
 }
 // The legacy arrays are compatibility projections, never independent stores.
 export function projectMemories(c: Character) {

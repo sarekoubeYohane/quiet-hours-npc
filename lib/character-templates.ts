@@ -1,3 +1,5 @@
+import { shortMemoryTextMaxBytes } from './memory-limits';
+
 export const characterTemplateFields = {
   name: { label: '姓名', maxLength: 80 },
   appearance: { label: '外觀', maxLength: 1200 },
@@ -22,6 +24,16 @@ export function blankCharacterTemplateFields(): CharacterTemplateFields {
 
 export const characterDescriptionMaxLength = 2400;
 
+export class CharacterTemplateValidationError extends Error {}
+
+export function initialMemoryCapacityError(value: unknown): string | undefined {
+  if (typeof value !== 'string') return;
+  const bytes = new TextEncoder().encode(value).length;
+  if (bytes > shortMemoryTextMaxBytes) {
+    return `初始記憶目前為 ${bytes} UTF-8 bytes，上限為 ${shortMemoryTextMaxBytes} bytes（另有 2,400 字元上限）。請到人物範本縮短「初始記憶」後保存，再重新選用；原文已保留，未截斷。`;
+  }
+}
+
 export function readCharacterTemplateFields(value: unknown): CharacterTemplateFields | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return;
   const submitted = value as Record<string, unknown>;
@@ -31,5 +43,6 @@ export function readCharacterTemplateFields(value: unknown): CharacterTemplateFi
     if (typeof input !== 'string' || input.length > characterTemplateFields[field].maxLength) return;
     accepted[field] = input;
   }
+  if (initialMemoryCapacityError(accepted.initialMemories)) return;
   return accepted;
 }

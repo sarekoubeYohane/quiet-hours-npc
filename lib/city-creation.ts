@@ -1,3 +1,4 @@
+import { initialMemoryCapacityError } from './character-templates';
 import { seedOpeningKnowledge } from './opening-knowledge';
 import { z } from 'zod';
 import { prepareCityAccess } from './city-access';
@@ -146,6 +147,8 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
       continue;
     }
     const { fields } = template;
+    const memoryError = initialMemoryCapacityError(fields.initialMemories);
+    if (memoryError) preview.issues.push(fields.name + '：' + memoryError);
     const home = preview.places.find(candidate => candidate.id === selection.homeId);
     const generatedBedroom = home && unique(home.rooms.filter(item=>item.privateFor===selection.templateId));
     const bedroom = selection.homeRoomId ? home?.rooms.find(item => item.id === selection.homeRoomId)
@@ -170,6 +173,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
       preview.missingStarts = (preview.missingStarts ?? 0) + 1;
       continue;
     }
+    if (memoryError) continue;
     const id = 'npc:' + (people.length + 1);
     const location = locationKey(place.id);
     const actor: Character = {
