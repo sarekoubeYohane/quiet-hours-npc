@@ -46,15 +46,16 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
  const periodEnded='自己選定的活動時段已到期，接下來可重新安排。';
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=throughMinute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
-  let results:string[];
-  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
+  let committed:ReturnType<typeof commitActivityPhase>;
+  try{committed=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
    if(error instanceof PerceptionCapacityError)throw error;
    recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
   }
+  const {results,feelingSourceId}=committed;
   phases.cursor++;
   const finished=phases.cursor===phases.stages.length&&throughMinute>=plan.until;
   const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
-  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
+  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution,phase.effects.some(effect=>effect.kind!=='schedule-natural')||finished&&plan.selectedResult&&!phases.stages.some(stage=>stage.effects.some(effect=>effect.kind!=='schedule-natural'))?'result':undefined,feelingSourceId);
  }
  if(phases.cursor===phases.stages.length&&throughMinute>=plan.until){
   // A stored plan may finish its final effect before its chosen period ends.
