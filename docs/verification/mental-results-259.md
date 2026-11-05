@@ -34,7 +34,7 @@ pnpm lint
 git diff --check
 ```
 
-首次相關回歸 **58/58** 通過（`259-regression.log`，當時本票 8 項）；補上延遲自然結果案例後本票 9/9 通過。typecheck 通過，lint 0 errors、4 個既有 warnings，diff check 通過。整份測試由 integration 最後統一執行。
+最終相關回歸 **63/63** 通過（`259-regression-final.log`，包含本票 9 項、#258、activity-results、pursuits 及 npc-input-equivalence）；更早的 `259-regression.log` 亦為 58/58 通過。typecheck 通過，lint 0 errors、4 個既有 warnings，diff check 通過。整份測試由 integration 最後統一執行。
 
 ## 既有畫面
 
