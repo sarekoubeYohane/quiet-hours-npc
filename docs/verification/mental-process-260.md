@@ -34,8 +34,10 @@ history 的 process 行保留該段實際開始/結束、有效分鐘、主觀�
 
 ## 驗證
 
-`tests/mental-process-api.test.cjs` 使用真正 world GET/POST、SQLite serialization/reload 與實際 provider body；只對外部模型回覆與明示 test seed 進行控制。現有 10 條案例涵蓋首次不預付、多 slot/partial、15+15 vs30、多 actor 排程變化、上下界同時自然消耗、forward-only 改評價不重抽、真實睡眠醒來端點、真正可暫停活動 pause/resume、活動到期/重做、拒絕/neutral/缺口、later actor/save/CAS/uncertain 故障、known usage 與原 ID 回放。純續做沒有新增 NPC calls。
+`tests/mental-process-api.test.cjs` 使用真正 world GET/POST、SQLite serialization/reload 與實際 provider body；只對外部模型回覆與明示 test seed 進行控制。現有 12 條案例涵蓋首次不預付、多 slot/partial、15+15 vs30、多 actor 排程變化、上下界同時自然消耗、forward-only 改評價不重抽、真實睡眠醒來端點、真正可暫停活動 pause/resume、活動到期/重做、拒絕/neutral/缺口、later actor/save/CAS/uncertain 故障、known usage 與原 ID 回放、首段新睡眠重算不覆蓋舊過程收入，以及損壞的保存評估 fail closed。純續做沒有新增 NPC calls。
 
-TDD 暫存紀錄：`/tmp/quiet-hours-255-context/260-red-1.log` → `260-green-1.log`；`260-red-sleep-boundary.log`（10.75 而非實睡 12 分鐘的 10.6）→ `260-green-sleep-boundary.log`；`260-red-actor-stream.log`（多 actor 切分改變同 slot sample）→ `260-green-actor-stream.log`。
+TDD 暫存紀錄：`/tmp/quiet-hours-255-context/260-red-1.log` → `260-green-1.log`；`260-red-sleep-boundary.log`（10.75 而非實睡 12 分鐘的 10.6）→ `260-green-sleep-boundary.log`；`260-red-actor-stream.log`（多 actor 切分改變同 slot sample）→ `260-green-actor-stream.log`；`260-red-persisted-assessment.log`（無效 level=99 原本回 200 並污染餘額）→ `260-green-persisted-assessment.log`（派送前拒絕並保留原狀）。
 
-最後相關回歸、typecheck/lint/diff、review 與 Chromium 結果於最末提交更新。受控模型僅證明契約、時間與記帳；不宣稱真實模型已正確判定享受或負擔，不關閉 #255/#263。
+合入 #259/#261 的 integration `96a322a` 後，process/result/regulation 與原 pinned transcript 相關組合 33/33 通過；合前較廣相關組合 64/64 通過。`pnpm typecheck` 通過，lint 0 errors／4 個既有 warnings，diff check 通過。最末相關回歸與 review 結果另於工作票記錄。
+
+Chromium 已由 root 執行並目視 [角色面板](assets/mental-process-260/process-panel.png)：既有 UI 真正 start 保持 10 不預付，實際投入後 11.5→13，21:45 改評價為 negative 僅使後續變成 10；45 有效分鐘、3 個固定 slot samples。SQLite 重讀、原 ID 回放不改歷史，實際 2 個受控 NPC calls、60/20 tokens、0 paid calls。browser fixture 明示 seed=1、multipliers=[1] 的退化分布，沒有當成正式骰法；[原始證據](assets/mental-process-260/evidence.json) 與 `tooling/verification/browser-mental-process.mjs` 已保存。受控模型僅證明契約、時間與記帳；不宣稱真實模型已正確判定享受或負擔，不關閉 #255/#263。

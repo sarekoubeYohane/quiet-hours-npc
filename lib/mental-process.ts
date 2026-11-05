@@ -32,8 +32,11 @@ export function applyProcessAssessment(actor:Character,feeling:ProcessFeeling|nu
 /** One persisted sample per fixed grid of assessed effective activity minutes. */
 export function collectProcessSlices(actor:Character,from:number,to:number):ProcessSlice[]{
  const plan=actor.plan,process=plan?.mentalProcess,policy=actor.mentalEnergy?.policy.process;
- if(!plan||!process||!policy||!process.assessment)return [];
- if(process.version!==1||!process.id||!Number.isFinite(process.updatedAt)||process.updatedAt>to||!Number.isFinite(process.activeMinutes)||process.activeMinutes<0||!Number.isSafeInteger(process.randomState)||process.randomState<0||process.randomState>0xffffffff||!Number.isSafeInteger(process.draws)||process.draws<0||!Number.isSafeInteger(process.revision)||process.revision<0||process.slot&&(!Number.isSafeInteger(process.slot.index)||process.slot.index<0||!policy.multipliers.includes(process.slot.draw)||!Number.isFinite(process.slot.usedMinutes)||process.slot.usedMinutes<0||process.slot.usedMinutes>policy.slotMinutes||Math.abs(process.activeMinutes-(process.slot.index*policy.slotMinutes+process.slot.usedMinutes))>1e-7))throw new MemoryValidationError('活動精神時間資料無效');
+ if(!plan||!process||!policy)return [];
+ if(process.version!==1||typeof process.id!=='string'||!process.id||process.id.length>128||!Number.isFinite(process.effectiveAt)||process.effectiveAt>process.updatedAt||!Number.isFinite(process.updatedAt)||process.updatedAt>to||!Number.isFinite(process.activeMinutes)||process.activeMinutes<0||process.activeMinutes>0&&!process.slot||!Number.isSafeInteger(process.randomState)||process.randomState<0||process.randomState>0xffffffff||!Number.isSafeInteger(process.draws)||process.draws<0||!Number.isSafeInteger(process.revision)||process.revision<0||process.slot&&(!Number.isSafeInteger(process.slot.index)||process.slot.index<0||!policy.multipliers.includes(process.slot.draw)||!Number.isFinite(process.slot.usedMinutes)||process.slot.usedMinutes<0||process.slot.usedMinutes>policy.slotMinutes||Math.abs(process.activeMinutes-(process.slot.index*policy.slotMinutes+process.slot.usedMinutes))>1e-7))throw new MemoryValidationError('活動精神時間資料無效');
+ if(process.assessment===undefined)return [];
+ if(!process.assessment)throw new MemoryValidationError('活動感受保存格式無效');
+ parseProcessFeeling(actor,process.assessment);
  const start=Math.max(from,process.updatedAt,process.effectiveAt,plan.startedAt),end=Math.min(to,plan.until,plan.sleep?.naturalWakeAt??Infinity,plan.sleep?.stimulusWakeAt??Infinity,plan.bodyActivity?.kind==='sleep'?from+activeBodyMinutes(actor,from,to):Infinity);
  const slices:ProcessSlice[]=[];let at=start;
  while(at<end){
