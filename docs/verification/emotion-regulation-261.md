@@ -26,6 +26,6 @@ TDD 第一個真世界 API 測試先出現 502（尚不支援調節欄位），�
 
 相關回歸共 **37/37 通過**：emotion-regulation、mental-energy、mental-experiences、npc-input-equivalence。Typecheck 通過；lint 0 errors、4 個既有 warnings；diff check 通過。完整全測由 integration 最末統一跑。
 
-既有分析畫面的精神電量歷史顯示「主動情緒調節」、扣費前後值、心情前後文字、心理努力與理由；Chromium runner 和證據由 root 核對後另附。
+既有分析畫面的精神電量歷史顯示「主動情緒調節」、扣費前後值、心情前後文字、心理努力與理由。2026-11-05 root 已執行 `tooling/verification/browser-emotion-regulation.mjs` 並目視核對[截圖](assets/emotion-regulation-261/energy-panel.png)：從既有 UI 建立獨立經歷，5→自然收入7→固定付款4→餘額3；自然心情再到「仍難受但能承受」，努力／理由皆可讀。SQLite 重讀、重載和原操作回放不變，下一輪純續作 0 次新增呼叫、0 次再扣費。共 2 個受控 NPC calls、input/output 60/20 tokens、0 次付費模型。[原始證據](assets/emotion-regulation-261/evidence.json) 保存實際 inputs、calls 與檢查結果；執行日誌 `/tmp/quiet-hours-255-context/browser261.log`。
 
 受控回覆證明結構、權限、記帳與保存承接，不能證明自由文字真的比先前緩和。沒有跑付費模型，本票不宣稱完成真實心理語義品質驗收，也不關閉 #255 或解除 #263 對 #256 的阻擋。
