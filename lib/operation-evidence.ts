@@ -98,7 +98,7 @@ export function createOperationEvidence(context: {
     let parsed:unknown;
     try{parsed=JSON.parse(task==='npc'?raw.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, ''):raw);}catch{return {status:'invalid-json',truncated:false,redacted:false};}
     if(!record(parsed))return {status:'omitted',truncated:true,redacted:false};
-    if(task==='feelings')return {status:'captured',value:{contractVersion:parsed.contractVersion},truncated:false,redacted:false};
+    if(task==='feelings')return {status:'captured',value:{contractVersion:parsed.contractVersion==='controlled-feelings.v1'?'controlled-feelings.v1':'invalid'},truncated:false,redacted:false};
     const previousTruncated=evidence.truncated,previousRedacted=evidence.redacted;
     evidence.truncated=false;evidence.redacted=false;
     // Private NPC response fields are intentionally excluded, not a failed capture.

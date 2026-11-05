@@ -43,7 +43,7 @@ TDD 與相關紀錄位於 `/tmp/quiet-hours-255-context`：
 - `262-red-1.log` → `262-green-1.log`：實際指定 rest 後一次評估，純續做只按已發生時間累積。
 - `262-red-instant.log` → `262-green-instant.log`：瞬間指定行動也有必要評估機會，但不發明補電來源。
 - `262-red-handoff-arrival.log` → `262-green-handoff-arrival.log`：無變化來源交還後不能重領，以及單次旅程本輪抵達清 active 仍承接新經歷。
-- `262-all-own.log`：本票 **28/28** 通過。涵蓋 pending、active、waiting、traveling、顯示名／職業改變、純續做零呼叫、正負過程向後修正、自然來源／處理去重、handoff／reload／ID replay、七種越權欄位、無 active process、calls/tokens 預算、transport unknown、provider refusal、非法候選、後續 evaluator 失敗、保存前／CAS／uncertain commit、timeout late response、lease expiry 的用途回復、容量與過期，以及最終投影來源省略不誤標已處理。
+- `262-all-own.log`：本票原 **28/28** 通過；`262-red-safe-evidence.log` → `262-green-safe-evidence.log` 再驗證畸形 contract metadata 不把私有回覆複製到 public evidence，最終 **29/29** 通過。涵蓋 pending、active、waiting、traveling、顯示名／職業改變、純續做零呼叫、正負過程向後修正、自然來源／處理去重、handoff／reload／ID replay、七種越權欄位、無 active process、calls/tokens 預算、transport unknown、provider refusal、非法候選、後續 evaluator 失敗、保存前／CAS／uncertain commit、timeout late response、lease expiry 的用途回復、容量與過期，以及最終投影來源省略不誤標已處理。
 
 ```sh
 NODE_OPTIONS='--import=./tooling/verification/no-network.mjs' node tests/run-activities.mjs tests/controlled-feelings-api.test.cjs tests/mental-energy-api.test.cjs tests/mental-experiences-api.test.cjs tests/mental-process-api.test.cjs tests/emotion-regulation-api.test.cjs tests/mental-results-api.test.cjs tests/takeover-api.test.cjs tests/owner-control-api.test.cjs tests/operation-evidence-api.test.cjs tests/costs-api.test.cjs tests/npc-input-equivalence.test.cjs
@@ -52,7 +52,7 @@ pnpm lint
 git diff --check
 ```
 
-`262-regression-final.log` 為 **125/125** 通過，0 fail／skip。typecheck 通過；lint 0 errors、4 個既有 warnings；diff check 通過。舊 #258 手機 fixture 明示在新的 controlled boundary 評估實際讀取，#261 fixture 明示此入口無變化並計入新增一次 feelings 用量，沒有把普通決策假裝成 feelings 回覆。整份 suite/build 由 integration 最後執行。
+`262-regression-final.log` 為 **125/125** 通過，0 fail／skip。capture flags 窄修正後另跑 controlled-feelings＋operation-evidence **48/48**（`262-evidence-followup.log`）；新增 metadata 遮蔽案例後本票 **29/29**。typecheck 通過；lint 0 errors、4 個既有 warnings；diff check 通過。舊 #258 手機 fixture 明示在新的 controlled boundary 評估實際讀取，#261 fixture 明示此入口無變化並計入新增一次 feelings 用量，沒有把普通決策假裝成 feelings 回覆。整份 suite/build 由 integration 最後執行。
 
 ## 既有畫面與應用流程
 
