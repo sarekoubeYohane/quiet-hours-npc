@@ -1,9 +1,10 @@
 import { timeLabel, type World, type WorldEvent } from '@/lib/world';
 
 export default function PerceptionDetails({ event, world }: { event: WorldEvent; world: World }) {
-  if (!event.perception?.length) return null;
+  if (!event.perception?.length && !event.entryPermission) return null;
   return <details className="perception-details"><summary>感知詳情（觀察者）</summary>
-    {event.perception.map(trace => <div key={trace.characterId}>
+    {event.entryPermission && <p>進出權限 · {event.entryPermission.allowed ? '已授權' : '未授權'}</p>}
+    {event.perception?.map(trace => <div key={trace.characterId}>
       <strong>{world.characters.find(c => c.id === trace.characterId)?.name}</strong>
       <span> · {trace.reason}</span>
       {trace.resolution && <p>感知 D20：{trace.resolution.roll} {trace.resolution.modifier < 0 ? '−' : '＋'} {Math.abs(trace.resolution.modifier)} ／ DC {trace.resolution.dc} · {({ 'critical-success': '大成功', success: '成功', mixed: '部分成功', failure: '失敗', 'critical-failure': '大失敗' })[trace.resolution.outcome]}

@@ -4,9 +4,19 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const { Miniflare } = createRequire(import.meta.resolve('wrangler'))('miniflare');
+const { build } = createRequire(import.meta.resolve('vite'))('esbuild');
 const modules = [];
+// Workerd's explicit module list does not resolve bare package specifiers.
+const zod = await build({
+  entryPoints: [fileURLToPath(import.meta.resolve('zod'))],
+  bundle: true,
+  format: 'esm',
+  write: false,
+});
+modules.push({ type: 'ESModule', path: 'zod.js', contents: zod.outputFiles[0].text });
 modules.push({type:'ESModule',path:'pursuit-fixture.js',contents:(await readFile('tests/pursuit-fixture.cjs','utf8')).replace(/module\.exports\s*=[^;]+;/,'')+'\nexport {fixtureDecision};'});
 // Load the same top-level runtime library modules as the application. Keeping a
 // second hand-written import graph here lets a real runtime dependency go missing.
@@ -15,7 +25,8 @@ for (const name of [...libraryModules, 'world-api']) {
   const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
-    .replace(/(['"])(?:@\/lib\/|\.\/)([\w-]+)\1/g, "'./$2.js'");
+    .replace(/(['"])(?:@\/lib\/|\.\/)([\w-]+)\1/g, "'./$2.js'")
+    .replace(/from ['"]zod['"]/g, "from './zod.js'");
   modules.push({ type: 'ESModule', path: name + '.js', contents: code });
 }
 

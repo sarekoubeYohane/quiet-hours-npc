@@ -12,9 +12,14 @@ const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('vite')]
 const directory=await mkdtemp(join(tmpdir(),'quiet-browser-'));
 const sources=(await readdir('lib')).filter(x=>x.endsWith('.ts')).map(x=>[`lib/${x}`,x.slice(0,-3)]);
 sources.push(['app/api/world/route.ts','route']);
+const cityEditors = process.env.FIXTURE_CITY_EDITORS === '1';
+if (cityEditors) sources.push(
+ ['app/api/character-templates/route.ts','character-templates-route'],
+ ['app/api/scene-templates/route.ts','scene-templates-route'],
+);
 for (const [source,output] of sources) {
  const result=ts.transpileModule(await readFile(source,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2023,module:ts.ModuleKind.CommonJS}});
- const code=result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g,'require("./$1.cjs")').replace('require("cloudflare:workers")','require("./cloudflare-workers.cjs")');
+ const code=result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g,'require("./$1.cjs")').replace('require("zod")', `require(${JSON.stringify(require.resolve('zod'))})`).replace('require("cloudflare:workers")','require("./cloudflare-workers.cjs")');
  await writeFile(join(directory,`${output}.cjs`),code);
 }
   // Test fixtures are generated only in a temporary directory, never included in the Worker.
@@ -68,6 +73,10 @@ for (const [source,output] of sources) {
 const load=name=>require(join(directory,`${name}.cjs`));
 const store=load('store'); store.install(load('world').seedWorld());
 const {GET,POST}=load('route');
+const templateRoutes = cityEditors ? new Map([
+ ['/api/character-templates',load('character-templates-route')],
+ ['/api/scene-templates',load('scene-templates-route')],
+]) : new Map();
 // Optional read-only view of an already executed private experiment file.
 // This never imports a key, forwards a model request or exposes fixture mutation.
 let experimentReadback;
@@ -89,7 +98,11 @@ globalThis.fetch=async(url,init)=>{
  transportFrames.push({requestBody:init.body,responseBody:await response.clone().text()});return response;
 };
 const entry=join(directory,'entry.jsx');
-await writeFile(entry,`import React from ${JSON.stringify(require.resolve('react'))};import {createRoot} from ${JSON.stringify(require.resolve('react-dom/client'))};import WorldApp from ${JSON.stringify(join(repo,'components/world-app.tsx'))};createRoot(document.getElementById('root')).render(<WorldApp signInPath="/login" displayName="browser fixture" environment={{caption:'local fixture',builtAtLabel:'fixed clock'}}/>);`);
+const rootImports = `import React from ${JSON.stringify(require.resolve('react'))};import {createRoot} from ${JSON.stringify(require.resolve('react-dom/client'))};import WorldApp from ${JSON.stringify(join(repo,'components/world-app.tsx'))};`;
+const editorImports = cityEditors ? `import People from ${JSON.stringify(join(repo,'components/character-template-editor.tsx'))};import Places from ${JSON.stringify(join(repo,'components/scene-template-editor.tsx'))};` : '';
+const worldApp = `<WorldApp signInPath="/login" displayName="browser fixture" environment={{caption:'local fixture',builtAtLabel:'fixed clock'}} ${cityEditors ? 'templateNavigation={<nav><a href="/character-templates">人物範本</a><a href="/scene-templates">場景範本</a></nav>}' : ''}/>`;
+const browserContent = cityEditors ? `location.pathname==='/character-templates'?<People/>:location.pathname==='/scene-templates'?<Places/>:${worldApp}` : worldApp;
+await writeFile(entry,`${rootImports}${editorImports}createRoot(document.getElementById('root')).render(${browserContent});`);
 const bundle=await esbuild.build({entryPoints:[entry],bundle:true,write:false,platform:'browser',format:'esm',jsx:'automatic',alias:{'@':repo},nodePaths:[join(repo,'node_modules')],define:{'process.env.NODE_ENV':'"development"'},loader:{'.png':'dataurl'}});
 const js=bundle.outputFiles[0].text;
 const postcss=require(require.resolve('postcss',{paths:[require.resolve('@tailwindcss/postcss')]}));
@@ -114,6 +127,12 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST')requests.push(JSON.parse(body));
   const request=new Request(url,{method:req.method,headers:{origin,...req.headers},...(req.method==='POST'?{body}:{})});
   const response=await (req.method==='POST'?POST(request):GET(request));
+  res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;
+ }
+ if(templateRoutes.has(url.pathname)){
+  const handler=templateRoutes.get(url.pathname);
+  const request=new Request(url,{method:req.method,headers:{origin,...req.headers},...(req.method==='POST'?{body}:{})});
+  const response=await (req.method==='POST'?handler.POST(request):handler.GET(request));
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;
  }
  if(url.pathname.startsWith('/__font/')&&fontDirectory){const file=url.pathname.slice('/__font/'.length);if(!/^[a-zA-Z0-9_.-]+$/.test(file))throw Error('invalid font path');res.setHeader('Content-Type','font/woff2');res.end(await readFile(join(fontDirectory,'files',file)));return;}

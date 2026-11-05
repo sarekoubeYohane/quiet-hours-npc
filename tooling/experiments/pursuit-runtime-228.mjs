@@ -16,7 +16,7 @@ export async function createRuntime({ root = process.cwd(), databasePath, owner 
   sources.push(['app/api/world/route.ts', 'route']);
   for (const [source, name] of sources) {
     const { outputText } = ts.transpileModule(await readFile(join(root, source), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    await writeFile(join(directory, name + '.cjs'), outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g, 'require("./$1.cjs")').replaceAll('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")'));
+    await writeFile(join(directory, name + '.cjs'), outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g, 'require("./$1.cjs")').replace('require("zod")', `require(${JSON.stringify(require.resolve('zod'))})`).replaceAll('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")'));
   }
   // No secret literal is written to generated code, SQLite or the run manifest.
   await writeFile(join(directory, 'cloudflare-workers.cjs'), 'exports.env = {};');

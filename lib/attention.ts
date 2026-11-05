@@ -1,5 +1,6 @@
 import type { Character, World } from './world';
-import { regions, doors, regionOf, defaultRegion, type Observation } from './perception';
+import { defaultRegion, worldRegions } from './world-configuration';
+import { observationTargets, type Observation } from './perception';
 
 export const clueKinds = ['person', 'speech', 'sound', 'door', 'activity'] as const;
 export type AttentionCondition = { kind: Observation['kind']; source: string; region: string };
@@ -24,7 +25,8 @@ export function parseAttention(world: World, character: Character, value: unknow
   if (!Array.isArray(value) || value.length > 12) throw Error('關注條件格式無效');
   // Contacts are already explicitly exposed by the established model interface.
   const knownPeople = new Set(world.characters.map(c => c.id));
-  const knownRegions = new Set(regions.filter(r => r.id === defaultRegion(r.location) || r.id === regionOf(character) || doors.some(d => d.regions.includes(regionOf(character)) && d.regions.includes(r.id))).map(r => r.id));
+  const knownRegions = new Set(observationTargets(world, character).regions.map(region => region.id));
+  if (!world.configuration) for (const region of worldRegions(world)) knownRegions.add(defaultRegion(region.location, world));
   for (const observation of character.observations || []) if (observation.region) knownRegions.add(observation.region);
   const conditions: AttentionCondition[] = [], diagnostics: string[] = [];
   for (const item of value) {

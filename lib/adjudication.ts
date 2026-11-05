@@ -1,3 +1,6 @@
+import { entryPermission } from './city-access';
+import { worldLocations, worldRegions } from './world-configuration';
+import { regionOf } from './perception';
 import { routineWorldLimits } from './routine-world-contract';
 import { adjudicationRules } from './adjudication-contract';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
@@ -11,6 +14,7 @@ export type AdjudicationInput = {
   actor: { id: string; location: string; region?: string; abilityTags: string[] };
   target?: { id: string; location: string; region?: string };
   rules: string[];
+  entryPermission?: { regionId: string; allowed: boolean };
   durationMinutes?: number;
   knownActivityIdentities?: {version:1;key:string;label:string}[];
 };
@@ -106,13 +110,24 @@ export function captureAdjudicationFailure(
 }
 export function buildAdjudicationInput(world: World, actor: Character, action: Action, routinePrograms=false): AdjudicationInput {
   const target = world.characters.find(character => character.id === action.target);
+  const regions = worldRegions(world);
+  const region = regions.find(item => item.id === action.target);
+  const location = region?.location ?? worldLocations(world).find(item => item.id === action.target)?.id;
+  const room = region?.id ?? (location && regions.find(item => item.location === location)?.id);
+  const permission = (action.type === 'move' || action.type === 'propose') && location && room
+    ? entryPermission(world, actor.id, location, room)
+    : action.type === 'propose' ? entryPermission(world, actor.id, actor.location, regionOf(actor)) : undefined;
   return {
     contractVersion: adjudicationContractVersion,
     knownActivityIdentities:[...new Map((actor.habitEvidence||[]).filter(item=>item.confirmedIdentity).map(item=>[item.confirmedIdentity!.key,item.confirmedIdentity!])).values()].slice(-24),
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
     actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])] },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
-    rules: adjudicationRules(routinePrograms),
+    ...(permission ? {entryPermission:permission} : {}),
+    rules: [
+      ...adjudicationRules(routinePrograms),
+      ...(permission ? ['entryPermission 是此區域的實際進出授權。授權不代表門已開啟或其他人同意協助；未獲授權也不等於物理上無法進入。'] : []),
+    ],
   };
 }
 // Separate task transcript and service configuration; NPC chat history is never reused.

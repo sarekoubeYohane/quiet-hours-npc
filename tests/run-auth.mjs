@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-auth-'));
 try {
@@ -15,6 +17,7 @@ try {
     await mkdir(dirname(output), { recursive: true });
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
     const code = result.outputText.replace(/require\("([^\"]+)"\)/g, (match, name) => {
+      if (name === 'zod') return `require(${JSON.stringify(require.resolve(name))})`;
       if (name === 'cloudflare:workers') return `require(${JSON.stringify(join(directory, 'bindings.cjs'))})`;
       if (name === 'next/headers') return `require(${JSON.stringify(join(directory, 'headers.cjs'))})`;
       if (name === 'next/navigation') return '({redirect: () => { throw Error("Unexpected redirect"); }})';

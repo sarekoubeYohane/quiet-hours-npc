@@ -8,7 +8,7 @@ import { activateBodyNeeds, advanceBodyNeeds, isSleeping, activeBodyMinutes, bod
 import { advanceNaturalChanges } from './natural-changes';
 import { emitExternalConsequences } from './world-effects';
 import { requiresWorldEffects, type EffectCandidate } from './world-effects';
-import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, wakeSleepingActivity, startActivity } from './activity-lifecycle';
+import { sustainedActions, canResumeActivity, cancelActivity, progressActivity, discardLegacyActivity, wakeSleepingActivity, startActivity, finishJourney } from './activity-lifecycle';
 export { activityDurations, canResumeActivity } from './activity-lifecycle';
 import { bindRoutine } from './routine-rules';
 import { projectRelationships, type CognitiveState } from './cognition';
@@ -83,7 +83,7 @@ export function plannedCalls(world: World, minutes: number, modelKey: string): n
   const next = structuredClone(world);
   initializeKnownConditionOrder(next);activateBodyNeeds(next);next.minute += minutes;advanceBodyNeeds(next);
   const potentialReminder=hasDueCalendarReminder(next);
-  return next.characters.filter(character => mayChooseAutonomously(character) && (!canContinue(next, character, modelKey)||potentialReminder&&!isSleeping(character))).length;
+  return next.characters.filter(character => !character.plan?.journey && mayChooseAutonomously(character) && (!canContinue(next, character, modelKey)||potentialReminder&&!isSleeping(character))).length;
 }
 
 export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
@@ -113,11 +113,14 @@ export async function advanceActivities(world: World, options: {
   world.minute += minutes; world.lastMode = mode;
   advanceNaturalChanges(world,world.minute,emitExternalConsequences);
   advanceBodyNeeds(world);
+  const traveling = new Set(world.characters.filter(actor => actor.plan?.journey).map(actor => actor.id));
+  for (const character of world.characters) if (traveling.has(character.id)) finishJourney(world,character);
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     try {
     advanceCalendarReminders(world);
+    if(traveling.has(character.id)){if(ai)usage.savedDecisions++;continue;}
     const control = character.control;
     discardLegacyActivity(world,character);
     wakeSleepingActivity(world,character);

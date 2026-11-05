@@ -1,4 +1,5 @@
-import { regions, regionOf } from './perception';
+import { regionOf } from './perception';
+import { worldRegions } from './world-configuration';
 import { assertBoundedState, validBodyStateKey } from './adjudication-contract';
 import type { World } from './world';
 import type { StateChange } from './world-effects';
@@ -20,7 +21,7 @@ export function worldTargetSnapshot(w:World,target:WorldStateTarget):{revision:n
   const actor=w.characters.find(c=>c.id===target.id);if(!actor)return;
   return {revision:actor.physical?.revision||0,state:actor.physical?.state||{},region:regionOf(actor)};
  }
- const region=target.id;if(!regions.some(item=>item.id===region))return;
+ const region=target.id;if(!worldRegions(w).some(item=>item.id===region))return;
  // Region existence is checked by the contract executor before this writer.
  const bag=w.scene?.external?.[region];return {revision:bag?.revision||0,state:bag?.state||{},region};
 }

@@ -1,16 +1,22 @@
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
-  for (const [source, output] of [['lib/npc-decision-preparation.ts','npc-decision-preparation'], ['lib/npc-decision-schema.ts','npc-decision-schema'], ['lib/pursuit-selection.ts','pursuit-selection'], ['lib/pursuits.ts','pursuits'], ['lib/usage-recovery.ts','usage-recovery'], ['lib/phone-calendar.ts','phone-calendar'], ['lib/phone-notifications.ts','phone-notifications'], ['lib/phones.ts','phones'], ['lib/npc-input.ts','npc-input'], ['lib/arrangement-cues.ts','arrangement-cues'], ['lib/arrangements.ts','arrangements'], ['lib/paused-activities.ts','paused-activities'], ['lib/needs.ts','needs'], ['lib/preferences.ts','preferences'], ['lib/round-time-policy.ts', 'round-time-policy'], ['lib/decision-traces.ts', 'decision-traces'], ['lib/decision-trace-capture.ts', 'decision-trace-capture'], ['lib/routine-world-programs.ts', 'routine-world-programs'], ['lib/routine-world-bindings.ts', 'routine-world-bindings'], ['lib/routine-world-contract.ts', 'routine-world-contract'], ['lib/natural-changes.ts', 'natural-changes'], ['lib/world-state.ts', 'world-state'], ['lib/world-formation-contract.ts', 'world-formation-contract'], ['lib/world-formation.ts', 'world-formation'], ['lib/adjudication-limits.ts', 'adjudication-limits'], ['lib/adjudication-contract.ts', 'adjudication-contract'], ['lib/diagnostic-redaction.ts', 'diagnostic-redaction'], ['lib/operation-evidence.ts', 'operation-evidence'], ['lib/routine-program-contract.ts', 'routine-program-contract'], ['lib/routine-programs.ts', 'routine-programs'], ['lib/activity-lifecycle.ts', 'activity-lifecycle'], ['lib/routine-materials.ts', 'routine-materials'], ['lib/routine-obstacles.ts', 'routine-obstacles'], ['lib/routine-rules.ts', 'routine-rules'], ['lib/acceptance-scene.ts', 'acceptance-scene'], ['lib/world-effects.ts', 'world-effects'], ['lib/costs.ts', 'costs'], ['lib/cognition.ts', 'cognition'], ['lib/recall.ts', 'recall'], ['lib/recall-services.ts', 'recall-services'], ['lib/memory.ts', 'memory'], ['lib/false-perception.ts', 'false-perception'], ['lib/attention.ts', 'attention'], ['lib/perception.ts', 'perception'], ['lib/world.ts', 'world'], ['lib/d20.ts', 'd20'], ['lib/habits.ts', 'habits'], ['lib/activities.ts', 'activities'], ['lib/model-adapter.ts', 'model-adapter'], ['lib/adjudication.ts', 'adjudication'], ['lib/models.ts', 'models'], ['lib/model-keys.ts', 'model-keys'], ['lib/playbook.ts', 'playbook'], ['lib/environment.ts', 'environment'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route']]) {
+  const sources = (await readdir('lib')).filter(file => file.endsWith('.ts')).map(file => ['lib/' + file, file.slice(0, -3)]);
+  sources.push(['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route'],
+    ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
+  for (const [source, output] of sources) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
-    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)(npc-decision-preparation|npc-decision-schema|pursuit-selection|pursuits|usage-recovery|phone-calendar|phone-notifications|phones|npc-input|arrangement-cues|arrangements|paused-activities|needs|preferences|round-time-policy|decision-traces|decision-trace-capture|routine-world-programs|routine-world-bindings|routine-world-contract|natural-changes|world-state|world-formation-contract|world-formation|adjudication-limits|adjudication-contract|diagnostic-redaction|operation-evidence|routine-program-contract|routine-programs|activity-lifecycle|routine-materials|routine-obstacles|routine-rules|acceptance-scene|world-effects|costs|cognition|recall|recall-services|memory|world|attention|false-perception|perception|habits|activities|models|adjudication|model-adapter|model-keys|playbook|d20|environment)"\)/g, 'require("./$1.cjs")')
+    const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g, 'require("./$1.cjs")')
       .replace('require("cloudflare:workers")', 'require("./cloudflare-workers.cjs")')
-      .replace('require("@/lib/auth")', 'require("./auth.cjs")').replace(/require\("(?:@\/lib\/|\.\/)store"\)/g, 'require("./store.cjs")');
+      .replace('require("zod")', `require(${JSON.stringify(require.resolve('zod'))})`);
     await writeFile(join(directory, `${output}.cjs`), code);
   }
   // Test fixtures are generated only in a temporary directory, never included in the Worker.
@@ -25,10 +31,14 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0003_world_operations.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0004_recall_usage.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0005_decision_traces.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0006_character_templates.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0007_scene_templates.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0008_world_before_city.sql', 'utf8'))});
+    exports.archivedWorld = () => db.prepare('SELECT state FROM world_before_city WHERE owner = ?').get('test-owner')?.state;
     let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure, traceWriteHook, traceReadFailure, storageHook;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
+      db.exec('DELETE FROM world_before_city; DELETE FROM scene_templates; DELETE FROM character_templates; DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
@@ -68,7 +78,7 @@ try {
       return { meta: { changes: Number(result.changes) } };
     } }; } }; } });
   `);
-  const allTests = ['tests/pursuit-capacity-api.test.cjs', 'tests/pursuit-arrangements-api.test.cjs', 'tests/pursuit-selection-api.test.cjs', 'tests/pursuits-api.test.cjs', 'tests/memory-selection-contract-api.test.cjs', 'tests/model-contract-api.test.cjs', 'tests/costs-api.test.cjs', 'tests/budgets-api.test.cjs', 'tests/recovery-ui.test.cjs', 'tests/recall-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
+  const allTests = ['tests/pursuit-capacity-api.test.cjs', 'tests/pursuit-arrangements-api.test.cjs', 'tests/pursuit-selection-api.test.cjs', 'tests/pursuits-api.test.cjs', 'tests/memory-selection-contract-api.test.cjs', 'tests/model-contract-api.test.cjs', 'tests/costs-api.test.cjs', 'tests/budgets-api.test.cjs', 'tests/recovery-ui.test.cjs', 'tests/recall-api.test.cjs', 'tests/cognition-api.test.cjs', 'tests/maintenance-api.test.cjs', 'tests/memory-api.test.cjs', 'tests/operations-api.test.cjs', 'tests/false-perception-api.test.cjs', 'tests/active-perception-api.test.cjs', 'tests/attention-api.test.cjs', 'tests/perception-api.test.cjs', 'tests/world-configuration-api.test.cjs', 'tests/world-configuration-ui.test.cjs', 'tests/activities.test.cjs', 'tests/intents.test.cjs', 'tests/continue-api.test.cjs', 'tests/owner-control-api.test.cjs', 'tests/takeover-api.test.cjs', 'tests/conflict-api.test.cjs', 'tests/d20-api.test.cjs', 'tests/environment-api.test.cjs'];
   // Pass test file paths as arguments to run a subset; the default runs everything.
   allTests.push('tests/activity-lifecycle-api.test.cjs', 'tests/activity-semantics-api.test.cjs', 'tests/activity-time-api.test.cjs', 'tests/activity-time-limit-api.test.cjs', 'tests/routine-first-approval-api.test.cjs', 'tests/routine-sharing-api.test.cjs', 'tests/routine-obstacles-api.test.cjs', 'tests/routine-api.test.cjs', 'tests/tea-api.test.cjs', 'tests/free-actions-api.test.cjs', 'tests/acceptance-scene-api.test.cjs', 'tests/adjudication-failure-api.test.cjs');
   allTests.push('tests/live-acceptance-cup-api.test.cjs', 'tests/operation-evidence-api.test.cjs', 'tests/routine-results-api.test.cjs', 'tests/routine-program-api.test.cjs', 'tests/activity-results-api.test.cjs', 'tests/activity-time-review-api.test.cjs', 'tests/routine-objects-api.test.cjs', 'tests/routine-contract-api.test.cjs');
@@ -99,7 +109,9 @@ try {
   allTests.push('tests/pursuit-lifecycle-api.test.cjs');
   allTests.push('tests/pursuit-exit-api.test.cjs','tests/pursuit-new-waiting-api.test.cjs');
   allTests.push('tests/pursuit-review-api.test.cjs');
-  allTests.push('tests/npc-input-equivalence.test.cjs');
+  allTests.push('tests/npc-input-equivalence.test.cjs', 'tests/city-creation-api.test.cjs', 'tests/city-access-api.test.cjs', 'tests/city-travel-api.test.cjs', 'tests/city-phone-map-api.test.cjs');
+  allTests.push('tests/character-generation-api.test.cjs');
+  allTests.push('tests/city-activity-hints-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

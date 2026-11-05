@@ -1,6 +1,7 @@
 import { finiteSourceScope, routineFiniteScopeMatches, routineOrdinarySourceMatches, type RoutineSourceQualification } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
-import { regionOf, canSee, regions } from './perception';
+import { regionOf, canSee } from './perception';
+import { worldRegions } from './world-configuration';
 import { hasObjectPermission, type Effect, type SceneSupply, type WorldObject } from './world-effects';
 import type { World, Character } from './world';
 import type { RoutineRule } from './routine-rules';
@@ -74,7 +75,7 @@ function routineBackgroundContext(world:World,actor:Character,scope:RoutineSourc
 }
 function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineSourceQualification):boolean {
  const matches=(item:WorldObject|SceneSupply)=>routineFiniteScopeMatches(item,binding);
- const local=(item:WorldObject|SceneSupply)=>{const scope=finiteSourceScope(item);return scope?.coverage==='location'?regions.find(region=>region.id===item.region)?.location===actor.location:item.region===regionOf(actor);};
+ const local=(item:WorldObject|SceneSupply)=>{const scope=finiteSourceScope(item);return scope?.coverage==='location'?worldRegions(world).find(region=>region.id===item.region)?.location===actor.location:item.region===regionOf(actor);};
  return (world.supplies||[]).some(item=>!item.background&&local(item)&&matches(item))||
   (world.objects||[]).some(item=>local(item)&&!world.supplies?.some(supply=>supply.id===item.source&&supply.background)&&matches(item));
 }

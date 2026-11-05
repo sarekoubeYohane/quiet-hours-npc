@@ -1,8 +1,8 @@
-import { locations, type Action, type Character, type Habit, type EventHabit, type World } from './world';
+import { type Action, type Character, type Habit, type EventHabit, type World } from './world';
 import { routineOperation } from './routine-rules';
 import type { ShortMemory } from './memory';
 import type { EffectCandidate } from './world-effects';
-import { regions } from './perception';
+import { worldLocations, worldRegions } from './world-configuration';
 
 export const habitPeriods = ['深夜', '上午', '下午', '晚上'];
 const dayOf = (minute: number) => Math.floor(minute / 1440) + 1;
@@ -50,10 +50,10 @@ export function habitStrength(habit: Habit, minute: number): number {
  return habitEvidenceState(habit,minute).strength;
 }
 
-export function habitLabel(habit: Habit, characters: Character[]): string {
-  const place = locations.find(place => place.id === habit.location)?.name || habit.location;
-  const destination = locations.find(place => place.id === habit.target)?.name || habit.target;
-  const person = characters.find(character => character.id === habit.target)?.name || '朋友';
+export function habitLabel(habit: Habit, world: World): string {
+  const place = worldLocations(world).find(place => place.id === habit.location)?.name || habit.location;
+  const destination = worldLocations(world).find(place => place.id === habit.target)?.name || habit.target;
+  const person = world.characters.find(character => character.id === habit.target)?.name || '朋友';
   const activity = habit.activityLabel || (habit.type === 'move' ? `前往${destination}` : habit.type === 'say' ? `與 ${person} 聊聊` :
     habit.type === 'shout' ? `向 ${person} 大聲說話` : habit.type === 'persuade' ? `嘗試說服 ${person}` : habit.type === 'message' ? `傳訊息給 ${person}` : habit.type === 'work' ? ({ tea: '泡茶', tidy: '整理', craft: '畫髮飾' }[habit.target] || '工作') :
     ({ phone:'操作手機', pause:'暫停活動',resume:'恢復活動',abandon:'放棄活動',propose:'自由方法', door: '操作門', rest: '休息', reflect: '留些時間給自己', observe: '觀察周圍' }[habit.type] || '活動'));
@@ -62,13 +62,13 @@ export function habitLabel(habit: Habit, characters: Character[]): string {
 
 export function habitViews(world: World, character: Character) {
   return (character.habits || []).map(habit => {
-    return { ...habit, ...habitEvidenceState(habit,world.minute), label: habitLabel(habit, world.characters) };
+    return { ...habit, ...habitEvidenceState(habit,world.minute), label: habitLabel(habit, world) };
   }).filter(habit => habit.days > 0).sort((a, b) => Number(b.established) - Number(a.established) || b.strength - a.strength || b.lastSeen - a.lastSeen);
 }
 
 export function habitsForDecision(world: World, character: Character) {
   return habitViews(world, character).filter(habit => habit.established && habit.period === periodOf(world.minute) && habit.location === character.location)
-    .slice(0, 5).map(habit => ({ tendency: habit.label, strength: Math.round(habit.strength * 100), observedDays: habit.days })).concat(eventHabitViews(world,character).filter(habit=>habit.established&&habit.location===character.location&&character.shortTerm?.some(memory=>{const trigger=triggerIdentity(character,memory);return !!trigger&&trigger.key===habit.triggerKey&&world.minute-trigger.time<=120&&world.minute>=trigger.time;})).slice(0,3).map(habit=>({tendency:habit.label,strength:Math.round(habit.strength*100),observedDays:habit.days}))).slice(0,5);
+    .slice(0, 5).map(habit => ({ tendency: habit.label, strength: Math.round(habit.strength * 100), observedDays: habit.days })).concat(eventHabitViews(world,character).filter(habit=>habit.established&&habit.location===character.location&&character.shortTerm?.some(memory=>{const trigger=triggerIdentity(world,character,memory);return !!trigger&&trigger.key===habit.triggerKey&&world.minute-trigger.time<=120&&world.minute>=trigger.time;})).slice(0,3).map(habit=>({tendency:habit.label,strength:Math.round(habit.strength*100),observedDays:habit.days}))).slice(0,5);
 }
 
 
@@ -89,12 +89,12 @@ export function activityIdentity(world:World,action:Action,candidate:EffectCandi
  return {key:'unclassified',label:(action.purpose||'自由活動').slice(0,80),semanticGap:true};
 }
 
-function triggerIdentity(character:Character,memory:ShortMemory){
+function triggerIdentity(world:World,character:Character,memory:ShortMemory){
  const evidence=character.habitEvidence?.find(item=>item.memory?.id===memory.id&&item.memory.version===memory.version&&!item.semanticGap);
  if(evidence)return {key:evidence.activityKey,label:evidence.activityLabel,time:evidence.time,location:evidence.location};
  if(memory.source.kind!=='observation'||!memory.observation)return;
  const region=memory.observation.region||memory.source.region;
- const location=regions.find(item=>item.id===region)?.location;
+ const location=worldRegions(world).find(item=>item.id===region)?.location;
  if(!location)return;
  const observed=memory.observation;
  // Text is the subjective event itself, never the hidden source/world event.
@@ -124,7 +124,7 @@ export function updateEventHabits(world:World,character:Character,value:unknown,
   const known=(r:{id:string;version:number})=>visible.find(memory=>memory.characterId===character.id&&memory.id===r.id&&memory.version===r.version&&!memory.controlled&&memory.time<=world.minute);
   if(!known(trigger)||!known(action))throw Error('習慣來源不在本次本人可見經歷。');
   const prior=(r:{id:string;version:number})=>character.habitEvidence?.find(e=>e.version===1&&e.memory?.id===r.id&&e.memory.version===r.version);
-  const before=triggerIdentity(character,known(trigger)!),after=prior(action);
+  const before=triggerIdentity(world,character,known(trigger)!),after=prior(action);
   if(!before||!after||world.minute-after.time>21*1440||after.semanticGap||trigger.id===action.id||before.time>=after.time||after.time-before.time>120||before.location!==after.location||after.time>world.minute)throw Error('習慣來源不是時序合法的已開始自主行為。');
   const key=`event.v1:${before.key}:${after.activityKey}:${after.location}`;
   let habit=habits.find(item=>item.key===key);
