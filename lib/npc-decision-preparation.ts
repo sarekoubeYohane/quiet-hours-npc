@@ -27,9 +27,9 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
  const input=options.continuation?.input??normalDecisionInput(w,c,options.modelKey);
  const recalled=options.continuation?.recalled||[];
  const pinned=input.self.longTerm.filter(m=>recalled.some(r=>r.id===m.id&&r.version===m.version)).map(({id,version})=>({id,version}));
- let schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined);
+ let schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined,!!c.mentalEnergy);
  boundDecisionRequest(w,c,input,()=>{
-  schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined);
+  schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined,!!c.mentalEnergy);
   messages[1].content=JSON.stringify(input);
   return new TextEncoder().encode(modelRequestBody(options,messages,schema,{allowRecall:options.allowRecall})).length<164000;
  },pinned);

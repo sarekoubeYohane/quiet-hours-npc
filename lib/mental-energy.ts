@@ -3,7 +3,7 @@ import { activeBodyMinutes } from './needs';
 
 /** No product balance is defined here. Only explicitly configured isolated tests activate v1. */
 export type MentalEnergyPolicy={version:1;kind:'test';id:string;initial:number;maximum:number;awakePerHour:number;regulationCost:number;lowAt:number;experience?:{levels:[number,number,number]}};
-export type MentalEnergy={version:1;policy:MentalEnergyPolicy;value:number;activatedAt:number;updatedAt:number;history:{kind:'natural'|'experience';source?:string;moodBefore?:string;moodAfter?:string;from:number;minute:number;reason:string;before:number;after:number;awakeMinutes:number}[];dropped:number;experiences?:{receipts:import('./mental-experiences').FeelingReceipt[];dropped:number}};
+export type MentalEnergy={version:1;policy:MentalEnergyPolicy;value:number;activatedAt:number;updatedAt:number;history:{kind:'natural'|'experience'|'regulation';source?:string;effort?:string;moodBefore?:string;moodAfter?:string;from:number;minute:number;reason:string;before:number;after:number;awakeMinutes:number}[];dropped:number;lastRegulationChoice?:string;experiences?:{receipts:import('./mental-experiences').FeelingReceipt[];dropped:number}};
 export function readMentalEnergyTestPolicy(environment:{APP_ENV?:string;MENTAL_ENERGY_TEST_POLICY?:string},world:World):MentalEnergyPolicy|undefined {
  // Saved fixture policy remains authoritative, so environment isolation must
  // also protect reads-for-write when the activation binding has been removed.
