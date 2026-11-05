@@ -1,3 +1,4 @@
+import { settleMentalInterval, type MentalInterval } from './mental-energy';
 import { worldLocations } from './world-configuration';
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
@@ -96,7 +97,7 @@ export function finishJourney(world:World,character:Character):void{
  invalidateNaturalChanges(world);
 }
 
-export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
+export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;mentalInterval?:MentalInterval;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
  const {minutes,modelKey,attention,ai}=options;
  let confirmedProfile:BodyActivity|undefined;
  cancelActivity(world,character);
@@ -188,6 +189,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   const duration=decision.freeCandidate?.confirmedDurationMinutes??decision.durationMinutes;
   const available=Math.min(options.bodyMinutes??minutes,duration);
   const actual=applyBodyActivity(character,world.minute,profile,available,options.bodyBase);
+  if(profile.kind==='sleep'&&options.mentalInterval)settleMentalInterval(character,options.mentalInterval,actual);
   if(character.plan){
    character.plan.bodyActivity={...profile};
    if(profile.kind==='sleep'){
