@@ -93,7 +93,7 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
       <h3>實際模型派送</h3>
       {!shown.dispatches.length&&<p>沒有已保存的模型派送。程式續做不會捏造模型呼叫。</p>}
       {shown.dispatches.map(dispatch=><article key={dispatch.sequence} style={{display:'grid',gap:10,minWidth:0,borderTop:'1px solid #445365',paddingTop:12}}>
-        <h4>#{dispatch.sequence} · {dispatch.task==='npc'?'NPC 決策':'世界裁定'} · {dispatch.actorId}</h4>
+        <h4>#{dispatch.sequence} · {dispatch.task==='feelings'?'接管感受評估':dispatch.task==='npc'?'NPC 決策':'世界裁定'} · {dispatch.actorId}</h4>
         <p>{dispatch.provider} / {dispatch.model}<br/>請求：{dispatch.requestId}<br/>階段：{dispatch.stage} · HTTP {dispatch.httpStatus??'未記錄'}</p>
         {dispatch.stage==='dispatch-prepared'&&<p>派送前保存點：是否真正發送未知；這筆準備紀錄不能證明供應商已收到請求。</p>}
         {dispatch.failure&&<p>技術故障：{dispatch.failure.kind}{dispatch.failure.stage?` · ${dispatch.failure.stage}`:''}。這不是模型對世界行動的正常否決。</p>}

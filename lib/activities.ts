@@ -1,3 +1,4 @@
+import { prepareControlledFeelings, acknowledgeControlledFeelings, type ControlledFeelingRequest, type ControlledFeelingCandidate } from './controlled-feelings';
 import { applyEmotionRegulation, type EmotionRegulation } from './emotion-regulation';
 import { applyProcessAssessment, type ProcessFeeling } from './mental-process';
 import { applyFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
@@ -100,10 +101,12 @@ export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
   mentalEnergyPolicy?:MentalEnergyPolicy;
   beforeDecision?: () => Promise<void>;
+  evaluateControlledFeelings?: (world:World,character:Character,request:ControlledFeelingRequest,onUsage:(tokens:TokenUsage)=>void)=>Promise<ControlledFeelingCandidate>;
   onActor?: (world:World,character:Character)=>void;
   decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
 }): Promise<void> {
   const { minutes, mode, modelKey, limits } = options;
+  const controlledActors=new Set(world.characters.filter(c=>c.control?.pending||c.control?.active||c.control?.mode==='taken-over').map(c=>c.id));
   const ai = mode !== 'demo';
   const usage = currentUsage(world, options.now);
   world.aiUsage = usage;
@@ -128,6 +131,7 @@ export async function advanceActivities(world: World, options: {
   for (const character of world.characters) if (traveling.has(character.id)) finishJourney(world,character);
   const offset = world.turn % world.characters.length;
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
+  const controlledStarts=new Map<string,{id:string;at:number;action:Pick<Action,'type'|'target'|'content'>}>();
   for (const character of ordered) {
     let feelingUpdates:PreparedFeelingUpdate[]=[];let processFeeling:ProcessFeeling|null=null;let emotionRegulation:EmotionRegulation|undefined;
     try {
@@ -224,6 +228,7 @@ export async function advanceActivities(world: World, options: {
     if (decision.intents) character.intents = decision.intents;
     try {
       if(!startActivity(world,character,decision,{minutes,modelKey,attention:attentionMarker(world,character),ai,mentalInterval:mental.get(character.id),bodyMinutes:bodyMinutes.get(character.id),bodyBase:bodyBases.get(character.id)}))continue;
+      if(controlledDecision)controlledStarts.set(character.id,{id:crypto.randomUUID(),at:world.minute,action:{type:decision.action.type,target:decision.action.target,content:decision.action.content}});
       if(character.plan&&!controlledDecision&&ai)bindActivityPursuit(character,decision,true);
       if (ai && !controlledDecision && !respondingToUser) learnHabit(world, character, decision.action, from, decision.freeCandidate);
       if(controlledDecision&&character.plan)control!.active=true;
@@ -232,6 +237,19 @@ export async function advanceActivities(world: World, options: {
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
     } finally {applyProcessAssessment(character,processFeeling,world.minute);applyFeelingUpdates(character,feelingUpdates,world.minute);applyEmotionRegulation(character,emotionRegulation,world.minute,`${world.turn}:${world.minute}:${character.id}`);if(world.pursuitVersion===1)validateActivityPursuits(character);try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}}
+  }
+  if(ai&&options.evaluateControlledFeelings)for(const character of world.characters){
+    if(!controlledActors.has(character.id))continue;
+    const request=prepareControlledFeelings(world,character,modelKey,{provider:mode==='openai'?'openai':'openrouter',model:modelKey.slice(modelKey.indexOf(':')+1)},controlledStarts.get(character.id));
+    if(!request)continue;
+    if(budgetReached(usage,limits))throw new BudgetExceeded();
+    await options.beforeDecision?.();
+    usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
+    const result=await options.evaluateControlledFeelings(world,character,request,tokens=>accountUsage(usage,tokens));
+    applyProcessAssessment(character,result.processFeeling,world.minute);
+    applyFeelingUpdates(character,result.feelingUpdates,world.minute);
+    acknowledgeControlledFeelings(character,request,world.minute);
+    try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}
   }
   for (const character of world.characters) for (const observation of pendingObservations(character)) {
     const reason = observationAttention(character, observation);

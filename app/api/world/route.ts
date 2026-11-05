@@ -1,3 +1,4 @@
+import { requestControlledFeelings } from '@/lib/controlled-feelings';
 import { readMentalEnergyTestPolicy } from '@/lib/mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from '@/lib/character-templates';
 import { initializeCity } from '@/lib/city-initialization';
@@ -500,6 +501,13 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
             dispatchKey = await workWait(readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
+          evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
+            const provider=b.mode==='openai'?'openai':'openrouter',model=b.model!.trim();
+            const cost=beginCost(w.aiUsage!,provider,model,w.modelPrices?.find(p=>p.provider===provider&&p.model===model),'feelings');
+            traceWorld(trace,'controlled-feelings-dispatch');
+            const observer=decisionTrace?.observer('feelings',c,w,provider,model,dispatchKey,evidence?.observer('feelings',c.id,provider,model,dispatchKey));
+            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:observer?event=>workWait(Promise.resolve(observer(event))):undefined,onUsage:tokens=>{onUsage(tokens);cost(tokens);},verifyCurrent:verifyLease});
+          },
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
             const provider=b.mode === 'openai' ? 'openai' : 'openrouter';

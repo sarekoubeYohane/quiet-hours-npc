@@ -61,7 +61,7 @@ function usageFromTrace(trace:DecisionTrace,storedWindow?:number):AIUsage|null {
     else{result.unknownCalls++;result.totalUnknownCalls++;}
     const candidate=d.price as CostCohort['price']|undefined;
     const price=validPrice(candidate)&&typeof candidate.id==='string'&&candidate.id.length>0&&candidate.id.length<=256&&candidate.provider===d.provider&&candidate.model===d.model?candidate:undefined;
-    const report=beginCost(result,typeof d.provider==='string'?d.provider:'unknown',typeof d.model==='string'?d.model:'unknown',price??undefined,d.task==='adjudication'?'adjudication':'npc',typeof d.startedAt==='number'?d.startedAt:window);
+    const report=beginCost(result,typeof d.provider==='string'?d.provider:'unknown',typeof d.model==='string'?d.model:'unknown',price??undefined,d.task==='feelings'?'feelings':d.task==='adjudication'?'adjudication':'npc',typeof d.startedAt==='number'?d.startedAt:window);
     if(known)report(tokens!);
   }
   return result;
