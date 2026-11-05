@@ -1,0 +1,3517 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "counts": {
+    "npc": 2,
+    "adjudication": 1
+  },
+  "checks": {
+    "uiProposal": true,
+    "uiCompletion": true,
+    "uiResultReceipt": true,
+    "uiPursuitDeferral": true,
+    "fullEnergyPreservesPursuit": true,
+    "sqliteReload": true,
+    "sameOperationReplay": true,
+    "privateFeelings": true
+  },
+  "state": {
+    "id": "owner",
+    "name": "店主",
+    "color": "#a5c9b3",
+    "location": "cafe",
+    "mood": "有成就感",
+    "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+    "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+    "activity": "自己選定的活動時段已到期，接下來可重新安排。",
+    "relationships": {},
+    "memories": [
+      {
+        "id": "legacy:owner:memory:0:1260",
+        "time": 1260,
+        "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+      },
+      {
+        "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+        "time": 1275,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1275）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。"
+      },
+      {
+        "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+        "time": 1290,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。"
+      },
+      {
+        "id": "f2c12681-40f4-4e3e-89ba-b7d022d7a565",
+        "time": 1305,
+        "text": "店主 回覆你：「我喜歡這次成果，仍想繼續創作，先延到稍後」"
+      }
+    ],
+    "intents": [
+      {
+        "id": "owner:direction",
+        "content": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "intensity": "medium",
+        "importance": "medium",
+        "urgency": "low",
+        "context": "",
+        "version": 1,
+        "kind": "direction",
+        "scope": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "satisfaction": null,
+        "parents": [],
+        "references": [],
+        "status": "active",
+        "reason": "角色設定提供的初始方向"
+      },
+      {
+        "id": "owner:work",
+        "content": "繼續創作",
+        "intensity": "medium",
+        "importance": "medium",
+        "urgency": "low",
+        "context": "",
+        "version": 2,
+        "kind": "intent",
+        "scope": "繼續創作",
+        "satisfaction": null,
+        "parents": [],
+        "references": [],
+        "status": "active",
+        "reason": "自己的下一步取捨",
+        "progress": "deferred",
+        "assessment": {
+          "kind": "known-result",
+          "text": "作品完成後仍想繼續創作，但先延期",
+          "references": [
+            {
+              "kind": "short",
+              "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+              "version": 1
+            }
+          ],
+          "time": 1305
+        }
+      }
+    ],
+    "control": {
+      "mode": "autonomous"
+    },
+    "attentionConditions": [],
+    "observationCursor": 0,
+    "region": "cafe-front",
+    "observations": [],
+    "shortTerm": [
+      {
+        "id": "legacy:owner:memory:0:1260",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1260,
+        "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+        "source": {
+          "kind": "legacy-unclassified"
+        }
+      },
+      {
+        "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1275,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1275）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "10203f6d-e9d6-461e-86c5-c78864f4e4f7"
+      },
+      {
+        "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1290,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "ebbb7f77-6509-49e7-b624-c043a055d960",
+        "feelingOrigins": [
+          {
+            "id": "ebbb7f77-6509-49e7-b624-c043a055d960",
+            "actorId": "owner",
+            "version": 1,
+            "at": 1290,
+            "kind": "result"
+          }
+        ]
+      },
+      {
+        "id": "f2c12681-40f4-4e3e-89ba-b7d022d7a565",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1305,
+        "text": "店主 回覆你：「我喜歡這次成果，仍想繼續創作，先延到稍後」",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "4c685d3c-9b33-4311-8387-4ef32c4ccf94"
+      }
+    ],
+    "longTerm": [
+      {
+        "id": "ea4106f1-6573-4bee-9d87-0cae37089502",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1290,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "origin": {
+          "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+          "version": 1
+        },
+        "reason": "記住真正完成的成果",
+        "feelingOrigins": [
+          {
+            "id": "ebbb7f77-6509-49e7-b624-c043a055d960",
+            "actorId": "owner",
+            "version": 1,
+            "at": 1290,
+            "kind": "result"
+          }
+        ]
+      }
+    ],
+    "needs": {
+      "version": 1,
+      "activatedAt": 1260,
+      "updatedAt": 1305,
+      "values": {
+        "hunger": 22.25,
+        "thirst": 24.5,
+        "fatigue": 15.75,
+        "sleep": 23
+      },
+      "assessed": {
+        "hunger": 0,
+        "thirst": 0,
+        "fatigue": 0,
+        "sleep": 0
+      },
+      "history": [
+        {
+          "minute": 1275,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20,
+            "thirst": 20,
+            "fatigue": 15,
+            "sleep": 20
+          },
+          "after": {
+            "hunger": 20.75,
+            "thirst": 21.5,
+            "fatigue": 15.25,
+            "sleep": 21
+          }
+        },
+        {
+          "minute": 1290,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20.75,
+            "thirst": 21.5,
+            "fatigue": 15.25,
+            "sleep": 21
+          },
+          "after": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          }
+        },
+        {
+          "minute": 1305,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.5,
+            "sleep": 22
+          },
+          "after": {
+            "hunger": 22.25,
+            "thirst": 24.5,
+            "fatigue": 15.75,
+            "sleep": 23
+          }
+        }
+      ],
+      "dropped": 0
+    },
+    "mentalEnergy": {
+      "version": 1,
+      "policy": {
+        "version": 1,
+        "kind": "test",
+        "id": "browser-results-259",
+        "initial": 10,
+        "maximum": 10,
+        "awakePerHour": 0,
+        "regulationCost": 4,
+        "lowAt": 4,
+        "experience": {
+          "levels": [
+            0,
+            2,
+            5
+          ]
+        }
+      },
+      "value": 10,
+      "activatedAt": 1260,
+      "updatedAt": 1305,
+      "history": [
+        {
+          "kind": "natural",
+          "from": 1260,
+          "minute": 1275,
+          "reason": "清醒世界時間自然消耗",
+          "before": 10,
+          "after": 10,
+          "awakeMinutes": 15
+        },
+        {
+          "kind": "natural",
+          "from": 1275,
+          "minute": 1290,
+          "reason": "清醒世界時間自然消耗",
+          "before": 10,
+          "after": 10,
+          "awakeMinutes": 15
+        },
+        {
+          "kind": "natural",
+          "from": 1290,
+          "minute": 1305,
+          "reason": "清醒世界時間自然消耗",
+          "before": 10,
+          "after": 10,
+          "awakeMinutes": 15
+        },
+        {
+          "kind": "experience",
+          "minute": 1305,
+          "from": 1305,
+          "reason": "親自完成作品帶來成就感，滿電也不代表追求結束",
+          "before": 10,
+          "after": 10,
+          "awakeMinutes": 0,
+          "source": "ebbb7f77-6509-49e7-b624-c043a055d960",
+          "moodBefore": "平靜",
+          "moodAfter": "有成就感"
+        }
+      ],
+      "dropped": 0,
+      "experiences": {
+        "receipts": [
+          {
+            "source": "ebbb7f77-6509-49e7-b624-c043a055d960",
+            "direction": "positive",
+            "level": 1,
+            "reason": "親自完成作品帶來成就感，滿電也不代表追求結束",
+            "mood": "有成就感",
+            "originKind": "result",
+            "at": 1305,
+            "expiresAt": 11370,
+            "before": 10,
+            "after": 10,
+            "moodBefore": "平靜",
+            "moodAfter": "有成就感"
+          }
+        ],
+        "dropped": 0
+      }
+    },
+    "attentionDiagnostics": [
+      {
+        "time": 1275,
+        "reason": "正常決策或重新評估時取得待用觀察"
+      },
+      {
+        "time": 1305,
+        "reason": "正常決策或重新評估時取得待用觀察"
+      }
+    ],
+    "eventHabits": [],
+    "memoryTrace": [],
+    "pursuitArchived": [],
+    "pursuitArchivedDropped": 0,
+    "pursuitTrace": [
+      {
+        "id": "owner:work",
+        "time": 1305,
+        "operation": "assess",
+        "reason": "自己的下一步取捨",
+        "before": {
+          "id": "owner:work",
+          "content": "繼續創作",
+          "intensity": "medium",
+          "importance": "medium",
+          "urgency": "low",
+          "context": "",
+          "version": 1,
+          "kind": "intent",
+          "scope": "繼續創作",
+          "satisfaction": null,
+          "parents": [],
+          "references": [],
+          "status": "active",
+          "reason": "明示合成測試起點的追求"
+        },
+        "after": {
+          "id": "owner:work",
+          "content": "繼續創作",
+          "intensity": "medium",
+          "importance": "medium",
+          "urgency": "low",
+          "context": "",
+          "version": 2,
+          "kind": "intent",
+          "scope": "繼續創作",
+          "satisfaction": null,
+          "parents": [],
+          "references": [],
+          "status": "active",
+          "reason": "自己的下一步取捨",
+          "progress": "deferred",
+          "assessment": {
+            "kind": "known-result",
+            "text": "作品完成後仍想繼續創作，但先延期",
+            "references": [
+              {
+                "kind": "short",
+                "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+                "version": 1
+              }
+            ],
+            "time": 1305
+          }
+        }
+      }
+    ],
+    "pursuitTraceDropped": 0,
+    "focusIntentId": null,
+    "habitEvidenceDropped": 0,
+    "habitEvidence": [
+      {
+        "id": "10203f6d-e9d6-461e-86c5-c78864f4e4f7",
+        "version": 1,
+        "time": 1275,
+        "location": "cafe",
+        "activityKey": "unclassified",
+        "activityLabel": "完成作品",
+        "semanticGap": true,
+        "eventId": "10203f6d-e9d6-461e-86c5-c78864f4e4f7",
+        "memory": {
+          "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+          "version": 1
+        },
+        "started": true
+      }
+    ]
+  },
+  "inputs": [
+    {
+      "contractVersion": "npc-decision.v3",
+      "pursuitContext": "12c1b49c-46d1-4a4f-9240-61c876c121fe",
+      "phones": [
+        {
+          "objectId": "phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1",
+          "owner": "owner",
+          "records": []
+        }
+      ],
+      "objects": [
+        {
+          "id": "workpiece",
+          "label": "練習作品",
+          "region": "cafe-front",
+          "holder": "owner",
+          "state": {
+            "progress": "raw"
+          },
+          "kind": "utensil"
+        },
+        {
+          "id": "phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1",
+          "label": "店主 的手機",
+          "region": "cafe-front",
+          "holder": "owner",
+          "state": {
+            "condition": "sound"
+          },
+          "kind": "phone"
+        }
+      ],
+      "supplies": [],
+      "time": "21:15",
+      "day": 1,
+      "self": {
+        "mentalEnergy": {
+          "feeling": "心裡還有餘裕。",
+          "canRegulate": true
+        },
+        "arrangements": {
+          "items": [],
+          "capacity": 16
+        },
+        "bodyFeelings": [
+          {
+            "need": "飢餓",
+            "feeling": "沒有明顯餓意"
+          },
+          {
+            "need": "口渴",
+            "feeling": "沒有明顯渴意"
+          },
+          {
+            "need": "體力疲勞",
+            "feeling": "身體沒有明顯疲累"
+          },
+          {
+            "need": "睡眠需求",
+            "feeling": "沒有明顯睡意"
+          }
+        ],
+        "preferences": {
+          "items": [],
+          "capacity": 16
+        },
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "region": "cafe-front",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "在吧台整理杯子。",
+        "relationships": {},
+        "cognition": {
+          "beliefs": [],
+          "relationshipTags": []
+        },
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          }
+        ],
+        "longTerm": [],
+        "memoryReview": [],
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          }
+        ],
+        "intents": [
+          {
+            "id": "owner:direction",
+            "content": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "intensity": "medium",
+            "importance": "medium",
+            "urgency": "low",
+            "context": "",
+            "version": 1,
+            "kind": "direction",
+            "scope": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "satisfaction": null,
+            "parents": [],
+            "references": [],
+            "status": "active",
+            "sourceGaps": {
+              "formation": 0,
+              "assessment": 0
+            }
+          },
+          {
+            "id": "owner:work",
+            "content": "繼續創作",
+            "intensity": "medium",
+            "importance": "medium",
+            "urgency": "low",
+            "context": "",
+            "version": 1,
+            "kind": "intent",
+            "scope": "繼續創作",
+            "satisfaction": null,
+            "parents": [],
+            "references": [],
+            "status": "active",
+            "sourceGaps": {
+              "formation": 0,
+              "assessment": 0
+            }
+          }
+        ],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observations": [],
+        "pursuitCapacity": {
+          "nodes": 12,
+          "remaining": 10,
+          "omitted": 0,
+          "archivable": [],
+          "archivedCount": 0,
+          "archivedGap": 0
+        },
+        "focusIntentId": null,
+        "lastKnownState": {
+          "entries": [
+            {
+              "reference": {
+                "kind": "short",
+                "id": "legacy:owner:memory:0:1260",
+                "version": 1
+              },
+              "time": 1260,
+              "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+              "source": {
+                "kind": "legacy-unclassified"
+              }
+            }
+          ],
+          "capacity": 8,
+          "omitted": 0,
+          "gap": "僅整理本次可見的主觀來源；未列出、已忘或未得知的狀態與後續補充仍未知，所知狀態不證明受阻原因。"
+        },
+        "arrangementCues": [],
+        "arrangementCueGap": 0,
+        "noticeOpportunities": [],
+        "noticeOpportunityGap": 0
+      },
+      "home": {
+        "id": "cafe",
+        "name": "街角咖啡館",
+        "note": "熟悉的角落。坐下，也可能遇見人。"
+      },
+      "pendingInterventions": [],
+      "places": [
+        {
+          "id": "kris-home",
+          "name": "Kris 的住處",
+          "note": "一盞沒關的燈，一壺剛泡好的茶。"
+        },
+        {
+          "id": "vera-home",
+          "name": "Vera 的房間",
+          "note": "布料、髮飾，與安靜的手機。"
+        },
+        {
+          "id": "cafe",
+          "name": "街角咖啡館",
+          "note": "熟悉的角落。坐下，也可能遇見人。"
+        }
+      ],
+      "scene": {
+        "region": {
+          "id": "cafe-front",
+          "location": "cafe",
+          "name": "前台"
+        },
+        "exits": [
+          {
+            "id": "cafe-door",
+            "name": "儲藏室門",
+            "state": "open",
+            "destination": {
+              "id": "cafe-storeroom",
+              "location": "cafe",
+              "name": "儲藏室"
+            }
+          }
+        ]
+      },
+      "observationTargets": {
+        "regions": [
+          {
+            "id": "cafe-front",
+            "location": "cafe",
+            "name": "前台"
+          },
+          {
+            "id": "cafe-storeroom",
+            "location": "cafe",
+            "name": "儲藏室"
+          }
+        ],
+        "people": []
+      },
+      "contacts": [
+        {
+          "id": "owner",
+          "name": "店主"
+        }
+      ],
+      "visiblePeople": [],
+      "knownMethods": [],
+      "currentActivity": null,
+      "learnedHabits": [],
+      "projectionGaps": {
+        "longTerm": 0,
+        "beliefs": 0,
+        "relationships": 0,
+        "preferences": 0,
+        "habits": 0
+      },
+      "phoneReferenceGap": 0
+    },
+    {
+      "contractVersion": "world-adjudication.v1",
+      "knownActivityIdentities": [],
+      "action": {
+        "type": "propose",
+        "target": "workpiece",
+        "content": "加工這件作品",
+        "purpose": "完成作品"
+      },
+      "actor": {
+        "id": "owner",
+        "location": "cafe",
+        "region": "cafe-front",
+        "abilityTags": []
+      },
+      "rules": [
+        "舊範圍的模型日常候選 routine.version=2：family、operation、subject、timings 沿日常範圍，另提供 programs，恰好涵蓋 routineOffer.operations 各一次。頂層 accepted、check=null、effects=[]、stages=[]、branches=null、completionMinutes=null；時間唯一來自 timings。version=1 的空效果程序只是舊契約相容，不表示模型確認了效果。",
+        "不確定日常program={operation,effects:[],stages:[],check:{difficulty:8|12|16,ability},branches}，branches為1至5組{outcomes,effects,stages}，outcomes恰好涵蓋critical-success/success/mixed/failure/critical-failure各一次，多級可共用；分支內effects是準備。成功須含完整合法成果；部分或失敗可僅消耗/留下water等合法中間成果，空分支仍花確認時間。失敗不生成完整茶或食物。程式用原D20選分支，規則不存骰值。確定program可check=null、branches=null沿effects/stages，或一組全部級別。",
+        "每項確定 program={operation,effects,stages,check:null,branches:null}；此program內的effects是最多4項起始準備（不等於routine=null自由分支的頂層最終成果），完整食物或飲品只能列在最後stages，不能提前產生成品；階段={afterMinutes,effects}，15分鐘遞增，最多4階段，最後階段等於該項timing向上對齊15分鐘。只確認有意義時點與既有 materialize/consume/transfer/state 效果，不產生程式、ID、revision、任意patch或新能力；程式綁定當前合法角色並檢查每階段前提。",
+        "符號角色：vessel為本次合法杯子，vesselSupply是確有需要時的合法杯子供應；materialSupply/material為明確原料供應/該份原料，沒有明確原料時為核准背景；productSupply為此次合法成品供應，drink為杯內當前飲品。選用當前物件/供應由程式按權限及短缺處理，規則不保存歷史ID。可選供應未綁定時略過其步驟；transfer到actor已持有時略過；state已是所需值時略過，clean未宣告時略過。這些略過不放寬缺貨、特定杯子、工具、知情或使用權。",
+        "效果格式：{kind:materialize,role:vesselSupply|materialSupply|productSupply}；{kind:consume,role:material|drink}；{kind:transfer,role:vessel|drink,toHolder:actor|null}；{kind:state,role:vessel,key:contents|clean,value:字串}。null放下只適用return，不允許第三方、grant、consent或destroy。",
+        "確定程序及成功分支：tea/coffee 須明列取得可選原料(materialize materialSupply、consume material)、取得本次杯子(materialize vesselSupply、transfer vessel到actor)、contents轉tea/coffee及materialize productSupply；可明列water準備。完整成品只能在最後階段。drink須拿取vessel及drink、consume drink及contents=dirty同批；wash須拿取vessel、contents=empty及clean=yes（只在有該欄位時）；return須放下vessel；food須materialize productSupply。這些是合法成果的必要承接，時點和有意義階段由模型確認。確定日常不擲骰；不增加每階段或擲骰後呼叫。",
+        "新通用日常使用routine.version=3：programs明示methods[{content,purpose,aliases:[{content,purpose}]}]；aliases最多4組，只確認同方法、同用途的合理表述（如飲用／喝茶），每組content與purpose成對匹配，不交叉組合；不確定或不同用途不列入。舊methods缺aliases保持原核准範圍。programs另明示bindings與stages/check/branches。effects必須空，效果放15分鐘以上階段；已確認的原長提案會可靠保存為該方法，後續當前對象不同仍重新綁定，不重問。v1/v2保留舊原義，不冒稱曾確認新後果。",
+        "bindings宣告role/type(object|supply|body|environment)/select(target|local|actor|here|linked)/kind與label(null或必要篩選)/state必要subset/access/link/background/quantity/sourceRole/sourceSubject。material須明示來源主題（如茶葉、蛋糕），食物同kind不代表同類，已知label／material／category符合該來源主題者優先；target是本次指定對象，不能找不到便替換；local的實際使用限可知本地；查找可用supply角色的background確認合理普通來源，階段以discover引用該$role及$here，不需materialize拿取；成立與察覺分開，查找不授予使用許可。只有符合當前場所與普通日常份量的背景可確認；特殊、大量、明確有限或受限來源不得因查找自動核准。既有來源身份與canonical種類、sourceSubject及必要狀態優先重用，不以新提案措辭或顯示名稱另建。linked明示link.direction：to-role表示候選.state[key]等於先前角色ID；from-role表示先前角色.state[key]等於候選ID，例如先宣告drink再以drink.vessel找杯。舊資料缺direction維持to-role。link.role、binding state的$role必須先宣告，不能前向引用。actor/here為系統角色。supply背景須明示來源用途material或equipment及label/kind/consumable/quantity/initialState逐key exposure，已知有限供應及指定物件優先，不用改名避開缺貨。",
+        "program的效果沿本次相同封閉世界effect能力，所有物件/供應/身體引用與environment target使用$role；移動目的區域或guard.region可用既有地圖固定ID（仍驗可達），或$here；expectedRevision與expectedRemaining一律0佔位，程式在當前前提成立後綁定。form/separate新output用新$role，僅能從形成效果之後引用；階段preconditions不得引用同階段尚未形成的成果。程式每活動產生fresh ID；state.vessel可引用$vessel，杯不作原料。保留每個外在effect與形成state的明示exposure，不把reason/hidden線索告知NPC。",
+        "routineOffer.genericMethods允許同受限角色/場所的新明示方法ID（不是handler），例如擦桌面；若operation是原offered-family項目仍完整確認該組timings/programs。新method-only只確認自己的完整範圍。角色意願/記憶/信念不由世界程序改寫；physical不是同意，grant/consent仍由本人選擇。",
+        "只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，可依 version=2 舊程序或優先 version=3 通用程序確認本次 operation、subject、完整timings與programs；v3新方法在明示genericMethods受限範圍內一次確認。version=1空效果核准僅供舊候選相容，不用於新確認。日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源；v1/v2與v3使用原operation時必須恰好涵蓋 routineOffer.operations 各一次，v3 generic新方法則只列自己的operation一次，每項 {operation,minutes} 為正數且至多1440；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊15分鐘。v1/v2 subject 選模板 subjects；v3 subject 明示本次有界主題，餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。未確認的特殊方法、大量規模、代他人授權與強制交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。",
+        "不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。"
+      ],
+      "explorationScope": {
+        "region": "cafe-front",
+        "objectsOmitted": 0,
+        "suppliesOmitted": 0,
+        "restrictionsOmitted": 0,
+        "complete": true
+      },
+      "external": {
+        "bodies": [
+          {
+            "id": "owner",
+            "revision": 0,
+            "state": {},
+            "region": "cafe-front"
+          }
+        ],
+        "environment": {
+          "revision": 0,
+          "state": {},
+          "region": "cafe-front"
+        }
+      },
+      "objects": [
+        {
+          "id": "workpiece",
+          "source": "fixture",
+          "label": "練習作品",
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "revision": 1,
+          "state": {
+            "progress": "raw"
+          },
+          "lifecycle": "active",
+          "kind": "utensil",
+          "knownTo": [
+            "owner"
+          ],
+          "allowedTo": [
+            "owner"
+          ],
+          "stateTransitions": {
+            "progress": [
+              "raw",
+              "complete"
+            ]
+          }
+        },
+        {
+          "id": "phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1",
+          "source": "phone-baseline-v1",
+          "label": "店主 的手機",
+          "kind": "phone",
+          "region": "cafe-front",
+          "holder": "owner",
+          "owner": "owner",
+          "revision": 1,
+          "state": {
+            "condition": "sound"
+          },
+          "lifecycle": "active",
+          "knownTo": [
+            "owner"
+          ],
+          "allowedTo": [
+            "owner"
+          ]
+        }
+      ],
+      "supplies": [],
+      "finiteRestrictions": [],
+      "effectContractVersion": "world-effects.v5",
+      "effectRules": [
+        "bodyConsequencesReconfirmation=true表示角色明示想重新確認既有方法對自己身體的實際影響，本次沿原普通裁定slot處理；accepted時必須以獨立routine.version=3範圍保存包含真正ingest或bodyActivity的程序。舊範圍與既有成果保留，不改寫歷史、不從consume名稱猜恢復量。尚無明示有界身體後果可承接時可denied/unsupported，不假裝已確認；已確認且仍適用的範圍不應再次裁定。",
+        "bodyActivity version=1 是本次活動每實際世界小時的額外需求變化，與程式的 fatigue+1/時、sleep+4/時清醒基線合成後執行。kind=rest：fatiguePerHour=-20..0，sleepPerHour必須0，清醒休息不恢復睡眠需求；kind=exertion：fatiguePerHour=0..20，sleepPerHour必須0，體力活動不能產生疲勞或睡眠需求恢復；kind=sleep：fatiguePerHour=-20..0，sleepPerHour至少-20且嚴格小於-4，睡眠需求淨變化必須為負。所有值必須有限，不能跨kind挪用恢復能力。只算真正開始後的已發生分鐘，不預支完整時段；sleep只在確實入睡時確認，嘗試入睡不等於已睡著。缺省/null表示沒有新確認，不從活動文字推論；日常核准頂層bodyActivity=null，逐program.bodyActivity沿相同kind界線保存確認，舊program缺欄位不補造。",
+        "ingest version=1：真正攝取本人持有且可消耗的同一物件，objectId/expectedRevision沿consume前提，hungerRelief/thirstRelief各0至60且至少一項大於0；完整消耗這份具體物件並同步緩解需求。部分攝取先separate出明示份量；不能以形成食物、敘述成功或普通body狀態代替。一般consume舊原義不自動取得未確認的需求效果。",
+        "部分攝取的追蹤粒度：舊1 item不能直接separate出更小正整數，不代表幾口不可承接。可在本次普通裁定明示form partition：完整舊物1 item作來源終止，產生同一既有內容物的有界等份整體（例如4 quarter-serving，不推定毫升、固定口數或新增飲品）；保持原kind、consumable、全部狀態及曝光、vessel與來源連續，所有權／許可沿來源交集，不消耗杯子。再separate出實際要攝取的部分並ingest，餘量保持同一容器；只有實際攝取部分按本次確認的比例恢復需求（例如整體12、四分之一3），轉換本身不恢復。最後全量沿ingest並同批更新杯contents；不能將整杯消耗冒充幾口，不可對耗盡來源轉換或反覆補出原量。這是本次操作的明示表示，不在讀取舊資料時補精確容量或攝取史，也不要求每次都選部分飲用。",
+        "explanation是有界的模型自述結果說明，不是程式已驗證的根因或角色已知事實；請用summary（1至512字）簡述允許、否決或無進展的可核對結果，facts最多8筆{reference,value}引用當次輸入中既有事實（reference至多160字，value至多256字）。不要求或輸出內部思考過程，不創造不存在的事實；無可用說明時explanation=null。此說明只供觀察者，不可自動作為NPC回饋。",
+        "schedule-natural version=1：在同次裁定確認已形成外在狀態的自然後續。delayMinutes是從該狀態正式提交起算的15分鐘倍數，15至1440；不是從回溯phase進展時間起算，不同回合追溯觸發。conditions為1至4個state-condition，僅綁必要state及可選region/holder guard，沒有guard的條件須有state。effects為1至4個{target,changes,exposure}，同target可分不同鍵的曝光，同鍵不能重複寫入，只允許同change-state受限狀態後果，不含revision或遞迴安排；每筆changes.from亦為持續前提。exposure明示object/environment public或hidden，body public/subject/hidden。每次正式批次後必要條件或from破壞即永久失效，即使後來恢復也不復活；無關state/revision不影響。reason只供證據，不是角色已知理由。pending最多32、已結算紀錄最多64；安排與世界同批保存，執行不追加模型或骰子。",
+        "form version=1：operation=partition或transform，access=authorized或physical；inputs最多8個{objectId,expectedRevision,quantity:{amount,unit},disposition:consumed|destroyed}，outputs最多4個{id,label,kind,consumable,quantity,state:[{key,value,exposure:public|hidden}]}。id必須是尚未使用的新身份，不能替換／復活既有物件或供應。數量為正安全整數且至多1000000、unit最多24字；reason最多300字只入觀察者證據。",
+        "partition把一個完整原物切開／碎裂，當下終止原物active並產生一組有份量的整體；已有重要差異可列少數不同output。transform明示扣除每個當前active來源的量，剩餘量保留，不能先consume來源再form。各來源單位必須與現場相符；全部輸入輸出同單位時，總產量不可大於消耗量。不同單位轉化由模型確認，不模擬完整質量守恆。舊缺quantity物件按1 item承接；只有新操作才保存數量，不追補歷史。",
+        "separate version=1：{access,objectId,expectedRevision,quantity,outputId,reason}從已有整體扣出小於其餘量的一部分，保存新child及原物來源；child保持原kind、狀態、消耗能力、所有權及使用權，不複製已發生的歷史。全量拿取沿transfer，不因細分複製完整原物。",
+        "來源扣至零時依模型明示disposition保存消耗／轉化或損毀，不按物件kind或行動動詞硬猜。authorized須有現場使用權及可操作持有；physical可承接未經許可及他人持有的外在後果，但不改owner、coOwners、allowedTo或acceptedBy，仍須已知可見本地active與當前份量。",
+        "形成不接受模型指定owner、allowedTo或同意；保存全部來源owner/coOwners並沿既有權利交集，不能由其中一位單方代其餘共有人授權。新成果明示consumable布林，舊缺欄位才以food相容；容器只是state.vessel關聯，不作為泡茶原料消耗。新飲品與杯的contents、位置、持有仍須同批一致。",
+        "共同界線：effects kinds=discover/ingest/form/separate/materialize/consume/destroy/transfer/state/grant/consent/schedule-natural/change-state/displace-body/physical；status=accepted/denied/unsupported；effects 至多4；stages 至多4；completionMinutes 必須是正數且至多1440，向上對齊15分鐘；階段時點=15/30/45/60/75/90/105/120/135/150/165/180/195/210/225/240/255/270/285/300/315/330/345/360/375/390/405/420/435/450/465/480/495/510/525/540/555/570/585/600/615/630/645/660/675/690/705/720/735/750/765/780/795/810/825/840/855/870/885/900/915/930/945/960/975/990/1005/1020/1035/1050/1065/1080/1095/1110/1125/1140/1155/1170/1185/1200/1215/1230/1245/1260/1275/1290/1305/1320/1335/1350/1365/1380/1395/1410/1425/1440；不確定難度=8/12/16。",
+        "activityIdentity：一般 accepted 新方法可確認 {version:1,key:穩定語義代碼,label:短活動名稱}；key以小寫英文字開頭、僅英數._-、最多64字，label最多64字。不以物件實例ID、原句hash或成敗級別分類。同語義換措辭／換杯子應沿用 knownActivityIdentities 的 key/label；不同方法不得共用。找不到等義才新增身份。routine非null或未核准時填null，舊缺欄位不補造。這只分類已執行選擇，不是喜歡、成功或強制意圖。",
+        "一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。",
+        "effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。",
+        "materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。",
+        "consume：明示 consumable=true 的物件且 holder=actor.id 才可食用；consumable=false 不可，只有舊資料缺 consumable 才以 kind=food 相容，不以新kind名稱決定。之後 lifecycle=consumed、holder=null、已保存quantity歸零，不會補貨。桌上可食用物件先 transfer 拿取再 consume，第二步版本加一。容器本身不能因裝有飲品而被食用；杯中獨立飲品按其可消耗能力consume，並在同批更新原杯contents，保留飲品與容器連續性。",
+        "舊kind state/transfer/consume/destroy的授權模式及change-state access=authorized：物件必須已知、active、本地且獲准，並由actor持有或無人持有。這是舊核准方法的適用範圍，不代表所有物理方法都不可能；需要未經許可或對他人持有物件的外在後果時明示新physical契約。",
+        "transfer：toRegion 必須是 actor 當前 region；toHolder=null 是放下，toHolder=actor.id 是拿取。交給其他角色需要同區域、allowedTo 與該角色先前 consent 形成的 acceptedBy；不能代對方同意。移動另用 NPC move，不得遠端轉移。",
+        "grant：僅物件或供應的 owner 角色自己提出，且目標已知、可見、本地，recipient 須在場可見。只增加使用權與知情，不轉移 holder 或 owner。口頭台詞不等於 grant，借用者不能代所有者授權。",
+        "consent：當前角色對已知、可見、active 且 allowedTo 允許的物件同意接收；增加 actor.id 至 acceptedBy。舊destroy只允許處理自己的物件；借用意外或未經許可的外在損毀須明示physical destroy，不能偽造grant。",
+        "change-state version=1、access=authorized/physical：target={type:object,id}、exposure=public/hidden，public是有感知機會才可知、hidden只供權威條件。舊物件缺曝光元資料的舊state保留原可知原義，不補歷史；expectedRevision為當前正整數版本，changes最多4筆{key,from,value}；from=null明示原本無該鍵，否則須等於當前值。key最多60字、value最多100字；物件state最多16鍵及4096 UTF-8 bytes。允許未預列的新外在狀態；reason必須提供（最多300字），僅供觀察者裁定證據，不是NPC已知內情。不能寫核心身份、來源、數量、位置、歸屬、許可、生命週期或prototype鍵；資料文字不作為指令執行。每項效果增加一次revision，不能以狀態複製物件或復活成果。",
+        "change-state另承接target.type=environment/body，access=physical；環境id是本地區域，身體id是在場角色，沒有新欄位的當前狀況為空state、revision=0。body必填exposure=public/subject/hidden、environment必填exposure=public/hidden：public是可見外在表徵，subject是本人有依據能感到的身體狀況，hidden只是權威事實（連本人也不自動知悉），不可把看得到區域當成知道該區所有內情；禁止情緒、意願、記憶、信念與反應。理由不進NPC。物理後果不等於對方同意。",
+        "displace-body version=1：targetId為在場可接觸的角色，expectedRegion/expectedRevision為當前外在位置及版本，toRegion限同場所相鄰且通路開啟；reason只供觀察者查證。只改外在位置並同步攜物，不產生同意、選擇、情緒或後續反應。需要不確定判定時沿原D20結果分支。",
+        "state-condition version=1：target可為object/environment/body，state是1至4個必要key/value（null表示不存在），只檢查相關鍵，無關狀態不使其失效。可選guard={region:null或區域id,holder:{check:boolean,value:null或角色id}}；缺guard或region=null不檢查位置，holder.check=false只許value=null；check=true僅object可用並明確檢查持有（null是要求無人持有）。條件不補造世界事實，不用全revision替代相關條件。",
+        "physical version=1：operation=materialize引用supplyId/expectedRemaining；operation=take/place/consume/destroy引用objectId/expectedRevision。reason必填且至多300字，只供觀察者證據。已知、本地、可見、active及正確版本/有限供應仍必須成立；物主許可與物理可行性分開，允許確認的意外或未經許可後果，包括其他在場角色持有的物件。take只改為actor持有，place只放在actor當前區域；不能直接強迫第三者接收、grant或consent。consume仍需本身可食用且先在actor手上；destroy不復活、不轉移owner。change-state access=physical沿同一物理邊界，不改角色意願。物件保留有界事前許可歷史，原權利不因後果改寫。",
+        "discover v1：region只能是actor當前可見區域，objectIds/supplyIds各最多16個本次相關authority對象。表示實際查探這些線索，不代表自動察覺、持有、獲准或全知；感知由程式確認。空陣列表示本次未取得新線索，不能推論全場所不存在或永久缺貨。未知物品不需角色預先猜ID，主持從相關權威資料選取；explorationScope有省略時不得視為完整庫存。finiteRestrictions是當前場所跨區域的唯讀明示來源範圍限制，不是可接觸來源，不得引用其遠端ID執行discover或materialize。只說明explanation不能替代discover效果，不接受心理patch。",
+        "state：key/value 必須在物件 stateTransitions 內且改變目前值，不得新增任意欄位。所有效果均不能更換物件 kind、owner 或隱含生成替代物。",
+        "resumable：只有世界確認活動可停下並保留工序時為true，不可暫停或日常核准封套填false；暫停不凍結材料與外界。",
+        "completionMinutes：一般效果分支（routine=null）有完成目標且 accepted 時，依方法與當下條件確認完成所需合理分鐘（有限正數，至多1440）；一般 durationMinutes 只是角色估時。程式向上對齊15。denied/unsupported 或開放式時段回傳 null。授權與同意是一次性選擇，耗時15。stages：只列少數有意義的進度；afterMinutes 依序遞增且不超過對齊後完成時間，最後一階段在完成時間；完整成品不能提前產生。完成契約的頂層 effects 是最終成果，即使已有 stages 也在完成時間執行；準備工作須列在明確時點的 stages。食物 materialize 會生成可食用的完整物件，只能在確認完成時點；不以早期階段冒充部分食物。最終階段連同頂層 effects 合計最多4項。preconditions 使用當階段執行前的版本、region、holder 與 state（key/value 陣列）；後續階段引用先前效果遞增後的版本。階段不能包含 grant、consent 或需要其他角色新同意的交付。",
+        "結果分支：routine=null 的完成活動可用 branches 確認 1 至 5 組 {outcomes,effects,stages}，此時頂層 effects/stages 必須空。outcomes 必須恰好各涵蓋 critical-success/success/mixed/failure/critical-failure 一次，可共用後果；每組沿相同受限效果及時間契約，失敗可消耗、部分成果用合法狀態表示，不能自動套用成功效果。確定活動 check=null 時僅一組涵蓋全部級別；不擲骰。無變化的失敗分支允許空效果，仍消耗確認時間。所有分支在擲骰前驗證。不確定自由活動 target 必須是當前可知具體物件／供應，或本地可接觸角色／區域；改措辭、難度或分支表示不取得重擲資格。branches=null 保留舊效果契約。",
+        "例如供應 meal 的 materializedObjectId=\"meal:1\"：effects=[{kind:\"materialize\",supplyId:\"meal\",expectedRemaining:1},{kind:\"consume\",objectId:\"meal:1\",expectedRevision:1}]。桌上 revision=1 的 food 則先 transfer(expectedRevision=1,toHolder=actor.id,toRegion=actor.region)，再 consume(expectedRevision=2)。",
+        "確定可行的日常活動 check=null。只有合法且結果不確定的嘗試可提出 difficulty=8/12/16 與相關 ability；不得擲骰或指定結果。"
+      ],
+      "effectContract": {
+        "type": "object",
+        "properties": {
+          "resumable": {
+            "type": "boolean"
+          },
+          "activityIdentity": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[a-z][a-z0-9._-]*$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "version",
+                  "key",
+                  "label"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "bodyActivity": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "integer",
+                        "const": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "rest"
+                      },
+                      "fatiguePerHour": {
+                        "type": "number",
+                        "minimum": -20,
+                        "maximum": 0
+                      },
+                      "sleepPerHour": {
+                        "type": "number",
+                        "const": 0
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "kind",
+                      "fatiguePerHour",
+                      "sleepPerHour"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "integer",
+                        "const": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "exertion"
+                      },
+                      "fatiguePerHour": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 20
+                      },
+                      "sleepPerHour": {
+                        "type": "number",
+                        "const": 0
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "kind",
+                      "fatiguePerHour",
+                      "sleepPerHour"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "integer",
+                        "const": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "sleep"
+                      },
+                      "fatiguePerHour": {
+                        "type": "number",
+                        "minimum": -20,
+                        "maximum": 0
+                      },
+                      "sleepPerHour": {
+                        "type": "number",
+                        "minimum": -20,
+                        "exclusiveMaximum": -4
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "kind",
+                      "fatiguePerHour",
+                      "sleepPerHour"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            ]
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "facts": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "reference",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "facts"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "branches": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "outcomes": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "critical-success",
+                          "success",
+                          "mixed",
+                          "failure",
+                          "critical-failure"
+                        ]
+                      }
+                    },
+                    "effects": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "$ref": "#/$defs/effect"
+                      }
+                    },
+                    "stages": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "$ref": "#/$defs/phase"
+                      }
+                    }
+                  },
+                  "required": [
+                    "outcomes",
+                    "effects",
+                    "stages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          },
+          "completionMinutes": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1440
+              }
+            ]
+          },
+          "stages": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/$defs/phase"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "denied",
+              "unsupported"
+            ]
+          },
+          "effects": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/$defs/effect"
+            }
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "difficulty": {
+                    "type": "integer",
+                    "enum": [
+                      8,
+                      12,
+                      16
+                    ]
+                  },
+                  "ability": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "difficulty",
+                  "ability"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "resumable",
+          "activityIdentity",
+          "bodyActivity",
+          "explanation",
+          "branches",
+          "completionMinutes",
+          "stages",
+          "status",
+          "effects",
+          "check"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "effect": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "discover"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "region": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "objectIds": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    }
+                  },
+                  "supplyIds": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "region",
+                  "objectIds",
+                  "supplyIds"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "ingest"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "objectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "hungerRelief": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 60
+                  },
+                  "thirstRelief": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "objectId",
+                  "expectedRevision",
+                  "hungerRelief",
+                  "thirstRelief"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "schedule-natural"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "delayMinutes": {
+                    "type": "integer",
+                    "enum": [
+                      15,
+                      30,
+                      45,
+                      60,
+                      75,
+                      90,
+                      105,
+                      120,
+                      135,
+                      150,
+                      165,
+                      180,
+                      195,
+                      210,
+                      225,
+                      240,
+                      255,
+                      270,
+                      285,
+                      300,
+                      315,
+                      330,
+                      345,
+                      360,
+                      375,
+                      390,
+                      405,
+                      420,
+                      435,
+                      450,
+                      465,
+                      480,
+                      495,
+                      510,
+                      525,
+                      540,
+                      555,
+                      570,
+                      585,
+                      600,
+                      615,
+                      630,
+                      645,
+                      660,
+                      675,
+                      690,
+                      705,
+                      720,
+                      735,
+                      750,
+                      765,
+                      780,
+                      795,
+                      810,
+                      825,
+                      840,
+                      855,
+                      870,
+                      885,
+                      900,
+                      915,
+                      930,
+                      945,
+                      960,
+                      975,
+                      990,
+                      1005,
+                      1020,
+                      1035,
+                      1050,
+                      1065,
+                      1080,
+                      1095,
+                      1110,
+                      1125,
+                      1140,
+                      1155,
+                      1170,
+                      1185,
+                      1200,
+                      1215,
+                      1230,
+                      1245,
+                      1260,
+                      1275,
+                      1290,
+                      1305,
+                      1320,
+                      1335,
+                      1350,
+                      1365,
+                      1380,
+                      1395,
+                      1410,
+                      1425,
+                      1440
+                    ]
+                  },
+                  "conditions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "state-condition"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "const": 1
+                            },
+                            "target": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "object",
+                                    "environment",
+                                    "body"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "state": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 60
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "version",
+                            "target",
+                            "state"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "state-condition"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "const": 1
+                            },
+                            "target": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "object",
+                                    "environment",
+                                    "body"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "state": {
+                              "type": "array",
+                              "minItems": 0,
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 60
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "guard": {
+                              "type": "object",
+                              "properties": {
+                                "region": {
+                                  "anyOf": [
+                                    {
+                                      "type": "null"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    }
+                                  ]
+                                },
+                                "holder": {
+                                  "type": "object",
+                                  "properties": {
+                                    "check": {
+                                      "type": "boolean"
+                                    },
+                                    "value": {
+                                      "anyOf": [
+                                        {
+                                          "type": "null"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 120
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "check",
+                                    "value"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "region",
+                                "holder"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "version",
+                            "target",
+                            "state",
+                            "guard"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "effects": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "target": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "object"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "changes": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 60
+                                  },
+                                  "from": {
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "from",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "exposure": {
+                              "type": "string",
+                              "enum": [
+                                "public",
+                                "hidden"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "target",
+                            "changes",
+                            "exposure"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "target": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "environment"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "changes": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 60
+                                  },
+                                  "from": {
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "from",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "exposure": {
+                              "type": "string",
+                              "enum": [
+                                "public",
+                                "hidden"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "target",
+                            "changes",
+                            "exposure"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "target": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "body"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "changes": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 60
+                                  },
+                                  "from": {
+                                    "anyOf": [
+                                      {
+                                        "type": "null"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "from",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "exposure": {
+                              "type": "string",
+                              "enum": [
+                                "public",
+                                "subject",
+                                "hidden"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "target",
+                            "changes",
+                            "exposure"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "delayMinutes",
+                  "conditions",
+                  "effects",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "form"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "access": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "physical"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "partition",
+                      "transform"
+                    ]
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "objectId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "expectedRevision": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "quantity": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000000
+                            },
+                            "unit": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 24
+                            }
+                          },
+                          "required": [
+                            "amount",
+                            "unit"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "disposition": {
+                          "type": "string",
+                          "enum": [
+                            "consumed",
+                            "destroyed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "objectId",
+                        "expectedRevision",
+                        "quantity",
+                        "disposition"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        "consumable": {
+                          "type": "boolean"
+                        },
+                        "quantity": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000000
+                            },
+                            "unit": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 24
+                            }
+                          },
+                          "required": [
+                            "amount",
+                            "unit"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "state": {
+                          "type": "array",
+                          "maxItems": 16,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "value": {
+                                "type": "string",
+                                "maxLength": 100
+                              },
+                              "exposure": {
+                                "type": "string",
+                                "enum": [
+                                  "public",
+                                  "hidden"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value",
+                              "exposure"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "kind",
+                        "consumable",
+                        "quantity",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "access",
+                  "operation",
+                  "inputs",
+                  "outputs",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "separate"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "access": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "physical"
+                    ]
+                  },
+                  "objectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "quantity": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 24
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "outputId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "access",
+                  "objectId",
+                  "expectedRevision",
+                  "quantity",
+                  "outputId",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "physical"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "operation": {
+                    "type": "string",
+                    "const": "materialize"
+                  },
+                  "supplyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRemaining": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "reason",
+                  "operation",
+                  "supplyId",
+                  "expectedRemaining"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "physical"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "take",
+                      "place",
+                      "consume",
+                      "destroy"
+                    ]
+                  },
+                  "objectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "reason",
+                  "operation",
+                  "objectId",
+                  "expectedRevision"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "exposure": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "hidden"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "change-state"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "access": {
+                    "type": "string",
+                    "enum": [
+                      "authorized",
+                      "physical"
+                    ]
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "object"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "changes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        "from": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string",
+                              "maxLength": 100
+                            }
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "from",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "exposure",
+                  "kind",
+                  "version",
+                  "access",
+                  "target",
+                  "expectedRevision",
+                  "changes",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "exposure": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "hidden"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "change-state"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "access": {
+                    "type": "string",
+                    "const": "physical"
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "environment"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "changes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        "from": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string",
+                              "maxLength": 100
+                            }
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "from",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "exposure",
+                  "kind",
+                  "version",
+                  "access",
+                  "target",
+                  "expectedRevision",
+                  "changes",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "exposure": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "subject",
+                      "hidden"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "change-state"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "access": {
+                    "type": "string",
+                    "const": "physical"
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "body"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "changes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        "from": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string",
+                              "maxLength": 100
+                            }
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "from",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "exposure",
+                  "kind",
+                  "version",
+                  "access",
+                  "target",
+                  "expectedRevision",
+                  "changes",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "displace-body"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRegion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "toRegion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "targetId",
+                  "expectedRegion",
+                  "expectedRevision",
+                  "toRegion",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "transfer",
+                    "type": "string"
+                  },
+                  "objectId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  },
+                  "toHolder": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "toRegion": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "objectId",
+                  "expectedRevision",
+                  "toHolder",
+                  "toRegion"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "state",
+                    "type": "string"
+                  },
+                  "objectId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "objectId",
+                  "expectedRevision",
+                  "key",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "grant",
+                    "type": "string"
+                  },
+                  "targetId": {
+                    "type": "string"
+                  },
+                  "recipient": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "targetId",
+                  "recipient"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "consent",
+                    "type": "string"
+                  },
+                  "objectId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "objectId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "destroy",
+                    "type": "string"
+                  },
+                  "objectId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "objectId",
+                  "expectedRevision"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "materialize",
+                    "type": "string"
+                  },
+                  "supplyId": {
+                    "type": "string"
+                  },
+                  "expectedRemaining": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "supplyId",
+                  "expectedRemaining"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "consume",
+                    "type": "string"
+                  },
+                  "objectId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "objectId",
+                  "expectedRevision"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "phase": {
+            "type": "object",
+            "properties": {
+              "afterMinutes": {
+                "type": "integer",
+                "enum": [
+                  15,
+                  30,
+                  45,
+                  60,
+                  75,
+                  90,
+                  105,
+                  120,
+                  135,
+                  150,
+                  165,
+                  180,
+                  195,
+                  210,
+                  225,
+                  240,
+                  255,
+                  270,
+                  285,
+                  300,
+                  315,
+                  330,
+                  345,
+                  360,
+                  375,
+                  390,
+                  405,
+                  420,
+                  435,
+                  450,
+                  465,
+                  480,
+                  495,
+                  510,
+                  525,
+                  540,
+                  555,
+                  570,
+                  585,
+                  600,
+                  615,
+                  630,
+                  645,
+                  660,
+                  675,
+                  690,
+                  705,
+                  720,
+                  735,
+                  750,
+                  765,
+                  780,
+                  795,
+                  810,
+                  825,
+                  840,
+                  855,
+                  870,
+                  885,
+                  900,
+                  915,
+                  930,
+                  945,
+                  960,
+                  975,
+                  990,
+                  1005,
+                  1020,
+                  1035,
+                  1050,
+                  1065,
+                  1080,
+                  1095,
+                  1110,
+                  1125,
+                  1140,
+                  1155,
+                  1170,
+                  1185,
+                  1200,
+                  1215,
+                  1230,
+                  1245,
+                  1260,
+                  1275,
+                  1290,
+                  1305,
+                  1320,
+                  1335,
+                  1350,
+                  1365,
+                  1380,
+                  1395,
+                  1410,
+                  1425,
+                  1440
+                ]
+              },
+              "preconditions": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "objectId": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "holder": {
+                          "anyOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "state": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "objectId",
+                        "revision",
+                        "region",
+                        "holder",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "state-condition"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "const": 1
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "object",
+                                "environment",
+                                "body"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "state": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "version",
+                        "target",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "state-condition"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "const": 1
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "object",
+                                "environment",
+                                "body"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "state": {
+                          "type": "array",
+                          "minItems": 0,
+                          "maxItems": 4,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "guard": {
+                          "type": "object",
+                          "properties": {
+                            "region": {
+                              "anyOf": [
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                }
+                              ]
+                            },
+                            "holder": {
+                              "type": "object",
+                              "properties": {
+                                "check": {
+                                  "type": "boolean"
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "null"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "check",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "region",
+                            "holder"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "version",
+                        "target",
+                        "state",
+                        "guard"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "effects": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "items": {
+                  "$ref": "#/$defs/effect"
+                }
+              }
+            },
+            "required": [
+              "afterMinutes",
+              "preconditions",
+              "effects"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "durationMinutes": 30,
+      "timeIntent": {
+        "kind": "completion",
+        "maxMinutes": null
+      },
+      "routineOffer": {
+        "family": "cafe-service",
+        "version": 2,
+        "genericMethods": {
+          "maxPrograms": 8
+        },
+        "operations": [
+          "tea",
+          "coffee",
+          "food",
+          "drink",
+          "wash",
+          "return"
+        ],
+        "templates": [
+          {
+            "operation": "tea",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶"
+            ],
+            "purposes": [
+              "泡茶",
+              "喝茶",
+              "準備茶",
+              "飲用",
+              "日常泡茶",
+              "招待客人",
+              "提供茶飲"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "tea"
+            }
+          },
+          {
+            "operation": "coffee",
+            "verbs": [
+              "泡",
+              "準備",
+              "製作",
+              "沖泡",
+              "沖"
+            ],
+            "subjects": [
+              "咖啡"
+            ],
+            "purposes": [
+              "泡咖啡",
+              "喝咖啡",
+              "準備咖啡",
+              "飲用",
+              "招待客人"
+            ],
+            "result": {
+              "kind": "brew",
+              "contents": "coffee"
+            }
+          },
+          {
+            "operation": "food",
+            "verbs": [
+              "準備",
+              "製作",
+              "取得",
+              "取用",
+              "拿取"
+            ],
+            "subjects": [
+              "簡餐",
+              "蛋糕",
+              "三明治"
+            ],
+            "purposes": [
+              "用餐",
+              "食用",
+              "招待客人",
+              "準備簡餐"
+            ],
+            "result": {
+              "kind": "serve"
+            }
+          },
+          {
+            "operation": "drink",
+            "verbs": [
+              "喝",
+              "喝掉",
+              "飲用"
+            ],
+            "subjects": [
+              "茶",
+              "紅茶",
+              "綠茶",
+              "咖啡",
+              "飲品"
+            ],
+            "purposes": [
+              "飲用",
+              "解渴",
+              "喝茶",
+              "喝咖啡"
+            ],
+            "result": {
+              "kind": "consume"
+            }
+          },
+          {
+            "operation": "wash",
+            "verbs": [
+              "清洗",
+              "洗",
+              "洗淨"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "清洗餐具",
+              "清潔",
+              "清洗"
+            ],
+            "result": {
+              "kind": "clean",
+              "contents": "empty"
+            }
+          },
+          {
+            "operation": "return",
+            "verbs": [
+              "歸還",
+              "放回"
+            ],
+            "subjects": [
+              "杯子",
+              "茶杯",
+              "咖啡杯",
+              "餐具"
+            ],
+            "purposes": [
+              "歸還",
+              "歸還餐具",
+              "歸還杯子"
+            ],
+            "result": {
+              "kind": "release"
+            }
+          }
+        ],
+        "background": "ordinary local materials and utensils only; explicit finite supplies and object facts take precedence",
+        "place": {
+          "location": "cafe",
+          "purpose": "cafe",
+          "operators": [
+            "owner"
+          ]
+        }
+      }
+    },
+    {
+      "contractVersion": "npc-decision.v3",
+      "pursuitContext": "12c1b49c-46d1-4a4f-9240-61c876c121fe",
+      "phones": [
+        {
+          "objectId": "phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1",
+          "owner": "owner",
+          "records": []
+        }
+      ],
+      "objects": [
+        {
+          "id": "workpiece",
+          "label": "練習作品",
+          "region": "cafe-front",
+          "holder": "owner",
+          "state": {
+            "progress": "complete"
+          },
+          "kind": "utensil"
+        },
+        {
+          "id": "phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1",
+          "label": "店主 的手機",
+          "region": "cafe-front",
+          "holder": "owner",
+          "state": {
+            "condition": "sound"
+          },
+          "kind": "phone"
+        }
+      ],
+      "supplies": [],
+      "time": "21:45",
+      "day": 1,
+      "self": {
+        "mentalEnergy": {
+          "feeling": "心裡還有餘裕。",
+          "canRegulate": true
+        },
+        "arrangements": {
+          "items": [],
+          "capacity": 16
+        },
+        "bodyFeelings": [
+          {
+            "need": "飢餓",
+            "feeling": "沒有明顯餓意"
+          },
+          {
+            "need": "口渴",
+            "feeling": "沒有明顯渴意"
+          },
+          {
+            "need": "體力疲勞",
+            "feeling": "身體沒有明顯疲累"
+          },
+          {
+            "need": "睡眠需求",
+            "feeling": "沒有明顯睡意"
+          }
+        ],
+        "preferences": {
+          "items": [],
+          "capacity": 16
+        },
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "region": "cafe-front",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "練習作品：progress=complete；活動已完成。",
+        "relationships": {},
+        "cognition": {
+          "beliefs": [],
+          "relationshipTags": []
+        },
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          },
+          {
+            "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+            "version": 1,
+            "time": 1275,
+            "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1275）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            }
+          },
+          {
+            "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+            "version": 1,
+            "time": 1290,
+            "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+            "source": {
+              "kind": "experience",
+              "person": "owner",
+              "region": "cafe-front"
+            },
+            "feelingSources": [
+              "ebbb7f77-6509-49e7-b624-c043a055d960"
+            ]
+          }
+        ],
+        "longTerm": [],
+        "memoryReview": [],
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          },
+          {
+            "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+            "time": 1275,
+            "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1275）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。"
+          },
+          {
+            "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+            "time": 1290,
+            "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。"
+          }
+        ],
+        "intents": [
+          {
+            "id": "owner:direction",
+            "content": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "intensity": "medium",
+            "importance": "medium",
+            "urgency": "low",
+            "context": "",
+            "version": 1,
+            "kind": "direction",
+            "scope": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "satisfaction": null,
+            "parents": [],
+            "references": [],
+            "status": "active",
+            "sourceGaps": {
+              "formation": 0,
+              "assessment": 0
+            }
+          },
+          {
+            "id": "owner:work",
+            "content": "繼續創作",
+            "intensity": "medium",
+            "importance": "medium",
+            "urgency": "low",
+            "context": "",
+            "version": 1,
+            "kind": "intent",
+            "scope": "繼續創作",
+            "satisfaction": null,
+            "parents": [],
+            "references": [],
+            "status": "active",
+            "sourceGaps": {
+              "formation": 0,
+              "assessment": 0
+            }
+          }
+        ],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observations": [],
+        "pursuitCapacity": {
+          "nodes": 12,
+          "remaining": 10,
+          "omitted": 0,
+          "archivable": [],
+          "archivedCount": 0,
+          "archivedGap": 0
+        },
+        "focusIntentId": null,
+        "lastKnownState": {
+          "entries": [
+            {
+              "reference": {
+                "kind": "short",
+                "id": "e54c2c75-a074-47ad-ac91-67ce5f7426ff",
+                "version": 1
+              },
+              "time": 1290,
+              "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1260；世界時間 1290）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+              "source": {
+                "kind": "experience",
+                "person": "owner",
+                "region": "cafe-front"
+              }
+            },
+            {
+              "reference": {
+                "kind": "short",
+                "id": "22483822-55c4-4fcf-93c3-b8bbb608a5a5",
+                "version": 1
+              },
+              "time": 1275,
+              "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1275）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:b1901cba-6725-4065-a0c1-aa2119ce70f1]：{\"condition\":\"sound\"}。",
+              "source": {
+                "kind": "experience",
+                "person": "owner",
+                "region": "cafe-front"
+              }
+            },
+            {
+              "reference": {
+                "kind": "short",
+                "id": "legacy:owner:memory:0:1260",
+                "version": 1
+              },
+              "time": 1260,
+              "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+              "source": {
+                "kind": "legacy-unclassified"
+              }
+            }
+          ],
+          "capacity": 8,
+          "omitted": 0,
+          "gap": "僅整理本次可見的主觀來源；未列出、已忘或未得知的狀態與後續補充仍未知，所知狀態不證明受阻原因。"
+        },
+        "arrangementCues": [],
+        "arrangementCueGap": 0,
+        "noticeOpportunities": [],
+        "noticeOpportunityGap": 0
+      },
+      "home": {
+        "id": "cafe",
+        "name": "街角咖啡館",
+        "note": "熟悉的角落。坐下，也可能遇見人。"
+      },
+      "pendingInterventions": [],
+      "places": [
+        {
+          "id": "kris-home",
+          "name": "Kris 的住處",
+          "note": "一盞沒關的燈，一壺剛泡好的茶。"
+        },
+        {
+          "id": "vera-home",
+          "name": "Vera 的房間",
+          "note": "布料、髮飾，與安靜的手機。"
+        },
+        {
+          "id": "cafe",
+          "name": "街角咖啡館",
+          "note": "熟悉的角落。坐下，也可能遇見人。"
+        }
+      ],
+      "scene": {
+        "region": {
+          "id": "cafe-front",
+          "location": "cafe",
+          "name": "前台"
+        },
+        "exits": [
+          {
+            "id": "cafe-door",
+            "name": "儲藏室門",
+            "state": "open",
+            "destination": {
+              "id": "cafe-storeroom",
+              "location": "cafe",
+              "name": "儲藏室"
+            }
+          }
+        ]
+      },
+      "observationTargets": {
+        "regions": [
+          {
+            "id": "cafe-front",
+            "location": "cafe",
+            "name": "前台"
+          },
+          {
+            "id": "cafe-storeroom",
+            "location": "cafe",
+            "name": "儲藏室"
+          }
+        ],
+        "people": []
+      },
+      "contacts": [
+        {
+          "id": "owner",
+          "name": "店主"
+        }
+      ],
+      "visiblePeople": [],
+      "knownMethods": [],
+      "currentActivity": null,
+      "learnedHabits": [],
+      "projectionGaps": {
+        "longTerm": 0,
+        "beliefs": 0,
+        "relationships": 0,
+        "preferences": 0,
+        "habits": 0
+      },
+      "phoneReferenceGap": 0
+    }
+  ]
+}
