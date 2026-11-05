@@ -1,3 +1,4 @@
+import { applyEmotionRegulation, type EmotionRegulation } from './emotion-regulation';
 import { applyFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
 import { applyLegacyMood, activateMentalEnergy, mentalIntervals, settleMentalInterval, type MentalEnergyPolicy } from './mental-energy';
 import { advanceCalendarReminders, hasDueCalendarReminder } from './phone-calendar';
@@ -22,7 +23,7 @@ import { PerceptionCapacityError } from './perception';
 
 export type TimeIntent = {kind: 'completion' | 'open-ended'; maxMinutes: number | null};
 export type MethodAssessment = { purpose:string; knownResults:{kind:'short'|'long';id:string;version:number}[]; choice:'new'|'retry'|'continue'|'wait'|'switch'|'drop'; method:string; change:{kind:'none'|'source'|'target'|'preparation'|'operation'|'condition'|'not-applicable';detail:string}; reason:string; selectedAction:{type:Action['type']|'continue';target:string}; intentIds:string[] };
-export type ActivityDecision = {feelingUpdates?:PreparedFeelingUpdate[]; pursuitArchived?:{id:string;version:number}[];pursuitArchivedDropped?:number;pursuitExits?:import('./pursuits').PursuitExit[]; pursuitEvidence?:import('./pursuit-selection').PursuitSelectionEvidence;pursuitTrace?:import('./pursuits').PursuitTrace[];pursuitTraceDropped?:number;focusIntentId?:string|null; phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; methodAssessment?:MethodAssessment; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
+export type ActivityDecision = {emotionRegulation?:EmotionRegulation;feelingUpdates?:PreparedFeelingUpdate[]; pursuitArchived?:{id:string;version:number}[];pursuitArchivedDropped?:number;pursuitExits?:import('./pursuits').PursuitExit[]; pursuitEvidence?:import('./pursuit-selection').PursuitSelectionEvidence;pursuitTrace?:import('./pursuits').PursuitTrace[];pursuitTraceDropped?:number;focusIntentId?:string|null; phoneNotificationReceipts?:string[]; arrangementCueReceipts?:ArrangementCueReceipt[]; arrangements?:import('./arrangements').ArrangementState; methodAssessment?:MethodAssessment; reconfirmBodyConsequences?:boolean; eventHabits?:import('./world').EventHabit[]; preferences?:import('./preferences').PreferenceState; timeIntent?: TimeIntent; freeCandidate?:EffectCandidate; longTerm?: LongMemory[]; cognition?: CognitiveState; interpretation?: string; shortTerm?: ShortMemory[]; memoryTrace?: MemoryTrace[]; action: Action; durationMinutes: number; intents?: Intent[]; attentionConditions?: AttentionCondition[]; attentionDiagnostics?: string[]; continueExisting?: boolean };
 export type TokenUsage = { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
 function bindActivityPursuit(character:Character,decision:ActivityDecision,started=false){
  const plan=character.plan;if(!plan)return;
@@ -125,6 +126,7 @@ export async function advanceActivities(world: World, options: {
   const ordered = [...world.characters.slice(offset), ...world.characters.slice(0, offset)];
   for (const character of ordered) {
     let feelingUpdates:PreparedFeelingUpdate[]=[];
+    let emotionRegulation:EmotionRegulation|undefined;
     try {
     advanceCalendarReminders(world);
     if(traveling.has(character.id)){if(ai)usage.savedDecisions++;continue;}
@@ -179,6 +181,7 @@ export async function advanceActivities(world: World, options: {
       decision.freeCandidate=bindRoutine(world,character,decision.action,decision.durationMinutes,undefined,minutes,decision.timeIntent?.maxMinutes)??{status:'unsupported',effects:[],stages:[],check:null};
     }
     feelingUpdates=decision.feelingUpdates||[];
+    if(ai&&!controlledDecision)emotionRegulation=decision.emotionRegulation;
     acknowledgePhoneNotifications(world,character,decision.phoneNotificationReceipts,world.minute);
     acknowledgeBodyNeeds(character);
     character.observationCursor = observedCount;
@@ -225,7 +228,7 @@ export async function advanceActivities(world: World, options: {
       if (error instanceof MemoryValidationError || error instanceof PerceptionCapacityError || requiresWorldEffects(decision.action)) throw error;
       record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
     }
-    } finally {applyFeelingUpdates(character,feelingUpdates,world.minute);if(world.pursuitVersion===1)validateActivityPursuits(character);try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}}
+    } finally {applyFeelingUpdates(character,feelingUpdates,world.minute);applyEmotionRegulation(character,emotionRegulation,world.minute,`${world.turn}:${world.minute}:${character.id}`);if(world.pursuitVersion===1)validateActivityPursuits(character);try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}}
   }
   for (const character of world.characters) for (const observation of pendingObservations(character)) {
     const reason = observationAttention(character, observation);
