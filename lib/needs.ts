@@ -27,7 +27,7 @@ export function advanceBodyNeeds(world:World):void {
   if(state.version!==1||!Number.isFinite(state.activatedAt)||!Number.isFinite(state.updatedAt)||needKeys.some(key=>!Number.isFinite(state.values[key])||state.values[key]<0||state.values[key]>100||!Number.isInteger(state.assessed[key])||state.assessed[key]<0||state.assessed[key]>3))throw Error('身體需求資料超出版本或有限範圍。');
   const elapsed=world.minute-state.updatedAt;if(!elapsed)continue;
   let activeMinutes=activeBodyMinutes(actor,state.updatedAt,world.minute);
-  if(actor.plan?.bodyActivity?.kind==='sleep'&&actor.plan.sleep?.naturalWakeAt===undefined&&actor.plan.sleep?.stimulusWakeAt===undefined){
+  if(actor.plan?.bodyActivity?.kind==='sleep'&&actor.plan.sleep?.naturalWakeAt===undefined){
    const remaining=sleepMinutesUntilWake(actor.plan.bodyActivity,state.values.sleep);
    if(remaining<=activeMinutes){activeMinutes=remaining;actor.plan.sleep={elapsedMinutes:actor.plan.sleep?.elapsedMinutes??0,naturalWakeAt:state.updatedAt+remaining};}
   }
@@ -103,7 +103,7 @@ export function activeBodyMinutes(actor:Character,from:number,to:number):number 
  const plan=actor.plan;if(!plan?.bodyActivity)return 0;
  const end=Math.min(to,plan.until,plan.sleep?.naturalWakeAt??Infinity,plan.sleep?.stimulusWakeAt??Infinity);
  const elapsed=Math.max(0,end-Math.max(from,plan.startedAt));
- return plan.bodyActivity.kind==='sleep'&&plan.sleep?.naturalWakeAt===undefined&&plan.sleep?.stimulusWakeAt===undefined&&actor.needs?Math.min(elapsed,sleepMinutesUntilWake(plan.bodyActivity,actor.needs.values.sleep)):elapsed;
+ return plan.bodyActivity.kind==='sleep'&&plan.sleep?.naturalWakeAt===undefined&&actor.needs?Math.min(elapsed,sleepMinutesUntilWake(plan.bodyActivity,actor.needs.values.sleep)):elapsed;
 }
 
 // A method's saved contract, not its wording or observed bodily outcome, proves

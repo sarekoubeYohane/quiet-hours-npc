@@ -20,11 +20,11 @@
 
 新正常評估只修改之後的 direction/level/reason 和 revision/effectiveAt，不移動已結算游標、不回收既有收支、不清除目前 slot sample。即使在同一 partial slot 改評價也不重抽。骰果幅度非負，不能翻轉角色方向。
 
-有效 endpoint 取實際 plan.until、睡眠自然醒/刺激醒與當輪世界邊界的交集。睡眠使用同一 activeBodyMinutes 計算，包含尚未寫入 naturalWakeAt 的當輪自然醒；不能把 12 分鐘實睡付成整個 15 分鐘請求。已完成、取消、暫停或換活動後沒有未來收入。
+有效 endpoint 取實際 plan.until、睡眠自然醒/刺激醒與當輪世界邊界的交集。睡眠使用同一 activeBodyMinutes 計算，包含尚未寫入 naturalWakeAt 的當輪自然醒；自然醒早於刺激時，共同 body/process helper 取較早端點；不能把 12 分鐘實睡付成整個 15 分鐘請求。已完成、取消、暫停或換活動後沒有未來收入。
 
 ## 共同收支與觀察者證據
 
-對已開始且已評估的活動，在決策前先按實際時間收斂上段過程。自然消耗與過程收支依同一 chronological boundaries（slot、睡眠與活動端點）合算，再在每個固定 rate 區段限制於 0/maximum；不先把整輪消耗與整輪收入分開 clamp，也不保留上限溢出 credit。這避免零點與上限附近因 transport 分段而改變結果。
+先執行本輪已到期的自然變化，確立其中刺激真正終止睡眠的時點，再抽取 process slots 與收斂自然/過程時間；不能先付整輪睡眠、之後才看見中途喚醒。對已開始且已評估的活動，在決策前按實際時間收斂上段過程。自然消耗與過程收支依同一 chronological boundaries（slot、睡眠與活動端點）合算，再在每個固定 rate 區段限制於 0/maximum；不先把整輪消耗與整輪收入分開 clamp，也不保留上限溢出 credit。這避免零點與上限附近因 transport 分段而改變結果。
 
 history 的 process 行保留該段實際開始/結束、有效分鐘、主觀理由、slot identities/samples、自然 requested delta、過程 requested delta 與實際 before→after。requested delta 不是可另行花費的帳戶；最終餘額才是權威。既有角色面板分別顯示自然/主觀收支及合算限制，保留目前評估的向後生效時點。
 
@@ -34,10 +34,10 @@ history 的 process 行保留該段實際開始/結束、有效分鐘、主觀�
 
 ## 驗證
 
-`tests/mental-process-api.test.cjs` 使用真正 world GET/POST、SQLite serialization/reload 與實際 provider body；只對外部模型回覆與明示 test seed 進行控制。現有 12 條案例涵蓋首次不預付、多 slot/partial、15+15 vs30、多 actor 排程變化、上下界同時自然消耗、forward-only 改評價不重抽、真實睡眠醒來端點、真正可暫停活動 pause/resume、活動到期/重做、拒絕/neutral/缺口、later actor/save/CAS/uncertain 故障、known usage 與原 ID 回放、首段新睡眠重算不覆蓋舊過程收入，以及損壞的保存評估 fail closed。純續做沒有新增 NPC calls。
+`tests/mental-process-api.test.cjs` 使用真正 world GET/POST、SQLite serialization/reload 與實際 provider body；只對外部模型回覆與明示 test seed 進行控制。現有 13 條案例涵蓋首次不預付、多 slot/partial、15+15 vs30、多 actor 排程變化、上下界同時自然消耗、forward-only 改評價不重抽、真實睡眠醒來端點、真正可暫停活動 pause/resume、活動到期/重做、拒絕/neutral/缺口、later actor/save/CAS/uncertain 故障、known usage 與原 ID 回放、首段新睡眠重算不覆蓋舊過程收入，以及損壞的保存評估 fail closed。純續做沒有新增 NPC calls。
 
-TDD 暫存紀錄：`/tmp/quiet-hours-255-context/260-red-1.log` → `260-green-1.log`；`260-red-sleep-boundary.log`（10.75 而非實睡 12 分鐘的 10.6）→ `260-green-sleep-boundary.log`；`260-red-actor-stream.log`（多 actor 切分改變同 slot sample）→ `260-green-actor-stream.log`；`260-red-persisted-assessment.log`（無效 level=99 原本回 200 並污染餘額）→ `260-green-persisted-assessment.log`（派送前拒絕並保留原狀）。
+TDD 暫存紀錄：`/tmp/quiet-hours-255-context/260-red-1.log` → `260-green-1.log`；`260-red-sleep-boundary.log`（10.75 而非實睡 12 分鐘的 10.6）→ `260-green-sleep-boundary.log`；`260-red-actor-stream.log`（多 actor 切分改變同 slot sample）→ `260-green-actor-stream.log`；`260-red-persisted-assessment.log`（無效 level=99 原本回 200 並污染餘額）→ `260-green-persisted-assessment.log`（派送前拒絕並保留原狀）；review 提供的 `260-red-actual-stimulus.log`（中途 5 分鐘刺激原本付 15 分鐘並抽兩樣本）→ `260-green-actual-stimulus.log`（5 分鐘過程、10 分鐘清醒、1 樣本，餘額 8.25）。另覆蓋原生 30 分鐘請求中第 15 分鐘喚醒與 15+15 切分，皆為 15 過程＋15 清醒、2 樣本、餘額 7.75。
 
-合入 #259/#261 的 integration `96a322a` 後，process/result/regulation 與原 pinned transcript 相關組合 33/33 通過；合前較廣相關組合 64/64 通過。`pnpm typecheck` 通過，lint 0 errors／4 個既有 warnings，diff check 通過。最末相關回歸與 review 結果另於工作票記錄。
+合入 #259/#261 的 integration `96a322a` 後，process/result/regulation 與原 pinned transcript 相關組合 33/33 通過；合前較廣相關組合 64/64 通過。`pnpm typecheck` 通過，lint 0 errors／4 個既有 warnings，diff check 通過。修正 review 中途刺激端點後，再擴大跑 process/energy/experiences/results/regulation/pinned transcripts、activity lifecycle/time/long/time-review、sleep/life-needs/natural-changes 共 **126/126 通過**，記錄為 `260-postreview-related.log`。最末 review 結果另於工作票記錄。
 
 Chromium 已由 root 執行並目視 [角色面板](assets/mental-process-260/process-panel.png)：既有 UI 真正 start 保持 10 不預付，實際投入後 11.5→13，21:45 改評價為 negative 僅使後續變成 10；45 有效分鐘、3 個固定 slot samples。SQLite 重讀、原 ID 回放不改歷史，實際 2 個受控 NPC calls、60/20 tokens、0 paid calls。browser fixture 明示 seed=1、multipliers=[1] 的退化分布，沒有當成正式骰法；[原始證據](assets/mental-process-260/evidence.json) 與 `tooling/verification/browser-mental-process.mjs` 已保存。受控模型僅證明契約、時間與記帳；不宣稱真實模型已正確判定享受或負擔，不關閉 #255/#263。

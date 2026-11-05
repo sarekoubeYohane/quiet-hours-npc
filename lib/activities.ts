@@ -114,12 +114,15 @@ export async function advanceActivities(world: World, options: {
   initializeKnownConditionOrder(world);
   activateBodyNeeds(world);
   activateMentalEnergy(world,options.mentalEnergyPolicy);
-  const mental=mentalIntervals(world,world.minute+minutes);
+  const roundFrom=world.minute,roundTo=roundFrom+minutes;
+  world.minute=roundTo;world.lastMode=mode;
+  // A due external consequence may end actual sleep inside this interval.
+  // Establish its endpoint before consuming process slots or natural time.
+  advanceNaturalChanges(world,roundTo,emitExternalConsequences);
+  const mental=mentalIntervals(world,roundTo);
   for(const actor of world.characters){const interval=mental.get(actor.id);if(interval)settleMentalInterval(actor,interval);}
-  const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,world.minute+minutes)]));
-  const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,world.minute,world.minute+minutes)]));
-  world.minute += minutes; world.lastMode = mode;
-  advanceNaturalChanges(world,world.minute,emitExternalConsequences);
+  const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,roundTo)]));
+  const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,roundFrom,roundTo)]));
   advanceBodyNeeds(world);
   const traveling = new Set(world.characters.filter(actor => actor.plan?.journey).map(actor => actor.id));
   for (const character of world.characters) if (traveling.has(character.id)) finishJourney(world,character);
