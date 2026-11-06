@@ -26,7 +26,9 @@ test('the actual supported discriminated wire schema rejects blank propose field
  const s=await scenario({decision:wire(rest)});
  try{
   await advance(s);const body=s.inputs.find(x=>x.input.self).request,schema=body.response_format.json_schema.schema,validate=new Ajv().compile(schema);
-  assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,wire(rest))),true,JSON.stringify(validate.errors));
+  const legal=fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,wire(rest));
+  for(const field of ['feelingUpdates','processFeeling','emotionRegulation']){assert.equal(schema.properties[field],undefined,'inactive world preserves its strict original wire contract');assert.equal(Object.hasOwn(legal,field),false,'fixture must not inject disabled psychology fields');}
+  assert.equal(validate(legal),true,JSON.stringify(validate.errors));
   for(const [field,value] of [['purpose',''],['purpose','   '],['content',''],['content','\n']]){const candidate=wire(proposal);candidate.action[field]=value;assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,candidate)),false,field);}
   assert.equal(validate(fixturePursuitDecision(s.inputs.find(x=>x.input.self).input,wire(proposal))),true,JSON.stringify(validate.errors));assert.ok(!('if' in schema));assert.equal(schema.type,'object');assert.equal(schema.anyOf,undefined);
  }finally{s.restore();}
@@ -116,4 +118,13 @@ test('v2 phone action and sourced arrangement share one assessed decision and at
   const counts=s.counts();await s.post(op);assert.deepEqual(s.counts(),counts);assert.equal(counts.npc,2);assert.equal(counts.judgments,0);
   assert.deepEqual((await s.read()).phones,saved.phones);
  }finally{s.restore();}
+});
+
+// The same actual provider boundary must also author the enabled strict branch.
+test('active isolated psychology keeps all three fields in its actual strict wire schema and provider candidate',async()=>{
+ const {env}=load('cloudflare-workers');env.MENTAL_ENERGY_TEST_POLICY=JSON.stringify({version:1,kind:'test',id:'method-wire-active',initial:5,maximum:10,awakePerHour:0,regulationCost:4,lowAt:4,experience:{levels:[0,2,5]},process:{seed:7,slotMinutes:15,levels:[0,4,8],multipliers:[1]}});
+ let s;try{s=await scenario({decision:wire(rest)});await advance(s);const actual=s.inputs.find(x=>x.input.self),schema=actual.request.response_format.json_schema.schema,legal=fixturePursuitDecision(actual.input,wire(rest)),validate=new Ajv().compile(schema);
+  for(const field of ['feelingUpdates','processFeeling','emotionRegulation']){assert.ok(schema.required.includes(field));assert.ok(Object.hasOwn(legal,field));}
+  assert.equal(validate(legal),true,JSON.stringify(validate.errors));assert.equal(schema.additionalProperties,false);assert.equal(actual.input.self.mentalEnergy.value,undefined);assert.equal(actual.input.self.mentalEnergy.policy,undefined);assert.equal(s.counts().npc,1);
+ }finally{s?.restore();delete env.MENTAL_ENERGY_TEST_POLICY;}
 });

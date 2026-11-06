@@ -1,3 +1,4 @@
+import { applyLegacyMood, settleMentalInterval, type MentalInterval } from './mental-energy';
 import { worldLocations } from './world-configuration';
 import { adjudicationLimits } from './adjudication-limits';
 import { applyBodyActivity, sleepMinutesUntilWake, naturalWakeLevel, type BodyActivity } from './needs';
@@ -45,15 +46,16 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
  const periodEnded='自己選定的活動時段已到期，接下來可重新安排。';
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=throughMinute-plan.startedAt){
   const phase=phases.stages[phases.cursor];
-  let results:string[];
-  try{results=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
+  let committed:ReturnType<typeof commitActivityPhase>;
+  try{committed=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
    if(error instanceof PerceptionCapacityError)throw error;
    recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
   }
+  const {results,feelingSourceId}=committed;
   phases.cursor++;
   const finished=phases.cursor===phases.stages.length&&throughMinute>=plan.until;
   const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
-  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution);
+  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution,phase.effects.some(effect=>effect.kind!=='schedule-natural')||finished&&plan.selectedResult&&!phases.stages.some(stage=>stage.effects.some(effect=>effect.kind!=='schedule-natural'))?'result':undefined,feelingSourceId);
  }
  if(phases.cursor===phases.stages.length&&throughMinute>=plan.until){
   // A stored plan may finish its final effect before its chosen period ends.
@@ -96,7 +98,7 @@ export function finishJourney(world:World,character:Character):void{
  invalidateNaturalChanges(world);
 }
 
-export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
+export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;mentalInterval?:MentalInterval;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
  const {minutes,modelKey,attention,ai}=options;
  let confirmedProfile:BodyActivity|undefined;
  cancelActivity(world,character);
@@ -114,7 +116,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,
       journey:{location:destination.location,region:destination.region}};
     character.activity=`正在前往${destination.name}。`;
-    if(typeof decision.action.mood==='string')character.mood=decision.action.mood.slice(0,20);
+    applyLegacyMood(character,decision.action.mood);
     const road=transitRegion(character);
     moveHeldObjects(world,character,road);
     record(world,character.id,`${character.name} 開始步行前往${destination.name}。`,'depart',[character.id],
@@ -188,12 +190,13 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   const duration=decision.freeCandidate?.confirmedDurationMinutes??decision.durationMinutes;
   const available=Math.min(options.bodyMinutes??minutes,duration);
   const actual=applyBodyActivity(character,world.minute,profile,available,options.bodyBase);
+  if(profile.kind==='sleep'&&options.mentalInterval)settleMentalInterval(character,options.mentalInterval,actual);
   if(character.plan){
    character.plan.bodyActivity={...profile};
    if(profile.kind==='sleep'){
     character.plan.sleep={elapsedMinutes:actual,...(actual<available||character.needs!.values.sleep<=naturalWakeLevel?{naturalWakeAt:world.minute-available+actual}:{})};
     character.activity='正在睡眠中。';
-    if(actual>0)record(world,character.id,`${character.name} 已實際睡著。`,'rest',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
+    if(actual>0)record(world,character.id,`${character.name} 已實際睡著。`,'rest',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)},undefined,undefined,'experience');
     wakeSleepingActivity(world,character);
    }
   }

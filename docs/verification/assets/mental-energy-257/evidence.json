@@ -1,0 +1,279 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "counts": {
+    "npc": 1
+  },
+  "checks": {
+    "uiActivation": true,
+    "uiAdvance": true,
+    "sqliteReload": true,
+    "sameOperationReplay": true,
+    "privateFeelings": true,
+    "awakeRest": true
+  },
+  "state": {
+    "version": 1,
+    "policy": {
+      "version": 1,
+      "kind": "test",
+      "id": "browser-energy-257",
+      "initial": 10,
+      "maximum": 20,
+      "awakePerHour": 12,
+      "regulationCost": 7,
+      "lowAt": 10
+    },
+    "value": 4,
+    "activatedAt": 1260,
+    "updatedAt": 1290,
+    "history": [
+      {
+        "kind": "natural",
+        "from": 1260,
+        "minute": 1275,
+        "reason": "清醒世界時間自然消耗",
+        "before": 10,
+        "after": 7,
+        "awakeMinutes": 15
+      },
+      {
+        "kind": "natural",
+        "from": 1275,
+        "minute": 1290,
+        "reason": "清醒世界時間自然消耗",
+        "before": 7,
+        "after": 4,
+        "awakeMinutes": 15
+      }
+    ],
+    "dropped": 0
+  },
+  "inputs": [
+    {
+      "contractVersion": "npc-decision.v3",
+      "pursuitContext": "5151df09-c22e-4c5f-9e9d-8f258409d0a8",
+      "phones": [
+        {
+          "objectId": "phone:owner:f1770031-ca2d-4554-810c-ad7550e1e7a1",
+          "owner": "owner",
+          "records": []
+        }
+      ],
+      "objects": [
+        {
+          "id": "phone:owner:f1770031-ca2d-4554-810c-ad7550e1e7a1",
+          "label": "店主 的手機",
+          "region": "cafe-front",
+          "holder": "owner",
+          "state": {
+            "condition": "sound"
+          },
+          "kind": "phone"
+        }
+      ],
+      "supplies": [],
+      "time": "21:15",
+      "day": 1,
+      "self": {
+        "mentalEnergy": {
+          "feeling": "心力有些吃緊，可以考慮照顧自己；仍可自行取捨。",
+          "canRegulate": true
+        },
+        "arrangements": {
+          "items": [],
+          "capacity": 16
+        },
+        "bodyFeelings": [
+          {
+            "need": "飢餓",
+            "feeling": "沒有明顯餓意"
+          },
+          {
+            "need": "口渴",
+            "feeling": "沒有明顯渴意"
+          },
+          {
+            "need": "體力疲勞",
+            "feeling": "身體沒有明顯疲累"
+          },
+          {
+            "need": "睡眠需求",
+            "feeling": "沒有明顯睡意"
+          }
+        ],
+        "preferences": {
+          "items": [],
+          "capacity": 16
+        },
+        "id": "owner",
+        "name": "店主",
+        "color": "#a5c9b3",
+        "location": "cafe",
+        "region": "cafe-front",
+        "mood": "平靜",
+        "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+        "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "activity": "在吧台整理杯子。",
+        "relationships": {},
+        "cognition": {
+          "beliefs": [],
+          "relationshipTags": []
+        },
+        "shortTerm": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "version": 1,
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+            "source": {
+              "kind": "legacy-unclassified"
+            }
+          }
+        ],
+        "longTerm": [],
+        "memoryReview": [],
+        "memories": [
+          {
+            "id": "legacy:owner:memory:0:1260",
+            "time": 1260,
+            "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+          }
+        ],
+        "intents": [
+          {
+            "id": "owner:direction",
+            "content": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "intensity": "medium",
+            "importance": "medium",
+            "urgency": "low",
+            "context": "",
+            "version": 1,
+            "kind": "direction",
+            "scope": "整理咖啡館，照顧自己的生活與來訪的客人。",
+            "satisfaction": null,
+            "parents": [],
+            "references": [],
+            "status": "active",
+            "sourceGaps": {
+              "formation": 0,
+              "assessment": 0
+            }
+          }
+        ],
+        "control": {
+          "mode": "autonomous"
+        },
+        "attentionConditions": [],
+        "observations": [],
+        "pursuitCapacity": {
+          "nodes": 12,
+          "remaining": 11,
+          "omitted": 0,
+          "archivable": [],
+          "archivedCount": 0,
+          "archivedGap": 0
+        },
+        "focusIntentId": null,
+        "lastKnownState": {
+          "entries": [
+            {
+              "reference": {
+                "kind": "short",
+                "id": "legacy:owner:memory:0:1260",
+                "version": 1
+              },
+              "time": 1260,
+              "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+              "source": {
+                "kind": "legacy-unclassified"
+              }
+            }
+          ],
+          "capacity": 8,
+          "omitted": 0,
+          "gap": "僅整理本次可見的主觀來源；未列出、已忘或未得知的狀態與後續補充仍未知，所知狀態不證明受阻原因。"
+        },
+        "arrangementCues": [],
+        "arrangementCueGap": 0,
+        "noticeOpportunities": [],
+        "noticeOpportunityGap": 0
+      },
+      "home": {
+        "id": "cafe",
+        "name": "街角咖啡館",
+        "note": "熟悉的角落。坐下，也可能遇見人。"
+      },
+      "pendingInterventions": [],
+      "places": [
+        {
+          "id": "kris-home",
+          "name": "Kris 的住處",
+          "note": "一盞沒關的燈，一壺剛泡好的茶。"
+        },
+        {
+          "id": "vera-home",
+          "name": "Vera 的房間",
+          "note": "布料、髮飾，與安靜的手機。"
+        },
+        {
+          "id": "cafe",
+          "name": "街角咖啡館",
+          "note": "熟悉的角落。坐下，也可能遇見人。"
+        }
+      ],
+      "scene": {
+        "region": {
+          "id": "cafe-front",
+          "location": "cafe",
+          "name": "前台"
+        },
+        "exits": [
+          {
+            "id": "cafe-door",
+            "name": "儲藏室門",
+            "state": "open",
+            "destination": {
+              "id": "cafe-storeroom",
+              "location": "cafe",
+              "name": "儲藏室"
+            }
+          }
+        ]
+      },
+      "observationTargets": {
+        "regions": [
+          {
+            "id": "cafe-front",
+            "location": "cafe",
+            "name": "前台"
+          },
+          {
+            "id": "cafe-storeroom",
+            "location": "cafe",
+            "name": "儲藏室"
+          }
+        ],
+        "people": []
+      },
+      "contacts": [
+        {
+          "id": "owner",
+          "name": "店主"
+        }
+      ],
+      "visiblePeople": [],
+      "knownMethods": [],
+      "currentActivity": null,
+      "learnedHabits": [],
+      "projectionGaps": {
+        "longTerm": 0,
+        "beliefs": 0,
+        "relationships": 0,
+        "preferences": 0,
+        "habits": 0
+      },
+      "phoneReferenceGap": 0
+    }
+  ]
+}

@@ -163,11 +163,11 @@ export function resolvePerception(world: World, character: Character, eventId: s
   (world.perceptionTrials ??= {})[opportunity] = trial;
   return trial;
 }
-export function remember(world: World, character: Character, text: string, event?: { id: string; actor: string }) {
+export function remember(world: World, character: Character, text: string, event?: { id: string; actor: string; kind?:string; time?:number;feelingSourceId?:string;feelingKind?:import('./mental-experiences').FeelingOrigin['kind'] }) {
   addExperience(character, world.minute, text, undefined, event);
 }
-export function saveObservation(world: World, character: Character, observation: Observation) {
-  addExperience(character, world.minute, observation.text, observation);
+export function saveObservation(world: World, character: Character, observation: Observation, event?:import('./world').WorldEvent) {
+  addExperience(character, world.minute, observation.text, observation, event);
   if (observation.objectId && observation.clarity === 'clear') {
     const object = world.objects?.find(item => item.id === observation.objectId);
     if (object && !object.knownTo.includes(character.id)) object.knownTo.push(character.id);
@@ -183,7 +183,7 @@ export function saveObservation(world: World, character: Character, observation:
 function observationTrace(world: World, character: Character, event: import('./world').WorldEvent, candidates: SensoryCandidate[], trial?: PerceptionTrial, active = false): PerceptionTrace {
   const selected = [...candidates.filter(candidate => candidate.direct), ...(trial?.candidates || [])];
   const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, objectId, supplyId, region, urgency }, index) => ({ sense, kind, text, clarity, source, ...(objectId ? { objectId } : {}), ...(supplyId ? { supplyId } : {}), region: world.configuration ? knownRoom(world,character,region)?.id : region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
-  for (const observation of observations) saveObservation(world, character, observation);
+  for (const observation of observations) saveObservation(world, character, observation,event);
   const status = trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity';
   const reason = active ? trial?.falsePerception ? '主動查探取得錯誤主觀感知' : observations.length ? '主動查探當前線索' : '主動查探沒有取得新線索' :
     trial?.falsePerception ? '取得錯誤主觀感知' : trial ? observations.length ? '察覺可接觸的線索' : '有感知機會但未察覺新線索' : observations.length ? '直接察覺' : '沒有可接觸的線索';
@@ -223,7 +223,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
       for (const other of visible) {
         const room = knownRoom(world,character,regionOf(other));
         const observation: Observation = { id: `${event.id}:${character.id}:present:${other.id}`, time: world.minute, sense: 'sight', kind: 'person', text: `看見 ${other.name} 在${room?.name ?? '附近'}。`, clarity: 'clear', source: other.id, ...(room ? {region:room.id} : {}) };
-        saveObservation(world, character, observation);
+        saveObservation(world, character, observation,event);
         let trace = event.perception.find(t => t.characterId === character.id);
         if (!trace) { trace = { characterId: character.id, status: 'direct', observations: [], reason: '場景變化後直接看見' }; event.perception.push(trace); }
         trace.observations.push(observation); trace.status = 'direct';

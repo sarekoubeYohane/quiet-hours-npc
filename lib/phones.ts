@@ -1,3 +1,4 @@
+import { feelingOrigin, type FeelingOrigin } from './mental-experiences';
 import { readPhoneMap, validPhoneMapOffset, type PhoneMapRead } from './phone-map';
 import { validateCalendarRequest, applyCalendarMetadata, calendarReadingDetails, type PhoneCalendarRecord } from './phone-calendar';
 import { emitPhoneNotification, cancelPhoneRecordNotifications, type PhoneNotification, type PhoneNotificationDedup } from './phone-notifications';
@@ -6,7 +7,7 @@ import type { WorldObject } from './world-effects';
 import { canSee, regionOf } from './perception';
 import { addExperience, MemoryValidationError } from './memory';
 
-export type PhoneRecord={id:string;version:number;text:string;createdAt:number;updatedAt:number;sharedWith:string[];readers:{actorId:string;at:number;version:number}[]};
+export type PhoneRecord={authorId?:string;feelingContentVersion?:number;id:string;version:number;text:string;createdAt:number;updatedAt:number;sharedWith:string[];readers:{actorId:string;at:number;version:number;feelingContentVersion?:number;feelingOrigin?:FeelingOrigin}[]};
 export type PhoneMessage=PhoneRecord&{from:string;to:string;deliveredAt:number};
 export type PhoneData={objectId:string;mapReads?:PhoneMapRead[];notifications?:PhoneNotification[];notificationDedup?:PhoneNotificationDedup[];notificationHistoryDropped?:number;memos:PhoneRecord[];calendar?:PhoneCalendarRecord[];inbox?:PhoneMessage[];inboxActivatedAt?:number;screen:{collection:string;id:string;version:number}[];presentations?:{actorId:string;memoryId:string;collection:string;id:string;version:number}[]};
 export type PhoneState={schemaVersion:1;activatedAt:number;devices:PhoneData[]};
@@ -77,8 +78,8 @@ export function validatePhoneActionReferences(w:World,c:Character,a:Action,shown
  if(a.type==='phone')validatePhoneReferences(w,c,a,parsePhoneRequest(a),shown);
 }
 
-export function phoneExperience(w:World,c:Character,d:PhoneData,text:string,records:PhoneRecord[],collection="memos"){
- addExperience(c,w.minute,text);const memoryId=c.shortTerm!.at(-1)!.id;
+export function phoneExperience(w:World,c:Character,d:PhoneData,text:string,records:PhoneRecord[],collection="memos",origin?:FeelingOrigin){
+ addExperience(c,w.minute,text,undefined,undefined,origin?[origin]:undefined);const memoryId=c.shortTerm!.at(-1)!.id;
  d.presentations??=[];
  for(const r of records){d.presentations=d.presentations.filter(p=>!(p.actorId===c.id&&p.collection===collection&&p.id===r.id));d.presentations.push({actorId:c.id,memoryId,collection,id:r.id,version:r.version});}
 }
@@ -88,8 +89,13 @@ export function canReadPhoneRecord(c:Character,o:WorldObject,d:PhoneData,collect
  return o.owner===c.id||r.sharedWith.includes(c.id)||displayed;
 }
 export function notePhoneReading(w:World,c:Character,r:PhoneRecord,label:string){
- r.readers=r.readers.filter(reader=>reader.actorId!==c.id);r.readers.push({actorId:c.id,at:w.minute,version:r.version});
- addExperience(c,w.minute,`我在手機上實際讀到${label} ${r.id} v${r.version}「${r.text}」。`);
+ const previous=r.readers.find(reader=>reader.actorId===c.id);
+ if(c.mentalEnergy)r.feelingContentVersion??=r.version;
+ const author=r.authorId??('from' in r?String(r.from):undefined);
+ const origin=c.mentalEnergy&&author&&author!==c.id?(previous&&previous.feelingContentVersion===r.feelingContentVersion&&previous.feelingOrigin?previous.feelingOrigin:feelingOrigin(c,crypto.randomUUID(),w.minute)):undefined;
+ r.readers=r.readers.filter(reader=>reader.actorId!==c.id);r.readers.push({actorId:c.id,at:w.minute,version:r.version,...(origin?{feelingContentVersion:r.feelingContentVersion,feelingOrigin:origin}:{})});
+ addExperience(c,w.minute,`我在手機上實際讀到${label} ${r.id} v${r.version}「${r.text}」。`,undefined,undefined,origin?[origin]:undefined);
+ return origin;
 }
 export const phonePrompt=' 手機行事曆collection=calendar沿同一list/read/create/update/delete/share/display；可選condition為內在安排同款time/event/context條件，arrangement={id,version}只連結本次實際可見的本人安排，不自動形成意圖或接受邀請。create/update可明示reminder=true以該condition設定提醒，預設不設。單獨設定或延期用operation=reminder並填condition；取消用condition=null。每機最多32筆行事曆。外部原文不隨遺忘改變，實際read才知道完整資料；通知只是一聲線索。'+' 手機收件匣collection=inbox只可list/read/delete/share/display，不可create/update正文。list不標已讀，只有指定read才建立本人閱讀，重讀不發送訊息，閱讀不代表相信、同意或回覆。message沿既有聯絡人入口送達對方裝置，必須有本人可操作發訊手機和有效收件裝置；對方不會因送達直接知道正文。收件匣最多64則，滿時明示失敗，不靜默丟未讀。啟用前歷史閱讀狀態未知，不從舊事件補造。 手機不是遠端知識：phones 只列現在可操作裝置。type=phone、target=objectId，content為JSON字串 {"collection":"memos","operation":"list|read|create|update|delete|share|display","id":"穩定id","version":0,"text":"原文","reader":"聯絡人id"}。list可填offset（預設0，每頁8筆），只取得有限身份和版本，不讀正文；read指定id/version才真正閱讀。create用新id和version=0與text，update/delete/share/display用本次實際看過的有效版本。share須由物主指定reader，只分享該項；display由物主展示該項於有限畫面，其他實際接觸者才能讀，不能假設解鎖或同意。備忘錄每機32筆、每筆300字/1024bytes，content JSON仍最多500字。一次只操作一項，固定15分鐘，不追加決策；外部原文不隨遺忘模糊，讀到不等於相信、回覆或完成安排。沒有實際閱讀不能宣稱知道內容。';
 export function applyPhoneAction(w:World,c:Character,a:Action,dryRun=false){
@@ -121,7 +127,7 @@ export function applyPhoneAction(w:World,c:Character,a:Action,dryRun=false){
  }else if(!r||r.version!==p.version)throw new MemoryValidationError('手機資料不存在或版本已過期。');
  if(operation==='read'){
   if(!canReadPhoneRecord(c,o,d,collection,r!))throw new MemoryValidationError('沒有此內容的可讀條件。');
-  if(!dryRun){notePhoneReading(w,c,r!,collection==='inbox'?`來自 ${w.characters.find(actor=>actor.id===(r as PhoneMessage).from)?.name||'已知聯絡人'} 的私人訊息`:label);if(collection==='calendar')addExperience(c,w.minute,calendarReadingDetails(r as PhoneCalendarRecord));phoneExperience(w,c,d,`我取得${label} ${r!.id} v${r!.version} 的閱讀經歷。`,[r!],collection);}return;
+  if(!dryRun){const origin=notePhoneReading(w,c,r!,collection==='inbox'?`來自 ${w.characters.find(actor=>actor.id===(r as PhoneMessage).from)?.name||'已知聯絡人'} 的私人訊息`:label);if(collection==='calendar')addExperience(c,w.minute,calendarReadingDetails(r as PhoneCalendarRecord));phoneExperience(w,c,d,`我取得${label} ${r!.id} v${r!.version} 的閱讀經歷。`,[r!],collection,origin);}return;
  }
  if(!owner)throw new MemoryValidationError('沒有修改私人資料的權限。');
  if(operation==='create'||operation==='update'){
@@ -130,8 +136,8 @@ export function applyPhoneAction(w:World,c:Character,a:Action,dryRun=false){
  if(operation==='share'&&(typeof p.reader!=='string'||!w.characters.some(actor=>actor.id===p.reader)||!r!.sharedWith.includes(p.reader)&&r!.sharedWith.length>=phoneLimits.sharedReaders))throw new MemoryValidationError('分享讀者無效或超限。');
  if(operation==='display'&&d.screen.length>=phoneLimits.screen&&!d.screen.some(s=>s.collection===collection&&s.id===p.id))throw new MemoryValidationError('可讀畫面已滿，未覆蓋既有項目。');
  if(dryRun)return;
- if(operation==='create'){if(collection==='calendar')d.calendar=records as PhoneCalendarRecord[];records.push({id:p.id,version:1,text:p.text as string,createdAt:w.minute,updatedAt:w.minute,sharedWith:[],readers:[]});}
- else if(operation==='update'){r!.text=p.text as string;r!.version++;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
+ if(operation==='create'){if(collection==='calendar')d.calendar=records as PhoneCalendarRecord[];records.push({authorId:c.id,id:p.id,version:1,text:p.text as string,createdAt:w.minute,updatedAt:w.minute,sharedWith:[],readers:[]});}
+ else if(operation==='update'){r!.text=p.text as string;r!.authorId=c.id;r!.version++;if(c.mentalEnergy||r!.feelingContentVersion!==undefined)r!.feelingContentVersion=r!.version;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='delete'){if(collection==='inbox')cancelPhoneRecordNotifications(d,'message',p.id,w.minute,{deleted:true});if(collection==='calendar'){cancelPhoneRecordNotifications(d,'reminder',p.id,w.minute,{deleted:true});d.calendar=d.calendar?.filter(item=>item.id!==p.id);}else if(collection==='memos')d.memos=d.memos.filter(item=>item.id!==p.id);else d.inbox=d.inbox?.filter(item=>item.id!==p.id);d.presentations=d.presentations?.filter(item=>item.collection!==collection||item.id!==p.id);d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='share'){if(!r!.sharedWith.includes(p.reader as string))r!.sharedWith.push(p.reader as string);r!.version++;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
  else if(operation==='reminder'){r!.version++;r!.updatedAt=w.minute;d.screen=d.screen.filter(s=>s.collection!==collection||s.id!==p.id);}
