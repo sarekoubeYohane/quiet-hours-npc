@@ -1,4 +1,5 @@
 'use client';
+import {boundPath} from '@/lib/bound-navigation';
 import {useCallback,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {useRouter} from 'next/navigation';
 import type {WorldSave} from '@/lib/world-saves';
@@ -21,7 +22,7 @@ function useSaveOperation(accountScope:string,onBefore?:()=>void) {
     if(result.operation==='delete'&&result.externalCleanup==='pending')persist(pending);
     else persist(null);
     window.dispatchEvent(new Event('quiet-hours:saves-changed'));
-    if(alive.current&&owner.current===requestScope)router.push(result.operation==='copy'?'/observe?save='+encodeURIComponent(result.save.id):'/');
+    if(alive.current&&owner.current===requestScope)router.push(result.operation==='copy'?boundPath('/observe',requestScope,{save:result.save.id}):'/');
   }
   async function submit(input:SaveManagementInput,recover=false) {
     if(busyRef.current)return;

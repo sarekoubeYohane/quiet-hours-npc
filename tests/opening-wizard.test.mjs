@@ -120,3 +120,16 @@ test('confirmation rejects non-v4 save identities before any world or save row i
   const ready=await prepared(f),before=f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n;const response=await f.post(f.saves,{id,draftId:ready.id,draftVersion:1},'/api/saves');assert.equal(response.status,400,JSON.stringify(response.body));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n,before);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM world_saves WHERE owner=? AND id=?').get('a',id).n,0);assert.equal((await f.readOpening(ready.id)).body.draft.finalizedSaveId,undefined);
  });
 });
+
+test('one opening keeps distinct versions of the same scene through preview, save and product reread',()=>controlled(async f=>{
+ const {id,body,scene,card}=await prepared(f);const dice=f.context.dice;
+ const changed=await f.post(f.scenes,{...scene,shared:undefined,name:'新版私屋',rooms:[{id:'front',name:'私室'},{id:'back',name:'內室'}],connections:[{id:'door',name:'私門',rooms:['front','back'],state:'closed'}],objects:[{id:'clock',name:'新版私鐘',roomId:'front',state:{運作:'上鎖'}}],access:{building:'private',rooms:{front:'private'}}},'/api/scene-templates');assert.equal(changed.status,200,JSON.stringify(changed.body));
+ const mixed={...body,city:{...body.city,places:[...body.city.places,{id:'private',templateId:scene.id,version:2,name:'新版私屋'}]}};
+ const preview=await f.post(f.openings,{id,version:1,body:mixed},'/api/opening-drafts');assert.equal(preview.status,200,JSON.stringify(preview.body));
+ assert.deepEqual(preview.body.draft.sources.scenes.map(value=>value.version).sort(),[1,2]);
+ assert.equal(preview.body.world.configuration.access['place:home'].rule,'public');
+ assert.deepEqual(preview.body.world.configuration.access['place:private'],{rule:'private',allowedActorIds:[]});
+ assert.equal(preview.body.preview.places.find(value=>value.id==='home').rooms[0].name,'客廳');assert.equal(preview.body.preview.places.find(value=>value.id==='private').rooms[0].name,'私室');
+ const saved=await f.post(f.saves,{id,draftId:id,draftVersion:preview.body.draft.version},'/api/saves');assert.equal(saved.status,201,JSON.stringify(saved.body));
+ const reread=(await f.worldRequest(undefined,id)).body.world;assert.deepEqual(reread.configuration,saved.body.world.configuration);assert.equal(reread.configuration.sceneSources['place:private'].version,2);assert.equal(reread.configuration.access['place:home'].rule,'public');assert.deepEqual(reread.configuration.access['place:private'],{rule:'private',allowedActorIds:[]});assert.equal(reread.configuration.access['place:private:room:front'].rule,'private');assert.equal(reread.configuration.doors.length,1);assert.equal(reread.objects.length,2);assert.equal(reread.turn,0);assert.deepEqual(reread.characters[0].attributes.values,card.values);assert.equal(f.context.dice,dice);
+}));

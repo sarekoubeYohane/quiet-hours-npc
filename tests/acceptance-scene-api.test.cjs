@@ -28,7 +28,7 @@ test('scene switches are replayable, reject stale other-tab operations, and neve
   const stale = await POST(request({ operationId: (Date.now() - 1000) + ':' + crypto.randomUUID(), operation: 'intervene', target: 'cass', text: 'OLD-TAB-MESSAGE' }));
   assert.equal(stale.status, 409); assert.equal((await stale.json()).contextMismatch, true);
   assert.doesNotMatch(JSON.stringify(await read()), /OLD-TAB-MESSAGE/);
-  assert.equal((await act({ operation: 'reset' })).status, 400);
+  await assertRetiredResetUnchanged();
   assert.equal((await act({ operation: 'enter-acceptance' })).status, 400);
   const before = await read(), previous = global.fetch;
   global.fetch = async (_fixtureUrl,_fixtureInit) => completion({ type: 'rest', target: '', content: '', mood: '', durationMinutes: 90, intents: [] },JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
@@ -133,7 +133,7 @@ test('an incompressible backup stays bounded and a damaged snapshot cannot repla
     assert.equal(response.status, 502); assert.match((await response.json()).error, /備份/);
     assert.deepEqual((await read()).characters, before.characters);
     assert.deepEqual((await read()).acceptance, { id: 'daily-life-v1' });
-    assert.equal((await act({ operation: 'reset' })).status, 400);
+    await assertRetiredResetUnchanged();
   }
 });
 
@@ -283,3 +283,9 @@ test('acceptance memory never enables vector recall or touches the paused story 
     await advance(); assert.equal(calls, 4);
   } finally { global.fetch = previous; delete env.RECALL_ENABLED; delete env.RECALL_USAGE_DB; }
 });
+
+async function assertRetiredResetUnchanged(){
+ await GET();const db=store.database(),worldBefore=await db.prepare('SELECT * FROM worlds WHERE owner=?').bind('test-owner').first(),accountBefore=await db.prepare('SELECT * FROM player_accounts WHERE owner=?').bind('test-owner').first();
+ assert.equal((await act({operation:'reset'})).status,409);
+ assert.deepEqual(await db.prepare('SELECT * FROM worlds WHERE owner=?').bind('test-owner').first(),worldBefore);assert.deepEqual(await db.prepare('SELECT * FROM player_accounts WHERE owner=?').bind('test-owner').first(),accountBefore);
+}

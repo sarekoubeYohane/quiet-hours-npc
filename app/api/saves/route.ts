@@ -9,6 +9,7 @@ export async function GET(request?:Request) {
   try {
     const user=await getGitHubUser();
     if(!user)return Response.json({error:'請先登入。'},{status:401});
+    const expectedScope=request&&new URL(request.url).searchParams.get('operationScope');if(expectedScope!==undefined&&expectedScope!==null&&expectedScope!==user.userId)return Response.json({error:'原帳號已變更，請重新選檔。',scopeMismatch:true},{status:409});
     const operationId=request&&new URL(request.url).searchParams.get('operationId');
     if(operationId&&new URL(request!.url).searchParams.get('operationScope')!==user.userId)return Response.json({error:'原帳號已變更或缺少原帳號識別；請回到原帳號恢復。',scopeMismatch:true},{status:409});
     if(operationId&&!z.string().uuid().safeParse(operationId).success)return Response.json({error:'操作識別碼無效。'},{status:400});
