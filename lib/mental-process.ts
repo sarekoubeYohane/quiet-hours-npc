@@ -1,16 +1,18 @@
 import { activeBodyMinutes } from './needs';
 import type { Character } from './world';
 import { MemoryValidationError } from './memory';
-export type ProcessFeeling={direction:'positive'|'negative'|'neutral';level:0|1|2;reason:string};
+export type ProcessFeeling={direction:'positive'|'negative'|'neutral';level:0|1|2|3;reason:string};
 export type MentalProcess={version:1;id:string;randomState:number;draws:number;effectiveAt:number;updatedAt:number;activeMinutes:number;revision:number;assessment?:ProcessFeeling;slot?:{index:number;draw:number;usedMinutes:number}};
 export type ProcessSlice={from:number;to:number;rate:number;id:string;slot:number;draw:number;reason:string;revision:number};
 export const processFeelingSchema={anyOf:[{type:'null'},{type:'object',properties:{direction:{type:'string',enum:['positive','negative','neutral']},level:{type:'integer',enum:[0,1,2]},reason:{type:'string',minLength:1,maxLength:256}},required:['direction','level','reason'],additionalProperties:false}]};
 export const processFeelingPrompt=' processFeeling可為null保留原感受，或以direction=positive/negative/neutral、level=0/1/2及reason暫估自己對所選實際活動過程的享受或負擔。不由動作名稱、外在成功或持續低落自動推定。只有真正開始或恢復且仍在進行的活動才承接，於本次選擇邊界向後生效；不補發選擇前時間，不給未來收入、不改寫既有結算。重述或改評價不會重抽同一有效時段。這項也佔共同四項/8KiB心理工作量，不輸出點數、時段、骰值或別人的感受。';
+export const processFeelingSchemaFor=(formal=false)=>formal?{anyOf:[processFeelingSchema.anyOf[0],{...processFeelingSchema.anyOf[1],properties:{...processFeelingSchema.anyOf[1].properties,level:{type:'integer',enum:[0,1,2,3]}}}]}:processFeelingSchema;
+export const processFeelingPromptFor=(formal=false)=>formal?processFeelingPrompt.replace('level=0/1/2','level=0/1/2/3（0無影響，1輕微，2明顯，3強烈）'):processFeelingPrompt;
 export function parseProcessFeeling(actor:Character,value:unknown):ProcessFeeling|null{
  if(value===undefined||value===null)return null;
  if(!actor.mentalEnergy?.policy.process||!value||typeof value!=='object'||Array.isArray(value))throw new MemoryValidationError('未啟用有效活動感受政策');
  const p=value as ProcessFeeling;
- if(Object.keys(p).sort().join(',')!=='direction,level,reason'||!['positive','negative','neutral'].includes(p.direction)||![0,1,2].includes(p.level)||p.direction==='neutral'&&p.level!==0||p.direction!=='neutral'&&p.level===0||typeof p.reason!=='string'||!p.reason.trim()||new TextEncoder().encode(p.reason).length>256)throw new MemoryValidationError('活動感受只能給有界方向、等級及理由');
+ if(Object.keys(p).sort().join(',')!=='direction,level,reason'||!['positive','negative','neutral'].includes(p.direction)||!(actor.mentalEnergy?.policy.kind==='formal'?[0,1,2,3]:[0,1,2]).includes(p.level)||p.direction==='neutral'&&p.level!==0||p.direction!=='neutral'&&p.level===0||typeof p.reason!=='string'||!p.reason.trim()||new TextEncoder().encode(p.reason).length>256)throw new MemoryValidationError('活動感受只能給有界方向、等級及理由');
  return {...p};
 }
 /** A newly chosen activity never inherits the decision round's backdated time. */

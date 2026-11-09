@@ -109,7 +109,7 @@ export function activeBodyMinutes(actor:Character,from:number,to:number):number 
  const plan=actor.plan;if(!plan?.bodyActivity)return 0;
  const end=Math.min(to,plan.until,plan.sleep?.naturalWakeAt??Infinity,plan.sleep?.stimulusWakeAt??Infinity);
  const elapsed=Math.max(0,end-Math.max(from,plan.startedAt));
- return !personalNeedsActive(actor)&&plan.bodyActivity.kind==='sleep'&&plan.sleep?.naturalWakeAt===undefined&&actor.needs?Math.min(elapsed,sleepMinutesUntilWake(plan.bodyActivity,actor.needs.values.sleep)):elapsed;
+ return !personalNeedsActive(actor)&&plan.bodyActivity.kind==='sleep'&&plan.sleep?.naturalWakeAt===undefined&&actor.needs&&actor.needs.updatedAt<to?Math.min(elapsed,sleepMinutesUntilWake(plan.bodyActivity,actor.needs.values.sleep)):elapsed;
 }
 
 // A method's saved contract, not its wording or observed bodily outcome, proves
