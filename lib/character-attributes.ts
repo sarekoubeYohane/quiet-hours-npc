@@ -12,6 +12,7 @@ const expertise = z.object({scope:z.string().trim().min(1).max(80),modifier}).st
 const sense = z.object({scope:z.enum(['sight','hearing','touch']),modifier}).strict();
 export const characterSetupSchema = z.object({
   attributes:z.object({strength:range.optional(),endurance:range.optional(),dexterity:range.optional(),perception:range.optional()}).strict().optional(),
+  blockedSenses:z.array(z.enum(['sight','hearing','touch'])).max(3).optional(),
   expertise:z.array(expertise).max(16).optional(), senses:z.array(sense).max(3).optional(),
 }).strict().superRefine((value,ctx)=>{
   for (const key of ['expertise','senses'] as const) {
@@ -22,6 +23,7 @@ export const characterSetupSchema = z.object({
 export type CharacterSetup = z.infer<typeof characterSetupSchema>;
 export type CharacterAttributes = {
   version:1; activatedAt:number; authority:'owner-confirmed'; values:Record<AttributeName,number>;
+  blockedSenses?:('sight'|'hearing'|'touch')[];
   constraints:NonNullable<CharacterSetup['attributes']>;
   expertise:NonNullable<CharacterSetup['expertise']>; senses:NonNullable<CharacterSetup['senses']>;
 };
@@ -49,5 +51,5 @@ export function formCharacterAttributes(actor:Character, setup:CharacterSetup, m
     values[name]=supported.at(-1)!;
     for(const value of supported){target-=weights[value-1];if(target<0){values[name]=value;break;}}
   }
-  actor.attributes={version:1,activatedAt:minute,authority:'owner-confirmed',values,constraints:structuredClone(accepted.attributes??{}),expertise:structuredClone(accepted.expertise??[]),senses:structuredClone(accepted.senses??[])};
+  actor.attributes={blockedSenses:[...new Set(accepted.blockedSenses??[])],version:1,activatedAt:minute,authority:'owner-confirmed',values,constraints:structuredClone(accepted.attributes??{}),expertise:structuredClone(accepted.expertise??[]),senses:structuredClone(accepted.senses??[])};
 }

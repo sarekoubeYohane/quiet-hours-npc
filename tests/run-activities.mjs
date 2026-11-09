@@ -112,7 +112,7 @@ try {
   allTests.push('tests/npc-input-equivalence.test.cjs', 'tests/city-creation-api.test.cjs', 'tests/city-access-api.test.cjs', 'tests/city-travel-api.test.cjs', 'tests/city-phone-map-api.test.cjs');
   allTests.push('tests/character-generation-api.test.cjs', 'tests/initial-memory-capacity-api.test.cjs');
   allTests.push('tests/city-activity-hints-api.test.cjs','tests/character-attributes-api.test.cjs','tests/character-attributes-ui.test.cjs');
-  allTests.push('tests/five-minute-time-api.test.cjs');
+  allTests.push('tests/five-minute-time-api.test.cjs','tests/d100-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

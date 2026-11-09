@@ -215,7 +215,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -300,12 +300,14 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       openingPreview = preview;
     }
     const adoptingAttributes = b.operation === 'adopt-character-attributes';
-    const characterSetup = adoptingAttributes ? characterSetupSchema.safeParse(b.characterSetup) : undefined;
-    if (adoptingAttributes) {
+    const updatingSenseLimits = b.operation === 'set-character-sense-limits';
+    const characterSetup = adoptingAttributes || updatingSenseLimits ? characterSetupSchema.safeParse(b.characterSetup) : undefined;
+    if (adoptingAttributes || updatingSenseLimits) {
       if (!characterSetup?.success) return reply({error:'請確認人物基本屬性、背景範圍及專長／感官修正。'},400);
       if (b.operationScope !== id || b.worldContext !== world.contextId || b.expectedVersion !== version) return reply({error:'人物設定依據的世界已變更，請重新讀取。',operationSettled:true},409);
       const actor=world.characters.find(actor=>actor.id===b.target);
-      if (!actor || actor.attributes || world.acceptance) return reply({error:'此人物無法再次導入基本屬性。'},400);
+      if (updatingSenseLimits && characterSetup.success && (characterSetup.data.blockedSenses === undefined || Object.keys(characterSetup.data).some(key=>key!=='blockedSenses'))) return reply({error:'此處只更新明示感官硬限制，不改寫人物數值。'},400);
+      if (!actor || (adoptingAttributes ? !!actor.attributes : !actor.attributes) || world.acceptance) return reply({error:'此人物無法再次導入基本屬性。'},400);
     }
     let startedCity: World | undefined;
     if (b.operation === 'start-city' && city?.success) {
@@ -470,6 +472,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       journal.floor = Math.max(journal.floor, issuedAt - 1);
     } else if (adoptingAttributes && characterSetup?.success) {
       formCharacterAttributes(world.characters.find(actor=>actor.id===b.target)!,characterSetup.data,world.minute);
+    } else if (updatingSenseLimits && characterSetup?.success) {
+      world.characters.find(actor=>actor.id===b.target)!.attributes!.blockedSenses=[...new Set(characterSetup.data.blockedSenses!)];
     } else if (b.operation === 'set-price') {
       savePrice(world,b.price!);
     } else if (b.operation === 'set-adjudication') {
