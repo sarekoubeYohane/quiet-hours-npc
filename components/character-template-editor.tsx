@@ -8,7 +8,7 @@ import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-ti
 
 type Library = { presets: CharacterTemplate[]; templates: CharacterTemplate[] };
 const endpoint = '/api/character-templates';
-const worldEndpoint = '/api/world';
+const worldEndpoint = '/api/world?workspace=account';
 type GenerationReceipt = { error?: string; retryable?: boolean; operationUncertain?: boolean; operationSettled?: boolean; generatedCharacter?: unknown };
 
 function newDraft(fields = blankCharacterTemplateFields()): CharacterTemplate {
