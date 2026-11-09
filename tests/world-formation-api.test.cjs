@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const read=async()=> (await (await GET()).json()).world;
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({mode:'openai',model:'gpt-6-luna',operationId:Date.now()+':'+crypto.randomUUID(),...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({mode:'openai',model:'gpt-6-luna',operationId:Date.now()+':'+crypto.randomUUID(),...body}, 'test-owner'))});
 const completion=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 const proposal=(target='cake')=>({type:'propose',target,content:'將這個蛋糕切成四份，先保留作一組',purpose:'整理食物',mood:'平靜',durationMinutes:15,timeIntent:{kind:'completion',maxMinutes:null},intents:[]});
 const accepted=effects=>({status:'accepted',effects,stages:[],branches:null,check:null,completionMinutes:15,routine:null});
@@ -47,7 +49,7 @@ test('new finite materialization preserves supply provenance and quantity throug
 
 test('formation receipts retain bounded reasons sources quantities and selected results without backfilling old evidence',async()=>{
  const s=await setup();try{
-  const id=Date.now()+':'+crypto.randomUUID();await advance({operationId:id});const result=await(await GET(new Request('https://test.invalid/api/world?operationId='+id))).json(),receipt=result.operation.evidence;
+  const id=Date.now()+':'+crypto.randomUUID();await advance({operationId:id});const result=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+id))).json(),receipt=result.operation.evidence;
   const candidate=receipt.dispatches.find(dispatch=>dispatch.task==='adjudication').candidate;
   assert.equal(candidate.truncated,false);assert.deepEqual(candidate.value.effects[0].inputs,partition().inputs);assert.deepEqual(candidate.value.effects[0].outputs,partition().outputs);
   assert.equal(candidate.value.effects[0].reason,partition().reason);assert.deepEqual(receipt.result.objects.find(o=>o.id==='cake-pieces').quantity,{amount:4,unit:'piece'});assert.equal(receipt.result.beforeObjects.find(o=>o.id==='cake').id,'cake');
@@ -170,6 +172,6 @@ test('formation state exposure persists for observers while later NPC input only
 
 test('formation reason credentials are redacted in bounded observer evidence and never copied into the persistent product or NPC story',async()=>{
  const s=await setup();try{
-  const effect=partition();effect.reason='只有觀察者可見的 fixture-key 裁定細節';s.choose(accepted([effect]));const id=Date.now()+':'+crypto.randomUUID();assert.equal((await POST(req({operation:'advance',minutes:15,operationId:id}))).status,502);const saved=await read();assert.equal(saved.objects.length,1);assert.equal(saved.objects[0].lifecycle,'active');const result=await(await GET(new Request('https://test.invalid/api/world?operationId='+id))).json();assert.doesNotMatch(JSON.stringify(result.operation.evidence),/fixture-key/);assert.equal(result.operation.evidence.redacted,true);assert.doesNotMatch(JSON.stringify(saved.objects),/裁定細節|fixture-key/);assert.doesNotMatch(saved.characters[0].activity,/裁定細節|fixture-key/);
+  const effect=partition();effect.reason='只有觀察者可見的 fixture-key 裁定細節';s.choose(accepted([effect]));const id=Date.now()+':'+crypto.randomUUID();assert.equal((await POST(req({operation:'advance',minutes:15,operationId:id}))).status,502);const saved=await read();assert.equal(saved.objects.length,1);assert.equal(saved.objects[0].lifecycle,'active');const result=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+id))).json();assert.doesNotMatch(JSON.stringify(result.operation.evidence),/fixture-key/);assert.equal(result.operation.evidence.redacted,true);assert.doesNotMatch(JSON.stringify(saved.objects),/裁定細節|fixture-key/);assert.doesNotMatch(saved.characters[0].activity,/裁定細節|fixture-key/);
  }finally{s.restore();}
 });

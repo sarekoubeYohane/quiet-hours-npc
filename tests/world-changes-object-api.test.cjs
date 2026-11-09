@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
@@ -11,7 +13,7 @@ const change=(value='茶漬',revision=1)=>({kind:'change-state',exposure:'public
 async function scenario({reply=accepted([change()]),decision=proposal,die=12,mutate=()=>{}}={}){
  const w=seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.contextId='objects-146';w.adjudication={provider:'openai',model:'fixture-world'};
  w.objects=[{id:'cup',source:'original-cup',label:'原杯子',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea']}}];mutate(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture-key'});
  const oldFetch=global.fetch,oldRandom=Math.random;let npc=0,adjudication=0,dice=0;const inputs=[];
  global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);inputs.push({input,request});if(input.contractVersion==='world-adjudication.v1'){adjudication++;return completion(reply,JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(decision,JSON.parse(JSON.parse(init.body).messages[1].content));};Math.random=()=>{dice++;return (die-.5)/20;};
  return {post,read:async()=>(await(await GET()).json()).world,choose:value=>{decision=value;},reply:value=>{reply=value;},counts:()=>({npc,adjudication,dice}),inputs,restore:()=>{global.fetch=oldFetch;Math.random=oldRandom;}};
@@ -35,7 +37,7 @@ test('the actual schema prompt parser and receipt expose the same bounded new st
   const schema=request.response_format.json_schema.schema.$defs.effect.anyOf.find(item=>item.properties.kind.const==='change-state');assert.equal(schema.properties.changes.maxItems,4);assert.deepEqual(schema.properties.access.enum,['authorized','physical']);
   const e=body.operationEvidence;assert.deepEqual(e.dispatches[1].candidate.value,reply);assert.ok(e.result.objects[0].stateEntries.some(item=>item.key==='surface'&&item.value==='茶漬'));assert.deepEqual(e.result.beforeObjects[0].stateEntries,[{key:'contents',value:'empty'}]);assert.equal(e.truncated,false);assert.ok(Buffer.byteLength(JSON.stringify(e))<=65536);
   assert.doesNotMatch(body.world.characters[0].activity,/布料擦拭後|裁定理由/);
-  const reread=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(reread.operation.evidence,e);assert.equal((await s.post(e.replay)).status,200);assert.deepEqual(s.counts(),{npc:1,adjudication:1,dice:0});
+  const reread=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(reread.operation.evidence,e);assert.equal((await s.post(e.replay)).status,200);assert.deepEqual(s.counts(),{npc:1,adjudication:1,dice:0});
  }finally{s.restore();}
 });
 

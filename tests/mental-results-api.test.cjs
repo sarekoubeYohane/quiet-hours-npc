@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API and SQLite; only external provider and die are controlled. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world'),{env}=load('cloudflare-workers');
@@ -13,7 +15,7 @@ async function scenario({reply=candidate(),die=12,initial=5,prepare=()=>{}}={}){
  w.objects=[{id:'workpiece',source:'fixture',label:'練習作品',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{progress:'raw'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{progress:['raw','partial','complete']}}];prepare(w);store.install(w);
  env.MENTAL_ENERGY_TEST_POLICY=JSON.stringify({...policy,initial});const requests=[];let choose=()=>proposal;const original=global.fetch,random=Math.random;
  global.fetch=async(_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);requests.push({body,input});return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(input.contractVersion==='world-adjudication.v1'?reply:(()=>{const selected=choose(input);return selected.contractVersion?selected:fixtureDecision(input,selected);})())}}]});};Math.random=()=>(die-.5)/20;
- const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...b})}));await post({operation:'set-model-key',key:'fixture'});
+ const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...b}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture'});
  return {post,requests,choose:f=>choose=f,reply:v=>reply=v,read:async()=>(await(await GET()).json()).world,restore(){global.fetch=original;Math.random=random;delete env.MENTAL_ENERGY_TEST_POLICY;}};
 }
 const advance=async(s,b={})=>{const r=await s.post({operation:'advance',minutes:15,...b});assert.equal(r.status,200,await r.clone().text());return s.read();};

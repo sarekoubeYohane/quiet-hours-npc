@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API and provider boundary fixtures. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {createRequire}=require('node:module');
@@ -6,7 +8,7 @@ const Ajv=createRequire(require.resolve('eslint'))('ajv');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
 const aiWorld=require('./fixtures/ai-world.cjs')(seedWorld);
-const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...b})});
+const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...b}, 'test-owner'))});
 const read=async()=>(await(await GET()).json()).world;
 const action={type:'reflect',target:'',content:'想一想。',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:''};
 function fixture(count=2){const w=aiWorld();for(const c of w.characters)c.control={mode:'taken-over'};const c=w.characters[0];c.control={mode:'autonomous'};c.memories=[];c.shortTerm=Array.from({length:count},(_,i)=>({id:`short-${i}`,characterId:c.id,version:i+1,time:i,text:`自己的經歷${i}`,source:{kind:'experience'}}));c.longTerm=[{id:'long-only',characterId:c.id,version:3,time:0,text:'可能聽過的事',source:{kind:'experience'},origin:{id:'past',version:1},reason:'在意'}];store.install(w);return w;}

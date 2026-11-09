@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -14,7 +16,7 @@ const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api, body) => api.POST(new Request(origin+'/api/world',{
-  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
+  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 const read = async () => (await route.GET()).json();
 async function expect(result, status) {

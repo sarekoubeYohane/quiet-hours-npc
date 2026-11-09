@@ -1,16 +1,19 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalAccountInput, originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const assert=require('node:assert/strict'),test=require('node:test'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const saves=load('saves-route'),world=load('route'),people=load('character-templates-route'),scenes=load('scene-templates-route'),store=load('store'),auth=load('auth');
 const {seedWorld}=load('world'),{blankCharacterTemplateFields}=load('character-templates');
+const originalSaveScopes=new Map();
 const origin='https://test.invalid';
-const req=(value,save)=>new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(value)});
+const req=(value,save)=>new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(value, save?originalSaveScopes.get(save):'test-owner'))});
 const body=async(response,status=200)=>{const value=await response.json();assert.equal(response.status,status,JSON.stringify(value));return value;};
 const id=()=>Date.now()+':'+crypto.randomUUID();
-const read=save=>world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r));
+const read=save=>world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r)).then(value=>{if(!originalSaveScopes.has(save))originalSaveScopes.set(save,value.operationScope);return value;});
 async function create(name='來源') {
- const scene=(await body(await scenes.POST(req({id:crypto.randomUUID(),version:0,name:'共享來源房屋',note:'',rooms:[{id:'front',name:'前室'}],connections:[],objects:[{id:'cup',name:'杯子',roomId:'front',state:{水量:'半杯'}}]})),201)).template;
- const {input,saved,formationCalls}=await require('./create-world-via-opening.cjs')({load,name,scene,placeName:'本次住處',characterName:name+'人物',initialMemories:'保存的開局記憶'});return {input,...saved,formationCalls};
+ const scene=(await body(await scenes.POST(new Request(origin+'/api/scene-templates',{method:'POST',headers:{origin},body:JSON.stringify(originalAccountInput({id:crypto.randomUUID(),version:0,name:'共享來源房屋',note:'',rooms:[{id:'front',name:'前室'}],connections:[],objects:[{id:'cup',name:'杯子',roomId:'front',state:{水量:'半杯'}}]},'account-operations:test-owner'))})),201)).template;
+ const {input,saved,formationCalls}=await require('./create-world-via-opening.cjs')({load,name,scene,placeName:'本次住處',characterName:name+'人物',initialMemories:'保存的開局記憶'});await read(saved.save.id);return {input,...saved,formationCalls};
 }
 async function advance(save,extra={}) {const current=await read(save);return body(await world.POST(req({operation:'advance',operationId:id(),operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1',...extra},save)));}
 
@@ -172,7 +175,7 @@ test('a terminal legacy uncertain operation that cannot finalize remains an expl
  const usage={windowStartedAt:Date.now(),calls:0,inputTokens:0,outputTokens:0,unknownCalls:0,totalCalls:0,totalInputTokens:0,totalOutputTokens:0,totalUnknownCalls:0,savedDecisions:0};
  const journal={floor:0,results:{[operationId]:{status:502,body:{error:'舊操作派送與費用未知',operationUncertain:true}}},usage:{[operationId]:{applied:usage,finalized:false}}};
  await store.database().prepare('UPDATE worlds SET operations = ? WHERE owner = ?').bind(JSON.stringify(journal),current.operationScope).run();
- const lookup=()=>world.GET(new Request(origin+'/api/world?save='+source.save.id+'&operationId='+operationId)).then(r=>body(r));
+ const lookup=()=>world.GET(new Request(origin+'/api/world?save='+source.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(source.save.id))+'&operationId='+operationId)).then(r=>body(r));
  assert.equal((await lookup()).usageRecovery.unknownRange,true);
  await body(await world.POST(req({operation:'advance',operationId,operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1'},source.save.id)),502);
  const unresolved=await lookup();assert.equal(unresolved.usageRecovery.unknownRange,true);assert.equal(unresolved.usageRecovery.status,'pending');
@@ -191,7 +194,7 @@ test('copy snapshots custom model roles and deletion keeps account defaults, oth
  store.install(seedWorld());auth.setUserId('test-owner');const source=await create('自訂模型來源'),other=await create('其他設定');
  const settings=load('model-settings-route');
  const readSettings=save=>settings.GET(new Request(origin+'/api/model-settings'+(save?'?save='+save:''))).then(r=>body(r));
- const setSettings=(value,save)=>settings.POST(new Request(origin+'/api/model-settings'+(save?'?save='+save:''),{method:'POST',headers:{origin},body:JSON.stringify(value)})).then(r=>body(r));
+ const setSettings=(value,save)=>settings.POST(new Request(origin+'/api/model-settings'+(save?'?save='+save:''),{method:'POST',headers:{origin},body:JSON.stringify(originalAccountInput(value, 'account-operations:test-owner'))})).then(r=>body(r));
  const account={npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
  const custom={npc:{provider:'openrouter',model:'vendor/npc-custom'},adjudication:{provider:'openrouter',model:'vendor/heaven-custom'}};
  await setSettings({version:0,mode:'custom',models:account});await setSettings({version:0,mode:'custom',models:custom},source.save.id);

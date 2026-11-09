@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
@@ -15,7 +17,7 @@ const { fixtureDecision } = require('./pursuit-fixture.cjs');
 const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
-  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === places ? {id:crypto.randomUUID(),version:0,...body} : body),
+  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === route ? originalWorldInput(api === places ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === places ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 const id = () => Date.now() + ':' + crypto.randomUUID();
 const response = async (result, status) => {
@@ -225,7 +227,7 @@ test('retired start-city preserves the old world; a historical city fixture reta
   auth.setUserId('other-owner');
   try {
     const other = await read();
-    const forbidden = await response(await send(route,{operation:'preview-city',mode:'demo',expectedVersion:other.version,city}), 200);
+    const forbidden = await response(await send(route,{operationScope:other.operationScope,operation:'preview-city',mode:'demo',expectedVersion:other.version,city}), 200);
     assert.match(forbidden.preview.issues.join(' '), /範本/);
     assert.equal(other.world.configuration, undefined);
   } finally {

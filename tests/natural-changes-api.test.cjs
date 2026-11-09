@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +10,7 @@ const { GET, POST } = load('route');
 const store = load('store');
 const { seedWorld } = load('world');
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
-const read = async id => (await (await GET(id ? new Request('https://test.invalid/api/world?operationId=' + encodeURIComponent(id)) : undefined)).json());
+const read = async id => (await (await GET(id ? new Request('https://test.invalid/api/world?operationScope=test-owner&operationId=' + encodeURIComponent(id)) : undefined)).json());
 const response = (value,_fixtureInput)=> Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 const rest = { type: 'rest', target: '', content: '安靜休息一會', purpose: '休息', mood: '平靜', durationMinutes: 15, timeIntent: { kind: 'open-ended', maxMinutes: null }, intents: [] };
 const proposal = { ...rest, type: 'propose', target: 'natural-cup', content: '觀察這只杯子並確認外在溫度的變化', purpose: '處理眼前物件', timeIntent: { kind: 'completion', maxMinutes: null } };
@@ -27,7 +29,7 @@ async function setup(adjust = () => {}) {
   world.objects = [{ id: 'natural-cup', source: 'known-cup', label: '自然變化測試杯', region: 'cafe-front', holder: 'owner', owner: 'owner', revision: 1, state: { temperature: 'warm' }, stateTransitions: { temperature: ['warm', 'hot', 'cool'] }, lifecycle: 'active', kind: 'utensil', knownTo: ['owner'], allowedTo: ['owner'] }];
   adjust(world);
   store.install(world);
-  const post = body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: operationId(), mode: 'openai', model: 'gpt-6-luna', ...body }) }));
+  const post = body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(originalWorldInput({ operationId: operationId(), mode: 'openai', model: 'gpt-6-luna', ...body }, 'test-owner')) }));
   assert.equal((await post({ operation: 'set-model-key', key: 'fixture-key' })).status, 200);
   let decision = proposal;
   let candidate = accepted([{ kind: 'state', objectId: 'natural-cup', expectedRevision: 1, key: 'temperature', value: 'hot' }, natural()]);
