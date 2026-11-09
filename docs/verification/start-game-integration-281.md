@@ -84,3 +84,5 @@ T6 固定產品 `7e9cfd7`、整合 `59bb7d9`，明示 d100-v2／能力版本 2 �
 另一份隔離 worktree 固定 `c2a38a3` 執行 `pnpm test`：核心 **1264/1264、fail 0**；隨後 auth／Key 組因舊測試 D1 接點缺 `all`／`batch` 出現多項 502，等待派送的測試 gate 因前置失敗未進入，停在該組。確認根因後僅終止本人這次失敗的 auth runner，整次 **exit 1**；後續組未跑，raw log 保留在 `/tmp/quiet-hours-context/integration-c2a38a3-full.log`，不稱完整全綠。
 
 同一修復者只補測試 hosting 的 immutable bind、真 `all`、同步 SQLite 原子 batch／rollback，原產品、播種前提及 API 斷言不變。[診斷與紅綠證據](auth-fixture-regression-281.md)。完整 auth **40/40**（原 38 加兩項接點契約）、真 Workers／D1 **2/2** 及 typecheck 通過；合入 `ac3216b` 後再跑 auth 40/40、diffcheck 通過。這不能替代 T7／T8 完成後的最後固定整合全套。
+
+固定 `1b09069` 補跑原先未執行組：Workers／遷移閘門／需求 **15/15**、source-pin **21/21** 通過；資產／草稿／卡／模型／遷移／新 d100 組 **43/44**，唯一失敗為另一個舊人物範本測試的 SQLite 接點缺 `batch`。真正帳號 GET 回 503，舊 helper 直接讀缺失 world 才誤報 contextId。唯一修復者加狀態斷言、保留原故障語義及 API 斷言，補原子 batch 與一項接點契約；該檔 **3/3**（原 2 加 1）及 typecheck／lint 通過，合入 `ae13572` 後再跑 3/3、diffcheck 通過。原 43/44 log 與不同固定版本的結果分開保存，未稱同一整次全綠。
