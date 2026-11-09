@@ -8,3 +8,5 @@
 Spec 的原真 App Router／Chromium反例 `/tmp/quiet-hours-opening-watchpoints.mjs` 已逐項重現兩問題。修復樹另先跑原帳號恢復反例 red（UI錯誤顯示已保存，預期未同步逾時），再跑同一完整產品 API／真頁旅程 green：A 原文不改、B 仍為其合法草稿、畫面保留 A 原未受理輸入且未同步；第二案切到另一實際世界，釋放已 commit 的慢回覆後 URL 保持選定世界，原新世界可由產品 API 讀回。
 
 驗證工具 `tooling/verification/browser-opening-operation-recovery-288.mjs` 使用共用 `opening-journey.mjs` 真形成卡／開局確認 API driver；模型與骰只在外部接點受控，1 次模型形成真入帳，不直接安裝世界。固定來源的畫面、typecheck、lint 與 build 結果待下段補入；不以本文件宣告整份 #281 完成。
+
+固定 `28b9edd` 真頁覆驗通過，origin `http://127.0.0.1:40571`，受控模型 1 次／實付 0；兩張畫面與機器紀錄位於 [證據](assets/opening-operation-recovery-288/evidence.json)。typecheck、lint（0 errors／4 既有 warnings）、build、diff check 通過。Spec 在該固定版本獨立重驗兩原反例，remaining 0。後續另外發現的 T9 copy/delete 帳號 P1 不含在此結論，仍未結案。
