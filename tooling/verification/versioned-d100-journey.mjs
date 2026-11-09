@@ -8,15 +8,15 @@ export async function journey(app,owner='d100-a',{configure=true}={}){
  const ok=async(path,body)=>{const r=await request(path,body);assert.ok(r.status>=200&&r.status<300,JSON.stringify(r));return r.body;};
  const world=save=>ok('/api/world'+(save?'?save='+save:'?workspace=account'));
  const send=async(save,body)=>{const scope=await world(save);return ok('/api/world'+(save?'?save='+save:'?workspace=account'),{operationId:operationId(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...body});};
- if(configure){await ok('/api/model-settings',{version:0,mode:'custom',models});await send(null,{operation:'set-budget',limits:{calls:null,tokens:null}});await send(null,{operation:'set-model-key',mode:'openai',key:'controlled-d100-key'});}
+ if(configure){await ok('/api/model-settings',{accountScope:'account-operations:'+owner,version:0,mode:'custom',models});await send(null,{operation:'set-budget',limits:{calls:null,tokens:null}});await send(null,{operation:'set-model-key',mode:'openai',key:'controlled-d100-key'});}
  async function create({dexterity=12,name='隔離檢定',objects=[]}={}){
-  const draft=(await ok('/api/character-drafts',{id:crypto.randomUUID(),version:0,concept:'修鐘的人',fields})).draft;const scope=await world();
+  const draft=(await ok('/api/character-drafts',{accountScope:'account-operations:'+owner,id:crypto.randomUUID(),version:0,concept:'修鐘的人',fields})).draft;const scope=await world();
   let formed=(await ok('/api/character-drafts/form',{id:draft.id,version:draft.version,operationId:operationId(),operationScope:scope.operationScope,worldContext:scope.world.contextId})).draft;
   const appearance=Math.min(18,24-dexterity);
   const values={strength:36-dexterity-appearance,endurance:12,dexterity,perception:12,appearance};
   formed=(await ok('/api/character-drafts/form',{action:'allocate',id:draft.id,version:formed.version,operationScope:scope.operationScope,values})).draft;
   const card=(await ok('/api/character-cards',{id:draft.id,version:formed.version,operationScope:scope.operationScope})).card;
-  const scene=(await ok('/api/scene-templates',{id:crypto.randomUUID(),version:0,name:'工房',note:'',rooms:[{id:'front',name:'工作間'}],connections:[],objects})).template;
+  const scene=(await ok('/api/scene-templates',{accountScope:'account-operations:'+owner,id:crypto.randomUUID(),version:0,name:'工房',note:'',rooms:[{id:'front',name:'工作間'}],connections:[],objects})).template;
   const {saved}=await confirmOpening(request,{name,city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:'工房'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}});
   return saved.save.id;
  }

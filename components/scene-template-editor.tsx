@@ -51,7 +51,7 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const [templates, setTemplates] = useState<SceneTemplate[]>([]);
   const [draft, setDraft] = useState<Draft>();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
