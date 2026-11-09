@@ -68,7 +68,7 @@ for(const stage of ['no-headers','body','response-save','prepared-save'])test(st
   global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;if(stage==='no-headers'){await c.sleep(26000);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(26000);controller.enqueue(new TextEncoder().encode(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content))));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,stage==='prepared-save'?0:1);
   store.onStorage(undefined);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,before.turn);assert.deepEqual(saved.world.events,before.events);
-  assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'?0:1);
+  assert.equal(saved.world.aiUsage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.accountPlayer.usage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'||stage==='prepared-save'?0:1);
  }finally{store.onStorage(undefined);s?.restore();c.restore();}
 });
 

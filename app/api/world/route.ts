@@ -279,7 +279,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
 
     if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
-    billing=playerBilling(accountId,id,operationId,accountPlayer.prices);
+    billing=playerBilling(accountId,id,operationId,accountPlayer.prices,accountPlayer.usage);
     trace.operationId = operationId; trace.version = version;
     traceWorld(trace, 'journal-read');
     const issuedAt = Number(operationId.split(':')[0]);

@@ -60,11 +60,12 @@ try {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ async batch(statements) { db.exec('BEGIN'); try { const results=[]; for(const statement of statements)results.push(await statement.run()); db.exec('COMMIT'); return results; } catch(error) { db.exec('ROLLBACK'); throw error; } }, prepare(sql) { return { bind(...values) { return { async all() { if(storageHook)await storageHook(sql,values); return { results: db.prepare(sql).all(...values) }; }, async first() { if(storageHook)await storageHook(sql,values); if(traceReadFailure&&sql.startsWith('SELECT body FROM decision_traces')){traceReadFailure=false;throw Error('fixture archive read unavailable');} if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ async batch(statements) { for(const statement of statements)await statement.beforeRun();db.exec('BEGIN'); try { const results=statements.map(statement=>statement.execute()); db.exec('COMMIT'); return results; } catch(error) { db.exec('ROLLBACK'); throw error; } }, prepare(sql) { return { bind(...values) { return { async all() { if(storageHook)await storageHook(sql,values); return { results: db.prepare(sql).all(...values) }; }, async first() { if(storageHook)await storageHook(sql,values); if(traceReadFailure&&sql.startsWith('SELECT body FROM decision_traces')){traceReadFailure=false;throw Error('fixture archive read unavailable');} if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() { await this.beforeRun();return this.execute(); }, async beforeRun() {
       if(storageHook)await storageHook(sql,values);
       if(sql.startsWith('INSERT OR IGNORE INTO recall_dispatch_usage') && budgetHook){const hook=budgetHook;budgetHook=undefined;await hook();}
       if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&traceWriteHook){const hook=traceWriteHook;traceWriteHook=undefined;await hook();}
       if(traceWriteFailure && (sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces')))throw Error('fixture trace storage unavailable');
+    }, execute() {
       const finalSave = sql.startsWith('UPDATE worlds SET state = ?');
       if (finalSave && failBefore) { failBefore = false; throw Error('Unknown commit outcome'); }
       if (finalSave && conflict) {

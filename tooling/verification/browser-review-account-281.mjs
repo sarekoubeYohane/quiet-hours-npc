@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -46,6 +47,19 @@ try{
  await page.close();await app.close();app=await startApp({port,databasePath,modelResponder:responder});page=await context.newPage();await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());await page.goto(app.url+'/settings');await page.getByText(/帳號本小時：1 次 AI 呼叫/).waitFor();
  const persisted=check(await get('/api/player-budget'));assert.equal(persisted.usage.totalCalls,1);assert.equal(persisted.usage.windowStartedAt,accountBefore.usage.windowStartedAt);assert.equal(persisted.prices[0].source,'受控本機價格');
  check(await act(copyId,generation),429);assert.equal(app.modelRequests.length,0);
- evidence.steps.push('SQLite close/reopen preserves original hour, settings, price and spent call; copied world cannot dispatch');evidence.commit=app.commit;evidence.origin=app.url;evidence.status='passed';evidence.controlledCalls=1;evidence.paidCalls=0;
+ evidence.steps.push('SQLite close/reopen preserves original hour, settings, price and spent call; copied world cannot dispatch');
+ // A historical uncertain receipt has no recoverable model trace. Seed only
+ // that old receipt after product creation, never a replacement story/world.
+ await context.addCookies([{name:'qh_local_owner',value:'review-unknown-281',url:app.url}]);await page.goto(app.url+'/character-templates');
+ const legacy=await create('歷史未知來源');const sqlite=new DatabaseSync(databasePath);
+ const storage=sqlite.prepare('SELECT storage_owner FROM world_saves WHERE owner=? AND id=?').get('review-unknown-281',legacy.save.id).storage_owner;
+ sqlite.prepare('UPDATE worlds SET operations=? WHERE owner=?').run(JSON.stringify({floor:0,results:{[Date.now()+':'+crypto.randomUUID()]:{status:502,body:{operationUncertain:true}}}}),storage);sqlite.close();
+ assert.equal(check(await get('/api/player-budget')).unknownAccountingRanges,1);
+ check(await post('/api/saves',{operation:'delete',operationId:crypto.randomUUID(),saveId:legacy.save.id,expectedVersion:0}));
+ const independent=await create('未知帳務後的其他世界');const unknown=check(await get('/api/world?save='+independent.save.id));assert.equal(unknown.accountPlayer.unknownAccountingRanges,1);assert.equal(unknown.unresolvedUsageRecovery,false);
+ await page.goto(app.url+'/observe?save='+independent.save.id);await page.getByRole('heading',{name:'此刻的世界'}).waitFor();
+ const compact=page.locator('.compact-cost');await compact.waitFor();assert.match(await compact.innerText(),/未確認範圍/);assert.doesNotMatch(await compact.innerText(),/估算 USD 0/);
+ await page.getByRole('button',{name:'費用與停止詳情',exact:true}).click();const panel=page.getByRole('region',{name:'已發生費用估算'});await panel.waitFor();assert.match(await panel.innerText(),/未確認範圍/);assert.doesNotMatch(await panel.innerText(),/玩家累計已發生：估算 USD 0/);
+ await page.screenshot({path:join(out,'account-unknown-both-summaries.png'),fullPage:true});evidence.steps.push('deleted historical uncertain source remains unknown in both compact summary and account cost panel of another real saved world');evidence.commit=app.commit;evidence.origin=app.url;evidence.status='passed';evidence.controlledCalls=1;evidence.paidCalls=0;
  await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence));
 } catch(error){if(page){await page.screenshot({path:join(out,'failure.png'),fullPage:true});await writeFile(join(out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());}throw error;} finally{await browser?.close();await app.close();await rm(dir,{recursive:true,force:true});}

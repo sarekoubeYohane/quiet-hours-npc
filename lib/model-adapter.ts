@@ -61,8 +61,14 @@ const work=(async()=>{
       knownUsage={inputTokens:u.prompt_tokens,outputTokens:u.completion_tokens,...(u.prompt_tokens_details?.cached_tokens===undefined?{}:{cachedInputTokens:u.prompt_tokens_details.cached_tokens})};
     }
   }
-  await observe({kind:signalExpired(requestSignal)?'late-response':'response',responseBody:body,httpStatus:response.status,at:bodyReceivedAt,usage:knownUsage});
-  if(knownUsage)await options.onUsage?.(knownUsage);
+  const observed=observe({kind:signalExpired(requestSignal)?'late-response':'response',responseBody:body,httpStatus:response.status,at:bodyReceivedAt,usage:knownUsage});
+  // Received usage is accounting evidence even when the trace storage hangs.
+  // Start settlement now; still await trace durability before surfacing a
+  // settlement failure, so original-request recovery can read known evidence.
+  const accounted=knownUsage?Promise.resolve(options.onUsage?.(knownUsage)):Promise.resolve();
+  accounted.catch(()=>{});
+  await observed;
+  await accounted;
   return {response,body};
 })();
 const bounded=awaitSignal(work,requestSignal);

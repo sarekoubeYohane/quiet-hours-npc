@@ -32,7 +32,7 @@ async function initialize(owner:string) {
     UNION ALL SELECT storage_owner,usage,NULL,NULL,accounting FROM deleted_world_usage WHERE owner=?`).bind(owner,'account-operations:'+owner,owner,owner).all<{storage_owner:string;usage:string|null;budget:string|null;prices:string|null;accounting:string}>();
   results.sort((a,b)=>Number(b.storage_owner===owner)-Number(a.storage_owner===owner));
   const usages=results.flatMap(value=>value.usage&&value.usage!=='null'?[JSON.parse(value.usage) as AIUsage]:[]);
-  const active=usages.filter(value=>value.windowStartedAt<=Date.now()&&Date.now()-value.windowStartedAt<3600000&&value.calls>0);
+  const active=usages.filter(value=>value.windowStartedAt<=Date.now()&&Date.now()-value.windowStartedAt<3600000&&(value.calls>0||value.inputTokens>0||value.outputTokens>0||value.unknownCalls>0));
   const usage=empty(active.length?Math.min(...active.map(value=>value.windowStartedAt)):0);
   for(const value of usages)addInitial(usage,value);
   const limits=results.map(value=>value.budget&&JSON.parse(value.budget)).find(validBudgetLimits)??defaultLimits;
@@ -130,7 +130,10 @@ async function settleAccountDispatch(owner:string,storageOwner:string,requestId:
     throw Error('已知帳號用量尚未同步；請沿原操作核對。');
   }
 
-export function playerBilling(owner:string,storageOwner:string,operationId:string,prices:ModelPrice[]) {
+export function playerBilling(owner:string,storageOwner:string,operationId:string,prices:ModelPrice[],initialUsage:AIUsage) {
+  // An hour boundary may refresh the next operation, never the continuation
+  // allowance captured when this logical operation began.
+  const operationUsage=structuredClone(initialUsage);
   let pending:string|undefined,sent=false;
   async function finish(){if(pending&&!sent){await settle(previous=>empty(previous.windowStartedAt),'cancelled');return;}if(pending){await database().prepare("UPDATE player_dispatches SET phase='unknown',pending_until=0 WHERE owner=? AND storage_owner=? AND request_id=? AND phase='pending'").bind(owner,storageOwner,pending).run();pending=undefined;}}
   const beforeDispatch=(provider:'openai'|'openrouter',model:string,task:'npc'|'adjudication'|'feelings')=>async(requestId:string|undefined,signal:AbortSignal)=>{
@@ -140,7 +143,7 @@ export function playerBilling(owner:string,storageOwner:string,operationId:strin
     for(let attempt=0;attempt<5;attempt++){
       const account=await playerAccount(owner),row=await rowFor(owner);
       if(row.version!==account.accountingVersion)continue;
-      if(budgetReached(account.usage,account.limits))throw Object.assign(new BudgetExceeded(),{code:'player_budget'});
+      if(budgetReached(account.usage,account.limits)||budgetReached(operationUsage,account.limits))throw Object.assign(new BudgetExceeded(),{code:'player_budget'});
       const exists=await database().prepare('SELECT phase FROM player_dispatches WHERE owner=? AND storage_owner=? AND request_id=?').bind(owner,storageOwner,requestId).first();
       if(exists)throw Error('此模型派送已受理；請恢復原操作，不得重新派送。');
       const delta=empty(account.usage.windowStartedAt);delta.calls=delta.totalCalls=delta.unknownCalls=delta.totalUnknownCalls=1;
@@ -156,13 +159,14 @@ export function playerBilling(owner:string,storageOwner:string,operationId:strin
       const accepted=await db.prepare('SELECT token FROM player_dispatches WHERE owner=? AND storage_owner=? AND request_id=?').bind(owner,storageOwner,requestId).first<{token:string}>();
       if(accepted?.token!==token)continue;
       if(signal.aborted){await settleAccountDispatch(owner,storageOwner,requestId,previous=>empty(previous.windowStartedAt),'cancelled');pending=undefined;signal.throwIfAborted();}
+      operationUsage.calls++;
       return;
     }
     throw Object.assign(Error('帳號正在處理另一個模型請求；本次未派送，請等待原操作完成後核對。'),{code:'account_budget_busy'});
   };
   const fetcher=(forward:typeof fetch=fetch):typeof fetch=>(url,init)=>{init?.signal?.throwIfAborted();sent=true;return forward(url,init);};
   async function settle(desiredFor:(previous:AIUsage)=>AIUsage,phase:'known'|'cancelled'){if(!pending)throw Error('找不到原帳號模型派送。');await settleAccountDispatch(owner,storageOwner,pending,desiredFor,phase);pending=undefined;}
-  const report=(tokens:TokenUsage)=>settle(previous=>knownDispatchUsage(previous,tokens),'known');
+  const report=(tokens:TokenUsage)=>{operationUsage.inputTokens+=tokens.inputTokens;operationUsage.outputTokens+=tokens.outputTokens;return settle(previous=>knownDispatchUsage(previous,tokens),'known');};
   return {beforeDispatch,fetcher,report,finish};
 }
 
