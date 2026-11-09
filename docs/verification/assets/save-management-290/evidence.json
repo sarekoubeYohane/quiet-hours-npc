@@ -1,0 +1,63 @@
+{
+  "production": false,
+  "identity": "local cookie boundary; no real OAuth",
+  "routes": [
+    {
+      "label": "copy recovered after lost reply",
+      "url": "http://127.0.0.1:38211/observe?save=d3743a81-9be4-4b41-b406-2ed1a97134d5",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    },
+    {
+      "label": "source permanently deleted",
+      "url": "http://127.0.0.1:38211/",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "世界存檔"
+      ]
+    },
+    {
+      "label": "copy resumes after source deletion and SQLite restart",
+      "url": "http://127.0.0.1:33319/observe?save=d3743a81-9be4-4b41-b406-2ed1a97134d5",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    },
+    {
+      "label": "current save deletion returns to picker",
+      "url": "http://127.0.0.1:33319/",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "世界存檔"
+      ]
+    },
+    {
+      "label": "last save deletion shows empty state",
+      "url": "http://127.0.0.1:33319/",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "世界存檔"
+      ]
+    }
+  ],
+  "dialogs": [
+    "永久刪除「河岸來源」？\n已走過 1 個回合，世界時間 1265 分鐘。\n這份世界將永久刪除，無法復原；其他存檔、人物與場景保留。",
+    "永久刪除「河岸分岔」？\n已走過 2 個回合，世界時間 1270 分鐘。\n這份世界將永久刪除，無法復原；其他存檔、人物與場景保留。",
+    "永久刪除「其他生活」？\n已走過 0 個回合，世界時間 1260 分鐘。\n這份世界將永久刪除，無法復原；其他存檔、人物與場景保留。"
+  ],
+  "result": "passed",
+  "commit": "4401504",
+  "origins": [
+    "http://127.0.0.1:38211",
+    "http://127.0.0.1:33319"
+  ],
+  "modelCalls": 0,
+  "pageErrors": [],
+  "confirmations": 3,
+  "originalsDeleted": 2,
+  "copyDeleted": 1,
+  "sqliteRestart": true
+}
