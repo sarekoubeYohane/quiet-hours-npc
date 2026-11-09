@@ -58,3 +58,9 @@ T5 API **10／10**；上述相關 API 組合 **22／22**；舊屬性／UI／生�
 ## 固定點獨立審查新增待修事項
 
 兩軸以 runtime `5eb98a8` 完成審查：Spec 真 API／SQLite 重現「耐力一般」「外觀十分普通」「力量一如往常」被直接數字正則誤擋（P2）；Standards 發現 `formation.normalized` 與 `drafts.meaningfulText` 正規化重複（P3）。原有數字／年齡身高正例與本頁完整旅程通過不排除這個新反例。兩項均由唯一修復者 `t1_navigation` 接手，本工作樹不平行修 runtime；需合入修正並重跑上述自然文字反例才可結案。反例腳本：`/tmp/quiet-hours-t5-spec-repro.mjs`。本次提交是 ready-for-fix，不是 #286 完成。
+
+## 整合審查修正（唯一修復實作者）
+
+合入帳號玩家預算與 T9 後，保留原人物來源、形成鎖定、完成卡及 legacySeed 明示接點。真 API／SQLite 反例先確認 `耐力一般`、`外觀十分普通`、`力量一如往常` 均錯誤回 400；修正後連同 `力量：一如往常` 均可形成並保存重讀原文。數值辨識只在屬性名稱與明示賦值／範圍語法相鄰處判讀；不再任意跨過 16 字尋找數字，也不把一般詞中的單一中文數字當屬性。真正 `力量十八`、`力量：一`、`耐力為十二`、`精神容量八十至九十`、`外觀10–18`、`dexterity is 18` 仍在模型與骰前拒絕；年齡、身高與訓練年數維持合法。
+
+文字來源保存與形成判讀共同使用輕量 `lib/text-equivalence.ts` 的 `meaningfulText`，沿用 NFKC／und 小寫／去標點空白符號及 Cf 的原等價責任，避免兩份規則漂移；沒有引入 server 模型到 client。cards 與 drafts 合計 **16/16**，包含既有 AI 血緣／未知範本與新自然語句案例。獨立反例 log `/tmp/quiet-hours-context/review-t5-natural-{red,green}.log`；固定提交的接合驗證待下列最後證據補入，不以此段宣告票已完成。

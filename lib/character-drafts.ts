@@ -1,3 +1,4 @@
+import { meaningfulText } from './text-equivalence';
 import { blankCharacterTemplateFields, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields, type CharacterTemplateFields } from './character-templates';
 
 export const characterDraftFieldNames = characterTemplateFieldNames.filter(name => name !== 'startLocation');
@@ -36,8 +37,6 @@ export function readCharacterDraftInput(value: unknown) {
   fields.startLocation = '';
   return { id: input.id, version: Number(input.version), concept: input.concept, fields };
 }
-// Punctuation/spacing alone cannot turn model-authored text into a user background.
-const meaningfulText = (text: string) => text.normalize('NFKC').toLocaleLowerCase('und').replace(/[\p{P}\p{Z}\p{S}\p{Cf}\s]/gu, '');
 function aiLineage(origin: TextProvenance | undefined, previousText = '') {
   return [...new Set([...(origin?.aiHistory ?? []), ...(origin?.aiText !== undefined ? [origin.aiText] : origin?.kind === 'ai' ? [previousText] : [])])];
 }

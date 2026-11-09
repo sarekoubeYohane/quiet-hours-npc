@@ -114,7 +114,7 @@ test('numeric game-stat requests and incomplete text stop before models or dice 
  globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
  try{
   await configure(f);
-  for(const abilities of ['力量至少18','精神容量65–90','耐力比18歲時更好且力量18','strength:18','容量80']){const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities}})).body.draft;assert.equal((await f.form(await operation(f,draft))).status,400);}
+  for(const abilities of ['力量至少18','精神容量65–90','耐力比18歲時更好且力量18','strength:18','容量80','力量十八','力量：一','耐力為十二','精神容量八十至九十','外觀10–18','dexterity is 18']){const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities}})).body.draft;assert.equal((await f.form(await operation(f,draft))).status,400);}
   const missing=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,beliefs:''}})).body.draft;assert.equal((await f.form(await operation(f,missing))).status,400);assert.equal(calls,0);assert.equal(f.context.dice,0);
   const legal=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'35歲，身高175公分，做力量訓練3年',fields})).body.draft;assert.equal((await f.form(await operation(f,legal))).status,200);assert.equal(calls,1);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
@@ -188,4 +188,14 @@ test('allocation and completion retain the original account even when two accoun
   assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.readDrafts()).body.drafts[0].fields.name,'另一帳號人物');
   f.context.owner='a';assert.equal((await f.readDrafts()).body.drafts[0].fields.name,'孟澄');assert.equal((await f.readDrafts()).body.drafts[0].completedCard,undefined);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
+});
+
+
+test('ordinary Chinese ability prose forms through the real API and persists without treating word fragments as numeric assignments',async()=>{
+ const f=await fixture(),old=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
+ try{await configure(f);for(const description of ['耐力一般','外觀十分普通','力量一如往常','力量：一如往常']){
+  const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities:description}})).body.draft;
+  const formed=await f.form(await operation(f,draft));assert.equal(formed.status,200,JSON.stringify(formed.body));
+  const saved=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);assert.equal(saved.fields.abilities,description);assert.ok(saved.formation);
+ }assert.equal(calls,4);}finally{globalThis.fetch=old;f.db.close();}
 });

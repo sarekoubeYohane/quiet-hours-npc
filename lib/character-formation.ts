@@ -1,3 +1,4 @@
+import { meaningfulText } from './text-equivalence';
 import { requestModel, type ModelService } from './model-adapter';
 import { characterDraftFieldNames, missingCharacterText, type CharacterDraft } from './character-drafts';
 import { cardAttributeNames, type CardAttribute, type CardFormation, type CardValues } from './character-cards';
@@ -5,15 +6,18 @@ export type BonusCandidate={target:CardAttribute|'capacity';source:string;quote:
 export type CardAssessment={bonuses:BonusCandidate[]};
 const targets=[...cardAttributeNames,'capacity'];
 const sources=['concept',...characterDraftFieldNames];
-const normalized=(text:string)=>text.normalize('NFKC').toLocaleLowerCase('und').replace(/[\p{P}\p{Z}\p{S}\p{Cf}\s]/gu,'');
 export function characterFormationIssue(draft:CharacterDraft):string|undefined {
  const missing=missingCharacterText(draft.fields);
  if(missing.length)return '形成前請完成：'+missing.join('、')+'。適用時可明示沒有特殊設定。';
  const text=[draft.concept,...characterDraftFieldNames.map(field=>draft.fields[field])].join('\n').normalize('NFKC');
- const numeric=/(?:力量|耐力|靈巧|敏捷|感知(?:能力)?|外觀|(?:精神(?:電量)?)?容量|strength|endurance|dexterity|perception|appearance|mental[ _-]*capacity)(?:[^\d\n，。；,;.]{0,16})([\d一二三四五六七八九十百零〇]+)(?=([^\n，。；,;.]{0,40}))/giu;
+ const numeric=/(?:力量|耐力|靈巧|敏捷|感知(?:能力)?|外觀|(?:精神(?:電量)?)?容量|strength|endurance|dexterity|perception|appearance|mental[ _-]*capacity)(?:\s|[:：=]|至少|至多|不低於|不高於|介於|範圍|數值|設定為|設定成|設為|固定為|等於|應為|應是|希望|想要|必須|達到|約|為|是|要|比|值|in|is|at|least|most|equals?){0,16}([\d一二三四五六七八九十百千萬億零〇兩]+)(?=([^\n，。；,;.]{0,40}))/giu;
  for(const match of text.matchAll(numeric)) {
    // Age, height, physical measurements and durations remain background facts.
    if(/^\s*(?:歲|岁|年|月|天|小時|分鐘|分鍾|公分|厘米|cm\b|公斤|kg\b|公里|毫升|公升|升|ml\b|mah\b|years?\b|months?\b|次|週|周)/i.test(match[2]))continue;
+   // A single Chinese numeral embedded in an ordinary word is prose,
+   // e.g. 一般／一如往常／十分普通, rather than an assigned statistic.
+   const after=match[2].trimStart();
+   if(!/\d/u.test(match[1])&&match[1].length===1&&/^\p{L}/u.test(after)&&! /^(?:至|到|分之|[點点分](?:$|[\s，。；,;.]|至|到))/u.test(after))continue;
    return '人物文字不能直接指定遊戲屬性或精神容量的數字／範圍；年齡、身高等背景數字可以保留。';
  }
 }
@@ -35,7 +39,7 @@ export async function assessCharacterCard(draft:CharacterDraft,service:ModelServ
    if(!origin||origin.kind==='empty')continue;
    if(origin.kind!=='user'){
     const originals=[origin.aiText,...origin.aiHistory??[],origin.sourceText].filter((item):item is string=>typeof item==='string');
-    if(!origin.materiallyEdited||!value.substantive||!originals.length||originals.some(original=>normalized(text)===normalized(original)||normalized(original).includes(normalized(value.quote))))continue;
+    if(!origin.materiallyEdited||!value.substantive||!originals.length||originals.some(original=>meaningfulText(text)===meaningfulText(original)||meaningfulText(original).includes(meaningfulText(value.quote))))continue;
    }
   }
   if(!bonuses.some(item=>item.target===value.target))bonuses.push({...value});
