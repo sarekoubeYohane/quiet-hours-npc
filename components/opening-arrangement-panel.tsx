@@ -36,7 +36,7 @@ export default function OpeningArrangementPanel({owner,draftId,arrangement,cards
   finally{if(active())working(false);}
  }
  const pendingView=!!pending||arrangement?.state==='pending';
- return <section className="panel" style={{padding:16,marginBlock:16}} aria-label="AI整理世界配置"><h3>可選：AI整理開局</h3><p>使用上方描述、已選人物卡與場景，保留已填安排。先保存建議，查看、修改及採納後才成為本次開局；不會建立世界或自動推進。</p>
+ return <section className="panel" style={{padding:16,marginBlock:16}} aria-label="AI整理世界配置"><h3>可選：AI整理開局</h3><p>使用本步驟的開局描述、已選人物卡與場景，保留已填安排。先保存建議，查看、修改及採納後才成為本次開局；不會建立世界或自動推進。</p>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
   {pendingView?<button disabled={busy} onClick={()=>void generate(true)}>恢復原AI整理操作</button>:<button disabled={busy} onClick={()=>void generate()}>{arrangement?'明示請AI另整理一份建議':'請AI整理本次開局'}</button>}
   {arrangement?.state==='failed'&&<p>原操作已停止：{arrangement.error}。沒有自動重試；若要重新請求，請明示按整理按鈕。</p>}
