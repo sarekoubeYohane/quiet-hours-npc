@@ -1,6 +1,6 @@
 import { getGitHubUser } from '@/lib/auth';
 import { loadCharacterDraft, writeCharacterDraft } from '@/lib/character-draft-store';
-import { characterDraftFieldNames } from '@/lib/character-drafts';
+import { characterDraftFieldNames, generatedTextProvenance } from '@/lib/character-drafts';
 import { readCharacterTemplateFields } from '@/lib/character-templates';
 import { POST as worldOperation } from '@/app/api/world/route';
 import { roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     for (const field of characterDraftFieldNames) {
       if (pending.fields[field] !== '' || next.fields[field] !== '') continue;
       next.fields[field] = fields[field];
-      if (fields[field].trim()) next.provenance[field] = { kind: 'ai', aiText: fields[field], materiallyEdited: false };
+      if (fields[field].trim()) next.provenance[field] = generatedTextProvenance(next.provenance[field], fields[field]);
     }
     delete next.pendingGeneration;
     const saved = await writeCharacterDraft(user.userId, next);

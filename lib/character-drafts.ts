@@ -2,7 +2,7 @@ import { blankCharacterTemplateFields, characterTemplateFieldNames, characterTem
 
 export const characterDraftFieldNames = characterTemplateFieldNames.filter(name => name !== 'startLocation');
 export type CharacterDraftField = typeof characterDraftFieldNames[number];
-export type TextProvenance = { kind: 'empty' | 'user' | 'ai'; aiText?: string; materiallyEdited: boolean; userText?: string };
+export type TextProvenance = { kind: 'empty' | 'user' | 'ai'; aiText?: string; aiHistory?: string[]; materiallyEdited: boolean; userText?: string };
 export type CharacterDraft = {
   id: string; version: number; concept: string; fields: CharacterTemplateFields;
   provenance: Record<string, TextProvenance>;
@@ -36,15 +36,23 @@ export function readCharacterDraftInput(value: unknown) {
 }
 // Punctuation/spacing alone cannot turn model-authored text into a user background.
 const meaningfulText = (text: string) => text.normalize('NFKC').toLocaleLowerCase('und').replace(/[\p{P}\p{Z}\p{S}\p{Cf}\s]/gu, '');
+function aiLineage(origin: TextProvenance | undefined, previousText = '') {
+  return [...new Set([...(origin?.aiHistory ?? []), ...(origin?.aiText !== undefined ? [origin.aiText] : origin?.kind === 'ai' ? [previousText] : [])])];
+}
+export function generatedTextProvenance(origin: TextProvenance | undefined, text: string): TextProvenance {
+  const history = aiLineage(origin).filter(value => meaningfulText(value) !== meaningfulText(text));
+  return { kind: 'ai', aiText: text, ...(history.length ? { aiHistory: history } : {}), materiallyEdited: false };
+}
 export function userTextProvenance(previous: CharacterDraft | undefined, fields: CharacterTemplateFields) {
   return Object.fromEntries(characterDraftFieldNames.map(field => {
     const text = fields[field];
     const origin = previous?.provenance[field];
-    if (!text.trim()) return [field, { kind: 'empty', materiallyEdited: false } satisfies TextProvenance];
-    if (origin?.kind === 'ai') {
-      const aiText = origin.aiText ?? previous!.fields[field];
-      const materiallyEdited = meaningfulText(text) !== meaningfulText(aiText);
-      return [field, { kind: 'ai', aiText, materiallyEdited, ...(materiallyEdited ? { userText: text } : {}) } satisfies TextProvenance];
+    const known = aiLineage(origin, previous?.fields[field]);
+    const lineage = known.length ? { aiText: known.at(-1)!, ...(known.length > 1 ? { aiHistory: known.slice(0, -1) } : {}) } : {};
+    if (!text.trim()) return [field, { ...lineage, kind: 'empty', materiallyEdited: false } satisfies TextProvenance];
+    if (known.length) {
+      const materiallyEdited = !known.some(value => meaningfulText(text) === meaningfulText(value));
+      return [field, { kind: 'ai', ...lineage, materiallyEdited, ...(materiallyEdited ? { userText: text } : {}) } satisfies TextProvenance];
     }
     return [field, { kind: 'user', materiallyEdited: true, userText: text } satisfies TextProvenance];
   }));

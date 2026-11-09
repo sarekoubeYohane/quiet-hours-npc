@@ -1,4 +1,5 @@
 import type { ModelKeyStatus } from './model-keys';
+import { directModels } from './direct-models';
 export type ModelChoice = { provider: 'openai' | 'openrouter'; model: string };
 export type ModelRoles = { npc?: ModelChoice; adjudication?: ModelChoice };
 export type ModelPreference = { mode: 'inherit' } | { mode: 'custom'; models: ModelRoles };
@@ -26,7 +27,7 @@ export function readModelPreference(value: unknown, allowInherit: boolean): Mode
     if (!choice || typeof choice !== 'object') return;
     const candidate = choice as Record<string, unknown>;
     if (!['openai', 'openrouter'].includes(String(candidate.provider)) || typeof candidate.model !== 'string' || !candidate.model.trim() || candidate.model.length > 120 || /[\x00-\x1f\x7f]/.test(candidate.model) || Object.keys(candidate).some(key => !['provider', 'model'].includes(key))) return;
-    if (role === 'npc' && candidate.provider === 'openai' && !['gpt-6-luna', 'gpt-6.1-sol'].includes(candidate.model.trim())) return;
+    if (role === 'npc' && candidate.provider === 'openai' && !directModels.includes(candidate.model.trim())) return;
     accepted[role] = { provider: candidate.provider as ModelChoice['provider'], model: candidate.model.trim() };
   }
   return { mode: 'custom', models: accepted };
