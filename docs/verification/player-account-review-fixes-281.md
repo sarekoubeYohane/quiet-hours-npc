@@ -1,6 +1,6 @@
 # #281 帳號玩家預算與審查修正
 
-狀態：P2 人物 AI 血緣、P3 輕量模型白名單已先行交付並獨立覆核；本文件記錄同一修復實作者的 P1 帳號預算及 T9 名稱恢復修正。**尚待固定提交的完整回歸及獨立覆核，不據此關票或宣告 #281 完成。**
+狀態：P2 人物 AI 血緣、P3 輕量模型白名單已先行交付並獨立覆核；本文件記錄同一修復實作者的 P1 帳號預算及 T9 名稱恢復修正。**專票與接合驗證已完成；最終 integration 全套回歸由整合者收尾，不據此宣告 #281 完成。**
 
 ## 問題與結果
 
@@ -41,7 +41,7 @@
 - `prepared-save` 的受控 transport 實際 **0 次**，現在中央及世界診斷共同斷言 **0 次**，取代舊測試在未派送就記 unknown 1 的期望。此改動僅精確描述新操作前置失敗，不重算既存 unknown 歷史。
 - 真 API 建世界後載入歷史 uncertain receipt、以產品 API 刪來源，再進另一真正 `/observe?save=…`：red 時 compact 宣稱 `估算 USD 0.00`；green 時 compact 與 CostPanel 均明示未知範圍，帳號缺口為 1、當前世界 unresolved 為 false。受控呼叫總數維持 1、實付 0。證據 `/tmp/quiet-hours-context/review-cost-browser-{red,green2}.log`。
 - 修正後帳號／草稿 API **20/20**、typecheck 再過；Forecast 真頁使用帳號先存單價、新世界無 `world.modelPrices`，真正自動完成 2 回合／61 秒；中途另一世界以同模型受控製作新增約 USD 10。帳號累計 USD 10.00003、當前世界 USD 0.00002、前景一小時預估 USD 0.0012，沒有混入他檔費用，受控呼叫 2／實付 0。腳本 `browser-review-forecast-281.mjs`。本次兩支新真頁證據採 `0165c2d` 上的未提交修正工作樹，僅為 red→green；最後固定整合 tip 將再覆驗，不冒充已固定來源。
-- 最後固定整合 tip 的完整回歸仍待收尾。必要命令與 log 保存於 `/tmp/quiet-hours-context/review-*`。
+- 固定 `2355317`：API **32/32**；六回歸＋T9 **14/14**；typecheck、lint（0 errors／4 既有 warnings）、build 均通過。帳號真頁 **1** 次受控呼叫、形成真頁 **2** 次、Forecast 真頁 **2** 次均通過；帳號及 Forecast 機器證據記錄 `2355317`。fresh 本機 D1 路徑 `/tmp/quiet-hours-review-final-migrations-281` 全部 migration（含 0017／0018）成功。整份 integration 全套回歸仍由整合者最後固定來源執行。必要命令與 log 保存於 `/tmp/quiet-hours-context/review-*`。
 
 ## 遷移與回退
 
