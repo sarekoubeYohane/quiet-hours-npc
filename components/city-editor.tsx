@@ -8,6 +8,7 @@ import type { SceneTemplate } from '@/lib/scene-templates';
 import type { World } from '@/lib/world';
 import { readWorldResponse } from '@/lib/world-response';
 import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
+import CharacterAttributesEditor from './character-attributes-editor';
 import OpeningPeopleEditor from './opening-people-editor';
 import CityFinalizationEditor from './city-finalization-editor';
 import { CityAccessEditor, CityAccessPreview } from './city-access-editor';
@@ -176,9 +177,10 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
         const homeScene = templates.scenes.find(scene=>scene.id===home?.templateId);
         const startRooms = [...(scene?.rooms??[]),...(draft.finalization?.spaces.find(space=>space.placeId===place?.id)?.rooms??[])];
         const homeRooms = [...(homeScene?.rooms??[]),...(draft.finalization?.spaces.find(space=>space.placeId===home?.id)?.rooms??[])];
-        return <div className="city-person" key={template.id}>
+        return <div className="city-person" role="group" aria-label={name+'的人物設定'} key={template.id}>
           <label><input type="checkbox" aria-label={'選用'+name} checked={!!person} disabled={!person&&draft.characters.length>=cityLimits.characters} onChange={()=>toggleCharacter(template)}/>{name}</label>
           {person && <>
+            <p>背景：{template.fields.background||'未指定'}</p><p>能力：{template.fields.abilities||'未指定'}</p><CharacterAttributesEditor value={person.characterSetup??{}} onChange={characterSetup=>changeCharacter(template.id,{characterSetup})}/>
             {template.fields.startLocation && <p>範本起點描述：{template.fields.startLocation}</p>}
             <label>起始場所<select aria-label={name+'的起始場所'} value={person.placeId}
               onChange={event=>changeCharacter(template.id,{placeId:event.target.value,roomId:''})}>
