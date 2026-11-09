@@ -1,0 +1,14 @@
+{
+  "commit": "1861ffd",
+  "origin": "http://127.0.0.1:45035",
+  "cardId": "card-1c10f02b-00ee-4bda-b4e8-e26c0c34c2e6",
+  "saveId": "d612b895-1095-4ae2-a3b0-b63617c3da48",
+  "retainedAcrossToggleAndReload": true,
+  "invalidReferencesCannotCreate": true,
+  "referencedPlaceRemovalBlocked": true,
+  "versionConflictPreservesReferences": true,
+  "explicitCleanupOnlyOnClick": true,
+  "confirmedTurn": 0,
+  "controlled": 1,
+  "paid": 0
+}
