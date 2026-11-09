@@ -1,5 +1,9 @@
 # #255 精神電量工程整合：#257–#262
 
+## 2026-11-09 正式政策後續交付
+
+後續#271／#256已經使用者批准完整A–D契約，#263正式啟用已於單一integration完成；[正式政策基線](formal-mental-energy-256.md)、[啟用及T1–T14](formal-mental-enable-263.md)、[完整整合回歸及審查](character-dice-energy-integration-271.md)分開記錄本次正式證據。PR #280待review，尚未合main或部署。以下「仍未完成／不開始#263」均為接手或#257–#262交付當時的歷史狀態，原fixture驗證沒有被改標為正式政策或真實模型語義驗收。
+
 ## 2026-11-09 接手狀態註記
 
 [PR #265](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/265) 已合併，最新 main 基線為 `a9a0ef545d4f233def30ecde3d0816e9ddd93b8e`；#257–#262 已完成，以下保留合併前交付與驗證原文。下文的「供合入 main 前 review」及 #256 當時未定數值描述屬歷史狀態。#271／#256 後續已確認主要正式數值，但剩餘契約與 #263 正式啟用仍未完成；現有程式仍只使用隔離測試政策，不可將 fixture 數字或 Q30 未回答提案視為正式政策。最新任務圖、接點與阻擋見 [2026-11-09 接手稽核](character-dice-energy-handoff-2026-11-09.md)。本註記不改寫以下歷史驗證結果，也不宣稱本次回歸已完成。
