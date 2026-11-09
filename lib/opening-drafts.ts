@@ -10,9 +10,10 @@ import type { CityPreview } from './city-draft';
 import { readSaveCreation,SaveAccessError } from './world-saves';
 export const openingBodySchema=z.object({name:z.string().trim().max(80),description:z.string().max(1600),step:z.number().int().min(1).max(5),city:cityDraftSchema}).strict();
 const identity=z.string().uuid();
+const operationScope=z.string().min(1).max(128);
 export const openingInputSchema=z.union([
- z.object({id:identity,version:z.number().int().nonnegative(),body:openingBodySchema}).strict(),
- z.object({id:identity,version:z.literal(0),restartSaveId:z.string().min(1).max(64)}).strict(),
+ z.object({operationScope,id:identity,version:z.number().int().nonnegative(),body:openingBodySchema}).strict(),
+ z.object({operationScope,id:identity,version:z.literal(0),restartSaveId:z.string().min(1).max(64)}).strict(),
 ]);
 type Body=z.infer<typeof openingBodySchema>;
 type Sources={cards:CharacterCard[];scenes:SceneTemplate[]};
@@ -29,6 +30,7 @@ async function selectedSources(owner:string,body:Body,old?:Sources):Promise<Sour
  return {cards:pick(body.city.characters,old?.cards??[],cards),scenes:pick(body.city.places,old?.scenes??[],scenes)};
 }
 export async function saveOpeningDraft(owner:string,input:z.infer<typeof openingInputSchema>){
+ if(input.operationScope!==owner)throw new SaveAccessError('原帳號已切換，請回到原帳號恢復此操作。',409);
  const previous=await rowFor(owner,input.id),request=JSON.stringify(input);
  if(previous?.last_request===request)return readOpeningDraft(owner,input.id);
  if(previous?.finalized_save_id||previous&&previous.version!==input.version||!previous&&input.version!==0)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留，請重新核對。',409);
@@ -51,9 +53,10 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
  if(stored?.last_request!==request)throw new SaveAccessError('未同步：另一頁已修改開局草稿，請保留輸入重新核對。',409);
  return readOpeningDraft(owner,input.id);
 }
-export const confirmOpeningSchema=z.object({id:identity,draftId:identity,draftVersion:z.number().int().positive()}).strict();
+export const confirmOpeningSchema=z.object({operationScope,id:identity,draftId:identity,draftVersion:z.number().int().positive()}).strict();
 /** The candidate shown at confirmation is the exact immutable world installed in one transaction. */
 export async function confirmOpening(owner:string,input:z.infer<typeof confirmOpeningSchema>){
+ if(input.operationScope!==owner)throw new SaveAccessError('原帳號已切換，請回到原帳號恢復此操作。',409);
  const request=JSON.stringify(input),previous=await readSaveCreation(owner,input.id,request);
  if(previous)return {saved:previous,created:false};
  const row=await rowFor(owner,input.draftId);
