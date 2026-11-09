@@ -42,3 +42,44 @@
 本切片僅新增接手紀錄並為舊整合報告加註日期；依專案技能對文件執行內容、相對引用與 diff 檢查，不新增 runtime 測試。未呼叫付費模型、未部署、未推進正式世界。2026-11-09 的完整回歸由整合流程另外記錄，本文件不預填尚未完成的測試結果，也不把舊報告測試數字當成本次執行。
 
 本次唯讀擷取與探索筆記暫存於 `/private/tmp/npc-handoff-20261109/`；暫存路徑不是持久驗證證據。正式可追溯來源為上述 GitHub Issues／PR、main SHA 與 repo 既有設計／驗證文件。
+
+## 本次獨立驗證結果
+
+產品來源固定 main `a9a0ef5`；本分支只有文件與算例檢查，未修改 runtime 或既有測試。推薦文件經 review 修正版本為 `188c940`，合入 `6af6ace`。完整執行 `npm test`，原 runner 自帶 no-network preload；所有模型 transport 受控、真實付費派送0。2026-11-09結尾唯讀核對遠端main仍為相同SHA。
+
+| 命令／組別 | 結果與執行界線 |
+|---|---|
+| `npm test`：activities／world API／SQLite／UI契約 | 1159/1159通過，0 fail/skip。 |
+| 同命令 auth | 37/37通過。 |
+| 同命令 templates | 6/6通過。 |
+| 同命令 Workers／migration／pinned material | 13/15通過；兩個 Workers案例遇127.0.0.1 listen EPERM，該輪exit1，未執行最後runner。 |
+| `node --import ./tooling/verification/no-network.mjs --test tests/auth-workerd.test.mjs tests/model-keys-workerd.test.mjs tests/migration-gate.test.mjs tooling/experiments/check-autonomous-demand-211.test.mjs` | 允許本機loopback後15/15通過，外網仍封鎖；exit0。 |
+| `node --import ./tooling/verification/no-network.mjs --test tooling/experiments/pursuit-runner-228.test.mjs` | 在前組結束後執行，21/21通過；exit0。 |
+| `npm run typecheck` | exit0。 |
+| `npm run lint` | exit0；0 errors／4既有warnings（character-profile img、pixel-world兩個img、world-app effect dependency）。 |
+| `python3 docs/verification/character-dice-energy-2026-11-09/check-examples.py` | [可重跑數學檢查](character-dice-energy-2026-11-09/check-examples.py)與[輸出](character-dice-energy-2026-11-09/examples.txt)：36容量、55中點、9能力分布、66×100 d100分級、兩人收支及睡醒、裁切順序與非整格例皆通過。這是推薦算例驗算，非產品政策測試。 |
+| 文件引用、`git diff a9a0ef5...HEAD --check` | 通過；推薦／稽核／舊報告共16個相對引用有效。 |
+
+最終不同案例合計1238（1159+37+6+15+21），沒有將重跑15項重複加總，也沒有將首輪exit1改記成功。pinned runner正向案例為10 trials／80 advances、17受控forward、64 partner fixture、81 engine calls、檔案SQLite重開；這些是既有runner基線，非本次正式電量或新人物驗收。
+
+本次沒有重新建置或執行Chromium互動旅程：runtime未變，既有各票畫面證據保持歷史證據；不將其宣稱為本次新正式流程驗收。沒有驗證付費語義品質、正式Worker/D1或正式世界。
+
+本機原始log位於上述暫存目錄，未上傳約17MiB逐操作診斷。供查核的SHA-256：
+
+| log | SHA-256 |
+|---|---|
+| baseline-test.log | `c976113c9233b6765509ac762a1fd9ab1d635624125c219ecd31303af2480d13` |
+| workers-retry.log | `bae120fe74d2f3f3f25c8d8b7c7193709fd753b2205fe7b81207e02d859b2db1` |
+| pinned-runner.log | `b1c02590a4c83ac8661f353fd746499d5198a03a8f2b3ae327243524825730d4` |
+| typecheck.log | `d9e5e23eca5e9c760a404e362da4c732c3bb64f22a1c462520aa70f137c32f63` |
+| lint.log | `dc258a938dbd15dd646791d6df0b77f3f2f6a1787d919180fe747b6dd7d351be` |
+
+## Standards
+
+固定差異 `a9a0ef5...a09c422` 由獨立代理審查，0硬性違反、0可行動smell；依AGENTS、領域文件及code-review十二項baseline檢視。修正 `188c940` 合入 `6af6ace` 後窄覆核仍0。文件引用與diff檢查通過。
+
+## Spec
+
+獨立代理首輪發現兩項P2：已確認區對有效睡眠單位表述不夠明確、專長／感官數值權威及缺值處理未寫。單一implementer於 `188c940` 修正：引用#256已確認原文並保留完整格為待批准推薦；數值只由擁有者確認的草稿／既有設定形成，無數字為0而硬限制仍有效。另釐清legacy睡眠整套舊需求規則保留至醒後正常提交點才切換。原reviewer窄覆核：2項resolved、0 unresolved／新增。
+
+兩軸皆只審查本次文件切片，不代表整份#271完成。規則推薦見[一次確認文件](../design/character-dice-energy-recommendation-2026-11-09.md)，[draft PR #280](https://github.com/sarekoubeYohane/quiet-hours-npc/pull/280)保持draft；本次完成接手稽核、推薦與基線補證，沒有完成或關閉#272/#273/#274/#256及其後續實作票。
