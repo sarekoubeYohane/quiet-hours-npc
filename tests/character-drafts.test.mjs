@@ -107,3 +107,55 @@ test('lost AI completion replies recover once, and slow AI responses never overw
     assert.equal((await generate({id:saved.id,version:saved.version,discard:true})).status,200);
   } finally {globalThis.fetch=originalFetch;db.close();}
 });
+
+test('restoring AI text after a persisted empty field preserves its AI source and substantive edit evidence', async()=>{
+  const {db,request,generate,worldRequest}=await fixture(),oldFetch=globalThis.fetch;
+  globalThis.fetch=async()=>Response.json({usage:{prompt_tokens:2,completion_tokens:2},choices:[{message:{content:'{"background":"在河畔學修鐘。"}'}}]});
+  try {
+    await worldRequest({operation:'set-model-key',mode:'openai',key:'controlled-key'});
+    await worldRequest({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}});
+    const scope=(await worldRequest()).body;
+    let draft=(await request({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields})).body.draft;
+    draft=(await generate({id:draft.id,version:draft.version,operationId:Date.now()+':'+crypto.randomUUID(),operationScope:scope.operationScope,worldContext:scope.world.contextId})).body.draft;
+    draft=(await request({...draft,fields:{...draft.fields,background:''}})).body.draft;
+    draft=(await request({...draft,fields:{...draft.fields,background:'在河畔，學修鐘！'}})).body.draft;
+    let saved=(await request()).body.drafts.find(value=>value.id===draft.id);
+    assert.equal(saved.provenance.background.kind,'ai');
+    assert.equal(saved.provenance.background.materiallyEdited,false);
+    assert.equal(saved.provenance.background.aiText,'在河畔學修鐘。');
+    draft=(await request({...draft,fields:{...draft.fields,background:'在河畔跟外公學修鐘。'}})).body.draft;
+    saved=(await request()).body.drafts.find(value=>value.id===draft.id);
+    assert.equal(saved.provenance.background.kind,'ai');
+    assert.equal(saved.provenance.background.materiallyEdited,true);
+    assert.equal(saved.provenance.background.userText,'在河畔跟外公學修鐘。');
+  } finally {globalThis.fetch=oldFetch;db.close();}
+});
+
+test('recompletion and discarded slow results retain every known AI field source across saved clears', async()=>{
+  const {db,request,generate,worldRequest}=await fixture(),oldFetch=globalThis.fetch;
+  let calls=0,onModel;
+  globalThis.fetch=async()=>{calls++;await onModel?.();return Response.json({usage:{prompt_tokens:2,completion_tokens:2},choices:[{message:{content:JSON.stringify({background:calls===1?'在河畔學修鐘。':calls===2?'在山城做木工。':'慢回覆的新文字'})}}]});};
+  try {
+    await worldRequest({operation:'set-model-key',mode:'openai',key:'controlled-key'});
+    await worldRequest({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}});
+    const scope=(await worldRequest()).body;
+    const inputFor=draft=>({id:draft.id,version:draft.version,operationId:Date.now()+':'+crypto.randomUUID(),operationScope:scope.operationScope,worldContext:scope.world.contextId});
+    let draft=(await request({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields})).body.draft;
+    draft=(await generate(inputFor(draft))).body.draft;
+    draft=(await request({...draft,fields:{...draft.fields,background:''}})).body.draft;
+    draft=(await generate(inputFor(draft))).body.draft;
+    draft=(await request({...draft,fields:{...draft.fields,background:''}})).body.draft;
+    onModel=async()=>{
+      const current=(await request()).body.drafts.find(value=>value.id===draft.id);
+      assert.equal((await request({...current,fields:{...current.fields,personality:'保留另一裝置的文字'}})).status,200);
+    };
+    assert.equal((await generate(inputFor(draft))).status,409);
+    draft=(await request()).body.drafts.find(value=>value.id===draft.id);
+    draft=(await request({...draft,fields:{...draft.fields,background:'在河畔，學修鐘！'}})).body.draft;
+    const saved=(await request()).body.drafts.find(value=>value.id===draft.id);
+    assert.equal(saved.fields.personality,'保留另一裝置的文字');
+    assert.equal(saved.provenance.background.kind,'ai');
+    assert.equal(saved.provenance.background.materiallyEdited,false);
+    assert.equal(calls,3);
+  }finally{globalThis.fetch=oldFetch;db.close();}
+});
