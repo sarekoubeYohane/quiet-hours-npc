@@ -16,10 +16,13 @@ try{
  const aRead=await req('a','/api/opening-drafts?id='+captured.id),bRead=await req('b','/api/opening-drafts?id='+captured.id);
  console.log('WATCH1',JSON.stringify({aStatus:aRead.status,bStatus:bRead.status,uiStatus:await page.getByRole('status').allTextContents(),requestScope:captured.operationScope,responseScope:bRead.body.operationScope}));assert.equal(aRead.status,200);assert.equal(aRead.body.draft.body.name,'甲尚未修改');assert.equal(bRead.status,200);const names={aName:aRead.body.draft.body.name,bName:bRead.body.draft.body.name,visibleName:await page.locator('[name=opening-name]').inputValue()};console.log('WATCH1_NAMES',JSON.stringify(names));assert.equal(names.visibleName,'甲的未受理新名稱');evidence.push({phase:'original-account recovery never accepts the other account same-id same-body draft',...names,requestScope:captured.operationScope,responseScope:bRead.body.operationScope});await page.screenshot({path:output+'/account-recovery-unsynced.png',fullPage:true});
  await page.unroute('**/api/opening-drafts');await context.addCookies([{name:'qh_local_owner',value:'a',url:app.url}]);
- await ok('a','/api/model-settings',{version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}});
- await ok('a','/api/world?workspace=account',{operation:'set-model-key',mode:'openai',key:'controlled-only-key'});
+ const modelSettings=await ok('a','/api/model-settings');
+ await ok('a','/api/model-settings',{accountScope:modelSettings.accountScope,version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}});
+ const accountWorkspace=await ok('a','/api/world?workspace=account');
+ await ok('a','/api/world?workspace=account',{operationScope:accountWorkspace.operationScope,operation:'set-model-key',mode:'openai',key:'controlled-only-key'});
  const aRequest=(path,payload)=>req('a',path,payload);const card=await formCharacterCard(aRequest);
- const scene=(await ok('a','/api/scene-templates',{id:crypto.randomUUID(),version:0,name:'老屋',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})).template;
+ const sceneTemplates=await ok('a','/api/scene-templates');
+ const scene=(await ok('a','/api/scene-templates',{accountScope:sceneTemplates.accountScope,id:crypto.randomUUID(),version:0,name:'老屋',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})).template;
  const opening=async(name)=>{const id=crypto.randomUUID(),body={name,step:5,description:'',city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:'老屋'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}};await ok('a','/api/opening-drafts',{operationScope:'a',id,version:0,body});return id;};
  const {saved}=await confirmOpening(aRequest,{name:'已選另一世界',city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:'老屋'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}});const other=saved.save.id,slow=await opening('慢回覆新世界');
  let entered,release;const started=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
