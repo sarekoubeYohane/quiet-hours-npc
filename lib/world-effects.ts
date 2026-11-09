@@ -1,3 +1,4 @@
+import { resolveActionCheck, senseAvailable, type ActionCheck } from './action-checks';
 import { connectingDoor, worldRegions } from './world-configuration';
 import { changeBodyNeeds, type IngestEffect } from './needs';
 import { routineBindingsHold, rebindRoutineEffects, recordCommittedRoutinePremises, canConfirmRoutineBackground, canContactRoutineBackground, routineBackgroundHasFiniteConflict, type RoutineSourceScope, type RoutinePhaseBindings } from './routine-world-bindings';
@@ -15,7 +16,7 @@ import type { Action, ActivityPlan, Character, World } from './world';
 import { canSee, regionOf, objectObservationCandidates, supplyObservationCandidates, discoverWorldResources, type DiscoveryMethod } from './perception';
 import { record } from './world';
 import { usableRoutineObject } from './routine-materials';
-import { judgeD20, rollD20, type Difficulty, type Advantage, type Outcome, type Resolution } from './d20';
+import { type Advantage, type Outcome, type Resolution } from './d20';
 
 // Legacy tea changes physical objects too; it must use the same verified effects.
 export function requiresWorldEffects(action: Action): boolean {
@@ -41,7 +42,7 @@ export type ResultBranch={outcomes:Outcome[];effects:Effect[];stages:ActivityPha
 export type TrialBinding={operation:string;subject:string;references:string[]};
 export type SelectedResult={outcome:Outcome|null;resolution?:Resolution;branch:number};
 export type ActivityIdentity={version:1;key:string;label:string};
-export type EffectCandidate={activityIdentity?:ActivityIdentity;resumable?:boolean;bodyActivity?:import('./needs').BodyActivity;pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;knownBlockedReason?:string;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:{difficulty:Difficulty;ability:string}|null};
+export type EffectCandidate={activityIdentity?:ActivityIdentity;resumable?:boolean;bodyActivity?:import('./needs').BodyActivity;pendingResultSupplies?:string[];branches?:ResultBranch[];selectedResult?:SelectedResult;trialBinding?:TrialBinding;preparationSupplies?:string[];confirmedDurationMinutes?:number;knownBlockedReason?:string;blockedReason?:string;stages?:ActivityPhase[];status:'accepted'|'denied'|'unsupported';effects:Effect[];check:ActionCheck|null};
 export function hasObjectPermission(object:{owner:string;allowedTo:string[];coOwners?:string[]},actorId:string):boolean {
  return object.allowedTo.includes(actorId)||(!object.coOwners||object.coOwners.length<=1)&&object.owner===actorId;
 }
@@ -254,7 +255,7 @@ function branchResolution(w:World,c:Character,candidate:EffectCandidate,action:A
  // attempt bind its current material unit. Mere branch/reference edits cannot.
  if(!prior&&!candidate.trialBinding){frozen=currentRefs;key=identity(frozen);prior=w.freeTrials?.[key];}
  if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
- const result=prior||judgeD20(rollD20(),abilityAdvantage(c,candidate.check!.ability),candidate.check!.difficulty);
+ const result=prior||resolveActionCheck(c,candidate.check!,abilityAdvantage(c,candidate.check!.ability));
  if(!prior){if(!candidate.trialBinding)(w.branchTrialScopes??={})[scope]=frozen;(w.freeTrials??={})[key]=result;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,result);w.events.at(-1)!.attemptKey=key;}
  return result;
 }
@@ -289,6 +290,8 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
 }
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean}):boolean{
+ if(candidate.check?.sense&&!senseAvailable(c,candidate.check.sense))throw new EffectValidationError('裁定所需的感官目前沒有成立機會。',{reason:'check_sense_unavailable',sense:candidate.check.sense});
+ if(context?.validateOnly&&candidate.branches){validateResultBranches(w,c,candidate);return true;}
  if(candidate.branches){
   validateResultBranches(w,c,candidate);
   if(!action)throw Error('結果分支缺少活動對象。');
@@ -341,6 +344,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
    throw new EffectValidationError(error instanceof Error?error.message:'活動階段前提無效。',{reason:'phase_precondition',phaseIndex,preconditions:phase.preconditions,actual:phase.preconditions.map(p=>'target' in p?worldTargetSnapshot(predicted,p.target):predicted.objects?.find(o=>o.id===p.objectId)||null)});
   }
  }
+ if(context?.validateOnly)return true;
  let resolution=candidate.selectedResult?.resolution;
  if(candidate.check){
   const allEffects=[...candidate.effects,...(candidate.stages||[]).flatMap(stage=>stage.effects)];
@@ -351,7 +355,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   const key=JSON.stringify(canonical(['free',c.id,regionOf(c),[...(c.abilityTags||[])].sort(),candidate.effects,phases,conditions]));
   const prior=w.freeTrials?.[key];
   if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
-  resolution=prior||judgeD20(rollD20(),abilityAdvantage(c,candidate.check.ability),candidate.check.difficulty);
+  resolution=prior||resolveActionCheck(c,candidate.check,abilityAdvantage(c,candidate.check.ability));
   if(!prior){(w.freeTrials??={})[key]=resolution;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);w.events.at(-1)!.attemptKey=key;}
   if(!['success','critical-success'].includes(resolution.outcome)){recordActionResult(w,c,action,'嘗試尚未完成，這次沒有新增成果。','blocked');return false;}
  }

@@ -79,7 +79,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
         // Avoid repeatedly serializing all earlier transcripts at every later
         // actor's checkpoint while preserving actual dispatch/usage metadata.
         for(const item of trace.dispatches){const dispatch=item as Record<string,unknown>;for(const key of ['requestBody','responseBody','rawCandidate','worldSnapshot','parsedCandidate','validation'])delete dispatch[key];}
-        for(const item of steps)item.data={gap:'single-record-limit'};
+        for(const item of steps)if(item.kind!=='time-policy')item.data={gap:'single-record-limit'};
         delete trace.result;
       }
     }

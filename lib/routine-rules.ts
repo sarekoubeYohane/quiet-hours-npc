@@ -1,3 +1,4 @@
+import { confirmNewCheck } from './action-checks';
 import { confirmsBodyConsequences } from './needs';
 import { adjudicationLimits, worldObjectCapacity } from './adjudication-limits';
 import { bindWorldRoutine } from './routine-world-programs';
@@ -34,6 +35,8 @@ export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string
 // World binding is deliberately separate from pure candidate parsing.
 export function resolveRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15,maxMinutes:number|null=null,observe?:RoutineSelectionObserver,onParsed?:(value:ReturnType<typeof parseAdjudicationCandidate>)=>void):EffectCandidate {
  const offer=routineOffer(w,c,a);const parsed=parseAdjudicationCandidate(raw,{routineOperations:offer?.operations||[],allowGenericMethods:!!offer?.genericMethods});
+ if(parsed.kind==='effects')parsed.candidate.check=confirmNewCheck(c,parsed.candidate.check);
+ else if('programs' in parsed.approval)for(const program of parsed.approval.programs??[])if(program.check)program.check=confirmNewCheck(c,program.check);
  try{onParsed?.(parsed);}catch{/* Observer cannot change candidate semantics. */}
  if(parsed.kind==='routine')return bindRoutine(w,c,a,duration,parsed.approval,elapsedMinutes,maxMinutes,observe)!;
  const rule=w.routineRules?.find(r=>r.knownTo.includes(c.id));if(rule)audit(w,c,rule,'exception');

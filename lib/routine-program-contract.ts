@@ -1,15 +1,16 @@
+import { actionCheckSchema, validActionCheck, type ActionCheck } from './action-checks';
 import { adjudicationLimits, routineOperations } from './adjudication-limits';
 import type { RoutineOperation } from './routine-rules';
-import type { Outcome, Difficulty } from './d20';
+import type { Outcome } from './d20';
 export type RoutineStep = {kind:'materialize';role:'vesselSupply'|'materialSupply'|'productSupply'} | {kind:'consume';role:'material'|'drink'} | {kind:'transfer';role:'vessel'|'drink';toHolder:'actor'|null} | {kind:'state';role:'vessel';key:'contents'|'clean';value:string};
 export type RoutinePath = {effects?:RoutineStep[];stages:{afterMinutes:number;effects:RoutineStep[]}[]};
-export type RoutineProgram = RoutinePath & {operation:RoutineOperation;check?:{difficulty:Difficulty;ability:string}|null;branches?:(RoutinePath & {outcomes:Outcome[]})[]|null};
+export type RoutineProgram = RoutinePath & {operation:RoutineOperation;check?:ActionCheck|null;branches?:(RoutinePath & {outcomes:Outcome[]})[]|null};
 const outcomes:readonly Outcome[]=adjudicationLimits.outcomes;
 const object=<T extends Record<string,unknown>>(properties:T)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
 const stagedProgramSchema=object({operation:{type:'string',enum:routineOperations},stages:{type:'array',minItems:1,maxItems:adjudicationLimits.maxStages,items:object({afterMinutes:{type:'integer',enum:[...adjudicationLimits.phaseMinutes]},effects:{type:'array',minItems:1,maxItems:adjudicationLimits.maxProgramSteps,items:{anyOf:[object({kind:{type:'string',const:'materialize'},role:{type:'string',enum:['vesselSupply','materialSupply','productSupply']}}),object({kind:{type:'string',const:'consume'},role:{type:'string',enum:['material','drink']}}),object({kind:{type:'string',const:'transfer'},role:{type:'string',enum:['vessel','drink']},toHolder:{type:['string','null'],enum:['actor',null]}}),object({kind:{type:'string',const:'state'},role:{type:'string',const:'vessel'},key:{type:'string',enum:['contents','clean']},value:{type:'string',maxLength:40}})]}}})}});
 const certainProgramSchema={...stagedProgramSchema,properties:{...stagedProgramSchema.properties,effects:{...stagedProgramSchema.properties.stages.items.properties.effects,minItems:0,maxItems:adjudicationLimits.maxEffects}},required:[...stagedProgramSchema.required,'effects']};
 const pathSchema=object({effects:certainProgramSchema.properties.effects,stages:{...stagedProgramSchema.properties.stages,minItems:0,items:{...stagedProgramSchema.properties.stages.items,properties:{...stagedProgramSchema.properties.stages.items.properties,effects:{...stagedProgramSchema.properties.stages.items.properties.effects,minItems:0}}}}});
-export const routineProgramSchema={...certainProgramSchema,properties:{...certainProgramSchema.properties,stages:{...certainProgramSchema.properties.stages,minItems:0},check:{anyOf:[{type:'null'},object({difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:{type:'string',minLength:1,maxLength:adjudicationLimits.maxValueLength}})]},branches:{anyOf:[{type:'null'},{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:object({...pathSchema.properties,outcomes:{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:{type:'string',enum:outcomes}}})}]}},required:[...certainProgramSchema.required,'check','branches']};
+export const routineProgramSchema={...certainProgramSchema,properties:{...certainProgramSchema.properties,stages:{...certainProgramSchema.properties.stages,minItems:0},check:{anyOf:[{type:'null'},...actionCheckSchema.anyOf]},branches:{anyOf:[{type:'null'},{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:object({...pathSchema.properties,outcomes:{type:'array',minItems:1,maxItems:adjudicationLimits.maxBranches,items:{type:'string',enum:outcomes}}})}]}},required:[...certainProgramSchema.required,'check','branches']};
 
 const exact=(v:unknown,keys:string[]):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');
 export function validateRoutinePrograms(programs:unknown,times:{operation:RoutineOperation;minutes:number}[],requireComplete=true):asserts programs is RoutineProgram[]{
@@ -18,7 +19,7 @@ export function validateRoutinePrograms(programs:unknown,times:{operation:Routin
   const time=times.find(t=>t.operation===p?.operation);
   if(p&&typeof p==='object'&&(p.branches!==undefined&&p.branches!==null)){
    if(!time||!exact(p,['operation','effects','stages','check','branches'])||!Array.isArray(p.effects)||p.effects.length||!Array.isArray(p.stages)||p.stages.length||!Array.isArray(p.branches)||!p.branches.length||p.branches.length>adjudicationLimits.maxBranches)throw Error('日常結果分支契約無效。');
-   if(p.check!==null&&(!exact(p.check,['difficulty','ability'])||!(adjudicationLimits.difficulties as readonly number[]).includes(p.check.difficulty as number)||typeof p.check.ability!=='string'||!p.check.ability.length||p.check.ability.length>adjudicationLimits.maxValueLength))throw Error('日常判定不可指定骰值或結果。');
+   if(p.check!==null&&!validActionCheck(p.check))throw Error('日常判定不可指定骰值或結果。');
    const seen:Outcome[]=[];
    for(const branch of p.branches){
     if(!exact(branch,['outcomes','effects','stages'])||!Array.isArray(branch.outcomes)||!branch.outcomes.length||branch.outcomes.some(o=>!outcomes.includes(o as Outcome)))throw Error('日常結果級別無效。');

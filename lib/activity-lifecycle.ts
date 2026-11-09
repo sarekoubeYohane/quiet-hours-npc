@@ -73,11 +73,11 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
 export function progressActivity(world:World,character:Character,kind:'controlled'|'automatic'|'chosen'):void {
  if(character.plan?.deferredAction){
   if(world.minute<character.plan.until)return;
-  const action=character.plan.action;
+  const action=character.plan.action,checkSystem=character.plan.checkSystem??'d20-v1';
   try{const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;resolve(validation,actor,action,{dryRun:true});}
   catch(error){if(error instanceof MemoryValidationError||error instanceof PerceptionCapacityError)throw error;cancelActivity(world,character);recordActionResult(world,character,action,'原活動的條件已改變，尚未完成。','blocked');return;}
   cancelActivity(world,character);
-  resolve(world,character,action);invalidateNaturalChanges(world);return;
+  resolve(world,character,action,{checkSystem});invalidateNaturalChanges(world);return;
  }
  if(character.plan?.phases){
   if(kind==='chosen')record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from:character.location,to:character.location});
@@ -157,6 +157,17 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(candidate.confirmedDurationMinutes===undefined)throw new EffectValidationError('完成目標缺少世界確認耗時。',{reason:'completion_time_missing'});
       const duration=candidate.confirmedDurationMinutes;
       if(instantaneousRights&&duration!==15)throw new EffectValidationError('授權與同意是一次性選擇。',{reason:'rights_duration'});
+      // Free branches describe complete outcomes. Schedule them before selecting
+      // a die so every outcome keeps the confirmed time. Routine factories own
+      // their explicit preparation/stage split and are already time-validated.
+      if(world.timeContract==='five-minute-v1'&&candidate.branches&&!candidate.trialBinding&&duration>minutes){
+        candidate={...candidate,branches:candidate.branches.map(branch=>{
+          const stages=structuredClone(branch.stages),last=stages.at(-1);
+          if(last?.afterMinutes===duration)last.effects=[...branch.effects,...last.effects];
+          else stages.push({afterMinutes:duration,preconditions:[],effects:branch.effects});
+          return {...branch,effects:[],stages};
+        })};
+      }
       if(!candidate.branches&&!(candidate.stages?.length)&&duration>minutes)candidate={...candidate,effects:[],stages:[{afterMinutes:duration,preconditions:[],effects:candidate.effects}]};
       if(!candidate.branches&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes&&candidate.bodyActivity?.kind!=='sleep'){
@@ -190,8 +201,8 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     if(world.timeContract==='five-minute-v1'){
       const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
       resolve(validation,actor,decision.action,{dryRun:true});
-      const duration=decision.timeIntent?.kind==='open-ended'?decision.durationMinutes:15;
-      character.plan={deferredAction:true,action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
+      const duration=decision.timeIntent?.kind==='open-ended'||!decision.timeIntent&&sustainedActions.has(decision.action.type)?decision.durationMinutes:15;
+      character.plan={deferredAction:true,checkSystem:character.attributes?'d100-v1':'d20-v1',action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
       character.activity='正在進行已選活動，尚未完成。';
       record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
       if(decision.action.type==='rest')character.plan.bodyActivity={version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0};
