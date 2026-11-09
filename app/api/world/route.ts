@@ -1,3 +1,4 @@
+import { readEffectiveModels, modelSettingsView } from '@/lib/model-settings-store';
 import { bindWorldSave, ensureAccountOperationLedger, SaveAccessError } from '@/lib/world-saves';
 import { adoptFormalMentalEnergy, validateMentalAdoption, formFormalMentalEnergy } from '@/lib/formal-mental-enablement';
 import { enablePersonalNeeds, validateBodyNeedsSetup } from '@/lib/body-needs-policy';
@@ -144,7 +145,10 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), accountId) : { enabled: false } });
+    const modelSettings = await modelSettingsView(accountId, binding);
+    if (modelSettings.effective.adjudication) loaded.world.adjudication = { ...modelSettings.effective.adjudication };
+    else if (modelSettings.source !== 'legacy') delete loaded.world.adjudication;
+    return reply({ ...loaded, modelSettings, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), accountId) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -233,8 +237,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'set-price' && !validPrice(b.price)) return reply({error:'請填寫有效的供應商、模型、非負有限 USD 單價、來源與日期。'},400);
     if (b.operation === 'advance') {
       if (![5, 15, 30].includes(b.minutes as number)) return reply({ error: '請選擇有效的世界推進時間。' }, 400);
-      if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
-      if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
+
 
     }
     if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return reply({error:'請填寫裁定服務與模型。'},400);
@@ -352,6 +355,22 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，請明示重置測試世界後再推進；舊世界仍可讀取，用量保留。',worldResetRequired:true},409);
+    const originalAdjudication = world.adjudication && { ...world.adjudication };
+    let ephemeralModels = false;
+    // Resolve only after exact-ID journal recovery and before accepting a new
+    // dispatch. Both roles are captured once; later account edits cannot change
+    // this operation's model chain or manufacture another paid opportunity.
+    if ((b.operation === 'advance' && b.mode !== 'demo') || generatingSetup) {
+      const settings = await readEffectiveModels(accountId, binding, world.adjudication ? { adjudication: world.adjudication } : undefined);
+      if (settings.source === 'account' || settings.source === 'save' || settings.source === 'missing') {
+        if (!settings.effective.adjudication || (!generatingSetup && !settings.effective.npc)) return reply({ error: '請在原流程補齊模型設定。', modelSettingsRequired: true }, 400);
+        ephemeralModels = true;
+        world.adjudication = { ...settings.effective.adjudication };
+        if (!generatingSetup) { b.mode = settings.effective.npc!.provider === 'openai' ? 'openai' : 'ai'; b.model = settings.effective.npc!.model; }
+      }
+      if (!generatingSetup && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。', modelSettingsRequired: true }, 400);
+      if (!generatingSetup && b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
+    }
     if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter');
     if(b.operation==='advance'&&b.mode!=='demo'){
       if(!world.adjudication)return reply({error:'請先設定天上意志的裁定服務、模型與 API Key。'},400);
@@ -646,6 +665,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     // abort timer callback. Only a completed in-budget candidate may enter the
     // separate commit/rollback window.
     if(!failure){try{checkSignal(workSignal!);}catch(error){restoreWorld(world,beforeOperation);failure=error instanceof Error?error:new Error('世界工作期限已到期。');decisionTrace?.step('round-failure',undefined,{name:failure.name,stage:'work-complete'});}}
+    // Effective account/save preferences belong to the captured dispatch, not
+    // to a newly invented legacy world setting on a later read.
+    if (ephemeralModels) { if (originalAdjudication) world.adjudication = originalAdjudication; else delete world.adjudication; }
     const usage = currentUsage(world);
     const result: OperationResult = failure
       ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
@@ -729,7 +751,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       decisionTrace?.step('commit-status-unknown',undefined,{gap:'journal-confirmation-unavailable'});decisionTrace?.gap('journal-confirmation-unavailable');await finishTrace('unknown');
       return reply({...uncertainResult.body,decisionTraceStatus:traceStatus}, uncertainResult.status);
     }
-    if (e instanceof ModelKeyError) return reply({ error: e.message }, e.status);
+    if (e instanceof ModelKeyError) return reply({ error: e.message, modelSettingsRequired: true }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。', stopReason:stopReason(e) }, 502);
   } finally {
     if (locked) try { await finishWait(database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run()); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }

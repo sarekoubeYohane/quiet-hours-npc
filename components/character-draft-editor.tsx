@@ -1,5 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ModelSettingsPanel from '@/components/model-settings-panel';
+import { modelRoleReady, type ModelSettingsView } from '@/lib/model-settings';
 import { Button } from '@/components/ui/button';
 import { characterDraftFieldNames, characterTextGroups, missingCharacterText, newCharacterDraft, type CharacterDraft } from '@/lib/character-drafts';
 import { characterTemplateFields, initialMemoryCapacityError, type CharacterTemplateField } from '@/lib/character-templates';
@@ -11,6 +13,7 @@ export default function CharacterDraftEditor() {
   const [drafts, setDrafts] = useState<CharacterDraft[]>([]);
   const [draft, setDraft] = useState<CharacterDraft>();
   const current = useRef<CharacterDraft>(undefined);
+  const [modelPanel, setModelPanel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -83,6 +86,10 @@ export default function CharacterDraftEditor() {
       if (discard) payload = { id: input.id, version: input.version, discard: true };
       else if (input.pendingGeneration) payload = { id: input.id, version: input.pendingGeneration.baseVersion, ...input.pendingGeneration };
       else {
+        const availabilityResponse = await fetch('/api/model-settings');
+        const availability = await availabilityResponse.json() as ModelSettingsView;
+        if (!availabilityResponse.ok) throw Error('暫時無法讀取模型設定，原輸入已保留。');
+        if (!modelRoleReady(availability, 'adjudication')) { setModelPanel(true); return; }
         const response = await fetch(workspace);
         const settings = await response.json() as { operationScope?: string; world?: { contextId?: string }; error?: string };
         if (!response.ok || !settings.operationScope || !settings.world) throw Error(settings.error || '暫時無法讀取帳號模型設定。');
@@ -111,6 +118,7 @@ export default function CharacterDraftEditor() {
   const canSwitch = !saving && !generating && !dirty && !saveFailed;
   return <section className="panel space-y-4 p-6" aria-label="建角文字草稿">
     <h2>製作人物卡</h2>
+    {modelPanel && <ModelSettingsPanel onClose={() => setModelPanel(false)} />}
     <p className="hint">先寫人物概念，或全部手填。此處保存帳號建角草稿，尚不是可選入世界的完成人物卡。起始位置在開局配置安排。</p>
     <div className="flex flex-wrap gap-2">
       <Button type="button" disabled={loading || !canSwitch} onClick={() => edit(newCharacterDraft())}>新建建角草稿</Button>
