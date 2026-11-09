@@ -1,4 +1,4 @@
-import {latestArrangement} from './opening-arrangement-store';
+import {latestArrangement,actionableArrangement} from './opening-arrangement-store';
 import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
@@ -25,7 +25,7 @@ export type OpeningDraft={id:string;version:number;body:Body;sources:Sources;fin
 const client=(row:Row):OpeningDraft=>({id:row.id,version:row.version,body:JSON.parse(row.body),sources:JSON.parse(row.sources),...(row.finalized_save_id?{finalizedSaveId:row.finalized_save_id}:{})});
 async function rowFor(owner:string,id:string){return database().prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').bind(owner,id).first<Row>();}
 export async function listOpeningDrafts(owner:string){const {results}=await database().prepare('SELECT * FROM opening_drafts WHERE owner=? AND finalized_save_id IS NULL ORDER BY rowid DESC').bind(owner).all<Row>();return results.map(row=>{const draft=client(row);return {id:draft.id,version:draft.version,name:draft.body.name,step:draft.body.step};});}
-export async function readOpeningDraft(owner:string,id:string){const row=await rowFor(owner,id);if(!row)throw new SaveAccessError('找不到這份開局草稿。',404);return {draft:client(row),...JSON.parse(row.candidate) as Candidate,arrangement:await latestArrangement(owner,id)};}
+export async function readOpeningDraft(owner:string,id:string){const row=await rowFor(owner,id);if(!row)throw new SaveAccessError('找不到這份開局草稿。',404);const arrangement=await latestArrangement(owner,id),previous=arrangement?.state==='failed'?await actionableArrangement(owner,id):undefined;return {draft:client(row),...JSON.parse(row.candidate) as Candidate,arrangement,previousArrangement:previous?.state==='complete'?previous:undefined};}
 async function selectedSources(owner:string,body:Body,old?:Sources):Promise<Sources>{
  const [cards,scenes]=await Promise.all([listCharacterCards(owner),listSceneTemplates(owner)]);
  const pick=<T extends {id:string;version:number}>(refs:{templateId:string;version:number}[],saved:T[],live:T[])=>refs.map(ref=>saved.find(item=>item.id===ref.templateId&&item.version===ref.version)??live.find(item=>item.id===ref.templateId&&item.version===ref.version)).filter((item):item is T=>!!item);

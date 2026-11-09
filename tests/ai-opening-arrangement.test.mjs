@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -59,7 +60,7 @@ test('slow arrangement and original operation recovery stay on the original draf
   const foreign=await fetch(app.url+'/api/opening-drafts/arrange',{method:'POST',headers:{Cookie:'qh_local_owner=b',Origin:app.url,'Content-Type':'application/json'},body:JSON.stringify(payload)});assert.equal(foreign.status,409);
   const foreignRead=await fetch(app.url+'/api/opening-drafts?id='+j.draft.id+'&operationScope=a',{headers:{Cookie:'qh_local_owner=b'}});assert.equal(foreignRead.status,409);
   release();assert.equal((await pending).status,200);const count=app.modelRequests.length;const replay=await j.ok('/api/opening-drafts/arrange',payload);assert.equal(replay.arrangement.state,'complete');assert.equal(app.modelRequests.length,count);assert.equal(count,2);
-  const newBody={...j.draft.body,name:'完成後明示修改'};const changed=await j.ok('/api/opening-drafts',{operationScope:'a',id:j.draft.id,version:j.draft.version,body:newBody});
+  const newBody={...j.draft.body,name:'完成後明示修改',description:'完成後明示更新開局描述'};const changed=await j.ok('/api/opening-drafts',{operationScope:'a',id:j.draft.id,version:j.draft.version,body:newBody});
   assert.equal((await j.request('/api/opening-drafts/arrange',{operationScope:'a',id:j.draft.id,version:j.draft.version,operationId:op,proposalVersion:0,action:'adopt',city:replay.arrangement.city})).status,409);assert.equal(changed.draft.body.name,'完成後明示修改');
  }finally{release?.();await app.close();}
 });
@@ -105,4 +106,25 @@ test('closing and reopening the disk database restores the saved suggestion and 
   const read=await fetch(app.url+'/api/opening-drafts?id='+j.draft.id+'&operationScope=a',{headers:{Cookie:'qh_local_owner=a'}});const stored=await read.json();assert.equal(read.status,200);assert.deepEqual(stored.arrangement,original.arrangement);
   const replay=await fetch(app.url+'/api/opening-drafts/arrange',{method:'POST',headers:{Cookie:'qh_local_owner=a',Origin:app.url,'Content-Type':'application/json'},body:JSON.stringify(input)});assert.equal(replay.status,200);assert.deepEqual((await replay.json()).arrangement,original.arrangement);assert.equal(app.modelRequests.length,0);
  }finally{await app.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('actual SQLite adoption failure before a write preserves both draft and proposal, then the original request recovers exactly once',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task==='character-card-assessment-v1'?{bonuses:[]}:proposal(input);}});let db;
+ try{
+  const j=await journey(app),base={operationScope:'a',id:j.draft.id,version:j.draft.version,operationId:operationId()};const result=await j.ok('/api/opening-drafts/arrange',{...base,worldContext:j.scope.world.contextId});const input={...base,action:'adopt',proposalVersion:result.arrangement.version,city:result.arrangement.city};
+  db=new DatabaseSync(app.sqlitePath);db.exec("CREATE TRIGGER controlled_adoption_failure BEFORE UPDATE ON opening_drafts BEGIN SELECT RAISE(ABORT,'controlled storage failure before adoption write'); END");
+  assert.equal((await j.request('/api/opening-drafts/arrange',input)).status,503);const unchanged=await j.ok('/api/opening-drafts?id='+j.draft.id+'&operationScope=a');assert.deepEqual(unchanged.draft.body,j.draft.body);assert.equal(unchanged.arrangement.state,'complete');assert.equal((await j.ok('/api/saves')).saves.length,0);db.exec('DROP TRIGGER controlled_adoption_failure');
+  const adopted=await j.ok('/api/opening-drafts/arrange',input),replayed=await j.ok('/api/opening-drafts/arrange',input);assert.deepEqual(replayed.draft,adopted.draft);assert.equal(replayed.arrangement.state,'adopted');assert.equal(app.modelRequests.length,2);
+ }finally{db?.close();await app.close();}
+});
+
+test('a later failed request keeps the prior saved proposal accessible, and step or name changes do not require paying to regenerate it',async()=>{
+ let fail=false;const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task==='character-card-assessment-v1'?{bonuses:[]}:fail?{invalid:true}:proposal(input);}});
+ try{
+  const j=await journey(app),firstOp=operationId(),base={operationScope:'a',id:j.draft.id,version:j.draft.version,worldContext:j.scope.world.contextId};const first=await j.ok('/api/opening-drafts/arrange',{...base,operationId:firstOp});
+  fail=true;assert.equal((await j.request('/api/opening-drafts/arrange',{...base,operationId:operationId()})).status,502);
+  const loaded=await j.ok('/api/opening-drafts?id='+j.draft.id+'&operationScope=a');assert.deepEqual(loaded.previousArrangement.city,first.arrangement.city);assert.equal(loaded.previousArrangement.operationId,firstOp);
+  const stepped=await j.ok('/api/opening-drafts',{operationScope:'a',id:j.draft.id,version:j.draft.version,body:{...j.draft.body,name:'改名保留建議',step:4}});
+  const adopted=await j.ok('/api/opening-drafts/arrange',{operationScope:'a',id:j.draft.id,version:stepped.draft.version,operationId:firstOp,proposalVersion:first.arrangement.version,action:'adopt',city:first.arrangement.city});assert.equal(adopted.draft.body.name,'改名保留建議');assert.equal(adopted.world.objects.some(object=>object.label==='木桌'),true);assert.equal(app.modelRequests.length,3);
+ }finally{await app.close();}
 });

@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import {getGitHubUser} from '@/lib/auth';
 import {readOpeningDraft,saveOpeningDraft} from '@/lib/opening-drafts';
-import {readArrangement,reserveArrangement,settleArrangement,arrangementForClient,editArrangement,latestArrangement} from '@/lib/opening-arrangement-store';
+import {readArrangement,reserveArrangement,settleArrangement,arrangementForClient,editArrangement,actionableArrangement} from '@/lib/opening-arrangement-store';
 import {cityDraftSchema} from '@/lib/city-creation';
 import {SaveAccessError} from '@/lib/world-saves';
 import {database} from '@/lib/store';
@@ -24,14 +24,16 @@ export async function POST(request:Request){
   let row=await readArrangement(owner,input.id,input.operationId);
   if('action' in input){
    if(!row||!['complete','adopted'].includes(row.state))return reply({error:'請先恢復並查看原整理建議。'},409);
-   if((await latestArrangement(owner,input.id))?.operationId!==input.operationId)return reply({error:'已有較新的整理操作，請查看最新建議。'},409);
-   if(input.version!==row.input_version)return reply({error:'整理依據的草稿版本不符，原輸入已保留。'},409);
-   if(input.action==='edit'){const edited=await editArrangement(owner,row,input.proposalVersion,input.city);return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(edited)});}
-   const adoption=JSON.stringify(input);if(row.adoption_request&&row.adoption_request!==adoption)return reply({error:'原建議已採納，後續修改請使用手動配置。'},409);
-   if(row.state==='adopted'&&row.adoption_request===adoption)return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});
+   const adoption=JSON.stringify(input);
+   if(input.action==='adopt'&&row.state==='adopted'&&row.adoption_request===adoption)return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});
+   if((await actionableArrangement(owner,input.id))?.operationId!==input.operationId)return reply({error:'已有較新的整理操作，請查看最新建議。'},409);
+   if(input.version!==loaded.draft.version)return reply({error:'開局草稿版本已變更，原輸入已保留。'},409);
+   const originalDraft=JSON.parse(row.snapshot) as {body:{city:unknown;description:string}};
+   if(JSON.stringify(originalDraft.body.city)!==JSON.stringify(loaded.draft.body.city)||originalDraft.body.description!==loaded.draft.body.description)return reply({error:'整理依據的開局內容已變更，原輸入已保留；請核對或手動完成。'},409);
+   if(input.action==='edit'){const edited=await editArrangement(owner,row,input.proposalVersion,input.city,input.version);return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(edited)});}
+   if(row.adoption_request&&row.adoption_request!==adoption)return reply({error:'原建議已採納，後續修改請使用手動配置。'},409);
    if(input.proposalVersion!==row.revision||!row.result||JSON.stringify(JSON.parse(row.result).city)!==JSON.stringify(input.city))return reply({error:'建議已變更，請先保存修改並核對原版本。'},409);
    if(!JSON.parse(row.result).world||JSON.parse(row.result).preview.issues.length)return reply({error:'建議仍有開局阻擋問題，請修改後再採納。',preview:JSON.parse(row.result).preview},422);
-   if(input.version!==row.input_version)return reply({error:'整理依據的草稿版本不符，原輸入已保留。'},409);
    const result=await saveOpeningDraft(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:input.city}});
    await database().prepare('UPDATE opening_arrangements SET state=\'adopted\',adoption_request=? WHERE owner=? AND draft_id=? AND operation_id=?').bind(adoption,owner,input.id,input.operationId).run();
    return reply({operationScope:owner,...result,arrangement:arrangementForClient((await readArrangement(owner,input.id,input.operationId))!)});
