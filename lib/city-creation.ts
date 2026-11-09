@@ -32,7 +32,7 @@ export const cityDraftSchema = z.object({
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     homeDescription: z.string().trim().max(300).optional(), workDescription: z.string().trim().max(300).optional(),
-  }).strict()).max(cityLimits.characters),
+  }).strict().superRefine((selection,context)=>{if(selection.mentalOpening&&!selection.templateId.startsWith('card-')&&!mentalOpeningSchema.safeParse(selection.mentalOpening).success)context.addIssue({code:'custom',message:'舊文字範本的目前電量須適用其明示容量範圍。'});})).max(cityLimits.characters),
   backgroundPeople: z.array(z.object({
     id: instanceId, name: z.string().trim().min(1).max(60).refine(value => new TextEncoder().encode(value).length <= 128),
   }).strict()).max(cityLimits.backgroundPeople).optional(),

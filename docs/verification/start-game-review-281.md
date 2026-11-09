@@ -57,3 +57,13 @@ T9 實作者另外確認：另存請求未受理、回覆不明後頁面重載�
 唯一修復者在 `7e9cfd7` 以一行產品變更將新 alias 限定明示 v2；新增真 API／SQLite 保存及原 ID 回放反例。兩位 reviewer 各自獨立中英四格及舊 API 19/19 通過：v1 恢復 75／20，v2 保持 55／0，兩軸 remaining 0。完整 ready `6348f9f` 合入並推送 `59bb7d9`，新版真路由 6/6、固定真觀察／分析／重載及 typecheck／lint／build 通過。
 
 後續固定 `c2a38a3` 完整回歸核心 1264/1264 通過，auth 舊 hosting 接點缺 `all`／`batch` 的失敗已確認為 tests-only。修正 `913d842` 合入 `ac3216b`，保留原 API 斷言並新增原子／值綁定契約，合後 auth 40/40 通過。原整次 exit 1 與未跑組別詳見[整合報告](start-game-integration-281.md)。最後完整兩軸 review 仍待 T7／T8 交付。
+
+## T7 接合中途審查（尚未完成）
+
+後端 `b1696a2`：Standards 硬性 0、judgment P3 一項，開局測試整套複製完成卡 fixture；Spec P2 一項，晚到修改／確認只靠當下登入帳號。A／B 同 UUID／版本的 API／SQLite 反例確認誤覆 B 草稿及誤建 B 世界。UI 接合在收到 review 回報前也指出此問題，後端演進 `c159a0e` 已加原 `operationScope`；Spec 捕捉 A 真 scope 後切 B 重送 edit／confirm／restart／v0，均 409，B 資料不變，4/4 與原 9/9 通過，原 P2 remaining 0。fixture P3 尚待唯一修復者收斂。
+
+UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存受理前失敗後，恢復 GET 未驗原 scope，B 同 UUID／body 可令 UI 假稱 A 已同步；另暫扣已提交建立成功回覆，實際離開並續玩另一世界後釋放，舊閉包強制導航至新建世界。唯一修復者候選 `28b9edd` 正在固定真頁與獨立覆核，尚未清零或關 #288。
+
+同一接合版另獨立確認 **T9 新 P1**：真正形成卡、開局草稿與保存 API 建 A／B 各自相同 save UUID／版本，切 B 後重送 A 原 copy／delete payload。copy 回 201 建 B 副本；delete 回 200 永久刪 B 來源，A 保留。讀取授權仍有隔離，錯的是原操作身分沒有保留。`save-management` schema 及 `SaveActions` 未將原帳號 scope 帶入 POST。#290 已實際重新 open（留言 6743755849），交同一修復者；未完成前不宣告 T9／整份完成。
+
+上述均在隔離 SQLite／受控模型，正式資料及付費模型為 0。T7 本身仍在合法前置關閉後進行，#289 未開始；不能將尚未交付的 AI 功能列作本輪遺漏。

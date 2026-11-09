@@ -1,0 +1,23 @@
+{
+  "commit": "28b9edd",
+  "origin": "http://127.0.0.1:40571",
+  "status": "passed",
+  "controlledModelCalls": 1,
+  "paidCalls": 0,
+  "evidence": [
+    {
+      "phase": "original-account recovery never accepts the other account same-id same-body draft",
+      "aName": "甲尚未修改",
+      "bName": "甲的未受理新名稱",
+      "visibleName": "甲的未受理新名稱",
+      "requestScope": "a",
+      "responseScope": "b"
+    },
+    {
+      "phase": "unmounted creation keeps its committed save without navigating away from the newly selected world",
+      "selectedSaveId": "ee72cbd3-13a7-4b25-b64e-17677c5e6b93",
+      "committedLateSaveId": "b138680c-8035-4066-b829-6ce967e672dc",
+      "url": "http://127.0.0.1:40571/observe?save=ee72cbd3-13a7-4b25-b64e-17677c5e6b93"
+    }
+  ]
+}
