@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {fixtureDecision} from '../../tests/pursuit-fixture.cjs';
+import {launchBrowser,outputPath} from './browser-runtime.mjs';
+const {url,server,store,load,setModelResponder,requests}=await import('./browser-fixture.mjs');
+const world=load('world').seedWorld();world.timeContract='five-minute-v1';
+world.characters=['owner','vera'].map(id=>world.characters.find(c=>c.id===id));
+world.characters.forEach(c=>{c.location='cafe';c.region='cafe-front';});store.install(world);
+let browser,page;const random=Math.random;let draws=0,die=96;const inputs=[];
+try {
+ browser=await launchBrowser();page=await browser.newPage({viewport:{width:1280,height:1000},reducedMotion:'reduce'});page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(15000);const errors=[];page.on('pageerror',error=>errors.push(String(error)));
+ await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
+ const state=await(await page.request.get(url+'/__fixture')).json();await page.addInitScript(now=>{Date.now=()=>now;},state.now);
+ const tick=async()=>{const state=await(await page.request.post(url+'/__fixture',{data:{advanceMs:1000}})).json();await page.evaluate(now=>{Date.now=()=>now;},state.now);};
+ const click=name=>page.getByRole('button',{name,exact:true}).click();
+ const read=async()=>{const r=await page.request.get(url+'/api/world');assert.equal(r.status(),200);return r.json();};
+ const post=async(body,status=200)=>{await tick();const context=await read();const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{mode:'demo',operationId:Date.now()+':'+crypto.randomUUID(),worldContext:context.world.contextId,...body}});assert.equal(r.status(),status,await r.text());return r.json();};
+ const submit=async(name,operation)=>{await tick();const pending=page.waitForResponse(r=>r.url()===url+'/api/world'&&r.request().method()==='POST'&&r.request().postDataJSON().operation===operation,{timeout:15000});await click(name);const response=await pending;assert.equal(response.status(),200,await response.text());return response.json();};
+ const steps=async(count)=>{for(let index=0;index<count;index++){await submit('下一回合','advance');await page.waitForFunction(()=>!document.querySelector('.advance-button')?.disabled,null,{timeout:15000});}};
+ await page.goto(url);await click('人物檔案');await click('設定並導入基本屬性');for(const label of ['力量','耐力','感知能力'])await page.getByLabel(label+'指定值',{exact:true}).fill('3');await page.getByLabel('靈巧指定值',{exact:true}).fill('4');await click('新增專長');await page.getByLabel('專長領域1').fill('髮飾設計');await page.getByLabel('專長修正1').selectOption('10');await submit('確認背景並導入一次','adopt-character-attributes');
+ Math.random=()=>{draws++;return(die-.5)/100;};
+ await post({operation:'direct',target:'owner',action:{type:'work',target:'craft-challenge',content:'星月'}});assert.equal(draws,0);await click('返回觀察');await steps(4);
+ let saved=(await read()).world;const result=saved.events.find(e=>e.actor==='owner'&&e.resolution);assert.equal(result.resolution.system,'d100-v1');assert.equal(result.resolution.roll,96);assert.equal(result.resolution.threshold,75);assert.equal(result.resolution.outcome,'critical-failure');assert.equal(draws,1);
+ await click('查看角色分析');await page.locator('.analysis-events').getByText(/d100 96/).first().waitFor();await mkdir(process.env.BROWSER_ARTIFACT_DIR||'/tmp',{recursive:true});await page.screenshot({path:outputPath('checks-277-d100.png'),fullPage:true});await page.locator('.analysis-events article').filter({hasText:'d100 96'}).first().screenshot({path:outputPath('checks-277-result.png')});
+ await post({operation:'direct',target:'owner',action:{type:'work',target:'craft-challenge',content:'重述星月'}});await click('觀察');await steps(4);assert.equal(draws,1,'same craft conditions never reroll');
+ setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);inputs.push(input);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:'照顧自己的休息'}))}}]});});
+ await post({operation:'set-model-key',mode:'openai',key:'isolated-checks-277-provider-key'});await post({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}});await post({operation:'return-control'});await post({operation:'advance',mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'});
+ const ownerInput=inputs.find(input=>input.self.id==='owner');assert.ok(ownerInput);assert.doesNotMatch(JSON.stringify(ownerInput),/threshold|d100-v1|resolution|critical-failure/);
+ await page.reload();await click('人物檔案');await click('設定感官硬限制');await page.getByLabel('視覺無感知機會',{exact:true}).check();await submit('確認感官硬限制','set-character-sense-limits');const limits=(await read()).world.characters.find(c=>c.id==='owner').attributes;assert.deepEqual(limits.blockedSenses,['sight']);
+ die=1;const from=(await read()).world.minute;await post({operation:'direct',action:{type:'observe',target:'vera',content:'sight'}});await click('返回觀察');await steps(4);saved=(await read()).world;assert.equal(saved.characters.find(c=>c.id==='owner').observations.filter(o=>o.time>=from).some(o=>o.sense==='sight'),false);assert.equal(draws,1);
+ await page.reload();await click('人物檔案');await page.locator('[aria-label="人物基本屬性"]').getByText(/感官硬限制：視覺/).waitFor();await page.screenshot({path:outputPath('checks-277-limits.png'),fullPage:true});assert.equal(errors.length,0,errors.join('\n'));
+ const summary={status:'passed',draws,paidModelCalls:0,modelCalls:inputs.length,result:result.resolution,limits,phases:['owner-confirmed values through profile','direct preflight zero dice','5-minute actual d100 action result','same craft conditions no reroll','next true model request hides dice','owner-confirmed absent sight blocks 01 and visible-person probe','SQLite reload keeps values and limits'],operations:requests.map(request=>request.operation)};
+ await writeFile(outputPath('checks-277-browser.json'),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary));
+}catch(error){console.log('DIAGNOSTIC',JSON.stringify({requests,body:await page?.locator('body').innerText()}));await page?.screenshot({path:outputPath('checks-277-failure.png'),fullPage:true});throw error;}finally{Math.random=random;await browser?.close();server.close();}

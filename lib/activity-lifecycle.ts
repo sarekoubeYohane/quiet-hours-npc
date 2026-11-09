@@ -73,11 +73,11 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
 export function progressActivity(world:World,character:Character,kind:'controlled'|'automatic'|'chosen'):void {
  if(character.plan?.deferredAction){
   if(world.minute<character.plan.until)return;
-  const action=character.plan.action;
+  const action=character.plan.action,checkSystem=character.plan.checkSystem??'d20-v1';
   try{const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;resolve(validation,actor,action,{dryRun:true});}
   catch(error){if(error instanceof MemoryValidationError||error instanceof PerceptionCapacityError)throw error;cancelActivity(world,character);recordActionResult(world,character,action,'原活動的條件已改變，尚未完成。','blocked');return;}
   cancelActivity(world,character);
-  resolve(world,character,action);invalidateNaturalChanges(world);return;
+  resolve(world,character,action,{checkSystem});invalidateNaturalChanges(world);return;
  }
  if(character.plan?.phases){
   if(kind==='chosen')record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from:character.location,to:character.location});
@@ -191,7 +191,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
       resolve(validation,actor,decision.action,{dryRun:true});
       const duration=decision.timeIntent?.kind==='open-ended'?decision.durationMinutes:15;
-      character.plan={deferredAction:true,action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
+      character.plan={deferredAction:true,checkSystem:character.attributes?'d100-v1':'d20-v1',action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
       character.activity='正在進行已選活動，尚未完成。';
       record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
       if(decision.action.type==='rest')character.plan.bodyActivity={version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0};

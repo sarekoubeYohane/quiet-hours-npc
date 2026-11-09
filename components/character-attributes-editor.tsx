@@ -10,5 +10,7 @@ export default function CharacterAttributesEditor({value,onChange}:{value:Charac
   <button type="button" disabled={(value.expertise?.length??0)>=16} onClick={()=>onChange({...value,expertise:[...value.expertise??[],{scope:'',modifier:0}]})}>新增專長</button>
   <h4>已確認感官修正</h4><p>修正不移除失明等硬限制。已用於屬性的同一弱點不可再次扣分。</p>
   {Object.entries(senses).map(([scope,label])=><label key={scope}>{label}<select aria-label={label+'修正'} value={value.senses?.find(item=>item.scope===scope)?.modifier??0} onChange={event=>onChange({...value,senses:[...(value.senses??[]).filter(item=>item.scope!==scope),{scope:scope as keyof typeof senses,modifier:Number(event.target.value) as -20|-10|0|10|20}]})}>{[-20,-10,0,10,20].map(n=><option key={n} value={n}>{n>0?'+':''}{n}</option>)}</select></label>)}
+  <h4>背景的感官硬限制</h4><p>只確認實際無法使用的感官；不是能力較弱，也不從自由文字自動推定。</p>
+  {Object.entries(senses).map(([scope,label])=><label key={'blocked-'+scope}><input type="checkbox" aria-label={label+'無感知機會'} checked={value.blockedSenses?.includes(scope as keyof typeof senses)??false} onChange={event=>onChange({...value,blockedSenses:event.target.checked?[...value.blockedSenses??[],scope as keyof typeof senses]:(value.blockedSenses??[]).filter(item=>item!==scope)})}/>{label}無感知機會</label>)}
  </fieldset>;
 }

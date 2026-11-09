@@ -20,7 +20,7 @@ test('existing WorldApp profile confirms a bounded character and shows the SQLit
  await render();await click('人物檔案');await settle(()=>button('設定並導入基本屬性'));assert.match(document.body.textContent,/尚未導入基本屬性/);assert.doesNotMatch(document.body.textContent,/舊版平面意圖/);await click('設定並導入基本屬性');
  const field=document.querySelector('[aria-label="力量指定值"]');await React.act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(field,'2');field.dispatchEvent(new window.Event('input',{bubbles:true}));field.dispatchEvent(new window.Event('change',{bubbles:true}));});
  await click('確認背景並導入一次');await settle(()=>document.querySelector('[aria-label="人物基本屬性"] dl'));assert.equal(payload.operation,'adopt-character-attributes');assert.equal(payload.target,'cass');assert.equal(payload.characterSetup.attributes.strength.value,2);
- const committed=(await (await route.GET()).json()).world.characters.find(c=>c.id==='cass').attributes;assert.equal(committed.values.strength,2);assert.match(document.querySelector('[aria-label="人物基本屬性"]').textContent,/行動與感知尚沿既有判定/);
+ const committed=(await (await route.GET()).json()).world.characters.find(c=>c.id==='cass').attributes;assert.equal(committed.values.strength,2);assert.match(document.querySelector('[aria-label="人物基本屬性"]').textContent,/新確認行動與新感知機會採 d100/);
  await React.act(async()=>root.unmount());root=createRoot(document.body.appendChild(document.createElement('div')));await render();await click('人物檔案');await settle(()=>document.querySelector('[aria-label="人物基本屬性"] dl'));assert.deepEqual((await (await route.GET()).json()).world.characters.find(c=>c.id==='cass').attributes,committed);
  }finally{await React.act(async()=>root.unmount());global.fetch=fetch;window.happyDOM.abort();}
 });
