@@ -1,6 +1,6 @@
 # #288 五步開局與原始開局驗證
 
-狀態：實作及本票主要驗證完成，等待唯一修復者的跨票 scope／共用測試接合後固定最終來源；未宣告 #281 完成，未關 #288，未啟動 #289。2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），由 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012；不沿被 #281 取代的五級新建角或覆寫世界流程。
+狀態：本票主要實作及已知 guard 修正已接合，固定 `5bdc6db` 的必要驗證通過；另保留最後實測的已受理後切帳號導航 P2，尚未 ready。未宣告 #281 完成，未關 #288，未啟動 #289。2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），由 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012；不沿被 #281 取代的五級新建角或覆寫世界流程。
 
 ## 已交付行為
 
@@ -52,3 +52,25 @@
 已合 `1a3ea10` 與最新 integration `fa0af83`。共用 v4 身分契約 `79b7927` 現在拒絕不一致的草稿／存檔 UUID，無殘留 row；開局 API 組 **15／15**（含原 12 項）通過。共用 `character-api-fixture.mjs` 取代複製的接點；兩軸對原 fixture P3／UUID P2 的覆核 remaining 0。T9 原帳號 copy/delete／receipt 恢復修正亦已採用，原 P1 兩軸覆核 remaining 0；票狀態由 root 依真正整合結果處理。
 
 新增原帳號介面查核仍待 scope 收斂包：真 API／SQLite 顯示帳號模型預設、建角草稿、人物文字範本及場景來源的舊頁請求可在換帳後寫入另一帳號；Key fast branch 亦會在 scope 檢查前寫入新帳號。另真頁可在 visibility refresh 後把原觀察頁改綁另一帳號同 ID 世界並推進。這些皆交唯一修復者，未平行修產品；無真 Key、無付費模型或正式資料操作。此段是明示尚未完成狀態，不以先前正常旅程掩蓋已重現邊界。
+
+## 固定 `5bdc6db` 驗證及本機 D1
+
+已合完整 `80b9689` scope／consumer／相容 helper 包，含單一修復者的新 request guard、WorldApp 原帳號與同帳號 receipt 恢復、可讀配置摘要及全部必要 caller metadata。原 Key P1、模型／資產／觀察頁的原帳號問題，以及同帳號初讀 pending receipt 的後續回歸，均有獨立覆核與[修復證據](account-origin-surfaces-281.md)。
+
+本分支固定 `5bdc6db` 另外驗證：
+
+| 命令／實際範圍 | 結果 |
+| --- | --- |
+| `node --test`：account-origin-surfaces、character-templates、scene-templates、character-drafts、character-cards、model-settings、opening-wizard、versioned-d100、world-saves-migration、migration-gate | **69／69** |
+| `run-activities.mjs`：world-saves、save-management、8 檔 legacy 城市／屬性／精神組，以及 budgets、decision-traces、costs、pursuit-lifecycle | **101／101**，未改原費用與歷史斷言 |
+| `npm run typecheck`、`npm run lint`、`npm run build` | 皆 exit 0；lint 0 errors／4 既有 warnings |
+| `browser-opening-wizard-288.mjs` | 真人物／場景頁／五步／接續／重載／最後返回修改／回覆遺失恢復／確認住處工作所有權及 DB 配置同份／原始重開／兩世界各 2／1 回合；controlled 1／paid 0 |
+| `opening-durable-journey-288.mjs` | 同一磁碟 SQLite 實際關閉重開，已更新來源不洗掉草稿／原始開局；原 ID 200 回放與重新開始另建；controlled 1／paid 0 |
+
+畫面：[手動配置](assets/opening-wizard-288/manual-config.png)、[完整確認](assets/opening-wizard-288/confirmation.png)、[保存後 turn 0](assets/opening-wizard-288/observed-turn-zero.png)、[兩份獨立續玩](assets/opening-wizard-288/two-worlds-continued.png)。[頁面 origin／登入／版本／次數](assets/opening-wizard-288/evidence.json)、[磁碟重開](assets/opening-wizard-288/durable-evidence.json)均記錄該固定來源。
+
+另以專案 Wrangler 實際套本機 D1，使用獨立 `/tmp/quiet-hours-t7-d1-5bdc6db/state` 與只含 fake local DB id 的暫存 config，所有命令明示 `--local`，沒有 `--remote`。從空庫先套至 0018，插入明示的歷史遷移 fixture，再用 `npm run db:migrate:local -- --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state` 套 0019；共 **16** 份專案 SQL 成功。此 fixture 只驗遷移，不作為玩家建立成功的旅程。
+
+Readonly native SQLite 比較證明：舊 state 及含 D20 結果的 journal UTF-8 內容、version 42、原 lease、city_started 及 legacy 原始開局 null 皆不變；新 opening_drafts 為空 0。完整命令、來源及舊內容 hash 見 [D1 證據](assets/opening-wizard-288/d1-migration-evidence.json)，[前置 migration log](assets/opening-wizard-288/d1-pre19.log)、[歷史 fixture log](assets/opening-wizard-288/d1-legacy.log)、[0019 log](assets/opening-wizard-288/d1-0019.log)保留 `Executing on local database`。沒有正式資料遷移或正式回退。
+
+最後新增的可重現邊界仍待唯一修復者：`5bdc6db` 真卡／場景／開局中，B 已有同 public save UUID 的世界，A 的建立 POST 已 commit 201 後暫留回覆；原頁不卸載、只換 B cookie，再放回覆，裸 saveId 導航會進 B 既有世界，A 真正保存的世界未被觀察。來源 `/tmp/t7-late-create-account.mjs`／`.log`，controlled 2／paid 0，兩世界未推進。伺服器原寫入仍正確屬 A，缺口在後續讀導航丟掉原帳號。此反例已交 root／唯一 T1，本分支未平行改產品；其他通過證據不等於此項已解。
