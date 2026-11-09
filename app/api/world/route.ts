@@ -527,7 +527,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       world.adjudication={provider:b.adjudication!.provider,model:b.adjudication!.model.trim()};
     } else if (b.operation === 'set-budget') {
       await setPlayerAccount(accountId,{limits:b.limits!});
-      world.playerBudget = { ...b.limits! };
+      world.playerBudget = { calls:b.limits!.calls,tokens:b.limits!.tokens };
     } else if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';

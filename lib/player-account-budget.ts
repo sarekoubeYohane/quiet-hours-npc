@@ -39,7 +39,7 @@ async function initialize(owner:string) {
   const prices=Object.values(Object.fromEntries(results.flatMap(value=>value.prices?JSON.parse(value.prices) as ModelPrice[]:[]).sort((a,b)=>a.savedAt-b.savedAt).map(value=>[value.provider+':'+value.model,value])));
   const token=crypto.randomUUID();
   await db.batch([
-    db.prepare('INSERT OR IGNORE INTO player_accounts(owner,version,token,usage,budget,prices,initialized) VALUES(?,0,?,?,?,?,0)').bind(owner,token,JSON.stringify(usage),JSON.stringify(limits),JSON.stringify(prices)),
+    db.prepare('INSERT OR IGNORE INTO player_accounts(owner,version,token,usage,budget,prices,initialized) VALUES(?,0,?,?,?,?,0)').bind(owner,token,JSON.stringify(usage),JSON.stringify({calls:limits.calls,tokens:limits.tokens}),JSON.stringify(prices)),
     ...results.map(value=>{
       const journal=JSON.parse(value.accounting) as {usage?:Record<string,UsageReceipt>;results?:Record<string,{pending?:number;body?:{operationUncertain?:boolean}}>;operations?:{id:string;marker?:UsageReceipt}[];unknownRange?:boolean;unresolvedUsageEvicted?:number};
       const recovery:LegacyRecovery={};
@@ -83,6 +83,9 @@ export async function playerAccount(owner:string):Promise<PlayerAccountView> {
   return {accountOwner:owner,version:row.settings_version,accountingVersion:row.version,usage:currentUsage(worldFor(JSON.parse(row.usage))),limits:JSON.parse(row.budget),prices:JSON.parse(row.prices),unknownAccountingRanges:(pending?.count??0)+legacyGaps};
 }
 export async function setPlayerAccount(owner:string,input:{limits?:BudgetLimits;price?:PriceInput},version?:number) {
+  // Legacy callers may carry extra JSON keys. Only explicit billing fields
+  // enter the account settings or lost-response fingerprint.
+  input={...(input.limits?{limits:{calls:input.limits.calls,tokens:input.limits.tokens}}:{}),...(input.price?{price:{provider:input.price.provider,model:input.price.model,input:input.price.input,output:input.price.output,...(input.price.cachedInput===undefined?{}:{cachedInput:input.price.cachedInput}),source:input.price.source,date:input.price.date}}:{})};
   await initialize(owner);
   for(let attempt=0;attempt<5;attempt++){
     const row=await rowFor(owner);
