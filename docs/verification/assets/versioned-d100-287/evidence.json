@@ -1,11 +1,11 @@
 {
-  "origin": "http://127.0.0.1:46381",
-  "commit": "105197b",
-  "builtAt": "2026-11-09T14:42:25.218Z",
+  "origin": "http://127.0.0.1:44883",
+  "commit": "7e9cfd7",
+  "builtAt": "2026-11-09T14:47:41.897Z",
   "auth": "local cookie identity boundary",
   "database": "isolated disk SQLite, full migrations; card formed and saved via product APIs, city save via product API; no installed world fixture",
-  "saveId": "b56457f8-2055-41dc-9701-c4a041fac4bf",
-  "route": "http://127.0.0.1:46381/observe?save=b56457f8-2055-41dc-9701-c4a041fac4bf&view=analysis",
+  "saveId": "a8e4c6e5-7bea-465e-89d0-963ee08622d3",
+  "route": "http://127.0.0.1:44883/observe?save=a8e4c6e5-7bea-465e-89d0-963ee08622d3&view=analysis",
   "resolution": {
     "system": "d100-v2",
     "attributeVersion": 2,
