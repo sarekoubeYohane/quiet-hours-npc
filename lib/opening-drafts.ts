@@ -1,3 +1,4 @@
+import {latestArrangement,actionableArrangement} from './opening-arrangement-store';
 import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
@@ -24,7 +25,7 @@ export type OpeningDraft={id:string;version:number;body:Body;sources:Sources;fin
 const client=(row:Row):OpeningDraft=>({id:row.id,version:row.version,body:JSON.parse(row.body),sources:JSON.parse(row.sources),...(row.finalized_save_id?{finalizedSaveId:row.finalized_save_id}:{})});
 async function rowFor(owner:string,id:string){return database().prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').bind(owner,id).first<Row>();}
 export async function listOpeningDrafts(owner:string){const {results}=await database().prepare('SELECT * FROM opening_drafts WHERE owner=? AND finalized_save_id IS NULL ORDER BY rowid DESC').bind(owner).all<Row>();return results.map(row=>{const draft=client(row);return {id:draft.id,version:draft.version,name:draft.body.name,step:draft.body.step};});}
-export async function readOpeningDraft(owner:string,id:string){const row=await rowFor(owner,id);if(!row)throw new SaveAccessError('找不到這份開局草稿。',404);return {draft:client(row),...JSON.parse(row.candidate) as Candidate};}
+export async function readOpeningDraft(owner:string,id:string){const row=await rowFor(owner,id);if(!row)throw new SaveAccessError('找不到這份開局草稿。',404);const arrangement=await latestArrangement(owner,id),previous=arrangement?.state==='failed'?await actionableArrangement(owner,id):undefined;return {draft:client(row),...JSON.parse(row.candidate) as Candidate,arrangement,previousArrangement:previous?.state==='complete'?previous:undefined};}
 async function selectedSources(owner:string,body:Body,old?:Sources):Promise<Sources>{
  const [cards,scenes]=await Promise.all([listCharacterCards(owner),listSceneTemplates(owner)]);
  const pick=<T extends {id:string;version:number}>(refs:{templateId:string;version:number}[],saved:T[],live:T[])=>refs.map(ref=>saved.find(item=>item.id===ref.templateId&&item.version===ref.version)??live.find(item=>item.id===ref.templateId&&item.version===ref.version)).filter((item):item is T=>!!item);
@@ -34,6 +35,7 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
  if(input.operationScope!==owner)throw new SaveAccessError('原帳號已切換，請回到原帳號恢復此操作。',409);
  const previous=await rowFor(owner,input.id),request=JSON.stringify(input);
  if(previous?.last_request===request)return readOpeningDraft(owner,input.id);
+ const pending=await database().prepare("SELECT operation_id FROM opening_arrangements WHERE owner=? AND draft_id=? AND state='pending'").bind(owner,input.id).first();if(pending)throw new SaveAccessError('已有AI整理操作，請先恢復原操作，原輸入已保留。',409);
  if(previous?.finalized_save_id||previous&&previous.version!==input.version||!previous&&input.version!==0)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留，請重新核對。',409);
  let body:Body,sources:Sources;
  if('restartSaveId' in input){
@@ -49,7 +51,7 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
  if(candidate.world)candidate.world.timeContract='five-minute-v1';
  await database().prepare(`INSERT INTO opening_drafts (owner,id,version,body,sources,candidate,last_request) VALUES (?,?,1,?,?,?,?)
   ON CONFLICT(owner,id) DO UPDATE SET version=opening_drafts.version+1,body=excluded.body,sources=excluded.sources,candidate=excluded.candidate,last_request=excluded.last_request
-  WHERE opening_drafts.version=? AND opening_drafts.finalized_save_id IS NULL`).bind(owner,input.id,JSON.stringify(body),JSON.stringify(sources),JSON.stringify(candidate),request,input.version).run();
+  WHERE opening_drafts.version=? AND opening_drafts.finalized_save_id IS NULL AND NOT EXISTS (SELECT 1 FROM opening_arrangements a WHERE a.owner=opening_drafts.owner AND a.draft_id=opening_drafts.id AND a.state='pending')`).bind(owner,input.id,JSON.stringify(body),JSON.stringify(sources),JSON.stringify(candidate),request,input.version).run();
  const stored=await rowFor(owner,input.id);
  if(stored?.last_request!==request)throw new SaveAccessError('未同步：另一頁已修改開局草稿，請保留輸入重新核對。',409);
  return readOpeningDraft(owner,input.id);
@@ -66,7 +68,7 @@ export async function confirmOpening(owner:string,input:z.infer<typeof confirmOp
  const draft=client(row),candidate=JSON.parse(row.candidate) as Candidate;
  if(!draft.body.name||!candidate.world||candidate.preview.issues.length)throw new SaveAccessError(candidate.preview.issues.join(' ')||'請確認存檔名稱與完整開局。',400);
  const db=database(),storage='save:'+owner+':'+input.id;
- const guard='EXISTS (SELECT 1 FROM opening_drafts WHERE owner=? AND id=? AND version=? AND finalized_save_id IS NULL) AND NOT EXISTS (SELECT 1 FROM save_tombstones WHERE owner=? AND id=?)';
+ const guard='EXISTS (SELECT 1 FROM opening_drafts WHERE owner=? AND id=? AND version=? AND finalized_save_id IS NULL AND NOT EXISTS (SELECT 1 FROM opening_arrangements a WHERE a.owner=opening_drafts.owner AND a.draft_id=opening_drafts.id AND a.state=\'pending\')) AND NOT EXISTS (SELECT 1 FROM save_tombstones WHERE owner=? AND id=?)';
  const bindings=[owner,input.draftId,input.draftVersion,owner,input.id];
  const original=JSON.stringify({version:'opening-v1',body:draft.body,sources:draft.sources});
  await db.batch([

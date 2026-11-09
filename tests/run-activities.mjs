@@ -42,6 +42,7 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0017_character_cards.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0018_player_account_budget.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0019_opening_drafts.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0020_opening_arrangements.sql', 'utf8'))});
     exports.archivedWorld = () => db.prepare('SELECT state FROM world_before_city WHERE owner = ?').get('test-owner')?.state;
     let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure, traceWriteHook, traceReadFailure, storageHook;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };

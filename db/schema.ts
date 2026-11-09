@@ -1,4 +1,5 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import {sql} from 'drizzle-orm';
+import { sqliteTable, text, integer, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const worlds = sqliteTable('worlds', {owner:text('owner').primaryKey(),cityStarted:integer('city_started').notNull().default(0),state:text('state').notNull(),operations:text('operations').notNull().default('{"floor":0,"results":{}}'),version:integer('version').notNull().default(0),lockedUntil:integer('locked_until').notNull().default(0)});
 export const authSessions = sqliteTable('auth_sessions', { tokenHash: text('token_hash').primaryKey(), userId: text('user_id').notNull(), displayName: text('display_name').notNull(), expiresAt: integer('expires_at').notNull() });
 export const oauthAttempts = sqliteTable('oauth_attempts', { stateHash: text('state_hash').primaryKey(), verifier: text('verifier').notNull(), expiresAt: integer('expires_at').notNull() });
@@ -75,3 +76,5 @@ export const characterCardAssessments = sqliteTable('character_card_assessments'
 export const openingDrafts=sqliteTable('opening_drafts',{
   owner:text('owner').notNull(),id:text('id').notNull(),version:integer('version').notNull(),body:text('body').notNull(),sources:text('sources').notNull(),candidate:text('candidate').notNull(),lastRequest:text('last_request').notNull(),finalizedSaveId:text('finalized_save_id'),
 },table=>[primaryKey({columns:[table.owner,table.id]})]);
+
+export const openingArrangements=sqliteTable('opening_arrangements',{owner:text('owner').notNull(),draftId:text('draft_id').notNull(),operationId:text('operation_id').notNull(),inputVersion:integer('input_version').notNull(),revision:integer('revision').notNull().default(0),request:text('request').notNull(),snapshot:text('snapshot').notNull(),state:text('state').notNull(),result:text('result'),error:text('error'),adoptionRequest:text('adoption_request')},table=>[primaryKey({columns:[table.owner,table.draftId,table.operationId]}),uniqueIndex('opening_arrangement_pending').on(table.owner,table.draftId).where(sql`${table.state}='pending'`)]);
