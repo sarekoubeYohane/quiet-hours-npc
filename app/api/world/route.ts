@@ -198,7 +198,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
-    let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
+    let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
@@ -220,7 +220,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
     if (b.operation === 'set-price' && !validPrice(b.price)) return reply({error:'請填寫有效的供應商、模型、非負有限 USD 單價、來源與日期。'},400);
     if (b.operation === 'advance') {
-      if (![15, 30].includes(b.minutes || 0)) return reply({ error: '請選擇 15 或 30 分鐘。' }, 400);
+      if (![5, 15, 30].includes(b.minutes as number)) return reply({ error: '請選擇有效的世界推進時間。' }, 400);
       if (b.mode !== 'demo' && (typeof b.model !== 'string' || !b.model.trim())) return reply({ error: '請填入模型 ID。' }, 400);
       if (b.mode === 'openai' && !directModels.includes(b.model || '')) return reply({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
 
@@ -279,6 +279,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
+    if(b.operation==='advance'&&(b.timeContract!==undefined&&b.timeContract!=='five-minute-v1'||b.minutes===5&&b.timeContract!=='five-minute-v1'||(world.timeContract==='five-minute-v1'||b.timeContract==='five-minute-v1')&&b.minutes!==5))return reply({error:'五分鐘時間契約每次只能推進 5 分鐘；請更新頁面後以五分鐘步驟推進。'},400);
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     let openingPreview: Awaited<ReturnType<typeof prepareCity>>['preview'] | undefined;
     if ((suggestingOpening || initializingCity) && city?.success) {
@@ -490,6 +491,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       const before = structuredClone(world);
       try {
         let dispatchKey = '';
+        if(b.timeContract==='five-minute-v1')world.timeContract='five-minute-v1';
         await advanceActivities(world, {
           mentalEnergyPolicy:readMentalEnergyTestPolicy(env,world),
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
