@@ -55,3 +55,7 @@ export const deletedWorldUsage=sqliteTable('deleted_world_usage',{
 export const saveTombstones=sqliteTable('save_tombstones',{
   owner:text('owner').notNull(),id:text('id').notNull(),deletedAt:integer('deleted_at').notNull(),
 },table=>[primaryKey({columns:[table.owner,table.id]})]);
+export const modelPreferences = sqliteTable('model_preferences', {
+  owner: text('owner').notNull(), target: text('target').notNull(),
+  version: integer('version').notNull(), body: text('body').notNull(),
+}, table => [primaryKey({ columns: [table.owner, table.target] })]);

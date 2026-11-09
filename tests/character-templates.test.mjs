@@ -34,6 +34,7 @@ async function fixture({ withWorld = false } = {}) {
   const route = await loadEntry('app/api/character-templates/route.ts', context);
   const db = new DatabaseSync(':memory:');
   const worldRoute = withWorld && await loadEntry('app/api/world/route.ts', context);
+  const settingsRoute = withWorld && await loadEntry('app/api/model-settings/route.ts', context);
   const migrations = withWorld ? (await readdir('drizzle')).filter(name => name.endsWith('.sql')).sort() : ['0006_character_templates.sql'];
   for (const name of migrations) db.exec(await readFile('drizzle/' + name, 'utf8'));
   context.env.DB = {
@@ -72,7 +73,7 @@ async function fixture({ withWorld = false } = {}) {
       body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', operationScope: scope.operationScope, worldContext: scope.world.contextId, ...payload }),
     }));
   }
-  return { db, context, request, worldRequest };
+  return { db, context, request, worldRequest, settingsRequest:()=>settingsRoute.GET(new Request('https://test.invalid/api/model-settings')) };
 }
 
 test('two new characters persist privately, presets are read-only, and updates cannot erase newer data', async () => {
@@ -129,7 +130,7 @@ test('two new characters persist privately, presets are read-only, and updates c
 });
 
 test('the editor creates, edits, and reopens two custom characters through the real save route', async () => {
-  const { db, request, worldRequest } = await fixture({ withWorld: true });
+  const { db, request, worldRequest, settingsRequest } = await fixture({ withWorld: true });
   const key = 'test-editor-provider-key';
   assert.equal((await worldRequest({ operation: 'set-model-key', mode: 'openai', key })).status, 200);
   assert.equal((await worldRequest({ operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } })).status, 200);
@@ -152,6 +153,7 @@ test('the editor creates, edits, and reopens two custom characters through the r
       paidCalls++;
       return Response.json({ usage: { prompt_tokens: 5, completion_tokens: 3 }, choices: [{ message: { content: candidate } }] });
     }
+    if (url === '/api/model-settings') return settingsRequest();
     if (url === '/api/world?workspace=account') return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
     assert.equal(url, '/api/character-templates');
     const result = await request(options?.body ? JSON.parse(options.body) : undefined);
