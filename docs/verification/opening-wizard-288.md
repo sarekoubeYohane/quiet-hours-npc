@@ -46,3 +46,9 @@
 原 backend scope 反例已在 `c159a0e` 修正並獨立覆核：從原帳號捕捉 scope 後切帳，edit／confirm／restart／新 v0 都 409，不改另一帳號同 UUID 草稿。兩個 UI 慢回覆反例已採唯一修復者 `28b9edd`：另一帳號同 UUID／body 的 GET 不得假稱原輸入已同步；已離頁的新建成功回覆不拉走新選存檔。兩項獨立真頁覆核 remaining 0，沒有以正常旅程通過掩蓋原反例。
 
 後續具體發現的 v1 UUID 建立／選檔不一致仍待唯一修復者收斂：固定 `72d76e1`、真 formed card／v4 草稿，用 `00000000-0000-1000-8000-000000000001` 當 final save id 可獲 201，隨後同帳號 world GET 卻 400；因此本票此刻未 ready。另 T9 舊 copy／delete 原帳號 scope 的 P1 已重開 #290，由同一修復者處理，不把它算作已完成。最終固定證據須採用這些修正後來源。
+
+### 第一收斂包已採用
+
+已合 `1a3ea10` 與最新 integration `fa0af83`。共用 v4 身分契約 `79b7927` 現在拒絕不一致的草稿／存檔 UUID，無殘留 row；開局 API 組 **15／15**（含原 12 項）通過。共用 `character-api-fixture.mjs` 取代複製的接點；兩軸對原 fixture P3／UUID P2 的覆核 remaining 0。T9 原帳號 copy/delete／receipt 恢復修正亦已採用，原 P1 兩軸覆核 remaining 0；票狀態由 root 依真正整合結果處理。
+
+新增原帳號介面查核仍待 scope 收斂包：真 API／SQLite 顯示帳號模型預設、建角草稿、人物文字範本及場景來源的舊頁請求可在換帳後寫入另一帳號；Key fast branch 亦會在 scope 檢查前寫入新帳號。另真頁可在 visibility refresh 後把原觀察頁改綁另一帳號同 ID 世界並推進。這些皆交唯一修復者，未平行修產品；無真 Key、無付費模型或正式資料操作。此段是明示尚未完成狀態，不以先前正常旅程掩蓋已重現邊界。
