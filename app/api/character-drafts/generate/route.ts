@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     if (typeof input.id !== 'string' || !Number.isSafeInteger(input.version)) return reply({ error: '草稿版本無效。' }, 400);
     let draft = await loadCharacterDraft(user.userId, input.id);
     if (!draft) return reply({ error: '找不到本帳號的草稿。' }, 404);
+    if(draft.formation||draft.pendingFormation)return reply({error:'人物形成後文字已鎖定，不能補完或改寫。'},409);
     if (input.discard === true) {
       if (draft.version !== input.version) return reply({ error: '另一頁已修改草稿，請重新核對。' }, 409);
       const next = { ...draft }; delete next.pendingGeneration;

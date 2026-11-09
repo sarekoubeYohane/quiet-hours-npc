@@ -1,3 +1,6 @@
+import { assessCharacterCard, characterFormationIssue } from '@/lib/character-formation';
+import { saveCardAssessment } from '@/lib/character-card-store';
+import { loadCharacterDraft } from '@/lib/character-draft-store';
 import { readEffectiveModels, modelSettingsView } from '@/lib/model-settings-store';
 import { bindWorldSave, ensureAccountOperationLedger, SaveAccessError } from '@/lib/world-saves';
 import { adoptFormalMentalEnergy, validateMentalAdoption, formFormalMentalEnergy } from '@/lib/formal-mental-enablement';
@@ -15,7 +18,7 @@ import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, boundUs
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
-import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace } from '@/lib/decision-traces';
+import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace, omitDecisionTraceContent } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
@@ -145,6 +148,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
+    if(decisionTrace?.operation==='assess-character-card')decisionTrace=omitDecisionTraceContent(decisionTrace,'character-formation-private');
     const modelSettings = await modelSettingsView(accountId, binding);
     if (modelSettings.effective.adjudication) loaded.world.adjudication = { ...modelSettings.effective.adjudication };
     else if (modelSettings.source !== 'legacy') delete loaded.world.adjudication;
@@ -216,7 +220,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let b: { mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
-    if(binding.accountWorkspace&&!['generate-character-template','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
+    if(binding.accountWorkspace&&!['generate-character-template','assess-character-card','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
     const initializingCity = b.operation === 'initialize-city';
     const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
@@ -230,7 +234,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if ((binding.saveId&&new URL(request.url).searchParams.has('save')&&b.operationScope!==id) || (b.operationScope !== undefined && b.operationScope !== id)) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'assess-character-card', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -241,8 +245,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
 
     }
     if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return reply({error:'請填寫裁定服務與模型。'},400);
+    const assessingCard = b.operation === 'assess-character-card';
+    const assessingDraft = assessingCard && typeof b.target === 'string' ? await loadCharacterDraft(accountId,b.target) : undefined;
+    if(assessingCard&&(!binding.accountWorkspace||!assessingDraft?.pendingFormation||assessingDraft.pendingFormation.operationId!==b.operationId||assessingDraft.formation||characterFormationIssue(assessingDraft)))return reply({error:'請從已確認文字的原建角草稿恢復形成。'},400);
     const generatingCharacter = b.operation === 'generate-character-template';
-    const generatingSetup = generatingCharacter || suggestingOpening || initializingCity;
+    const generatingSetup = assessingCard || generatingCharacter || suggestingOpening || initializingCity;
     if (initializingCity && b.operationScope !== id) return reply({ error:'請重新讀取城市後再初始化。' },400);
     const openingDescription = suggestingOpening ? readOpeningDescription(b.openingDescription) : undefined;
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {
@@ -472,7 +479,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           await verifyLease();
           return result;
         };
-        if (characterGeneration) {
+        if (assessingCard && assessingDraft) {
+          const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
+          await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
+        } else if (characterGeneration) {
           generatedCharacter = await runSetup('character-generation',(service,options)=>generateCharacterFields(characterGeneration,service,options));
         } else if (openingPreview && city?.success) {
           const draft = city.data;
@@ -502,7 +512,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       world.timeContract='five-minute-v1';
       for (const actor of world.characters) {
         const selected = city?.success && city.data.characters.find(item=>item.templateId===actor.profileSource?.id);
-        formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
+        if(!actor.attributes)formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
         formFormalMentalEnergy(actor,world.minute,selected?.mentalOpening??{});
       }
       journal.floor = Math.max(journal.floor, issuedAt - 1);
@@ -680,6 +690,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     finishSignal!.throwIfAborted();responseSignal?.throwIfAborted();request.signal.throwIfAborted();
     result.body.decisionTraceStatus=traceWriteFailed?{status:'write-failed',gap:'trace-write-failed'}:{status:'pending',gap:'world-and-trace-are-separate-transactions'};
     result.body.operationEvidence=finishEvidence(world,failure?'rolled-back':'committed',version+1);
+    if(assessingCard&&result.body.operationEvidence){const safe=result.body.operationEvidence as OperationEvidence;result.body.operationEvidence={...safe,dispatches:safe.dispatches.map(({candidate,...dispatch})=>{void candidate;return dispatch;})};}
     journal.results[operationId] = result;
     if(journal.usage?.[operationId])journal.usage[operationId]={applied:paidDelta(paidBefore,world.aiUsage!),finalized:true};
     // The current exact response may exceed the historical byte budget by itself.

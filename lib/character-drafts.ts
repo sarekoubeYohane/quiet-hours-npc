@@ -6,6 +6,9 @@ export type TextProvenance = { kind: 'empty' | 'user' | 'ai'; aiText?: string; m
 export type CharacterDraft = {
   id: string; version: number; concept: string; fields: CharacterTemplateFields;
   provenance: Record<string, TextProvenance>;
+  formation?:import('./character-cards').CardFormation;
+  pendingFormation?:{operationId:string;operationScope:string;worldContext?:string;inputVersion:number};
+  completedCard?:{id:string;version:number};
   completedGeneration?: { operationId: string; inputVersion: number };
   pendingGeneration?: { operationId: string; operationScope: string; worldContext?: string; baseVersion: number; concept: string; fields: CharacterTemplateFields };
 };
@@ -45,4 +48,10 @@ export function userTextProvenance(previous: CharacterDraft | undefined, fields:
     }
     return [field, { kind: 'user', materiallyEdited: true, userText: text } satisfies TextProvenance];
   }));
+}
+
+export function characterDraftForClient(draft:CharacterDraft):CharacterDraft {
+ if(!draft.formation)return draft;
+ const {private:omitted,operationId:operation,inputVersion:input,...formation}=draft.formation;void omitted;void operation;void input;
+ return {...draft,formation};
 }

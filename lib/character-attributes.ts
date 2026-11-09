@@ -22,7 +22,7 @@ export const characterSetupSchema = z.object({
 });
 export type CharacterSetup = z.infer<typeof characterSetupSchema>;
 export type CharacterAttributes = {
-  version:1; activatedAt:number; authority:'owner-confirmed'; values:Record<AttributeName,number>;
+  version:1|2; activatedAt:number; authority:'owner-confirmed'|'formed-card'; values:Record<AttributeName,number>&{appearance?:number};
   blockedSenses?:('sight'|'hearing'|'touch')[];
   constraints:NonNullable<CharacterSetup['attributes']>;
   expertise:NonNullable<CharacterSetup['expertise']>; senses:NonNullable<CharacterSetup['senses']>;

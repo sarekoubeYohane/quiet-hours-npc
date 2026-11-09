@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import CharacterFormationControls from '@/components/character-formation-controls';
 import ModelSettingsPanel from '@/components/model-settings-panel';
 import { modelRoleReady, type ModelSettingsView } from '@/lib/model-settings';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ export default function CharacterDraftEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [forming, setForming] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [conflict, setConflict] = useState(false);
@@ -59,7 +61,7 @@ export default function CharacterDraftEditor() {
     } finally { if (alive.current) setSaving(false); }
   }
   useEffect(() => {
-    if (!dirty || saving || generating || error || !draft || draft.pendingGeneration) return;
+    if (!dirty || saving || generating || forming || error || !draft || draft.pendingGeneration || draft.formation || draft.pendingFormation) return;
     const timer = setTimeout(() => { void save(); }, 500);
     return () => clearTimeout(timer);
   });
@@ -114,8 +116,8 @@ export default function CharacterDraftEditor() {
   }
   const memoryError = initialMemoryCapacityError(draft?.fields.initialMemories);
   const missing = draft ? missingCharacterText(draft.fields) : [];
-  const locked = generating || !!draft?.pendingGeneration;
-  const canSwitch = !saving && !generating && !dirty && !saveFailed;
+  const locked = generating || forming || !!draft?.pendingGeneration || !!draft?.formation || !!draft?.pendingFormation;
+  const canSwitch = !saving && !generating && !forming && !dirty && !saveFailed;
   return <section className="panel space-y-4 p-6" aria-label="建角文字草稿">
     <h2>製作人物卡</h2>
     {modelPanel && <ModelSettingsPanel onClose={() => setModelPanel(false)} />}
@@ -123,13 +125,13 @@ export default function CharacterDraftEditor() {
     <div className="flex flex-wrap gap-2">
       <Button type="button" disabled={loading || !canSwitch} onClick={() => edit(newCharacterDraft())}>新建建角草稿</Button>
       <Button type="button" variant="outline" disabled={!canSwitch} onClick={() => void load()}>重新讀取建角草稿</Button>
-      {drafts.map(item => <Button key={item.id} type="button" variant="outline" disabled={!canSwitch} onClick={() => edit(item)}>{item.fields.name || item.concept.slice(0, 20) || '未命名草稿'}</Button>)}
+      {drafts.map(item => <Button key={item.id} type="button" variant="outline" disabled={!canSwitch} onClick={() => edit(item)}>{item.fields.name || item.concept.slice(0, 20) || '未命名草稿'}{item.completedCard?'（完成卡）':item.formation?'（已形成）':''}</Button>)}
     </div>
     {draft && <div className="space-y-4" aria-label="建角編輯器">
       <label>人物概念<textarea name="draftConcept" maxLength={2400} rows={3} value={draft.concept} disabled={locked} onChange={event => update('concept', event.target.value)} /></label>
       <p className="hint">AI 只補空白，已填內容（包含「沒有」）原樣保留。使用帳號現有天上意志模型設定；不會自動重試付費請求。</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={saving || generating || saveFailed || !!memoryError || (!draft.pendingGeneration && !draft.concept.trim() && !characterDraftFieldNames.some(field => draft.fields[field].trim())) || (!draft.pendingGeneration && !missing.length)} onClick={() => void generate()}>{generating ? '正在補完…' : draft.pendingGeneration ? '恢復原 AI 補完操作' : '用 AI 補完空白文字'}</Button>
+        <Button type="button" disabled={saving || generating || forming || !!draft.formation || !!draft.pendingFormation || saveFailed || !!memoryError || (!draft.pendingGeneration && !draft.concept.trim() && !characterDraftFieldNames.some(field => draft.fields[field].trim())) || (!draft.pendingGeneration && !missing.length)} onClick={() => void generate()}>{generating ? '正在補完…' : draft.pendingGeneration ? '恢復原 AI 補完操作' : '用 AI 補完空白文字'}</Button>
         {draft.pendingGeneration && <Button type="button" variant="outline" disabled={saving || generating} onClick={() => void generate(true)}>放棄套用原 AI 結果</Button>}
       </div>
       {characterTextGroups.map(group => <details key={group.title} open className="space-y-2">
@@ -144,7 +146,8 @@ export default function CharacterDraftEditor() {
       <p className="hint">形成數值前須完成九項文字；適用時可如實填寫「沒有特殊設定」。形成後所有文字都會鎖定，請先核對姓名及錯字。</p>
       {!!missing.length && <p role="status">待完成：{missing.join('、')}</p>}
       {memoryError && <p role="alert" className="error">{memoryError}</p>}
-      <Button type="button" disabled={saving || generating || !!memoryError || !!draft.pendingGeneration} onClick={() => void save()}>{saveFailed ? '恢復草稿保存' : '保存建角草稿'}</Button>
+      <Button type="button" disabled={saving || generating || forming || !!draft.formation || !!draft.pendingFormation || !!memoryError || !!draft.pendingGeneration} onClick={() => void save()}>{saveFailed ? '恢復草稿保存' : '保存建角草稿'}</Button>
+      <CharacterFormationControls key={draft.id} draft={draft} disabled={saving||generating||loading||saveFailed} onBusy={setForming} onModels={() => setModelPanel(true)} onSaved={value => { show(value); record(value); setDirty(false); setStatus('已保存至帳號'); }} onPrepare={async () => { if (!current.current) return; if (dirty || !current.current.version) return save(current.current); return current.current; }} />
       {conflict && <p className="hint">本頁文字仍保留。請另開人物頁核對帳號已保存版本，再決定如何處理變更；不會自動覆寫或另建副本。</p>}
     </div>}
     <p role="status" aria-live="polite">{status}</p>

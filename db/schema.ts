@@ -50,3 +50,6 @@ export const modelPreferences = sqliteTable('model_preferences', {
   owner: text('owner').notNull(), target: text('target').notNull(),
   version: integer('version').notNull(), body: text('body').notNull(),
 }, table => [primaryKey({ columns: [table.owner, table.target] })]);
+
+export const characterCards = sqliteTable('character_cards', {owner:text('owner').notNull(),id:text('id').notNull(),version:integer('version').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.id]})]);
+export const characterCardAssessments = sqliteTable('character_card_assessments', {owner:text('owner').notNull(),draftId:text('draft_id').notNull(),operationId:text('operation_id').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.draftId,table.operationId]})]);

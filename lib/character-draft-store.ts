@@ -23,6 +23,7 @@ export async function writeCharacterDraft(owner: string, next: CharacterDraft) {
 export async function saveCharacterDraft(owner: string, input: NonNullable<ReturnType<typeof readCharacterDraftInput>>) {
   const current = await loadCharacterDraft(owner, input.id);
   const sameText = current && current.concept === input.concept && JSON.stringify(current.fields) === JSON.stringify(input.fields);
+  if(current?.formation||current?.pendingFormation)return;
   if (sameText && (current.version === input.version || current.version === input.version + 1)) return current;
   if ((current?.version ?? 0) !== input.version) return;
   return writeCharacterDraft(owner, { ...input, provenance: userTextProvenance(current, input.fields), ...(current?.completedGeneration ? { completedGeneration: current.completedGeneration } : {}), ...(current?.pendingGeneration ? { pendingGeneration: current.pendingGeneration } : {}) });
