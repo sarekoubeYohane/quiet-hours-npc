@@ -10,6 +10,7 @@ export async function GET(request?:Request) {
     const user=await getGitHubUser();
     if(!user)return Response.json({error:'請先登入。'},{status:401});
     const operationId=request&&new URL(request.url).searchParams.get('operationId');
+    if(operationId&&new URL(request!.url).searchParams.get('operationScope')!==user.userId)return Response.json({error:'原帳號已變更或缺少原帳號識別；請回到原帳號恢復。',scopeMismatch:true},{status:409});
     if(operationId&&!z.string().uuid().safeParse(operationId).success)return Response.json({error:'操作識別碼無效。'},{status:400});
     return Response.json({saves:await listWorldSaves(user.userId),operationScope:user.userId,accountUsage:await accountSavedUsage(user.userId),...(operationId?{operation:await readSaveOperation(user.userId,operationId)??null}:{})},{headers:{'Cache-Control':'no-store'}});
   }catch{return Response.json({error:'暫時無法讀取存檔，請稍後重試。'},{status:503});}
@@ -26,11 +27,12 @@ export async function POST(request:Request) {
     let input:unknown;
     try{input=JSON.parse(raw);}catch{return Response.json({error:'請提供有效的存檔內容。'},{status:400});}
     if(input&&typeof input==='object'&&'operation' in input){
+      if(!('operationScope' in input)||input.operationScope!==user.userId)return Response.json({error:'原帳號已變更或缺少原帳號識別；請回到原帳號恢復存檔操作。',scopeMismatch:true},{status:409});
       const management=saveManagementInput.safeParse(input);
       if(!management.success)return Response.json({error:'存檔操作無效。'},{status:400});
-      if(management.data.operation==='delete')return Response.json(await deleteWorldSave(user.userId,management.data),{headers:{'Cache-Control':'no-store'}});
+      if(management.data.operation==='delete')return Response.json({...await deleteWorldSave(user.userId,management.data),operationScope:user.userId},{headers:{'Cache-Control':'no-store'}});
       const copied=await copyWorldSave(user.userId,management.data);
-      return Response.json(copied.result,{status:copied.created?201:200,headers:{'Cache-Control':'no-store'}});
+      return Response.json({...copied.result,operationScope:user.userId},{status:copied.created?201:200,headers:{'Cache-Control':'no-store'}});
     }
     const accepted=confirmOpeningSchema.safeParse(input);
     if(!accepted.success)return Response.json({error:'請由五步開局確認已保存的完成人物卡與世界配置。'},{status:400});

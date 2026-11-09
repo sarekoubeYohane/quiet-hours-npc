@@ -1,3 +1,4 @@
+import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
 import { cityDraftSchema,prepareCity } from './city-creation';
@@ -9,7 +10,7 @@ import type { World } from './world';
 import type { CityPreview } from './city-draft';
 import { readSaveCreation,SaveAccessError } from './world-saves';
 export const openingBodySchema=z.object({name:z.string().trim().max(80),description:z.string().max(1600),step:z.number().int().min(1).max(5),city:cityDraftSchema}).strict();
-const identity=z.string().uuid();
+const identity=z.string().regex(saveUuidPattern);
 const operationScope=z.string().min(1).max(128);
 export const openingInputSchema=z.union([
  z.object({operationScope,id:identity,version:z.number().int().nonnegative(),body:openingBodySchema}).strict(),
@@ -43,7 +44,7 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
   if(snapshot.version!=='opening-v1')throw new SaveAccessError('原始開局版本不可用。',409);
   body={...snapshot.body,step:1};sources=snapshot.sources;
  }else{body=input.body;sources=await selectedSources(owner,body,previous?JSON.parse(previous.sources):undefined);}
- const candidate=await prepareCity(owner,body.city,{minute:1260,turn:0,characters:[],events:[],lastMode:'demo'},sources);
+ const candidate:Candidate=previous&&JSON.stringify(JSON.parse(previous.body).city)===JSON.stringify(body.city)?JSON.parse(previous.candidate):await prepareCity(owner,body.city,{minute:1260,turn:0,characters:[],events:[],lastMode:'demo'},sources);
  if(body.city.characters.some(ref=>!sources.cards.some(card=>card.id===ref.templateId&&card.version===ref.version))){candidate.preview.issues.push('請選用已完成人物卡；文字範本及未形成草稿不能進入世界。');delete candidate.world;}
  if(candidate.world)candidate.world.timeContract='five-minute-v1';
  await database().prepare(`INSERT INTO opening_drafts (owner,id,version,body,sources,candidate,last_request) VALUES (?,?,1,?,?,?,?)

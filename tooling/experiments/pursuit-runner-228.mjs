@@ -140,15 +140,12 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
       await stop();
       const trial=state.trials[index],scenario=trial.id.split(':')[0];
       currentTrial={id:trial.id,focus:scenario==='L4'?'vera':'owner'};
-      const beforeReset=runtime.payerState();
-      await operation({operation:'reset'});
-      const reset=await(await runtime.get()).json();
-      const payerProjection=w=>({usage:w.aiUsage?{...w.aiUsage,savedDecisions:0}:undefined,budget:w.playerBudget});
-      if(JSON.stringify(beforeReset)!==JSON.stringify(runtime.payerState()))throw Error('reset-payer-mismatch');
+      const beforeFixture=runtime.payerState();
       const sceneEntry=plan.scenes[scenario==='L4'?'creative':'service'];
       const bytes=await readFile(resolve(root,sceneEntry.file));if(digest(bytes)!==sceneEntry.sha256)throw Error('scene-hash');
-      await runtime.initializeStory(JSON.parse(bytes));
-      partner=createPartner(scenario,{runId:state.runId,trial:trial.id});trial.status='running';trial.payerBefore=payerProjection(reset.world);trialBytes=0;
+      await runtime.initializeHistoricalTrial(JSON.parse(bytes));
+      if(JSON.stringify(beforeFixture)!==JSON.stringify(runtime.payerState()))throw Error('historical-fixture-payer-mismatch');
+      partner=createPartner(scenario,{runId:state.runId,trial:trial.id});trial.status='running';trial.payerBefore=runtime.payerState();trialBytes=0;
       for(let round=0;round<plan.window.advances;round++) {
         await stop();roundStart=await(await runtime.get()).json();roundDispatches=0;roundTokens=0;traceFrames=[];
         if(roundStart.unresolvedUsageRecovery||!roundStart.costSummary.total.complete)throw Error('unknown-usage-or-cost');
@@ -165,7 +162,7 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
         if(traceFrames.some(frame=>!actual.includes(frame.requestBody)))throw Error('prepared-request-mismatch');
         await writeEvidence(`${trial.id.replace(':','-')}-${round+1}.json`,{trial:trial.id,round:round+1,operationId:state.pendingOperationId,before:roundStart,after,transport:traceFrames});
         state.lastOperationId=state.pendingOperationId;state.pendingOperationId=null;
-        trial.rounds++;trial.lastVersion=after.version;trial.payerAfter=payerProjection(after.world);await save();
+        trial.rounds++;trial.lastVersion=after.version;trial.payerAfter=runtime.payerState();await save();
         let confirmation=null;
         if(scenario==='L5'){
           const remaining=Math.min(authorization.expiresAt-clock(),limits.elapsedMs-(state.firstDispatchAt?clock()-state.firstDispatchAt:0));

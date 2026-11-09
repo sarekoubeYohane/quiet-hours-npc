@@ -1,33 +1,12 @@
 import '../tooling/verification/no-network.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createRequire } from 'node:module';
-import { DatabaseSync } from 'node:sqlite';
-import { readFile, readdir } from 'node:fs/promises';
-const require = createRequire(import.meta.url);
-const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('vite')] }));
-async function fixture() {
-  const db = new DatabaseSync(':memory:');
-  for (const name of (await readdir('drizzle')).filter(n => n.endsWith('.sql')).sort()) db.exec(await readFile('drizzle/' + name, 'utf8'));
-  const context = { owner: 'a', fault: null, dice:0, random:()=>{context.dice++;return .5;} };
-  context.env = { APP_ENV: 'local', AUTH_ORIGIN: 'https://test.invalid', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32), DB: { prepare(sql) { return { bind(...values) { return {
-    async first() {const formedWrite=sql.startsWith('UPDATE character_drafts')&&typeof values[0]==='string'&&JSON.parse(values[0]).formation;const fault=formedWrite&&context.formFault||sql.includes('RETURNING')&&context.fault;if(formedWrite&&context.formFault)context.formFault=null;else if(fault)context.fault=null;if(fault==='before')throw Error('before');const result=db.prepare(sql).get(...values)??null;if(fault==='after')throw Error('after');return result;},
-    async all() { return { results: db.prepare(sql).all(...values) }; }, async run() { const fault=sql.startsWith('INSERT INTO opening_drafts')&&context.draftFault;if(fault)context.draftFault=null;if(fault==='before')throw Error('before draft');const result={meta:{changes:Number(db.prepare(sql).run(...values).changes)}};if(fault==='after')throw Error('after draft');return result; },
-  }; } }; } } };
-  context.env.DB.batch=async statements=>{const fault=context.batchFault;context.batchFault=null;if(context.beforeBatch){const before=context.beforeBatch;context.beforeBatch=null;await before();}if(fault==='before')throw Error('before batch');db.exec('BEGIN');let committed=false;try{const result=[];for(const statement of statements)result.push(await statement.run());db.exec('COMMIT');committed=true;if(fault==='after')throw Error('after batch');return result;}catch(error){if(!committed)db.exec('ROLLBACK');throw error;}};
-  const built = await esbuild.build({ entryPoints: ['app/api/opening-drafts/route.ts','app/api/character-drafts/route.ts','app/api/character-drafts/form/route.ts','app/api/character-cards/route.ts','app/api/model-settings/route.ts','app/api/world/route.ts','app/api/character-templates/route.ts','app/api/scene-templates/route.ts','app/api/saves/route.ts','app/api/character-drafts/from-template/route.ts','app/api/character-drafts/generate/route.ts'], outdir:'/tmp/character-drafts-test', bundle: true, write: false, platform: 'node', format: 'cjs', alias: { '@': process.cwd() }, plugins: [{ name: 'boundaries', setup(b) {
-    b.onLoad({filter:/character-formation\.ts$/},async args=>({contents:(await readFile(args.path,'utf8')).replaceAll('Math.random','context.random'),loader:'ts'}));
-    b.onResolve({ filter: /^(cloudflare:workers|@\/lib\/auth)$/ }, a => ({ path: a.path, namespace: 'boundary' }));
-    b.onLoad({ filter: /.*/, namespace: 'boundary' }, a => ({ contents: a.path === 'cloudflare:workers' ? 'export const env = context.env;' : 'export const getGitHubUser = async () => context.owner ? {userId:context.owner} : null;' }));
-  } }] });
-  const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
-  const [openings,drafts,form,cards,api,world,people,scenes,saves,fromTemplate,generation] = entries;
-  async function post(route,payload,path) {if(route===openings||route===saves)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
-  const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()};};
-  const worldRequest=async(payload,save)=>{const suffix=save?'?save='+save:'?workspace=account';const r=await world.GET(new Request('https://test.invalid/api/world'+suffix));const scope=await r.json();return payload===undefined?{status:r.status,body:scope}:post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world'+suffix);};
-
-  return {db,context,request,worldRequest,post,openings,scenes,saves,readOpening:async id=>{const r=await openings.GET(new Request('https://test.invalid/api/opening-drafts?id='+id+'&preview=1'));return {status:r.status,body:await r.json()};},source:payload=>post(people,payload,'/api/character-templates'),importTemplate:payload=>post(fromTemplate,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/from-template'),generate:payload=>post(generation,payload,'/api/character-drafts/generate'),readOperation:async id=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account&operationId='+id));return r.json();},saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),readDrafts:async()=>{const r=await drafts.GET();return {status:r.status,body:await r.json()};},form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:async()=>{const r=await cards.GET();return {status:r.status,body:await r.json()};}};
+import {characterApiFixture} from './support/character-api-fixture.mjs';
+async function fixture(){
+ const base=await characterApiFixture(['openings','drafts','form','cards','settings','world','scenes','saves']);const {context,post,read}=base,{openings,drafts,form,cards,scenes,saves}=base.routes;
+ return {...base,openings,scenes,saves,readOpening:id=>read(openings,'/api/opening-drafts?id='+id+'&preview=1'),saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:()=>read(cards,'/api/character-cards')};
 }
+
 
 const fields={name:'時雨',appearance:'35歲，身高175公分',personality:'安靜',abilities:'沒有特殊設定',background:'河畔長大',initialMemories:'記得老屋',beliefs:'重視承諾',preferences:'沒有特殊設定',directions:'修好老鐘',startLocation:''};
 const models={npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
@@ -96,3 +75,48 @@ test('a delayed new draft or finalization retains the originating account instea
  const id=crypto.randomUUID(),input={id,version:0,operationScope:'a',body:{name:'原帳號輸入',description:'',step:1,city:{characters:[],places:[]}}};f.context.owner='b';assert.equal((await f.post(f.openings,input,'/api/opening-drafts')).status,409);assert.equal(f.db.prepare('SELECT count(*) AS n FROM opening_drafts').get().n,0);
  f.context.owner='a';const created=await prepared(f);f.context.owner='b';assert.equal((await f.post(f.saves,{id:created.id,draftId:created.id,draftVersion:1,operationScope:'a'},'/api/saves')).status,409);assert.equal(f.db.prepare('SELECT count(*) AS n FROM world_saves').get().n,0);
 }));
+test('moving from confirmation to entry or renaming keeps the already saved candidate and future random streams',()=>controlled(async f=>{
+ const {id,body,draft}=await prepared(f);const moved=await f.post(f.openings,{id,version:1,body:{...body,name:'最後名稱',step:5}},'/api/opening-drafts');assert.equal(moved.status,200);assert.deepEqual(moved.body.world,draft.world);
+}));
+test('deleting a finalized world removes only its closed draft and preserves copied original, independent drafts and assets',()=>controlled(async f=>{
+ const {id}=await prepared(f),confirmation={id,draftId:id,draftVersion:1};await f.post(f.saves,confirmation,'/api/saves');const otherId=crypto.randomUUID();await f.post(f.openings,{id:otherId,version:0,body:{name:'仍在建立',step:2,description:'保留這份草稿',city:{places:[],characters:[]}}},'/api/opening-drafts');
+ const copy=await f.post(f.saves,{operation:'copy',operationId:crypto.randomUUID(),saveId:id,expectedVersion:0,name:'獨立副本'},'/api/saves');assert.equal(copy.status,201,JSON.stringify(copy.body));const copyId=copy.body.save.id;
+ const deleted=await f.post(f.saves,{operation:'delete',operationId:crypto.randomUUID(),saveId:id,expectedVersion:0},'/api/saves');assert.equal(deleted.status,200,JSON.stringify(deleted.body));assert.equal((await f.readOpening(id)).status,404);assert.equal((await f.readOpening(otherId)).status,200);
+ assert.equal((await f.post(f.saves,confirmation,'/api/saves')).status,410);assert.equal(f.db.prepare('SELECT count(*) AS n FROM worlds WHERE owner=?').get('save:a:'+id).n,0);assert.equal((await f.worldRequest(undefined,copyId)).body.world.turn,0);
+ const restarted=await f.post(f.openings,{id:crypto.randomUUID(),version:0,restartSaveId:copyId},'/api/opening-drafts');assert.equal(restarted.status,200);assert.equal(restarted.body.world.characters[0].name,'時雨');assert.equal((await f.cards()).body.cards.length,1);assert.equal(f.db.prepare('SELECT count(*) AS n FROM scene_templates').get().n,1);
+}));
+test('new opening keeps residence, ownership, entry grant, closed doors and first-person knowledge distinct',()=>controlled(async f=>{
+ const base=await prepared(f,{twoPlaces:true,twoPeople:true});const scene=base.scene;
+ const edited=await f.post(f.scenes,{...scene,shared:undefined,version:scene.version,access:{building:'residents',rooms:{secret:'private'}},rooms:[{id:'front',name:'客廳'},{id:'secret',name:'私人臥室'}],connections:[{id:'door',name:'臥室門',rooms:['front','secret'],state:'closed'}],objects:[{id:'diary',name:'住戶日記',roomId:'secret',state:{}},{id:'hidden',name:'隱藏信封',roomId:'front',state:{},hidden:true}]},'/api/scene-templates');assert.equal(edited.status,200);
+ const id=crypto.randomUUID(),[a,b]=base.body.city.characters,body={...base.body,city:{...base.body.city,places:base.body.city.places.map(place=>({...place,version:edited.body.template.version})),characters:[{...a,homeRoomId:'secret',ownedPlaceIds:[]},{...b,placeId:'work',homeId:undefined,homeRoomId:undefined,ownedPlaceIds:[]}],accessGrants:[{placeId:'home',roomId:'secret',characterTemplateId:b.templateId}]}};
+ const ready=await f.post(f.openings,{id,version:0,body},'/api/opening-drafts');assert.equal(ready.status,200);assert.deepEqual(ready.body.preview.issues,[]);const saved=await f.post(f.saves,{id,draftId:id,draftVersion:1},'/api/saves');assert.equal(saved.status,201);const world=saved.body.world,[resident,visitor]=world.characters,room='place:home:room:secret';
+ assert.ok(world.configuration.access[room].allowedActorIds.includes(visitor.id));assert.equal(world.configuration.residences[visitor.id],undefined);assert.deepEqual(world.configuration.ownerships,{});assert.equal(world.scene.doors['place:home:door:door'],'closed');assert.equal(visitor.openingKnowledge.rooms.some(value=>value.location==='place:home'),false);assert.ok(resident.openingKnowledge.rooms.some(value=>value.id===room));assert.equal(resident.openingKnowledge.objects.some(value=>value.name==='隱藏信封'),false);const diary=world.objects.find(value=>value.label==='住戶日記'&&value.region===room);assert.ok(diary.knownTo.includes(resident.id));assert.equal(diary.knownTo.includes(visitor.id),false);assert.deepEqual(diary.allowedTo,[]);assert.deepEqual(world.configuration.walks,[]);
+}));
+
+
+test('copy and delete bind the original account before receipt replay even when both accounts share world and operation UUIDs',()=>controlled(async f=>{
+ const shared=crypto.randomUUID(),a=await prepared(f);assert.equal((await f.post(f.saves,{id:shared,draftId:a.id,draftVersion:1},'/api/saves')).status,201);
+ const copy={operationScope:'a',operation:'copy',operationId:crypto.randomUUID(),saveId:shared,expectedVersion:0,name:'甲原操作副本'},deletion={operationScope:'a',operation:'delete',operationId:crypto.randomUUID(),saveId:shared,expectedVersion:0};
+ f.context.owner='b';const b=await prepared(f);assert.equal((await f.post(f.saves,{id:shared,draftId:b.id,draftVersion:1},'/api/saves')).status,201);
+ assert.equal((await f.post(f.saves,{...copy,operationScope:'b',name:'乙自己的合法副本'},'/api/saves')).status,201);
+ const before=f.db.prepare('SELECT state,version FROM worlds WHERE owner=(SELECT storage_owner FROM world_saves WHERE owner=? AND id=?)').get('b',shared);
+ assert.equal((await f.post(f.saves,copy,'/api/saves')).status,409);assert.equal((await f.post(f.saves,deletion,'/api/saves')).status,409);
+ assert.deepEqual(f.db.prepare('SELECT state,version FROM worlds WHERE owner=(SELECT storage_owner FROM world_saves WHERE owner=? AND id=?)').get('b',shared),before);
+ for(const query of ['?operationId='+copy.operationId,'?operationId='+copy.operationId+'&operationScope=a'])assert.equal((await f.saves.GET(new Request('https://test.invalid/api/saves'+query))).status,409);
+ const own=await f.saves.GET(new Request('https://test.invalid/api/saves?operationId='+copy.operationId+'&operationScope=b'));assert.equal(own.status,200);assert.equal((await own.json()).operation.save.name,'乙自己的合法副本');
+ f.context.owner='a';assert.equal((await f.post(f.saves,copy,'/api/saves')).status,201);assert.equal((await f.post(f.saves,copy,'/api/saves')).status,200);
+ const missing={...deletion};delete missing.operationScope;const response=await f.saves.POST(new Request('https://test.invalid/api/saves',{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(missing)}));assert.equal(response.status,409);
+ assert.ok(f.db.prepare('SELECT id FROM world_saves WHERE owner=? AND id=?').get('a',shared));
+}));
+
+test('new opening identities reject non-v4 UUIDs without leaving drafts',()=>controlled(async f=>{
+ const body={name:'不得留下的草稿',step:1,description:'',city:{characters:[],places:[]}};
+ for(const id of ['00000000-0000-1000-8000-000000000001','00000000-0000-5000-8000-000000000001']){
+  const response=await f.post(f.openings,{id,version:0,body},'/api/opening-drafts');assert.equal(response.status,400,JSON.stringify(response.body));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM opening_drafts WHERE owner=? AND id=?').get('a',id).n,0);
+ }
+}));
+test('confirmation rejects non-v4 save identities before any world or save row is installed',async()=>{
+ for(const id of ['00000000-0000-1000-8000-000000000001','00000000-0000-5000-8000-000000000001'])await controlled(async f=>{
+  const ready=await prepared(f),before=f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n;const response=await f.post(f.saves,{id,draftId:ready.id,draftVersion:1},'/api/saves');assert.equal(response.status,400,JSON.stringify(response.body));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n,before);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM world_saves WHERE owner=? AND id=?').get('a',id).n,0);assert.equal((await f.readOpening(ready.id)).body.draft.finalizedSaveId,undefined);
+ });
+});

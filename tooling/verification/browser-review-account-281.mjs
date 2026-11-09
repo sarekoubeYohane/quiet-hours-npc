@@ -48,7 +48,7 @@ try{
  assert.equal(await field().inputValue(),'保留可編輯的分岔名稱');assert.equal(await field().isEnabled(),true);await page.screenshot({path:join(out,'copy-conflict-input-retained.png'),fullPage:true});
  await page.reload();assert.equal(await field().inputValue(),'保留可編輯的分岔名稱');await region().getByRole('button',{name:'另存目前進度',exact:true}).click();await page.waitForURL(/\/observe\?save=/);await page.getByRole('heading',{name:'此刻的世界'}).waitFor();
  const copyId=new URL(page.url()).searchParams.get('save');assert.notEqual(copyId,first.save.id);const source=check(await get('/api/world?save='+first.save.id));
- check(await post('/api/saves',{operation:'delete',operationId:crypto.randomUUID(),saveId:first.save.id,expectedVersion:source.version}));
+ check(await post('/api/saves',{operationScope:'review-account-281',operation:'delete',operationId:crypto.randomUUID(),saveId:first.save.id,expectedVersion:source.version}));
  const copied=check(await get('/api/world?save='+copyId));assert.equal(copied.world.aiUsage.totalCalls,0);assert.equal(copied.accountPlayer.usage.totalCalls,accountBefore.usage.totalCalls);assert.equal(copied.accountPlayer.usage.windowStartedAt,accountBefore.usage.windowStartedAt);
  evidence.steps.push('unaccepted copy survives reload and version conflict with editable name; fresh confirmation copies, source deletion leaves account charge');
  await page.goto(app.url+'/settings');await page.getByText(/帳號本小時：2 次 AI 呼叫/).waitFor();await page.screenshot({path:join(out,'account-authority.png'),fullPage:true});
@@ -69,7 +69,7 @@ try{
  sqlite.exec('BEGIN IMMEDIATE');
  try{sqlite.prepare('UPDATE worlds SET operations=? WHERE owner=?').run(JSON.stringify({floor:0,results:{[historicalId]:{status:502,body:{operationUncertain:true}}}}),storage);sqlite.prepare('INSERT INTO player_usage_origins(owner,storage_owner,recovery,unknown_range) VALUES(?,?,?,0)').run('review-unknown-281',storage,JSON.stringify({[historicalId]:null}));sqlite.exec('COMMIT');}catch(error){sqlite.exec('ROLLBACK');throw error;}sqlite.close();
  assert.equal(check(await get('/api/player-budget')).unknownAccountingRanges,1);
- check(await post('/api/saves',{operation:'delete',operationId:crypto.randomUUID(),saveId:legacy.save.id,expectedVersion:0}));
+ check(await post('/api/saves',{operationScope:'review-unknown-281',operation:'delete',operationId:crypto.randomUUID(),saveId:legacy.save.id,expectedVersion:0}));
  const independent=await create('未知帳務後的其他世界');const unknown=check(await get('/api/world?save='+independent.save.id));assert.equal(unknown.accountPlayer.unknownAccountingRanges,1);assert.equal(unknown.unresolvedUsageRecovery,false);
  await page.goto(app.url+'/observe?save='+independent.save.id);await page.getByRole('heading',{name:'此刻的世界'}).waitFor();
  const compact=page.locator('.compact-cost');await compact.waitFor();assert.match(await compact.innerText(),/未確認範圍/);assert.doesNotMatch(await compact.innerText(),/估算 USD 0/);
