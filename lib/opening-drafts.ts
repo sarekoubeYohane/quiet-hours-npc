@@ -1,3 +1,4 @@
+import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
 import { cityDraftSchema,prepareCity } from './city-creation';
@@ -9,7 +10,7 @@ import type { World } from './world';
 import type { CityPreview } from './city-draft';
 import { readSaveCreation,SaveAccessError } from './world-saves';
 export const openingBodySchema=z.object({name:z.string().trim().max(80),description:z.string().max(1600),step:z.number().int().min(1).max(5),city:cityDraftSchema}).strict();
-const identity=z.string().uuid();
+const identity=z.string().regex(saveUuidPattern);
 const operationScope=z.string().min(1).max(128);
 export const openingInputSchema=z.union([
  z.object({operationScope,id:identity,version:z.number().int().nonnegative(),body:openingBodySchema}).strict(),

@@ -10,3 +10,7 @@ Spec 的原真 App Router／Chromium反例 `/tmp/quiet-hours-opening-watchpoints
 驗證工具 `tooling/verification/browser-opening-operation-recovery-288.mjs` 使用共用 `opening-journey.mjs` 真形成卡／開局確認 API driver；模型與骰只在外部接點受控，1 次模型形成真入帳，不直接安裝世界。固定來源的畫面、typecheck、lint 與 build 結果待下段補入；不以本文件宣告整份 #281 完成。
 
 固定 `28b9edd` 真頁覆驗通過，origin `http://127.0.0.1:40571`，受控模型 1 次／實付 0；兩張畫面與機器紀錄位於 [證據](assets/opening-operation-recovery-288/evidence.json)。typecheck、lint（0 errors／4 既有 warnings）、build、diff check 通過。Spec 在該固定版本獨立重驗兩原反例，remaining 0。後續另外發現的 T9 copy/delete 帳號 P1 不含在此結論，仍未結案。
+
+確認頁可讀性另沿用既有 `CityAccessPreview`：實際場所／房間名稱與繁中權限標籤共用原映射，卡來源顯示已保存快照姓名及版本。固定 `09f30d0` 的正常五步真頁再次通過，包含精神容量 70／手動目前值 56、權限可理解名稱及原始開局另建世界；沒有改動初值或規則。
+
+另補一項產品 API 身分一致性反例：非 v4 的 opening ID 原回 200 且留草稿；合法 v4 草稿用非 v4 save ID 原回 201，但觀察路由只接受 v4。將既有 v4 pattern 移到輕量 `lib/save-identities.ts`，由新草稿／確認／世界路由與 UI 共用，既有 `legacy` 選檔別名保留。真 API red→green 覆蓋 v1、v5 草稿及確認拒絕，資料庫無新 draft／world／save 殘留、合法草稿未被標成已建立；API 組 **15/15**。此項固定來源後尚待最後 type／lint／build 及正常真頁覆驗，原正常 v4 旅程沒有換成 fixture。

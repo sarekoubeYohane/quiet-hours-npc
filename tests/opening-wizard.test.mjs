@@ -129,3 +129,15 @@ test('copy and delete bind the original account before receipt replay even when 
  const missing={...deletion};delete missing.operationScope;const response=await f.saves.POST(new Request('https://test.invalid/api/saves',{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(missing)}));assert.equal(response.status,409);
  assert.ok(f.db.prepare('SELECT id FROM world_saves WHERE owner=? AND id=?').get('a',shared));
 }));
+
+test('new opening identities reject non-v4 UUIDs without leaving drafts',()=>controlled(async f=>{
+ const body={name:'不得留下的草稿',step:1,description:'',city:{characters:[],places:[]}};
+ for(const id of ['00000000-0000-1000-8000-000000000001','00000000-0000-5000-8000-000000000001']){
+  const response=await f.post(f.openings,{id,version:0,body},'/api/opening-drafts');assert.equal(response.status,400,JSON.stringify(response.body));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM opening_drafts WHERE owner=? AND id=?').get('a',id).n,0);
+ }
+}));
+test('confirmation rejects non-v4 save identities before any world or save row is installed',async()=>{
+ for(const id of ['00000000-0000-1000-8000-000000000001','00000000-0000-5000-8000-000000000001'])await controlled(async f=>{
+  const ready=await prepared(f),before=f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n;const response=await f.post(f.saves,{id,draftId:ready.id,draftVersion:1},'/api/saves');assert.equal(response.status,400,JSON.stringify(response.body));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM worlds').get().n,before);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM world_saves WHERE owner=? AND id=?').get('a',id).n,0);assert.equal((await f.readOpening(ready.id)).body.draft.finalizedSaveId,undefined);
+ });
+});
