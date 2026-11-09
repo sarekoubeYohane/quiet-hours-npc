@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {characterApiFixture} from './support/character-api-fixture.mjs';
 async function fixture(){
- const base=await characterApiFixture(),{db,context,request,worldRequest,post}=base,{openings,drafts,form,cards,world,people,scenes,saves,fromTemplate,generation}=base.routes;
+ const base=await characterApiFixture(),{context,post}=base,{openings,drafts,form,cards,world,people,scenes,saves,fromTemplate,generation}=base.routes;
   async function createWorld(name,card) {
-    assert.ok(card,'New worlds must use the card formed in this product journey');const person={body:{template:card}};
+    assert.ok(card,'New worlds must use the card formed in this product journey');
     const scene=await post(scenes,{id:crypto.randomUUID(),version:0,name:name+'的家',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]},'/api/scene-templates');assert.equal(scene.status,201);
     const apiRequest=async(path,payload)=>{const route=path==='/api/saves'?saves:openings;if(payload!==undefined)return post(route,payload,path);const response=await route.GET(new Request('https://test.invalid'+path));return {status:response.status,body:await response.json()};};
     const {saved}=await confirmOpening(apiRequest,{name,city:{places:[{id:'home',templateId:scene.body.template.id,version:scene.body.template.version,name:name+'的家'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}});return saved.save.id;

@@ -105,7 +105,7 @@ test('new operations resolve fresh defaults on the server, capture both roles on
 });
 
 test('existing explicit world adjudication remains legacy until the save explicitly chooses account inheritance', async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch;const calls=[];
+ const {db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch;const calls=[];
  globalThis.fetch=async(_url,init)=>{const p=JSON.parse(init.body);calls.push(p.model);return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"background":"受控背景"}'}}]});};
  try {
    const id=await createWorld('已有設定');
@@ -125,7 +125,7 @@ test('existing explicit world adjudication remains legacy until the save explici
 });
 
 test('explicit inheritance with no account defaults projects missing settings without rewriting the stored legacy result', async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture();
+ const {db,request,worldRequest,createWorld}=await fixture();
  try {
    const id=await createWorld('待補設定');
    const set=await worldRequest({operation:'set-adjudication',adjudication:{provider:'openai',model:'legacy-A'}},id);assert.equal(set.status,200);
@@ -138,7 +138,7 @@ test('explicit inheritance with no account defaults projects missing settings wi
 
 test('cleared or expired account keys return the original settings flag before any AI dispatch and keep the selected story', async()=>{
  for(const failure of ['clear','expire']) {
-   const {context,db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch,oldNow=Date.now;let calls=0;
+   const {db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch,oldNow=Date.now;let calls=0;
    globalThis.fetch=async()=>{calls++;throw Error('a missing key must never dispatch');};
    try {
      const id=await createWorld('保留來源世界');
@@ -155,7 +155,7 @@ test('cleared or expired account keys return the original settings flag before a
 });
 
 test('player budget and spent calls are shared by two saved worlds rather than reset by selecting another',async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture(),oldFetch=globalThis.fetch;let calls=0;
+ const {db,request,worldRequest,createWorld}=await fixture(),oldFetch=globalThis.fetch;let calls=0;
  globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:3,completion_tokens:2},choices:[{message:{content:'{"background":"受控背景"}'}}]});};
  try{
    const first=await createWorld('第一世界'),second=await createWorld('第二世界');
@@ -288,7 +288,7 @@ test('known and unknown paid failures remain account facts after source deletion
 });
 
 test('legacy uncertain operations without recoverable evidence retain an account unknown range after source deletion',async()=>{
- const {context,db,createLegacyWorld,budgetRequest,saveRequest}=await fixture();
+ const {db,createLegacyWorld,budgetRequest,saveRequest}=await fixture();
  try{
    const source=createLegacyWorld('舊的未知帳單'),storage=db.prepare('SELECT storage_owner FROM world_saves WHERE owner=? AND id=?').get('a',source).storage_owner;
    const operationId=Date.now()+':'+crypto.randomUUID();

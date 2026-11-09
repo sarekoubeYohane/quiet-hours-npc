@@ -44,13 +44,13 @@ test('current direction evolves explicitly and omitted directions survive withou
  }return value;},async()=>{for(round=0;round<3;round++)assert.equal((await advance()).status,200);const saved=await read();assert.equal(saved.characters[0].personality,initial.characters[0].personality);assert.equal(saved.characters[0].intents[0].version,3);assert.equal(saved.characters[0].goal,initial.characters[0].goal);});
 });
 
-test('old world remains readable and advance stops before dispatch until explicit reset, preserving usage',async()=>{
+test('old world remains readable and retired reset preserves unsupported history and original usage',async()=>{
  const old=await setup();delete old.pursuitVersion;delete old.pursuitContext;old.characters[0].intents=[];old.aiUsage={windowStartedAt:Date.now(),calls:7,inputTokens:70,outputTokens:30,unknownCalls:0,totalCalls:9,totalInputTokens:90,totalOutputTokens:50,totalUnknownCalls:0,savedDecisions:4};store.install(old);
  let calls=0;await transport(data=>{calls++;return decision(data);},async()=>{
   const loaded=await read();assert.deepEqual(loaded.characters[0].intents,[]);assert.equal(loaded.pursuitVersion,undefined);
   const blocked=await advance();assert.equal(blocked.status,409);assert.equal((await blocked.json()).worldResetRequired,true);assert.equal(calls,0);
   assert.deepEqual((await read()).aiUsage,old.aiUsage);assert.equal((await read()).turn,0);
-  assert.equal((await POST(request({operation:'reset'}))).status,200);const fresh=await read();assert.equal(fresh.pursuitVersion,1);assert.ok(fresh.pursuitContext);assert.equal(fresh.characters[0].intents[0].kind,'direction');assert.equal(fresh.aiUsage.totalCalls,9);assert.equal(fresh.aiUsage.savedDecisions,0);assert.equal(calls,0);
+  const before=await read();assert.equal((await POST(request({operation:'reset'}))).status,409);const unchanged=await read();assert.deepEqual(unchanged,before);assert.equal(unchanged.pursuitVersion,undefined);assert.deepEqual(unchanged.characters[0].intents,[]);assert.equal(unchanged.aiUsage.totalCalls,9);assert.equal(unchanged.aiUsage.savedDecisions,4);assert.equal(calls,0);
  });
 });
 

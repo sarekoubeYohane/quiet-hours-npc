@@ -4,7 +4,7 @@ const { originalAccountInput, originalWorldInput } = require('./original-scope-f
 const assert=require('node:assert/strict'),test=require('node:test'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const saves=load('saves-route'),world=load('route'),people=load('character-templates-route'),scenes=load('scene-templates-route'),store=load('store'),auth=load('auth');
-const {seedWorld}=load('world'),{blankCharacterTemplateFields}=load('character-templates');
+const {seedWorld}=load('world');
 const originalSaveScopes=new Map();
 const origin='https://test.invalid';
 const req=(value,save)=>new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(value, save?originalSaveScopes.get(save):'test-owner'))});

@@ -29,7 +29,7 @@ test('incurred estimates use immutable price cohorts, real cache split, clock wi
   await POST(req({operation:'set-price',price:price(3,4,{cachedInput:0.5})}));
   global.fetch=async(_fixtureUrl,_fixtureInit)=>response({prompt_tokens:1000000,completion_tokens:500000,prompt_tokens_details:{cached_tokens:200000}},JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content));
   await advance();saved=await read();assert.equal(saved.costSummary.total.knownUsd,26);assert.equal(saved.costSummary.total.cohorts.length,2);
-  await POST(req({operation:'reset'}));assert.equal((await read()).costSummary.total.knownUsd,26);
+  assert.equal((await POST(req({operation:'reset'}))).status,409);assert.equal((await read()).costSummary.total.knownUsd,26);
   now+=3600001;saved=await read();assert.equal(saved.costSummary.hour.knownUsd,0);assert.equal(saved.costSummary.total.knownUsd,26);
   await advance();assert.equal((await read()).costSummary.hour.knownUsd,18);
  }finally{global.fetch=fetcher;Date.now=clock;}

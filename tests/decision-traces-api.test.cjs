@@ -33,7 +33,7 @@ test('normal denial retains the full cup and raw reply even with no changed obje
 });
 module.exports={proposal};
 
-test('trace history survives journal eviction and time passage, stays private, and reset clears the old history',async()=>{
+test('trace history survives journal eviction and time passage, stays private, and retired reset retains the old history',async()=>{
  const s=await scenario({modify:w=>{w.characters[0].shortTerm[0].text='FORGOTTEN-PRIVATE-CONTEXT';w.characters[0].memories[0].text='FORGOTTEN-PRIVATE-CONTEXT';}});const store=load('store'),auth=load('auth');
  try{
   const r=await s.post({operation:'advance',minutes:15}),first=(await r.json()).operationEvidence;
@@ -48,7 +48,7 @@ test('trace history survives journal eviction and time passage, stays private, a
   try{const later=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.deepEqual(later.decisionTrace,before);}finally{Date.now=clock;}
   store.installForOwner('other-owner',load('world').seedWorld());auth.setUserId('other-owner');
   try{const isolated=await(await GET(new Request('https://test.invalid/api/world?operationScope=other-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.equal(isolated.decisionTrace,null);assert.equal(isolated.decisionTraces.retention.count,0);}finally{auth.setUserId('test-owner');}
-  await s.post({operation:'reset'});const reset=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.equal(reset.decisionTrace,null);assert.equal(reset.decisionTraces.retention.count,1);
+  const beforeRetirement=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.equal((await s.post({operation:'reset'})).status,409);const reset=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.deepEqual(reset.decisionTrace,beforeRetirement.decisionTrace);assert.deepEqual(reset.decisionTraces,beforeRetirement.decisionTraces);
  }finally{auth.setUserId('test-owner');s.restore();}
 });
 
