@@ -54,3 +54,13 @@
 - [壞狀態安全呈現](assets/formal-mental-enable-263/formal-unavailable.png)
 
 沒有部署、合併main、真實付費模型或正式世界推進。browser旅程沒有宣稱覆蓋 #276 branches提前效果／demo60分反例；合後108項已包含該票修復的真實API反例，最終全套由整合另驗。
+
+## 新城市編輯器與首次正常推進補證
+
+額外重跑既有 `browser-character-275.mjs`，首輪 `263-city-smoke.log` 停在歷史 runner 的「新人物精神電量 undefined」斷言，且其末尾仍傳15分鐘。實際城市已正確形成正式政策；這是 fixture 舊契約，不是產品回退理由。保留所有既有建角、矛盾草稿、專長／感官、SQLite reload 斷言，將 runner 更新為真實新城市契約。
+
+最終 `263-city-smoke-final.log` PASS：同一城市編輯器明示容量65／目前3，預覽不寫世界，start形成正式狀態及 `five-minute-v1`，reload保持精確初值；隨後真正正常模型 advance5（含時間header／契約版本）世界1260→1265，人物屬性與容量不變。一次受控NPC呼叫，真實付費0，無頁面錯誤。歷史275報告及資產未變更。
+
+- [新城市開局設定](assets/formal-mental-enable-263/new-city/character-263-city-opening.png)
+- [新城市人物與首次推進](assets/formal-mental-enable-263/new-city/character-275-city.png)
+- [完整結果JSON](assets/formal-mental-enable-263/new-city/character-275-browser.json)
