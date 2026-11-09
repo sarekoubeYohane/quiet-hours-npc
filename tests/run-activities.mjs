@@ -11,7 +11,7 @@ const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
   const sources = (await readdir('lib')).filter(file => file.endsWith('.ts')).map(file => ['lib/' + file, file.slice(0, -3)]);
   sources.push(['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route'],
-    ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
+    ['app/api/saves/route.ts', 'saves-route'], ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
   for (const [source, output] of sources) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
     const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g, 'require("./$1.cjs")')
@@ -34,11 +34,12 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0006_character_templates.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0007_scene_templates.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0008_world_before_city.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0014_world_saves.sql', 'utf8'))});
     exports.archivedWorld = () => db.prepare('SELECT state FROM world_before_city WHERE owner = ?').get('test-owner')?.state;
     let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure, traceWriteHook, traceReadFailure, storageHook;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM world_before_city; DELETE FROM scene_templates; DELETE FROM character_templates; DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
+      db.exec('DELETE FROM world_saves; DELETE FROM world_before_city; DELETE FROM scene_templates; DELETE FROM character_templates; DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };
@@ -56,7 +57,7 @@ try {
       const row = db.prepare('SELECT state, version FROM worlds WHERE owner = ?').get(owner);
       return { world: JSON.parse(row.state), version: row.version };
     };
-    exports.database = () => ({ prepare(sql) { return { bind(...values) { return { async all() { if(storageHook)await storageHook(sql,values); return { results: db.prepare(sql).all(...values) }; }, async first() { if(storageHook)await storageHook(sql,values); if(traceReadFailure&&sql.startsWith('SELECT body FROM decision_traces')){traceReadFailure=false;throw Error('fixture archive read unavailable');} if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
+    exports.database = () => ({ async batch(statements) { db.exec('BEGIN'); try { const results=[]; for(const statement of statements)results.push(await statement.run()); db.exec('COMMIT'); return results; } catch(error) { db.exec('ROLLBACK'); throw error; } }, prepare(sql) { return { bind(...values) { return { async all() { if(storageHook)await storageHook(sql,values); return { results: db.prepare(sql).all(...values) }; }, async first() { if(storageHook)await storageHook(sql,values); if(traceReadFailure&&sql.startsWith('SELECT body FROM decision_traces')){traceReadFailure=false;throw Error('fixture archive read unavailable');} if(failRead && sql.startsWith('SELECT operations')) { failRead = false; throw Error('D1 unavailable'); } return db.prepare(sql).get(...values) ?? null; }, async run() {
       if(storageHook)await storageHook(sql,values);
       if(sql.startsWith('INSERT OR IGNORE INTO recall_dispatch_usage') && budgetHook){const hook=budgetHook;budgetHook=undefined;await hook();}
       if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&traceWriteHook){const hook=traceWriteHook;traceWriteHook=undefined;await hook();}
@@ -114,6 +115,7 @@ try {
   allTests.push('tests/character-generation-api.test.cjs', 'tests/initial-memory-capacity-api.test.cjs');
   allTests.push('tests/city-activity-hints-api.test.cjs','tests/character-attributes-api.test.cjs','tests/character-attributes-ui.test.cjs');
   allTests.push('tests/five-minute-time-api.test.cjs','tests/d100-api.test.cjs','tests/time-policy-review-api.test.cjs');
+  allTests.push('tests/world-saves-api.test.cjs');
   allTests.push('tests/formal-mental-policy-api.test.cjs','tests/formal-mental-enable-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });

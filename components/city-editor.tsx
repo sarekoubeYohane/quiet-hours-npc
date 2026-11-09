@@ -24,8 +24,9 @@ async function templateResponse<T>(path: string, signal: AbortSignal): Promise<T
   return body;
 }
 
-export default function CityEditor({ context, disabled, onStart, onClose, onMeteredResult }: {
+export default function CityEditor({ worldEndpoint='/api/world', context, disabled, onStart, onClose, onMeteredResult }: {
   context: CityContext;
+  worldEndpoint?:string;
   disabled: boolean;
   onStart: (city: CityDraft, expectedVersion: number) => Promise<boolean>;
   onClose: () => void;
@@ -106,7 +107,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
           operationId:Date.now()+':'+crypto.randomUUID(), city:draft, openingDescription,
         })};
       }
-      const response = await fetch('/api/world', {
+      const response = await fetch(worldEndpoint, {
         method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json',[timePolicyHeader]:roundTimePolicy.version},
         signal:AbortSignal.timeout(roundClientMs), body:pendingSuggestion.current.payload,
       });
@@ -133,7 +134,7 @@ export default function CityEditor({ context, disabled, onStart, onClose, onMete
     setResult(undefined);
     setError('');
     try {
-      const response = await fetch('/api/world', {
+      const response = await fetch(worldEndpoint, {
         method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...context,expectedVersion,operation:'preview-city',mode:'demo',city:draft}),
       });
