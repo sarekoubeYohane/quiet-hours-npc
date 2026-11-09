@@ -11,6 +11,7 @@ const { seedWorld } = load('world');
 const { blankCharacterTemplateFields } = load('character-templates');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
 
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api,body) => api.POST(new Request(origin+'/api/world',{
@@ -103,7 +104,7 @@ test('known city fixtures suggest optional methods without exposing hidden restr
   const scope={operationScope:opening.operationScope,worldContext:opening.world.contextId,expectedVersion:opening.version};
   const preview=await response(await post(route,{...scope,operation:'preview-city',mode:'demo',city}),200);
   assert.deepEqual(preview.preview.issues,[]);
-  const started=await response(await post(route,{...scope,operation:'start-city',operationId:operationId(),mode:'demo',city}),200);
+  const started=await installHistoricalCity(city);
   const {world}=started;
 
   const decisions=[],adjudications=[];

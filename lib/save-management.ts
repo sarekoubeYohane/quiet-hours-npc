@@ -126,6 +126,7 @@ export async function deleteWorldSave(owner:string,input:Extract<SaveManagementI
     db.prepare(`INSERT OR IGNORE INTO save_operation_receipts (owner,operation_id,request,result,cleanup)
       SELECT ?,?,?,?,? FROM worlds w JOIN world_saves s ON s.storage_owner=w.owner WHERE ${gate}`)
       .bind(owner,input.operationId,request,JSON.stringify(result),JSON.stringify(vectors.results.map(row=>row.vector_id)),...basis),
+    db.prepare(`DELETE FROM opening_drafts WHERE owner=? AND finalized_save_id=? AND ${accepted}`).bind(owner,input.saveId,...receipt),
     db.prepare(`DELETE FROM model_preferences WHERE owner=? AND target=? AND ${accepted}`).bind(owner,'save:'+input.saveId,...receipt),
     db.prepare(`DELETE FROM decision_traces WHERE owner=? AND ${accepted}`).bind(source.storage_owner,...receipt),
     db.prepare(`DELETE FROM decision_trace_retention WHERE owner=? AND ${accepted}`).bind(source.storage_owner,...receipt),

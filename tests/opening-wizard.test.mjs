@@ -22,7 +22,7 @@ async function fixture() {
   } }] });
   const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
   const [openings,drafts,form,cards,api,world,people,scenes,saves,fromTemplate,generation] = entries;
-  async function post(route,payload,path) {if(route===openings||route===saves)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
+  async function post(route,payload,path) {if(route===openings||route===saves&&!payload.operation)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
   const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()};};
   const worldRequest=async(payload,save)=>{const suffix=save?'?save='+save:'?workspace=account';const r=await world.GET(new Request('https://test.invalid/api/world'+suffix));const scope=await r.json();return payload===undefined?{status:r.status,body:scope}:post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world'+suffix);};
 
@@ -95,4 +95,14 @@ test('legacy missing original is explicitly unavailable, and new reset/start-cit
 test('a delayed new draft or finalization retains the originating account instead of current cookie account',()=>controlled(async f=>{
  const id=crypto.randomUUID(),input={id,version:0,operationScope:'a',body:{name:'原帳號輸入',description:'',step:1,city:{characters:[],places:[]}}};f.context.owner='b';assert.equal((await f.post(f.openings,input,'/api/opening-drafts')).status,409);assert.equal(f.db.prepare('SELECT count(*) AS n FROM opening_drafts').get().n,0);
  f.context.owner='a';const created=await prepared(f);f.context.owner='b';assert.equal((await f.post(f.saves,{id:created.id,draftId:created.id,draftVersion:1,operationScope:'a'},'/api/saves')).status,409);assert.equal(f.db.prepare('SELECT count(*) AS n FROM world_saves').get().n,0);
+}));
+test('moving from confirmation to entry or renaming keeps the already saved candidate and future random streams',()=>controlled(async f=>{
+ const {id,body,draft}=await prepared(f);const moved=await f.post(f.openings,{id,version:1,body:{...body,name:'最後名稱',step:5}},'/api/opening-drafts');assert.equal(moved.status,200);assert.deepEqual(moved.body.world,draft.world);
+}));
+test('deleting a finalized world removes only its closed draft and preserves copied original, independent drafts and assets',()=>controlled(async f=>{
+ const {id}=await prepared(f),confirmation={id,draftId:id,draftVersion:1};await f.post(f.saves,confirmation,'/api/saves');const otherId=crypto.randomUUID();await f.post(f.openings,{id:otherId,version:0,body:{name:'仍在建立',step:2,description:'保留這份草稿',city:{places:[],characters:[]}}},'/api/opening-drafts');
+ const copy=await f.post(f.saves,{operation:'copy',operationId:crypto.randomUUID(),saveId:id,expectedVersion:0,name:'獨立副本'},'/api/saves');assert.equal(copy.status,201,JSON.stringify(copy.body));const copyId=copy.body.save.id;
+ const deleted=await f.post(f.saves,{operation:'delete',operationId:crypto.randomUUID(),saveId:id,expectedVersion:0},'/api/saves');assert.equal(deleted.status,200,JSON.stringify(deleted.body));assert.equal((await f.readOpening(id)).status,404);assert.equal((await f.readOpening(otherId)).status,200);
+ assert.equal((await f.post(f.saves,confirmation,'/api/saves')).status,410);assert.equal(f.db.prepare('SELECT count(*) AS n FROM worlds WHERE owner=?').get('save:a:'+id).n,0);assert.equal((await f.worldRequest(undefined,copyId)).body.world.turn,0);
+ const restarted=await f.post(f.openings,{id:crypto.randomUUID(),version:0,restartSaveId:copyId},'/api/opening-drafts');assert.equal(restarted.status,200);assert.equal(restarted.body.world.characters[0].name,'時雨');assert.equal((await f.cards()).body.cards.length,1);assert.equal(f.db.prepare('SELECT count(*) AS n FROM scene_templates').get().n,1);
 }));
