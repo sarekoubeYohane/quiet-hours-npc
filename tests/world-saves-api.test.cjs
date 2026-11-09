@@ -111,9 +111,9 @@ test('a slow accepted operation and recovery remain attached to the source world
     release();await body(await accepted);
     assert.equal((await read(a.saved.save.id)).world.turn,1);
     assert.equal((await read(b.saved.save.id)).world.turn,1);
-    const recovered=await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(a.saved.save.id))+'&operationScope='+encodeURIComponent(originalSaveScopes.get(b.saved.save.id))+'&operationId='+sent.operationId)));
+    const recovered=await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(a.saved.save.id))+'&operationId='+sent.operationId)));
     assert.equal(recovered.operation.state,'settled');
-    const other=await body(await world.GET(new Request(origin+'/api/world?save='+b.saved.save.id+'&operationId='+sent.operationId)));
+    const other=await body(await world.GET(new Request(origin+'/api/world?save='+b.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(b.saved.save.id))+'&operationId='+sent.operationId)));
     assert.equal(other.operation.state,'unknown');
     await body(await world.POST(req(sent,b.saved.save.id)),409);
     const replay=req(sent,a.saved.save.id);replay.headers.set('X-World-Time-Policy','round-v1');
