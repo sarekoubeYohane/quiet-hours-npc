@@ -67,3 +67,16 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 同一接合版另獨立確認 **T9 新 P1**：真正形成卡、開局草稿與保存 API 建 A／B 各自相同 save UUID／版本，切 B 後重送 A 原 copy／delete payload。copy 回 201 建 B 副本；delete 回 200 永久刪 B 來源，A 保留。讀取授權仍有隔離，錯的是原操作身分沒有保留。`save-management` schema 及 `SaveActions` 未將原帳號 scope 帶入 POST。#290 已實際重新 open（留言 6743755849），交同一修復者；未完成前不宣告 T9／整份完成。
 
 上述均在隔離 SQLite／受控模型，正式資料及付費模型為 0。T7 本身仍在合法前置關閉後進行，#289 未開始；不能將尚未交付的 AI 功能列作本輪遺漏。
+
+後續固定覆核：`11f782f` 的 T9 原帳號 P1 已由兩軸獨立清零（Spec 真原 scope 反例及回 A 原 ID 恢復 1/1、Standards API 13/13）；`28b9edd` 兩個 UI P2 亦由 Spec 真頁覆核清零。候選仍待 T7 整包接合，#290 尚未重新結案。`1a3ea10` 另完成 fixture P3 與 UUID 身分 P2：Standards 共用 fixture／v4 pattern 窄組 26/26，Spec 真 v1／v5 拒絕無殘留、正常 v4 保存／讀取／原 ID 回放 3/3。結論各限該項，不能蓋過下列新問題。
+
+## 跨表單原帳號擴充覆核（修正中）
+
+固定 `400eb94`，產品實作者先以真 API／SQLite 自查，Spec 再獨立核對真正 UI payload，確認 **P1 一項、P2 三項**：
+
+- **P1／#285：Key 設定／清除在原 scope 驗證前 early return。** 含 A 真 GET `account-operations:a` 的請求，切 B 後 set／clear 都回 200；SQLite 確認寫入／清除 B 的假 Key。沒有使用真 Key、模型或付費服務。
+- **P2／#285：帳號模型預設未保留原帳號。** 依 A GET 的版本及設定組成與 ModelSettingsPanel 相同的 payload，切 B 後 200 改 B，不需要 UUID 碰撞。
+- **P2／#284：普通建角保存丟棄原 accountScope。** A 完整 GET 草稿保留 scope，切 B 且同 UUID／版本後仍 200 覆 B；`readCharacterDraftInput` 捨棄該欄位。
+- **P2／#288 來源接點：人物文字／場景編輯沒有原帳號綁定。** 依實際 editor payload 重送 A 的編輯，B 同 ID／版本來源被改寫。這是晚到寫入歸屬錯誤，未證明跨帳號讀取漏洞。
+
+#284／#285 已實際重新 open（留言 6744392972／6744398869）。同一修復者另建獨立 worktree，統一檢查所有寫入早退、初始 GET 帳號捕捉與恢復回應，不以當下 cookie 補綁原操作；保留既有 rawOwner／account-operations scope 語義與模型快照／期限規則。尚未有完成候選，不先清零、不啟動 #289。研究 source-pin 的歷史 fixture 遷移亦仍有一項零用量視窗投影斷言待修；不宣告最終完整回歸通過。
