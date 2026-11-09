@@ -1,0 +1,29 @@
+{
+  "origin": "http://127.0.0.1:33647",
+  "commit": "42ec76b",
+  "builtAt": "2026-11-09T12:39:47.178Z",
+  "auth": "local cookie identity boundary; not production OAuth",
+  "database": "isolated disk SQLite with migrations; worlds created through product APIs",
+  "modelCalls": 1,
+  "paidCalls": 0,
+  "evidence": [
+    {
+      "phase": "missing models / cancel / failed save / saved key / explicit generation",
+      "url": "http://127.0.0.1:33647/character-templates",
+      "modelCalls": 1
+    },
+    {
+      "phase": "account inheritance / custom save / default changes do not override custom / original input",
+      "save": "6db05ab9-5b1f-401d-8cca-47658cdf6a3e",
+      "url": "http://127.0.0.1:33647/observe?save=6db05ab9-5b1f-401d-8cca-47658cdf6a3e",
+      "turn": 0,
+      "modelCalls": 1
+    },
+    {
+      "phase": "observation missing models / cancel retains input / rules work without keys",
+      "save": "4a74f44a-941a-4103-9a13-244d8eb13d7f",
+      "turn": 1,
+      "modelCalls": 1
+    }
+  ]
+}
