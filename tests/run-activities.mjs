@@ -114,6 +114,7 @@ try {
   allTests.push('tests/character-generation-api.test.cjs', 'tests/initial-memory-capacity-api.test.cjs');
   allTests.push('tests/city-activity-hints-api.test.cjs','tests/character-attributes-api.test.cjs','tests/character-attributes-ui.test.cjs');
   allTests.push('tests/five-minute-time-api.test.cjs');
+  allTests.push('tests/formal-mental-policy-api.test.cjs');
   const selected = process.argv.slice(2);
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;

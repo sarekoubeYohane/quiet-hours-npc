@@ -282,6 +282,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if(b.operation==='advance'&&(b.timeContract!==undefined&&b.timeContract!=='five-minute-v1'||b.minutes===5&&b.timeContract!=='five-minute-v1'||(world.timeContract==='five-minute-v1'||b.timeContract==='five-minute-v1')&&b.minutes!==5))return reply({error:'五分鐘時間契約每次只能推進 5 分鐘；請更新頁面後以五分鐘步驟推進。'},400);
+    if(b.operation==='advance'&&world.characters.some(c=>c.mentalEnergy?.policy.kind==='formal')&&world.timeContract!=='five-minute-v1'&&b.timeContract!=='five-minute-v1')return reply({error:'正式精神電量需要明示採用五分鐘時間契約，舊十五／三十分鐘操作未執行。'},400);
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     let openingPreview: Awaited<ReturnType<typeof prepareCity>>['preview'] | undefined;
     if ((suggestingOpening || initializingCity) && city?.success) {
