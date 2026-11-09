@@ -46,7 +46,7 @@ test('save-before, lost-response and CAS failures never leave partial or rerolle
   const random=Math.random;Math.random=()=>{throw Error('replay must not sample');};try{await send(payload);assert.deepEqual((await read()).world.characters.find(c=>c.id==='cass').attributes,actor.attributes);}finally{Math.random=random;}
  }
 });
-test('start-city forms once after preview without enabling energy, while old reads remain missing',async()=>{
+test('start-city forms once after preview alongside formal energy, while old reads remain missing',async()=>{
  store.install(seedWorld());const before=await read();const scenes=load('scene-templates-route'),people=load('character-templates-route');
  const api=async(api,body)=>{const r=await api.POST(new Request('https://test.invalid',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(body)}));assert.ok(r.status<300,await r.clone().text());return r.json();};
  const person=(await api(people,{id:crypto.randomUUID(),version:0,fields:{...load('character-templates').blankCharacterTemplateFields(),name:'定衡',background:'力量較弱'}})).template;
@@ -55,9 +55,9 @@ test('start-city forms once after preview without enabling energy, while old rea
  const context={operationScope:before.operationScope,expectedVersion:before.version,worldContext:before.world.contextId};
  const random=Math.random;let count=0;Math.random=()=>{count++;return 0;};try{
  const preview=await send({...context,operation:'preview-city',city});assert.equal(preview.status,200);assert.equal(count,0);
- const payload={...context,operation:'start-city',operationId:op(),city};const r=await send(payload);assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.world.characters[0].attributes.values.strength,1);assert.equal(r.body.world.characters[0].mentalEnergy,undefined);const n=count;
+ const payload={...context,operation:'start-city',operationId:op(),city};const r=await send(payload);assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.world.characters[0].attributes.values.strength,1);assert.equal(r.body.world.characters[0].mentalEnergy.policy.kind,'formal');const n=count;
  assert.equal((await send(payload)).status,200);assert.equal(count,n);assert.deepEqual((await read()).world.characters[0].attributes,r.body.world.characters[0].attributes);
- const advanced=await send({operation:'advance',worldContext:r.body.world.contextId,minutes:15});assert.equal(advanced.status,200,JSON.stringify(advanced.body));assert.equal(advanced.body.world.turn,1);assert.deepEqual(advanced.body.world.characters[0].attributes,r.body.world.characters[0].attributes);
+ const advanced=await send({operation:'advance',worldContext:r.body.world.contextId,minutes:5,timeContract:'five-minute-v1'});assert.equal(advanced.status,200,JSON.stringify(advanced.body));assert.equal(advanced.body.world.turn,1);assert.deepEqual(advanced.body.world.characters[0].attributes,r.body.world.characters[0].attributes);
  }finally{Math.random=random;}
 });
 test('file SQLite close/reopen preserves formation and does not resample the committed original operation',async()=>{

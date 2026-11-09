@@ -119,9 +119,10 @@ test('an actual city phone read supplies only public map knowledge to the reader
     return Response.json({usage:{prompt_tokens:9,completion_tokens:5},choices:[{message:{content:JSON.stringify(candidate)}}]});
   };
   const ui=await mountProfile();
-  const advance=()=>({operation:'advance',operationId:operationId(),worldContext:context,mode:'openai',model:'gpt-6.1-sol',minutes:15});
+  const advance=()=>({operation:'advance',operationId:operationId(),worldContext:context,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'});
+  const completePeriod=async()=>{let result;for(let part=0;part<4;part++)result=await expect(await post(route,advance()),200);return result;};
   try {
-    await expect(await post(route,advance()),200);
+    await completePeriod();
     assert.ok(phoneId);
     const original=await read();
     assert.equal(original.world.phones.devices.find(device=>device.objectId===phoneId).mapReads,undefined);
@@ -130,8 +131,9 @@ test('an actual city phone read supplies only public map knowledge to the reader
     assert.equal((await read()).version,original.version);
     assert.equal((await read()).world.phones.devices.find(device=>device.objectId===phoneId).mapReads,undefined);
     step=1;
-    const reading=advance();
-    const opened=await expect(await post(route,reading),200);
+    let reading=advance(),opened=await expect(await post(route,reading),200);
+    // Replay the operation that actually completes the read, not its earlier start.
+    for(let part=0;part<3;part++){reading=advance();opened=await expect(await post(route,reading),200);}
     const stored=(await read()).world;
     const entry=stored.phones.devices.find(device=>device.objectId===phoneId).mapReads[0];
     assert.equal(entry.actorId,'npc:1');
@@ -147,7 +149,7 @@ test('an actual city phone read supplies only public map knowledge to the reader
     assert.deepEqual(replayed.world.phones.devices.find(device=>device.objectId===phoneId).mapReads,[entry]);
 
     step=2;
-    await expect(await post(route,advance()),200);
+    await completePeriod();
     assert.equal((await read()).world.characters.find(person=>person.name==='瑤芷').location,'place:station');
     const payload=(turn,name)=>JSON.stringify(inputs.find(item=>item.step===turn&&item.input.self.name===name).input);
     assert.doesNotMatch(payload(0,'瑤芷'),/遠岸書店|暗號宅邸/);
@@ -158,9 +160,9 @@ test('an actual city phone read supplies only public map knowledge to the reader
     for(const {input} of inputs)assert.doesNotMatch(JSON.stringify(input),/暗號宅邸|地下研究室|不能外洩的手稿|切勿加入地圖的私密描述|未讀觀景台/);
 
     step=3;
-    await expect(await post(route,advance()),200);
+    await completePeriod();
     step=4;
-    await expect(await post(route,advance()),200);
+    await completePeriod();
     const after=(await read()).world;
     assert.equal(after.objects.find(object=>object.id===phoneId).state.condition,'broken');
     assert.deepEqual(after.objects.filter(object=>object.kind==='phone'&&object.owner==='npc:1').map(object=>object.id),[phoneId]);

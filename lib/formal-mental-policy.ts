@@ -19,7 +19,7 @@ export function formalDie(actor:Character,source:string,slot:number,die:number):
 export function createFormalMentalEnergy(actor:Pick<Character,'id'|'mentalEnergy'>,minute:number,opening:FormalOpening={}):MentalEnergy{
  if(!opening||typeof opening!=='object'||Array.isArray(opening)||typeof actor.id!=='string'||!actor.id||!Number.isFinite(minute)||Object.keys(opening).some(key=>!['capacity','minimum','maximum','current','stage','seed'].includes(key)))throw Error('正式精神電量開局格式無效。');
  if(['capacity','minimum','maximum','current','seed'].some(key=>opening[key as keyof FormalOpening]!==undefined&&!Number.isSafeInteger(opening[key as keyof FormalOpening])))throw Error('正式開局數值必須明示整數。');
- if(actor.mentalEnergy)throw Error('既有精神電量不得由開局工廠重抽或轉換測試政策。');
+ if(actor.mentalEnergy!==undefined)throw Error('既有精神電量不得由開局工廠重抽或轉換測試政策。');
  const min=opening.minimum??40,max=opening.maximum??90;
  if(!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||min<40||max>90||min>max)throw Error('一般容量限制必須位於40至90。');
  let capacity=opening.capacity,capacityDice:[number,number]|undefined;

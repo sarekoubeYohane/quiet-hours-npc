@@ -59,7 +59,7 @@ test('a new manual city saves closed and blocked connections and does not invent
     )}}]});
   };
   try {
-    await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+    await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'}),200);
     assert.equal(attempts,1);
     assert.equal((await read()).world.characters[0].location,'place:one');
   } finally { global.fetch = transport; }
@@ -88,7 +88,7 @@ test('city setup reserves capacity for the phones needed by the first round', as
   city.places.at(-1).templateId = smaller.id;
   assert.deepEqual((await preview()).issues,[]);
   const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
-  const round = await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'demo',minutes:15}),200);
+  const round = await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1'}),200);
   assert.equal(round.world.turn,1);
   assert.equal(round.world.objects.length,512);
   assert.equal(round.world.objects.filter(object=>object.kind==='phone').length,2);
@@ -125,10 +125,10 @@ test('opening an unidentified door keeps its private name out of the actor and w
     return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,action))}}]});
   };
   try {
-    const next = () => send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15});
+    const next = () => send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'});
     await response(await next(),200);
     opening = false;
-    await response(await next(),200);
+    for(let step=0;step<3;step++)await response(await next(),200);
     const stored = (await read()).world;
     assert.match(stored.events.find(event=>event.kind==='door').text,/密室的專名門/);
     for (const name of ['岑一','岑二']) {
@@ -211,12 +211,12 @@ test('the saved city preview starts one isolated world with two new people and d
     return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(model)}}]});
   };
   try {
-    await response(await send(route, {operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:15}), 200);
+    for(let step=0;step<4;step++)await response(await send(route, {operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'}), 200);
   } finally {
     global.fetch = transport;
   }
   const after = (await read()).world;
-  assert.equal(after.turn, 1);
+  assert.equal(after.turn, 4);
   assert.deepEqual(after.characters.map(actor=>actor.name), ['澄','杉']);
   assert.deepEqual(after.objects.filter(object=>object.label==='台燈').map(object=>object.state.電源), ['開啟','關閉']);
   assert.doesNotMatch(JSON.stringify(inputs.find(input=>input.self.name==='澄')), /私人背景杉|南屋|舊世界獨有歷史/);
@@ -442,7 +442,7 @@ test('opening associations separate home, ownership, work, an explicit start and
     return Response.json({usage:{prompt_tokens:3,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:''}))}}]});
   };
   try {
-    await response(await send(route,{operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+    await response(await send(route,{operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'}),200);
   } finally {
     global.fetch = originalFetch;
   }
@@ -746,7 +746,7 @@ test('opening familiarity is built from the edited final city and remains actor-
     assert.equal(world.objects.find(item=>item.label==='舊屋共用鐘').state.顏色,'確認後的銅色');
     assert.deepEqual(world.objects.find(item=>item.label==='新居隱藏筆記').knownTo,[]);
 
-    await response(await send(route,{operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+    await response(await send(route,{operation:'advance',worldContext:world.contextId,operationId:id(),mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'}),200);
     const decisions = requests.filter(input=>input.contractVersion==='npc-decision.v3');
     assert.equal(decisions.length,2);
     const firstInput = JSON.stringify(decisions.find(input=>input.self.name==='澄'));

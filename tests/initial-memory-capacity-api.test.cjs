@@ -54,7 +54,7 @@ for(const value of ['憶'.repeat(1365),'憶'.repeat(1366),'憶'.repeat(1500),'x'
       return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:''}))}}]});
     };
     try {
-      const result=await json(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15}),200);
+      const result=await json(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'}),200);
       assert.equal(result.world.turn,1);
       assert.equal(inputs.length,1);
       assert.ok(inputs[0].self.shortTerm.some(memory=>memory.text===value));
