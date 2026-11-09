@@ -37,3 +37,17 @@
 [局部d100結果](checks-277/checks-277-result.png) · [完整分析頁](checks-277/checks-277-d100.png) · [人物硬限制](checks-277/checks-277-limits.png) · [機械摘要](checks-277/checks-277-browser.json)。實測總取骰1、受控模型呼叫2、付費呼叫0、pageerror0。其他畫面有界資訊不靠固定台詞、測試專用UI或外部真假校正。
 
 精神電量正式政策與啟用仍歸 #256／#263，本票沒有擴寫該支線或新增需求依賴。未自行合併main、部署、推送或關閉Issue。
+
+## 整合同步複驗
+
+本票功能提交 `a99f737`；以 merge `e634437` 納入 integration `366b781` 的 #278 身體需求與 #256 正式政策，再以 `eb91dd7` 同步純驗證文件 `f1e0653`。三處衝突只合併雙邊入口／payload／測試清單，保留感官硬限制、需求明示啟用與各自時間／電量契約。
+
+共同 slice 使用下列命令 **65/65 PASS**（0 fail／skip），同時涵蓋 #275／#276／#277／#278／#256：
+
+```sh
+node --import ./tooling/verification/no-network.mjs tests/run-activities.mjs tests/d100-api.test.cjs tests/character-attributes-api.test.cjs tests/character-attributes-ui.test.cjs tests/five-minute-time-api.test.cjs tests/personal-needs-api.test.cjs tests/formal-mental-policy-api.test.cjs
+npm run typecheck
+git diff --check
+```
+
+同步後 typecheck 與 diff check 均通過。Chromium R2 證據對應本票功能提交前相同 runtime；同步後 API 共同 slice 另驗證共享路徑，未把未重跑的瀏覽器聲稱成跨支線新證據。
