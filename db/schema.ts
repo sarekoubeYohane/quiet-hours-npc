@@ -34,3 +34,8 @@ export const sceneTemplates = sqliteTable('scene_templates', {
 export const worldBeforeCity = sqliteTable('world_before_city', {
   owner: text('owner').primaryKey(), state: text('state').notNull(), version: integer('version').notNull(),
 });
+
+export const characterDrafts = sqliteTable('character_drafts', {
+  owner: text('owner').notNull(), id: text('id').notNull(),
+  version: integer('version').notNull(), body: text('body').notNull(),
+}, table => [primaryKey({ columns: [table.owner, table.id] })]);
