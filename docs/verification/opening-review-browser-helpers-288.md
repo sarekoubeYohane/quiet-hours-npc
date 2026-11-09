@@ -1,6 +1,6 @@
 # #288 費用驗收旅程接合完成卡與原始開局
 
-兩支既有真頁驗收工具改用 T7 的合法產品建立契約；沒有修改產品程式、原有停止／費用／名稱恢復斷言或新增測試產品入口。基準為 integration `c326ca3`，接入 T7 `c159a0e`，再合 T7 UI `cff3707`；最後固定來源 **`3c8e7d0`**。只替換原本使用文字範本直接 POST `/api/saves` 的建立 helper。
+兩支既有真頁驗收工具改用 T7 的合法產品建立契約；沒有修改產品程式、原有停止／費用／名稱恢復斷言或新增測試產品入口。基準為 integration `c326ca3`，接入 T7 `c159a0e`，再合 T7 UI `cff3707`；初輪固定來源為 `3c8e7d0`；接合完整帳號 scope guard `55ddc00` 後，最新固定來源為 **`cee4947`**（見下列協定補證）。只替換原本使用文字範本直接 POST `/api/saves` 的建立 helper。
 
 共用 `tooling/verification/opening-journey.mjs` 由 T1 提供：真帳號草稿 → 受控模型形成 → 保存完成卡；真場景範本 → 保存第四步開局草稿 → 用同一草稿版本確認存檔。建立及形成的 operationScope 在原 GET 時捕獲，不在重送時改讀目前帳號。兩世界重用同一張完成卡，沒有再次取骰或形成。每次 server 的人物骰邊界只提供 20 顆 d6（全為 4），多一次抽取即失敗。沒有直接安裝世界 fixture。
 
@@ -26,8 +26,8 @@
 ## 命令與限制
 
 ```sh
-PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t7-review-account-fixed node tooling/verification/browser-review-account-281.mjs
-PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t7-review-forecast-fixed node tooling/verification/browser-review-forecast-281.mjs
+PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t7-review-account-scope-fixed node tooling/verification/browser-review-account-281.mjs
+PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t7-review-forecast-scope-fixed node tooling/verification/browser-review-forecast-281.mjs
 node --check tooling/verification/opening-journey.mjs
 node --check tooling/verification/browser-review-account-281.mjs
 node --check tooling/verification/browser-review-forecast-281.mjs
@@ -36,3 +36,14 @@ git diff --check
 ```
 
 兩條固定來源真 Chromium／App Router／磁碟 SQLite 旅程及上述語法、限定 ESLint、diff 檢查全部通過。共享 runner 預載 no-network，只允許 loopback；模型在最終 HTTP 邊界回受控資料。本機 cookie 身分替身不是正式 OAuth，沒有驗證真實模型語義、正式站或正式資料回退；本報告不替代 T7 五步完整 UI 的獨立驗收，不宣稱 #281 已完成。沒有關票、推送或部署。
+
+## 完整帳號 scope 協定補證
+
+此輪只升級上述兩支 verification client 的 setup，沒有修改產品 guard、sticky UI、共用 journey driver 或新增的負向反例。先接合 integration `fa0af83`、固定修復 `1a3ea10` 與 server guard **`55ddc00`**，不合入唯一修復者當時尚未提交的 UI 工作。原 setup 在新 guard 上先 red：缺少初始 accountScope 的模型設定回 **409**，不是產品拒絕合法資料的 finding；原 log `/tmp/quiet-hours-context/t7-review-forecast-scope-red.log` 保留。
+
+- 模型及場景 POST 使用第一次合法 GET 回傳的 `accountScope`；Key POST 使用第一次帳號操作空間 GET 回傳的完整 `operationScope`，沒有從 cookie 拼出或補成目前帳號。
+- 存檔建立後捕捉原 full binding／worldContext。後續操作與重開後恢復使用該原值，GET 帶原 scope 並檢查回應一致；不在重送時改讀目前帳號來更新 scope。
+- 另存／刪除使用原存檔清單 GET 回傳的 raw-owner scope。第二個歷史帳號是明示開始的新旅程，另行捕捉自己的初始 metadata；第一帳號的舊 scope 不被覆寫。
+- 原有形成費用與角色次數斷言均保留。固定 **`cee4947`** 兩條真 Chromium／App Router／磁碟 SQLite 旅程再次通過；帳號費用 2 次與原小時持續保存，歷史缺口兩處明示；Forecast 仍為帳號 USD **10.000036**／前景 USD **0.00002**／一小時預估 USD **0.0012**，形成 USD **0.000006** 未清掉。各旅程受控 transport 均 **3 次**、實付 **0 次**。
+
+畫面及兩份機器證據已更新至 `cee4947`；語法、限定 ESLint、diffcheck 通過。這只證明兩支原有費用旅程已遵守新協定，不能替代唯一修復者的新 account-surface 負向反例或完整 T7 驗收；沒有先合入 integration、推送、關票、正式操作或付費。
