@@ -72,3 +72,6 @@ export const playerDispatches=sqliteTable('player_dispatches',{
 },table=>[primaryKey({columns:[table.owner,table.storageOwner,table.requestId]})]);
 export const characterCards = sqliteTable('character_cards', {owner:text('owner').notNull(),id:text('id').notNull(),version:integer('version').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.id]})]);
 export const characterCardAssessments = sqliteTable('character_card_assessments', {owner:text('owner').notNull(),draftId:text('draft_id').notNull(),operationId:text('operation_id').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.draftId,table.operationId]})]);
+export const openingDrafts=sqliteTable('opening_drafts',{
+  owner:text('owner').notNull(),id:text('id').notNull(),version:integer('version').notNull(),body:text('body').notNull(),sources:text('sources').notNull(),candidate:text('candidate').notNull(),lastRequest:text('last_request').notNull(),finalizedSaveId:text('finalized_save_id'),
+},table=>[primaryKey({columns:[table.owner,table.id]})]);

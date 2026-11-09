@@ -1,6 +1,8 @@
 import { listCharacterCards } from './character-card-store';
 import { applyCharacterCard } from './character-card-world';
 import { mentalOpeningSchema } from './formal-mental-enablement';
+import type { CharacterCard } from './character-cards';
+import type { SceneTemplate } from './scene-templates';
 import { characterSetupSchema } from './character-attributes';
 import { initialMemoryCapacityError } from './character-templates';
 import { seedOpeningKnowledge } from './opening-knowledge';
@@ -20,15 +22,17 @@ import { cityLocationId as locationKey, cityRegionId as roomKey } from './world-
 const instanceId = z.string().regex(/^[a-zA-Z0-9_-]{1,24}$/);
 const templateId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const version = z.number().int().positive().safe();
+export const cardMentalOpeningSchema=z.object({current:z.number().int().nonnegative().safe().optional(),stage:z.enum(['充沛','有餘','尚可','吃緊','見底']).optional()}).strict();
+const openingNeedsSchema=z.object({hunger:z.number().min(0).max(100).multipleOf(.01),thirst:z.number().min(0).max(100).multipleOf(.01),fatigue:z.number().min(0).max(100).multipleOf(.01),sleep:z.number().min(0).max(100).multipleOf(.01)}).strict();
 export const cityDraftSchema = z.object({
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
-    mentalOpening: mentalOpeningSchema.optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
+    mentalOpening: z.union([mentalOpeningSchema,cardMentalOpeningSchema]).optional(), openingNeeds:openingNeedsSchema.optional(), openingFeelings:z.object({hunger:z.number().int().min(0).max(3).optional(),thirst:z.number().int().min(0).max(3).optional(),fatigue:z.number().int().min(0).max(3).optional(),sleep:z.number().int().min(0).max(3).optional()}).strict().optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     homeDescription: z.string().trim().max(300).optional(), workDescription: z.string().trim().max(300).optional(),
-  }).strict()).max(cityLimits.characters),
+  }).strict().superRefine((selection,context)=>{if(selection.mentalOpening&&!selection.templateId.startsWith('card-')&&!mentalOpeningSchema.safeParse(selection.mentalOpening).success)context.addIssue({code:'custom',message:'舊文字範本的目前電量須適用其明示容量範圍。'});})).max(cityLimits.characters),
   backgroundPeople: z.array(z.object({
     id: instanceId, name: z.string().trim().min(1).max(60).refine(value => new TextEncoder().encode(value).length <= 128),
   }).strict()).max(cityLimits.backgroundPeople).optional(),
@@ -74,8 +78,8 @@ function resolveStart(selection: CityDraft['characters'][number], description: s
     .map(room => ({ place, room })))) ?? {};
 }
 
-export async function prepareCity(owner: string, draft: z.infer<typeof cityDraftSchema>, previous: World) {
-  const [scenes, savedCharacters, cards] = await Promise.all([listSceneTemplates(owner), listCharacterTemplates(owner), listCharacterCards(owner)]);
+export async function prepareCity(owner: string, draft: z.infer<typeof cityDraftSchema>, previous: World, frozen?:{scenes:SceneTemplate[];cards:CharacterCard[]}) {
+  const [scenes, savedCharacters, cards] = frozen?[frozen.scenes,[],frozen.cards]:await Promise.all([listSceneTemplates(owner), listCharacterTemplates(owner), listCharacterCards(owner)]);
   const characters = [...characterPresets(), ...savedCharacters, ...cards.map(card=>({id:card.id,version:card.version,fields:card.fields}))];
   const configuration: NonNullable<World['configuration']> = {
     locations: [], regions: [], doors: [], residences: {}, bedrooms: {}, ownerships: {}, workplaces: {}, sceneSources: {}, privateRooms:{}, blockedRoomConnections:[],
@@ -237,7 +241,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     aiUsage:previous.aiUsage && { ...structuredClone(previous.aiUsage), savedDecisions:0 },
     adjudication:previous.adjudication, modelPrices:previous.modelPrices, playerBudget:previous.playerBudget,
   });
-  for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{});}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
+  for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds,selection.openingFeelings);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
   if(preview.issues.length)return {preview};
   return { preview, world };
 }

@@ -24,7 +24,7 @@ preflight 核對完整產品 commit／工作樹、runner digest、模型與參�
 
 runDirectory 必須在 repository 外，只保存本批證據。live 的 payer 權威固定在使用者 private `~/.quiet-hours-npc/pursuit-220/account.sqlite`，不能透過output換位置；CLI不提供更換account位置的參數。SQLite原子claim唯一runId與payer/授權reference，並限制同payer一個active／未明批次。同授權或runId換output也拒絕，沒有讀Key或新派送；已用授權不自動重發餘額。真正不同的新授權仍共用原payer世界、用量、小時窗口與限制；未明派送未核對前會停止新的grant。有效claim最多256筆，僅清理已到期且非active的claim，滿載拒絕新增，不清除尚有效的grant。
 
-run-state以temp→fsync→rename保存，控制狀態也持久化到獨立output的同一account SQLite；output內RUN.lock不是唯一守門。同一SQLite內trial間先封存證據，再真reset，再只於初始邊界套入scene；帳務、限制、keys與journal不重建。Date.now使用實際時鐘，沒有每輪人造15分鐘。原有pending／uncertain／unknown決不切下一組。測試可在受控transport模式注入暫存account儲存位置，live模式禁止此override。
+run-state以temp→fsync→rename保存，控制狀態也持久化到獨立output的同一account SQLite；output內RUN.lock不是唯一守門。同一SQLite內trial間先封存證據，再於明示隔離的歷史研究fixture邊界套入sealed scene；不呼叫已退役的玩家reset，也不把研究fixture當使用者建立新世界的證據。中央player_accounts帳務及限制在fixture前後強斷言相同，跨trial用量繼續累計，keys與journal不重建。Date.now使用實際時鐘，沒有每輪人造15分鐘。原有pending／uncertain／unknown決不切下一組。測試可在受控transport模式注入暫存account儲存位置，live模式禁止此override。
 
 每個 runtime 使用隨機32-byte加密秘密，只保留在process記憶體binding，不採公共browser fixture的固定秘密、不寫秘密到生成module。Key只經原 set-model-key API加密保存；header／Authorization不進原件。原body原樣forward；副本保存前沿共用redaction遮蔽literal／JSON escape／Bearer echo。停止後新runtime只GET，沒有加密秘密、不讀取或探測Key。
 

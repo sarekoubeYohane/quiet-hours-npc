@@ -9,7 +9,7 @@ test('owner explicitly enables the formal policy once; GET, SQLite reload and or
  const s=scenario();assert.equal((await s.read()).characters[0].mentalEnergy,undefined);const op={...enable(),operationId:id()};const r=await s.post(op);assert.equal(r.status,200,await r.clone().text());const c=(await s.read()).characters[0];assert.equal(c.mentalEnergy.policy.kind,'formal');assert.equal(c.mentalEnergy.policy.maximum,65);assert.equal(c.mentalEnergy.value,3);assert.equal(c.mentalEnergy.activatedAt,c.mentalEnergy.updatedAt);
  await s.post(op);assert.deepEqual((await s.read()).characters[0].mentalEnergy,c.mentalEnergy);const again=await s.post(enable({capacity:90,current:90}));assert.equal(again.status,400);assert.deepEqual((await s.read()).characters[0].mentalEnergy,c.mentalEnergy);
 });
-test('new city preview does not draw; actual successful start forms the selected formal opening once',async()=>{
+test('retired start-city does not form values or overwrite an existing legacy world',async()=>{
  const s=scenario(),before=await(await GET()).json(),people=load('character-templates-route'),scenes=load('scene-templates-route');
  const api=async(route,b)=>{const r=await route.POST(new Request('https://test.invalid',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(b)}));assert.ok(r.status<300,await r.clone().text());return r.json();};
  const person=(await api(people,{id:crypto.randomUUID(),version:0,fields:{...load('character-templates').blankCharacterTemplateFields(),name:'開局居民'}})).template;
@@ -18,7 +18,7 @@ test('new city preview does not draw; actual successful start forms the selected
  const context={operationScope:before.operationScope,expectedVersion:before.version},random=Math.random;let count=0;Math.random=()=>{count++;return .5;};try{
   const invalidCity={...city,characters:[{...city.characters[0],mentalOpening:{current:80}}]};const invalid=await s.post({...context,operation:'preview-city',city:invalidCity});assert.equal(invalid.status,400);assert.equal(count,0);assert.equal((await s.read()).characters[0].mentalEnergy,undefined);
   const preview=await s.post({...context,operation:'preview-city',city});assert.equal(preview.status,200,await preview.clone().text());assert.equal(count,0);
-  const op={...context,operation:'start-city',operationId:id(),city};const r=await s.post(op);assert.equal(r.status,200,await r.clone().text());const formed=(await r.json()).world.characters[0].mentalEnergy;assert.equal(formed.policy.kind,'formal');assert.equal(formed.policy.maximum,65);assert.equal(formed.value,46);const draws=count;await s.post(op);assert.equal(count,draws);assert.deepEqual((await s.read()).characters[0].mentalEnergy,formed);
+  const op={...context,operation:'start-city',operationId:id(),city};const r=await s.post(op);assert.equal(r.status,409,await r.clone().text());assert.equal(count,0);assert.equal((await s.read()).characters[0].mentalEnergy,undefined);assert.equal((await s.post(op)).status,409);
  }finally{Math.random=random;}
 });
 test('invalid openings, engineering knobs, incompatible worlds and saved null or corrupt policies never recreate energy',async()=>{
