@@ -117,3 +117,21 @@ test('explicit inheritance with no account defaults projects missing settings wi
    const again=await worldRequest(undefined,id);assert.equal(again.body.version,before.body.version);assert.equal(again.body.world.turn,0);
  } finally {db.close();}
 });
+
+test('cleared or expired account keys return the original settings flag before any AI dispatch and keep the selected story', async()=>{
+ for(const failure of ['clear','expire']) {
+   const {db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch,oldNow=Date.now;let calls=0;
+   globalThis.fetch=async()=>{calls++;throw Error('a missing key must never dispatch');};
+   try {
+     const id=await createWorld('保留來源世界');
+     await request({version:0,mode:'custom',models});
+     await worldRequest({operation:'set-model-key',mode:'openai',key:'controlled-key'});
+     const initial=await worldRequest(undefined,id);assert.equal(initial.body.modelKeys.openai.configured,true);
+     if(failure==='clear')await worldRequest({operation:'clear-model-key',mode:'openai'});
+     else Date.now=()=>initial.body.modelKeys.openai.expiresAt+1;
+     const response=await worldRequest({operation:'advance',operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',minutes:5,timeContract:'five-minute-v1',operationScope:initial.body.operationScope,worldContext:initial.body.world.contextId},id);
+     assert.equal(response.status,400);assert.equal(response.body.modelSettingsRequired,true);assert.equal(calls,0);
+     const after=await worldRequest(undefined,id);assert.equal(after.body.world.turn,initial.body.world.turn);assert.equal(after.body.world.minute,initial.body.world.minute);assert.equal(after.body.version,initial.body.version);assert.equal(after.body.modelKeys.openai.configured,false);
+   } finally {Date.now=oldNow;globalThis.fetch=oldFetch;db.close();}
+ }
+});

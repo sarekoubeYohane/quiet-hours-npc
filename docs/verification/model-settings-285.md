@@ -35,3 +35,16 @@
 ## 遷移與回退
 
 新增 `0016_model_preferences.sql`，只建立帳號／存檔模型偏好表；世界、Key、已存活動及既有骰果不遷移。只在隔離資料庫套用。新程式讀設定需此表，正式發版前須依正常流程套 migration，本次沒有執行。回退可保留新表，但舊程式不會理解新偏好；不能將刪表視為無資料損失的回退。舊人物／場景來源及建角草稿不因設定改動重做；進行中操作與既存原 ID 結果沿原 journal，偏好不充當操作恢復紀錄。
+
+## 有效 Key 跨裝置變動補證
+
+以整合 runtime **`7634552`** 重跑新增反例；結果為**既有保護已通過，沒有產品 RED**，因此本次沒有修改 runtime，也不宣稱修復原本不存在的缺口。
+
+- 真觀察頁先讀有效模型與 Key；另一同帳號瀏覽器透過產品 API 清除 Key。原頁仍帶先前已讀設定，明示按下一回合時收到 **400／`modelSettingsRequired:true`**，在原頁打開模型設定面板。
+- 原 save URL、介入文字、回合及世界時間保留；此失敗操作沒有派送模型，沒有自動重試。關閉面板再按 AI 模式也會直接回到面板。
+- API 另以受控時間越過 Key 到期時點，確認與清除 Key 相同：400 保持原狀態碼、已有 flag 保留、零模型 dispatch，世界 version／turn／minute 不變。
+- 原版 `modelRoleReady` 已檢查有效到期時間；原版 `ModelKeyError` 回應與 `WorldApp` 也已有對應開面板行為。本次只加入測試及證據。
+
+新增後 API 組合 **10/10**（模型設定 5 項＋人物範本／建角草稿 5 項）；新增兩個測試檔案範圍 lint 與 diffcheck 通過。同 runtime 原有 typecheck／build／49 項核心回歸仍有效，沒有無變化的重跑。
+
+命令：`node --test tests/character-templates.test.mjs tests/character-drafts.test.mjs tests/model-settings.test.mjs`；`PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t4-key-recovery node tooling/verification/browser-model-settings-285.mjs`。真頁完整旅程含新增跨裝置清 Key 反例 **通過**，全旅程受控模型仍 **1 次**、真實付費 **0 次**。畫面與 evidence 已更新：[原頁缺 Key 面板與保留輸入](assets/model-settings-285/key-cleared-return.png)。
