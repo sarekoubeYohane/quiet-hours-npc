@@ -41,7 +41,7 @@ export function d100Parameters(actor:Character,check:ActionCheck,attention=0) {
  const factors:CheckFactors={attribute,level,senseName:check.sense??null,ability:level===null?0:modern?level*5-55:(level-3)*10,difficulty:check.difficulty===8?20:check.difficulty===16?-20:0,
   expertise:actor.attributes!.expertise.find(item=>normalized(item.scope)===normalized(check.ability))?.modifier??0,
   sense:check.sense?actor.attributes!.senses.find(item=>item.scope===check.sense)?.modifier??0:0,attention};
- const aliases=[...attributeNames,...Object.values(attributeLabels),'appearance','外觀','sight','hearing','touch','視覺','聽覺','觸覺'];
+ const aliases=[...attributeNames,...Object.values(attributeLabels),...(modern?['appearance','外觀']:[]),'sight','hearing','touch','視覺','聽覺','觸覺'];
  if(aliases.some(alias=>normalized(alias)===normalized(check.ability)))factors.expertise=0;
  if(level!==null&&(!Number.isInteger(level)||level<(modern?3:1)||level>(modern?18:5))||![factors.expertise,factors.sense].every(n=>[-20,-10,0,10,20].includes(n))||![-10,0,10].includes(attention))throw Error('人物檢定資料無效。');
  const modifier=factors.ability+factors.difficulty+factors.expertise+factors.sense+factors.attention;
