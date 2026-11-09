@@ -1,8 +1,8 @@
 {
-  "checkedAt": "2026-11-09T12:05:31.244Z",
+  "checkedAt": "2026-11-09T12:10:56.938Z",
   "origin": "http://127.0.0.1:5282",
-  "commit": "249f20c",
-  "builtAt": "2026-11-09T12:05:29.790Z",
+  "commit": "cf660e6",
+  "builtAt": "2026-11-09T12:10:52.232Z",
   "identity": "本機 cookie 身分替身 qh_local_owner；非真人 OAuth",
   "runtime": "真正 vinext App Router、產品頁面與 API、隔離 SQLite；未安裝世界 fixture",
   "trials": [

@@ -74,7 +74,7 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
       if(id.split('?')[0]!==join(root,'lib/model-adapter.ts'))return;
       const expected='options.fetcher || fetch';
       if(!source.includes(expected))throw Error('Model boundary changed: update the acceptance harness before testing');
-      return source.replace(expected,`options.fetcher || ((_url, init) => fetch(${JSON.stringify(modelUrl)}, {...init, headers:{'Content-Type':'application/json'}}))`);
+      return source.replace(expected,`((_url, init) => (options.fetcher || fetch)(${JSON.stringify(modelUrl)}, {...init, headers:{'Content-Type':'application/json'}}))`);
     },
     configureServer(server){server.middlewares.use((req,_res,next)=>{requests.push({method:req.method,url:req.url});next();});},
   };
