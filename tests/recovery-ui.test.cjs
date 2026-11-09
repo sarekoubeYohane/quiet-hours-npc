@@ -86,7 +86,9 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   assert.ok(requestedTimeouts.includes(445000),'new client waits for the complete bounded round');assert.equal(requestedTimeouts.includes(125000),false);
   assert.equal((await (await GET()).json()).world.turn,historyTurns+1);
   // A reload/foreground read must not submit a saved request the server never accepted.
-  const unknown=JSON.stringify({operation:'advance',minutes:15,mode:'demo',operationScope:'test-owner',operationId:`${instant}:${crypto.randomUUID()}`});
+  // The current UI already adopted five-minute-v1; an unaccepted new request
+  // follows that contract. Accepted legacy 15/30-minute replay has its own API cases.
+  const unknown=JSON.stringify({operation:'advance',minutes:5,timeContract:'five-minute-v1',mode:'demo',operationScope:'test-owner',operationId:`${instant}:${crypto.randomUUID()}`});
   sessionStorage.setItem('quiet-hours:pending:test-owner',unknown);
   const sent=payloads.length;
   Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});
@@ -120,7 +122,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   // A durable uncertain tombstone does not unlock or re-dispatch the paid request.
   await send({operation:'set-model-key',mode:'openai',key:'test-key'});
   instant++;
-  const uncertain={operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15,operationId:`${instant}:${crypto.randomUUID()}`};
+  const uncertain={operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:5,timeContract:'five-minute-v1',operationId:`${instant}:${crypto.randomUUID()}`};
   let release,entered,modelCalls=0;
   const gate=new Promise(resolve=>release=resolve),ready=new Promise(resolve=>entered=resolve);
   const transport=global.fetch;
