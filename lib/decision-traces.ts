@@ -54,7 +54,9 @@ export function omitDecisionTraceContent(trace: DecisionTrace, reason: string, u
     contextId: unknownCredentials?undefined:trace.contextId, operation: trace.operation, baseVersion: trace.baseVersion,
     resultVersion: trace.resultVersion, outcome: trace.outcome, lastKnownStage: trace.lastKnownStage,
     dispatches: receipts, dispatchCount: trace.dispatches.length,
-    gap: reason, gaps: [reason,...(Array.isArray(trace.gaps)?trace.gaps.filter((gap):gap is string=>typeof gap==='string'&&gap.length<=256).slice(0,16):[])], steps: [], redacted: unknownCredentials||trace.redacted === true, omittedOriginalBytes: originalBytes,acceptedAt:trace.acceptedAt,checkpoints:trace.checkpoints,timePolicy:trace.timePolicy,accounting:trace.accounting,
+    // The finite round envelope is program metadata, not transcript content.
+    gap: reason, gaps: [reason,...(Array.isArray(trace.gaps)?trace.gaps.filter((gap):gap is string=>typeof gap==='string'&&gap.length<=256).slice(0,16):[])],
+    steps: unknownCredentials?[]:Array.isArray(trace.steps)?trace.steps.filter(step=>step&&typeof step==='object'&&(step as {kind?:unknown}).kind==='time-policy'&&(step as {source?:unknown}).source==='program').slice(0,1):[], redacted: unknownCredentials||trace.redacted === true, omittedOriginalBytes: originalBytes,acceptedAt:trace.acceptedAt,checkpoints:trace.checkpoints,timePolicy:trace.timePolicy,accounting:trace.accounting,
   };
 }
 

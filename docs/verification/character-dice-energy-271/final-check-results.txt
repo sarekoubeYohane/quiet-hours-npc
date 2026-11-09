@@ -1,0 +1,57 @@
+Runtime commit: dfdd426c553e89ddb01e319cb86250f43b09cb6f
+Command: npm test
+Exit: 0
+No-network preload propagated to all child processes.
+
+ℹ tests 1246
+ℹ suites 0
+ℹ pass 1246
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311333.001875
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5567.199208
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 530.9635
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2097.086417
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59763.854167
+
+Total: 1246 + 37 + 6 + 15 + 21 = 1325 pass; 0 fail/skip.
+
+Test-only supplement commit: 30a9c94f772aea69799d3adf6ef97afd6b4cc329
+Runtime unchanged.
+Command: node --import ./tooling/verification/no-network.mjs tests/run-activities.mjs tests/formal-mental-enable-api.test.cjs tests/formal-mental-policy-api.test.cjs
+Exit: 0; 34/34 pass (32 overlap prior full run; 2 new boundary cases).
+
+Final 30a9c94 checks: npm run typecheck; npm run lint; npm run build:test; npm run build:production; git diff --check
+All exit 0. Lint: 0 errors / 4 existing warnings.
+Standards: 0 remaining. Spec: 0 remaining; independent API/SQLite 109/109 pass.
+Real paid calls: 0. No main merge, deployment, or production-world advancement.

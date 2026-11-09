@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "draws": 1,
+  "paidModelCalls": 0,
+  "modelCalls": 2,
+  "result": {
+    "system": "d100-v1",
+    "roll": 96,
+    "modifier": 20,
+    "dc": 12,
+    "total": -21,
+    "threshold": 75,
+    "factors": {
+      "attribute": "dexterity",
+      "level": 4,
+      "senseName": null,
+      "ability": 10,
+      "difficulty": 0,
+      "expertise": 10,
+      "sense": 0,
+      "attention": 0
+    },
+    "outcome": "critical-failure"
+  },
+  "limits": {
+    "blockedSenses": [
+      "sight"
+    ],
+    "version": 1,
+    "activatedAt": 1260,
+    "authority": "owner-confirmed",
+    "values": {
+      "strength": 3,
+      "endurance": 3,
+      "dexterity": 4,
+      "perception": 3
+    },
+    "constraints": {
+      "strength": {
+        "value": 3
+      },
+      "endurance": {
+        "value": 3
+      },
+      "dexterity": {
+        "value": 4
+      },
+      "perception": {
+        "value": 3
+      }
+    },
+    "expertise": [
+      {
+        "scope": "髮飾設計",
+        "modifier": 10
+      }
+    ],
+    "senses": []
+  },
+  "phases": [
+    "owner-confirmed values through profile",
+    "direct preflight zero dice",
+    "5-minute actual d100 action result",
+    "same craft conditions no reroll",
+    "next true model request hides dice",
+    "owner-confirmed absent sight blocks 01 and visible-person probe",
+    "SQLite reload keeps values and limits"
+  ],
+  "operations": [
+    "adopt-character-attributes",
+    "direct",
+    "advance",
+    "advance",
+    "advance",
+    "advance",
+    "direct",
+    "advance",
+    "advance",
+    "advance",
+    "advance",
+    "set-model-key",
+    "set-adjudication",
+    "return-control",
+    "advance",
+    "set-character-sense-limits",
+    "direct",
+    "advance",
+    "advance",
+    "advance",
+    "advance"
+  ]
+}

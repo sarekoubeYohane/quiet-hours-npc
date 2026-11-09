@@ -1,3 +1,5 @@
+import { personalNeedsActive, maximumSleepMinutes } from './body-needs-policy';
+import { MemoryValidationError } from './memory';
 import { applyLegacyMood, settleMentalInterval, type MentalInterval } from './mental-energy';
 import { worldLocations } from './world-configuration';
 import { adjudicationLimits } from './adjudication-limits';
@@ -14,8 +16,9 @@ export const activityDurations = [...adjudicationLimits.phaseMinutes];
 export const sustainedActions = new Set(['propose', 'rest', 'work', 'reflect', 'observe']);
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;
-  return !!plan && (!requiresWorldEffects(plan.action) || !!plan.phases) && (sustainedActions.has(plan.action.type) || plan.timeIntent?.kind==='open-ended') && plan.modelKey === modelKey &&
-    (world.minute <= plan.until || !!plan.phases);
+  return !!plan && plan.modelKey === modelKey && (plan.deferredAction===true ||
+    (!requiresWorldEffects(plan.action) || !!plan.phases) && (sustainedActions.has(plan.action.type) || plan.timeIntent?.kind==='open-ended') &&
+    (world.minute <= plan.until || !!plan.phases));
 }
 
 
@@ -68,6 +71,14 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
 // A control transition, an autonomous continuation and an explicit NPC continue
 // all advance the original plan and never start a fresh clock or reroll.
 export function progressActivity(world:World,character:Character,kind:'controlled'|'automatic'|'chosen'):void {
+ if(character.plan?.deferredAction){
+  if(world.minute<character.plan.until)return;
+  const action=character.plan.action,checkSystem=character.plan.checkSystem??'d20-v1';
+  try{const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;resolve(validation,actor,action,{dryRun:true});}
+  catch(error){if(error instanceof MemoryValidationError||error instanceof PerceptionCapacityError)throw error;cancelActivity(world,character);recordActionResult(world,character,action,'原活動的條件已改變，尚未完成。','blocked');return;}
+  cancelActivity(world,character);
+  resolve(world,character,action,{checkSystem});invalidateNaturalChanges(world);return;
+ }
  if(character.plan?.phases){
   if(kind==='chosen')record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from:character.location,to:character.location});
   advancePhases(world,character);return;
@@ -99,7 +110,9 @@ export function finishJourney(world:World,character:Character):void{
 }
 
 export function startActivity(world:World,character:Character,decision:ActivityDecision,options:{minutes:number;modelKey:string;attention:string;ai:boolean;mentalInterval?:MentalInterval;bodyMinutes?:number;bodyBase?:Pick<import('./needs').NeedValues,'fatigue'|'sleep'>}):boolean {
- const {minutes,modelKey,attention,ai}=options;
+ const {modelKey,attention,ai}=options;
+ // New choices use information available now, never the elapsed interval.
+ const minutes=world.timeContract==='five-minute-v1'?0:options.minutes;
  let confirmedProfile:BodyActivity|undefined;
  cancelActivity(world,character);
  if(decision.action.type==='move'&&world.configuration?.walks){
@@ -134,7 +147,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     }
     let candidate=decision.freeCandidate;
     if(candidate.status==='accepted'&&candidate.bodyActivity?.kind==='sleep'){
-      const required=sleepMinutesUntilWake(candidate.bodyActivity,character.needs!.values.sleep);
+      const required=personalNeedsActive(character)?maximumSleepMinutes(character,candidate.bodyActivity):sleepMinutesUntilWake(candidate.bodyActivity,character.needs!.values.sleep);
       if(required>adjudicationLimits.maxMinutes)candidate={status:'denied',effects:[],stages:[],check:null};
       else if(decision.timeIntent?.maxMinutes!==null&&decision.timeIntent?.maxMinutes!==undefined&&required>decision.timeIntent.maxMinutes)candidate={status:'denied',effects:[],stages:[],check:null,knownBlockedReason:'這次睡眠恢復需要超過自己選定的投入上限；尚未開始。'};
     }
@@ -144,6 +157,17 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(candidate.confirmedDurationMinutes===undefined)throw new EffectValidationError('完成目標缺少世界確認耗時。',{reason:'completion_time_missing'});
       const duration=candidate.confirmedDurationMinutes;
       if(instantaneousRights&&duration!==15)throw new EffectValidationError('授權與同意是一次性選擇。',{reason:'rights_duration'});
+      // Free branches describe complete outcomes. Schedule them before selecting
+      // a die so every outcome keeps the confirmed time. Routine factories own
+      // their explicit preparation/stage split and are already time-validated.
+      if(world.timeContract==='five-minute-v1'&&candidate.branches&&!candidate.trialBinding&&duration>minutes){
+        candidate={...candidate,branches:candidate.branches.map(branch=>{
+          const stages=structuredClone(branch.stages),last=stages.at(-1);
+          if(last?.afterMinutes===duration)last.effects=[...branch.effects,...last.effects];
+          else stages.push({afterMinutes:duration,preconditions:[],effects:branch.effects});
+          return {...branch,effects:[],stages};
+        })};
+      }
       if(!candidate.branches&&!(candidate.stages?.length)&&duration>minutes)candidate={...candidate,effects:[],stages:[{afterMinutes:duration,preconditions:[],effects:candidate.effects}]};
       if(!candidate.branches&&candidate.stages?.length&&candidate.stages.at(-1)!.afterMinutes!==duration)throw new EffectValidationError('最後階段須與確認完成時間一致。',{reason:'completion_phase_time'});
       if(decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes&&candidate.bodyActivity?.kind!=='sleep'){
@@ -174,6 +198,17 @@ export function startActivity(world:World,character:Character,decision:ActivityD
         return false;
       }
     }
+    if(world.timeContract==='five-minute-v1'){
+      const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
+      resolve(validation,actor,decision.action,{dryRun:true});
+      const duration=decision.timeIntent?.kind==='open-ended'||!decision.timeIntent&&sustainedActions.has(decision.action.type)?decision.durationMinutes:15;
+      character.plan={deferredAction:true,checkSystem:character.attributes?'d100-v1':'d20-v1',action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
+      character.activity='正在進行已選活動，尚未完成。';
+      record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
+      if(decision.action.type==='rest')character.plan.bodyActivity={version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0};
+      if(decision.action.type==='work')character.plan.bodyActivity={version:1,kind:'exertion',fatiguePerHour:3,sleepPerHour:0};
+      return true;
+    }
     resolve(world, character, decision.action);
     invalidateNaturalChanges(world);
   }
@@ -188,7 +223,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
  const profile:BodyActivity|undefined=requiresWorldEffects(decision.action)?confirmedProfile:decision.action.type==='rest'?{version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0}:decision.action.type==='work'?{version:1,kind:'exertion',fatiguePerHour:3,sleepPerHour:0}:undefined;
  if(profile){
   const duration=decision.freeCandidate?.confirmedDurationMinutes??decision.durationMinutes;
-  const available=Math.min(options.bodyMinutes??minutes,duration);
+  const available=world.timeContract==='five-minute-v1'?0:Math.min(options.bodyMinutes??minutes,duration);
   const actual=applyBodyActivity(character,world.minute,profile,available,options.bodyBase);
   if(profile.kind==='sleep'&&options.mentalInterval)settleMentalInterval(character,options.mentalInterval,actual);
   if(character.plan){
@@ -207,10 +242,11 @@ export function startActivity(world:World,character:Character,decision:ActivityD
 // Waking ends actual sleep; it does not schedule a replacement action.
 export function wakeSleepingActivity(world:World,character:Character):boolean {
  if(character.plan?.bodyActivity?.kind!=='sleep')return false;
- const natural=character.plan.sleep?.naturalWakeAt!==undefined;
+ const naturalAt=character.plan.sleep?.naturalWakeAt,stimulusAt=character.plan.sleep?.stimulusWakeAt;
+ const natural=naturalAt!==undefined&&(stimulusAt===undefined||naturalAt<=stimulusAt);
  if(!natural&&character.plan.sleep?.stimulusWakeAt===undefined)return false;
  const action=character.plan.action;
- const wakeAt=character.plan.sleep?.naturalWakeAt??character.plan.sleep?.stimulusWakeAt??world.minute;
+ const wakeAt=Math.min(naturalAt??Infinity,stimulusAt??Infinity);
  // Effects are committed now under current conditions, only for work that was
  // already due before actual sleep ended. Later stages remain unexecuted.
  if(character.plan.phases)advancePhases(world,character,Math.min(world.minute,wakeAt));

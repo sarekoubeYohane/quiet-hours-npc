@@ -1,0 +1,6 @@
+Confirmed general capacity: 36 outcomes, mean65; 55 midpoint/stage cases pass
+PROPOSAL A: 9 character outcomes; 66 thresholds x100 mutually-exclusive dice cases pass
+PROPOSAL C: exact-rational A/B work, ingestion, sleep80/120, awake40 cases pass
+PROPOSAL D: group-order/clipping and off-grid full-coverage examples pass
+Document references: 16 relative targets exist
+Arithmetic/document checks only; no product runtime, model transport or policy activation

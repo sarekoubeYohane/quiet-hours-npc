@@ -1,8 +1,9 @@
+import { resolveActionCheck, senseAvailable, d100Parameters } from './action-checks';
 import { canIdentifyOpeningDestination } from './opening-knowledge';
 import { isSleeping, isSleepStimulus } from './needs';
 import { knownExternalState, type PhysicalState } from './world-state';
 import { addExperience } from './memory';
-import { judgeD20, rollD20, type Resolution, type Advantage, type Difficulty } from './d20';
+import { type Resolution, type Advantage, type Difficulty } from './d20';
 import type { Character, World } from './world';
 import { connectingDoor, defaultRegion, worldDoors, worldRegions, type Door } from './world-configuration';
 import { falsePerception, type FalsePerceptionDiagnostic } from './false-perception';
@@ -37,7 +38,7 @@ export function normalizePerception(world: World) {
   }
 }
 export function canSee(world: World, observer: Character, region: string) {
-  if(isSleeping(observer)||observer.plan?.journey)return false;
+  if(isSleeping(observer)||observer.plan?.journey||!senseAvailable(observer,'sight'))return false;
   const own = regionOf(observer);
   if (world.scene?.occluded.includes(region)) return false;
   if (own === region) return true;
@@ -54,6 +55,7 @@ function sensoryCandidateIdentity(candidate: SensoryCandidate) {
   return [candidate.sense, candidate.kind, candidate.text, candidate.source, candidate.region, ...(candidate.objectId ? [{ objectId: candidate.objectId }] : candidate.supplyId ? [{ supplyId: candidate.supplyId }] : [])];
 }
 export function canHear(world: World, observer: Character, region: string) {
+  if(!senseAvailable(observer,'hearing'))return false;
   return regionOf(observer) === region || !!connectingDoor(world, regionOf(observer), region);
 }
 function knownRoom(world: World, observer: Character, regionId: string | undefined) {
@@ -141,6 +143,8 @@ export const perceptionRules = {
   difficulty: { weak: 8, medium: 12, strong: 16 } as const,
 };
 export function resolvePerception(world: World, character: Character, eventId: string, candidates: SensoryCandidate[], focused = false) {
+  candidates=candidates.filter(candidate=>senseAvailable(character,candidate.sense));
+  if(!candidates.length)return;
   const here = regionOf(character);
   const interference = candidates.reduce<'weak' | 'medium' | 'strong'>((best, candidate) => perceptionRules.difficulty[candidate.interference || 'weak'] < perceptionRules.difficulty[best] ? candidate.interference || 'weak' : best, 'strong');
   const dc: Difficulty = perceptionRules.difficulty[interference];
@@ -156,9 +160,23 @@ export function resolvePerception(world: World, character: Character, eventId: s
   const opportunity = JSON.stringify([eventId, character.id, here, candidates.map(sensoryCandidateIdentity).sort(), interference, ability, attention]);
   const previous = world.perceptionTrials?.[opportunity];
   if (previous) return previous;
-  const resolution = judgeD20(rollD20(), modifier, dc);
-  const falseResult = resolution.outcome === 'critical-failure' ? falsePerception(world, character, candidates) : undefined;
-  const selected = ['success', 'critical-success'].includes(resolution.outcome) ? candidates : resolution.outcome === 'mixed' ? candidates.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined, objectId: undefined, supplyId: undefined })) : [];
+  let relevant=candidates;
+  let checkDifficulty=dc;
+  let sense=candidates[0].sense;
+  if(character.attributes){
+    // One event offers several sensory routes. Use the strongest available
+    // route, with stable lexical tie-breaking; reveal only that route's clues.
+    const routes=[...new Set(candidates.map(candidate=>candidate.sense))].sort().map(route=>{
+      const clues=candidates.filter(candidate=>candidate.sense===route);
+      const difficulty=clues.reduce<Difficulty>((best,candidate)=>Math.min(best,perceptionRules.difficulty[candidate.interference||'weak']) as Difficulty,16);
+      const check={system:'d100-v1' as const,difficulty,ability:route,attribute:'perception' as const,sense:route};
+      return {route,clues,difficulty,threshold:d100Parameters(character,check,attention>0?10:attention<0?-10:0).threshold};
+    }).sort((a,b)=>b.threshold-a.threshold||(a.route<b.route?-1:1));
+    relevant=routes[0].clues;checkDifficulty=routes[0].difficulty;sense=routes[0].route;
+  }
+  const resolution = resolveActionCheck(character,{difficulty:checkDifficulty,ability:sense,...(character.attributes?{system:'d100-v1' as const,attribute:'perception' as const,sense}:{})},modifier,attention>0?10:attention<0?-10:0);
+  const falseResult = resolution.outcome === 'critical-failure' ? falsePerception(world, character, relevant) : undefined;
+  const selected = ['success', 'critical-success'].includes(resolution.outcome) ? relevant : resolution.outcome === 'mixed' ? relevant.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined, objectId: undefined, supplyId: undefined })) : [];
   const trial: PerceptionTrial = { opportunity, resolution, factors: { ability, attention, interference }, candidates: falseResult ? [falseResult.candidate] : selected, ...(falseResult ? { falsePerception: falseResult.diagnostic } : {}) };
   (world.perceptionTrials ??= {})[opportunity] = trial;
   return trial;
@@ -181,7 +199,7 @@ export function saveObservation(world: World, character: Character, observation:
 // Passive events and active probes share the same subjective projection and
 // persistence; only their observer-facing explanations differ.
 function observationTrace(world: World, character: Character, event: import('./world').WorldEvent, candidates: SensoryCandidate[], trial?: PerceptionTrial, active = false): PerceptionTrace {
-  const selected = [...candidates.filter(candidate => candidate.direct), ...(trial?.candidates || [])];
+  const selected = [...candidates.filter(candidate => candidate.direct&&senseAvailable(character,candidate.sense)), ...(trial?.candidates || [])];
   const observations: Observation[] = selected.map(({ sense, kind, text, clarity, source, objectId, supplyId, region, urgency }, index) => ({ sense, kind, text, clarity, source, ...(objectId ? { objectId } : {}), ...(supplyId ? { supplyId } : {}), region: world.configuration ? knownRoom(world,character,region)?.id : region, urgency, id: `${event.id}:${character.id}:${index}`, time: world.minute }));
   for (const observation of observations) saveObservation(world, character, observation,event);
   const status = trial ? observations.length ? 'noticed' : 'missed' : observations.length ? 'direct' : 'no-opportunity';
@@ -208,7 +226,7 @@ export function perceiveEvent(world: World, event: import('./world').WorldEvent,
   const audience: string[] = [];
   for (const character of world.characters) {
     if (character.id === event.actor && !event.scene.externalChanges) { remember(world, character, actorExperience ?? event.text, event); audience.push(character.id); continue; }
-    const candidates = eventCandidates(world, character, event).filter(candidate=>!isSleeping(character)||isSleepStimulus(candidate));
+    const candidates = eventCandidates(world, character, event).filter(candidate=>senseAvailable(character,candidate.sense)&&(!isSleeping(character)||isSleepStimulus(candidate)));
     const uncertain = candidates.filter(item => !item.direct);
     const trial = uncertain.length ? resolvePerception(world, character, event.id, uncertain) : undefined;
     const trace = observationTrace(world, character, event, candidates, trial);
@@ -319,6 +337,7 @@ function assertProbeCapacity(world:World,count:number,extra:unknown):void {
     throw new PerceptionCapacityError('物品探索的感知保存容量已滿；保留既有結果，未重新擲骰或判定缺貨。');
 }
 function resolveProbe(world: World, character: Character, event: import('./world').WorldEvent, sense: 'sight' | 'hearing', candidates: SensoryCandidate[], clues: string[],method?:DiscoveryMethod) {
+  candidates=candidates.filter(candidate=>senseAvailable(character,candidate.sense));
   const here = regionOf(character);
   const probeKey = JSON.stringify([character.id, here, sense, clues.sort(), candidates.map(c => [...sensoryCandidateIdentity(c), c.direct, c.interference]), sense === 'hearing' ? world.scene?.noise[here] || 'quiet' : '', (character.abilityTags || []).filter(tag => perceptionRules.abilities[sense][tag] !== undefined).sort(),...(method?[method]:[])]);
   const previous = world.probeResults?.[probeKey];
@@ -355,7 +374,8 @@ function resolveProbe(world: World, character: Character, event: import('./world
   }
   // Keep prior receipts rather than evicting them and allowing reload/rewording
   // to farm a new roll. A capacity error is technical, never world absence.
-  const reserved=fresh.map(({key,candidate})=>[key,{characterId:character.id,status:'noticed',observations:[{...candidate,id:'x'.repeat(128),time:world.minute}],reason:'主動查探取得錯誤主觀感知',opportunity:key,resolution:{roll:20,modifier:4,dc:16,total:24,outcome:'critical-success'},factors:{ability:4,attention:2,interference:'medium'}}]);
+  const reservedResolution:Resolution=character.attributes?{system:'d100-v1',roll:100,modifier:-100,dc:16,total:-100,threshold:75,factors:{attribute:'perception',level:5,ability:-20,difficulty:-20,expertise:-20,sense:-20,senseName:'hearing',attention:-10},outcome:'critical-success'}:{roll:20,modifier:-4,dc:16,total:-24,outcome:'critical-success'};
+  const reserved=fresh.map(({key,candidate})=>[key,{characterId:character.id,status:'noticed',observations:[{...candidate,id:'x'.repeat(128),time:world.minute}],reason:'主動查探取得錯誤主觀感知',opportunity:key,resolution:reservedResolution,factors:{ability:-20,attention:-10,interference:'medium'}}]);
   if(resources.length)assertProbeCapacity(world,fresh.length+aliases.length+1,[probeKey,probeKey,probeKey,probeKey,candidates,candidates,candidates,reserved,aliases]);
   const uncertain = candidates.filter(c => !c.direct);
   const trial = uncertain.length ? resolvePerception(world, character, JSON.stringify(['probe', ...clues.sort(),...(method?[method]:[])]), uncertain, true) : undefined;
