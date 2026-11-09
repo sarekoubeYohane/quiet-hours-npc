@@ -80,3 +80,7 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 - **P2／#288 來源接點：人物文字／場景編輯沒有原帳號綁定。** 依實際 editor payload 重送 A 的編輯，B 同 ID／版本來源被改寫。這是晚到寫入歸屬錯誤，未證明跨帳號讀取漏洞。
 
 #284／#285 已實際重新 open（留言 6744392972／6744398869）。同一修復者另建獨立 worktree，統一檢查所有寫入早退、初始 GET 帳號捕捉與恢復回應，不以當下 cookie 補綁原操作；保留既有 rawOwner／account-operations scope 語義與模型快照／期限規則。尚未有完成候選，不先清零、不啟動 #289。研究 source-pin 的歷史 fixture 遷移亦仍有一項零用量視窗投影斷言待修；不宣告最終完整回歸通過。
+
+同一擴充在 `21c0d46` 另確認 **#283 P2**：原 SSR 身分為 A，觀察頁背景重讀卻無條件將 `scopeRef` 改為 B。真形成卡／開局 API 建 A／B 各自同 save UUID，切 cookie B、觸發 visibilitychange 後舊頁顯示 B 人物，再點下一回合送 B scope 並 200，A turn 0／B turn 1。產品自查及 Spec 真 App Router／SQLite／Chromium 各獨立重現，形成呼叫 2、付費 0；這是舊 view 重綁，沒有證明跨帳號查詢漏洞。#283 已實際重新 open（留言 6744813143）。
+
+修復工作中的 Key 與世界讀取反例已紅轉綠：錯帳號 Key 寫入 409 且無 row；原 view 的 GET／下一回合維持 A scope 並 409，A／B turn 均 0。server checkpoint `55ddc00` 有 API 27/27，但 UI 仍在收斂，尚不是完整候選或獨立覆核完成。普通 CJS／auth 與費用 browser 的既有驗證 client setup 分獨立 worktree 遷移協定；所有產品與新反例修正仍由同一實作者負責。不得將舊無 scope payload 在 cookie 切換後補成當下 owner；新 negative 使用 raw Request 避免 helper 遮蔽。
