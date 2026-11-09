@@ -1,78 +1,70 @@
 # #288 五步開局與原始開局驗證
 
-狀態：本票主要實作及已知 guard 修正已接合，固定 `5bdc6db` 的必要驗證通過；另保留最後實測的已受理後切帳號導航與混合場景版本許可兩項 P2，尚未 ready。未宣告 #281 完成，未關 #288，未啟動 #289。2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），由 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012；不沿被 #281 取代的五級新建角或覆寫世界流程。
+狀態：T7 可交整合審查。已接合唯一修復者完整包 `49cc19a`，含 integration `1829384`；產品目錄 `app`、`components`、`lib`、`db`、`drizzle` 與已驗證 `5face37` 完全相同。最後兩項 P2 的獨立 Spec／Standards 覆核皆 remaining 0。本次收尾只整理證據，沒有為相同產品樹重跑已通過旅程。未關 #288、未啟動 #289，也未宣告 #281 或整合全套完成。
 
-## 已交付行為
+2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），從 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012。UI、相容測試 helpers 與審查修復均由各自獨立 worktree 交固定提交後接合；不沿被 #281 取代的新建角或覆寫世界流程。
 
-共同導覽常駐新開入口。`/new` 依人物、場景、世界配置、確認開局及進入觀察五步進行；人物／場景沿原頁面建立並帶返回網址，開局先保存才離開。開局草稿按原帳號與 UUID 保存，CAS 衝突或同步失敗保留本頁輸入，存檔頁「建立中」可接續內容與步驟。來源在首次選用時由 server 讀取並保存可信快照，後續來源修改不洗掉已選內容；客戶端不能上傳候選世界或偽造卡片數值。
+## 交付行為與逐項驗收
 
-新世界只接受已保存開局的確認 `{id,draftId,draftVersion,operationScope}`；不再接受暫接的 `{name,city}` 新建旁路。文字範本與未完成建角草稿不能成為新世界人物。原子 batch 同時安裝世界、帳號存檔身分、原始開局及已完成草稿標記。確認頁使用 durable candidate，單純變更步驟或存檔名稱不重造隱藏亂數流。已形成卡的能力／需求特性／容量直接承接，未指定需求 20／20／15／20，目前電量沿容量七成半點進位；本次可另指定合法需求、感受階段及容量內目前電量。
+共同導覽常駐新開入口。`/new` 依人物、場景、世界配置、確認開局及進入觀察五步進行；人物／場景沿真正資產頁建立並返回，離開前保存開局。草稿綁原帳號與 UUID，使用版本 CAS；衝突或同步失敗保留本頁輸入，選檔頁「建立中」可接續內容及步驟。來源首次選用時由 server 保存可信快照，來源後續修改不洗掉已選內容；客戶端不能上傳候選世界或偽造卡值。
 
-手動安排起點、同源多處場所、同住、可選住處／工作／所有權／許可／關係／道路，沒有道路不自動連通。起點、房間及所有引用由既有城市／權限／知情規則一起驗證。原始開局保存完整來源快照與確認安排，與進度分開；重新開始只預填新草稿，確認後建立另一世界。舊 null 原始開局明示不可用。新 `start-city`／`reset` 請求退役為 409，已保存歷史 receipt 仍先回放。刪世界的原子 batch 亦刪除該世界已結束的開局草稿，保留別份草稿／卡／場景、另存副本原始開局與帳號實際費用。
+新世界只接受已保存開局的確認 `{id,draftId,draftVersion,operationScope}`。文字範本、未完成建角草稿及暫接的 `{name,city}` 均不能繞過形成建立世界。原子 batch 同時保存世界、帳號存檔身分、immutable 原始開局及 finalized 草稿標記；確認使用已保存 candidate，單純變更步驟或名稱不重造隱藏亂數流。能力、需求特性及容量承接完成卡；預設需求 20／20／15／20、目前電量為容量七成半點進位，也可在確認前指定合法需求、感受階段及容量內電量。
 
-## 驗收矩陣
-
-| #288 條件 | 證據與結果 |
+| #288 驗收條件 | 外部可觀察證據與結果 |
 | --- | --- |
-| 至少完成卡與合法場景、同流程建立返回 | 真首頁空狀態→新開→真建角頁文字／受控形成／明示保存卡→返回選用→真場景頁建立→返回；全程只有形成的受控模型 1 次，付費 0 |
-| 五步、帳號草稿與建立中接續 | 真頁逐步、離開至選檔「建立中」、恢復第 3 步與重載保留內容；API／SQLite CAS、寫後丟回覆恢復、跨帳號延遲 v0／finalize 409 |
-| 場所獨立、同住、可選配置及不同責任 | API 兩張真卡／同源雙場所，實體房間／物件 id 各自獨立，同住共用實際 residence；新開局真保存的 grant 不製造 residence／ownership／知情，不打開 closed 門；hidden 物件不投影，knownTo 與 allowedTo 分開，空 roads 保留空 |
-| 確認實值與保存重讀一致 | 真頁保存最後名稱、背景、能力、來源、起點、需求 12／20／15／20、容量 70／電量 56；confirmation candidate 的完整人物深比 persisted／GET 同一份；API另驗預設／感受與矛盾拒絕 |
-| 成功才進觀察、去重與不推進 | 真頁在 server commit 後丟棄回覆，仍留新建頁，原 id 恢復同一份再進觀察 turn 0；API before／after batch fault、CAS 競態沒有半份世界／重複新世界；兩份世界各自手動續玩至 2／1 回合，不互相前進 |
-| 原始快照與重新開始 | API 原場景改版後草稿與 restart 仍使用已保存舊房間／物件／人物背景；真頁從原始開局重開並改名另建第二世界；舊 null 顯不可用；刪來源後副本可續玩及用其原始開局預填 |
-| 返回修改及來源更新 | 真頁確認返回第 3 步改最後名稱，再保存同一 candidate；API source edits／draft reload／step-only reuse；既有卡值不重骰 |
+| 首次空狀態、至少一張完成卡及一個合法場景 | 真首頁空狀態→新開→人物頁完整文字／受控形成／保存完成卡→返回選用→場景頁建立→返回。未完成卡及非法起點被產品 API 拒絕；形成受控模型 1 次，付費 0 |
+| 五步、返回修改、同頁建立資產、草稿自動保存及接續 | 真頁完整五步；離開至選檔「建立中」、恢復配置步驟、重載保留輸入，確認返回修改最後名稱；資產 author／returnTo 保留原 owner 及 draft。API 真 SQLite CAS、提交前失敗、提交後回覆遺失與原 ID 恢復皆有覆蓋 |
+| 完成卡值不重骰、來源更新不改已選內容 | API／磁碟關閉重開後仍保存原卡值、舊場景房間／物件／背景；只改步驟／名稱重用 candidate。受控取骰次數不增加 |
+| 最後確認與保存重讀同一份 | 真頁最後名稱、背景、能力、來源、起點、需求 12／20／15／20、容量 70／電量 56 深比 persisted／GET；實設住處甲屋、臥室客廳、工作乙屋、甲屋所有權，確認以可讀名稱顯示且 DB 配置一致。API 另驗預設、感受及矛盾輸入拒絕 |
+| 同源雙場所獨立、同住共用實際場所 | API 兩張真卡／同源雙場所的實體房間與物件 ID 各自獨立；同住者共用實際 residence。真頁可加入同來源 v1／v2，分別選其房間、重載、確認及保存，各自門／物件／權限仍按原版本 |
+| 起點、道路、住處、工作、關係、所有權、許可皆可選 | 手動產品 UI 可操作，無 raw JSON 代替流程。空 roads 保留空，不偷偷連通；起點與 room/ref 驗證。grant 不製造 residence／ownership／知情，也不打開 closed 門；hidden 物件不投影，knownTo 與 allowedTo 分開 |
+| 保存成功才進觀察、不推進首回合 | 寫後丟回覆仍留建立頁，原 ID 恢復同一份才進觀察 turn 0；before／after batch fault、CAS 競態不留半份或重複世界。兩份世界分別手動續玩至 2／1，不互相推進 |
+| 原始開局與進度分開、重新開始另建 | 真頁從原始開局預填、改名後確認新增第二世界；API 在來源更新後仍沿舊快照重開，contextId 獨立。舊 null 明示不可用；不拿現況／最新範本冒充原始開局 |
+| 刪除生命週期與其他資產隔離 | 保存→另存→刪來源：只刪該世界 finalized 草稿，其他草稿／卡／場景不動；副本保留完整原始開局可續玩／重開，原 confirm 重送不能復活來源；帳號實際費用保留 |
+| 原帳號、慢回覆及恢復綁定 | 舊 A scope 在 B 下 edit／confirm／restart／v0 均 409，不改 B 同 UUID 草稿；恢復 GET 不接受 B 同 UUID/body 假同步。卸載後慢 create 不拉走另一選檔；已 commit 後只換 cookie 也不會裸導航讀 B 世界，錯帳號明示返回選檔，A 已存世界仍可續讀 |
+| 舊流程相容及退役 | 新 `start-city`／`reset` 為 409；已保存 receipt 先回放，既有城市／活動／帳務保留。歷史城市 fixture 明示為舊保存資料，只驗相容，不冒充五步建立成功 |
 
-## 固定提交與命令
+## 固定提交與驗證
 
-- `b1696a2`：首條草稿／可信快照／確認保存 tracer 紅轉綠。
-- `c159a0e`：原帳號 scope、需求／精神初值、退役原地覆寫；API 9／9。
-- `cff3707`：獨立 UI worktree 五步、導覽、資產返回與觀察入口；合入主 T7。
-- `76b9b0b`／`4481c1e`：候選保存、已結束草稿刪除生命週期、權限及歷史相容；API 12／12。
-- `28b9edd`：唯一修復者修正異帳號恢復 GET 與卸載後慢建立回覆導航；獨立覆核兩反例 remaining 0。本分支已採用。
-- `976f0a5`：費用旅程 helpers 獨立 worktree 交付與證據；本分支已採用。
+主要提交：`b1696a2` 開局草稿／快照／原子確認；`c159a0e` 原 scope／初值／退役原地覆寫；`cff3707` 獨立 UI 切片；`76b9b0b`／`4481c1e` candidate 重用、草稿刪除生命週期及權限；`80b9689` 帳號介面 scope／consumer／helper 包；`5face37` 原 owner 導覽及精確場景版本；`71888ee`／`49f6d85` 純驗收 driver 收尾；`49cc19a` 最後覆核證據。
 
-已執行 `node --test tests/opening-wizard.test.mjs` **12／12**。`node tests/run-activities.mjs` 指定 city-creation／city-access／city-activity-hints／city-phone-map／city-travel／initial-memory-capacity／character-attributes／formal-mental-enable 八檔 **44／44**。歷史城市生活測試明示使用 `historical-city-fixture.cjs`，只測升版前已保存城市的相容；它不代表五步新建成功，不是產品測試捷徑。新 start-city 409 及既存 settled receipt 回放另經真正 route 驗證。
-
-固定 `4481c1e` 完成 typecheck、lint（0 errors／4 既有 warnings）、build、diff check；真 App Router／Chromium＋磁碟 SQLite 完整手動旅程通過。UI fixed 後的兩份世界各自續玩 probe 亦通過。最終接合後的固定版本、完整套件及畫面另在本頁下方補記。
-
-## 邊界與回退
-
-新增 `0019_opening_drafts.sql` 與對應 Drizzle schema，僅套在隔離 SQLite；沒有正式 migration。發布此程式前須先套 additive migration，回退不應刪除開局表／原始快照／已保存卡值或骰果；舊程式不支援新草稿與 opening-v1 重開，應保留資料並使用支援版本。舊版原地 reset／start-city 入口也不能當回退手段。未演練正式回退。
-
-未驗真實 OAuth、跨真裝置部署、真模型語義品質、正式世界與正式站寫入。模型 transport、身份 cookie、D1 hosting 及形成骰邊界受控，其餘為真頁／產品 API／SQLite；外網攔截，沒有付費模型。T8 可選 AI 世界配置尚未啟動，沒有放置假 AI 按鈕；本票不宣稱該項已完成。
-
-## 審查收斂狀態（最終接合前）
-
-原 backend scope 反例已在 `c159a0e` 修正並獨立覆核：從原帳號捕捉 scope 後切帳，edit／confirm／restart／新 v0 都 409，不改另一帳號同 UUID 草稿。兩個 UI 慢回覆反例已採唯一修復者 `28b9edd`：另一帳號同 UUID／body 的 GET 不得假稱原輸入已同步；已離頁的新建成功回覆不拉走新選存檔。兩項獨立真頁覆核 remaining 0，沒有以正常旅程通過掩蓋原反例。
-
-後續具體發現的 v1 UUID 建立／選檔不一致仍待唯一修復者收斂：固定 `72d76e1`、真 formed card／v4 草稿，用 `00000000-0000-1000-8000-000000000001` 當 final save id 可獲 201，隨後同帳號 world GET 卻 400；因此本票此刻未 ready。另 T9 舊 copy／delete 原帳號 scope 的 P1 已重開 #290，由同一修復者處理，不把它算作已完成。最終固定證據須採用這些修正後來源。
-
-### 第一收斂包已採用
-
-已合 `1a3ea10` 與最新 integration `fa0af83`。共用 v4 身分契約 `79b7927` 現在拒絕不一致的草稿／存檔 UUID，無殘留 row；開局 API 組 **15／15**（含原 12 項）通過。共用 `character-api-fixture.mjs` 取代複製的接點；兩軸對原 fixture P3／UUID P2 的覆核 remaining 0。T9 原帳號 copy/delete／receipt 恢復修正亦已採用，原 P1 兩軸覆核 remaining 0；票狀態由 root 依真正整合結果處理。
-
-新增原帳號介面查核仍待 scope 收斂包：真 API／SQLite 顯示帳號模型預設、建角草稿、人物文字範本及場景來源的舊頁請求可在換帳後寫入另一帳號；Key fast branch 亦會在 scope 檢查前寫入新帳號。另真頁可在 visibility refresh 後把原觀察頁改綁另一帳號同 ID 世界並推進。這些皆交唯一修復者，未平行修產品；無真 Key、無付費模型或正式資料操作。此段是明示尚未完成狀態，不以先前正常旅程掩蓋已重現邊界。
-
-## 固定 `5bdc6db` 驗證及本機 D1
-
-已合完整 `80b9689` scope／consumer／相容 helper 包，含單一修復者的新 request guard、WorldApp 原帳號與同帳號 receipt 恢復、可讀配置摘要及全部必要 caller metadata。原 Key P1、模型／資產／觀察頁的原帳號問題，以及同帳號初讀 pending receipt 的後續回歸，均有獨立覆核與[修復證據](account-origin-surfaces-281.md)。
-
-本分支固定 `5bdc6db` 另外驗證：
-
-| 命令／實際範圍 | 結果 |
+| 固定來源、命令／範圍 | 結果 |
 | --- | --- |
-| `node --test`：account-origin-surfaces、character-templates、scene-templates、character-drafts、character-cards、model-settings、opening-wizard、versioned-d100、world-saves-migration、migration-gate | **69／69** |
-| `run-activities.mjs`：world-saves、save-management、8 檔 legacy 城市／屬性／精神組，以及 budgets、decision-traces、costs、pursuit-lifecycle | **101／101**，未改原費用與歷史斷言 |
-| `npm run typecheck`、`npm run lint`、`npm run build` | 皆 exit 0；lint 0 errors／4 既有 warnings |
-| `browser-opening-wizard-288.mjs` | 真人物／場景頁／五步／接續／重載／最後返回修改／回覆遺失恢復／確認住處工作所有權及 DB 配置同份／原始重開／兩世界各 2／1 回合；controlled 1／paid 0 |
-| `opening-durable-journey-288.mjs` | 同一磁碟 SQLite 實際關閉重開，已更新來源不洗掉草稿／原始開局；原 ID 200 回放與重新開始另建；controlled 1／paid 0 |
+| `5bdc6db`：`node --test` account-origin-surfaces、character-templates、scene-templates、character-drafts、character-cards、model-settings、opening-wizard、versioned-d100、world-saves-migration、migration-gate | **69／69** |
+| `5bdc6db`：`node tests/run-activities.mjs` world-saves、save-management、8 檔歷史城市／屬性／精神組、budgets、decision-traces、costs、pursuit-lifecycle | **101／101**；原費用與歷史斷言保留 |
+| `5face37`：opening API、acceptance 全檔、實際 Workerd／D1 | **16／16、9／9、1／1**；新增 mixed-version preview→保存→產品 GET，卡值及取骰次數不變 |
+| `71888ee`：受影響 acceptance／city-access／creation／travel／phone-map／world-configuration | **24／24** |
+| `71888ee`：`npm run typecheck`、`npm run lint`、`npm run build` | 皆 exit 0；lint 0 errors／4 既有 warnings |
+| `5face37`：normal 五步、author-return、草稿接續、確認配置／DB、原始重開、兩世界 2／1；durable 關閉重開；原 WATCH1／WATCH2 | 真 App Router／Chromium／磁碟 SQLite 通過；normal、durable、recovery 各 controlled 1／paid 0 |
+| `5face37`：bound owner、同帳 pending receipt 恢復與 analysis reader | 新 owner 邊界真頁通過，controlled 2／paid 0；同帳恢復及兩分析私有證據 GET 200、turn 1、新增 POST 0；各 analysis controlled 1／paid 0 |
+| `49f6d85`：mixed scene version 真頁 | 實際從已選 v1 草稿點加入最新 v2，配置選不同房間、重載、確認／保存；v1 public／v2 private 各正確，controlled 1／paid 0；產品仍同 `5face37` |
 
-畫面：[手動配置](assets/opening-wizard-288/manual-config.png)、[完整確認](assets/opening-wizard-288/confirmation.png)、[保存後 turn 0](assets/opening-wizard-288/observed-turn-zero.png)、[兩份獨立續玩](assets/opening-wizard-288/two-worlds-continued.png)。[頁面 origin／登入／版本／次數](assets/opening-wizard-288/evidence.json)、[磁碟重開](assets/opening-wizard-288/durable-evidence.json)均記錄該固定來源。
+[最後修復、命令與獨立覆核](opening-bound-review-288.md)含原 RED、GREEN、固定來源及畫面；[帳號介面修復](account-origin-surfaces-281.md)、[相容 helper 遷移](opening-test-helper-migration-288.md)補充前一批守門與 consumer 驗證。`49cc19a` 是完整固定包，本次以 `git diff --exit-code 5face37 HEAD -- app components lib db drizzle` 確認產品完全相同，以 ancestor 檢查確認含 integration `1829384`，不把文件提交當新的產品測試版本。
 
-另以專案 Wrangler 實際套本機 D1，使用獨立 `/tmp/quiet-hours-t7-d1-5bdc6db/state` 與只含 fake local DB id 的暫存 config，所有命令明示 `--local`，沒有 `--remote`。從空庫先套至 0018，插入明示的歷史遷移 fixture，再用 `npm run db:migrate:local -- --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state` 套 0019；共 **16** 份專案 SQL 成功。此 fixture 只驗遷移，不作為玩家建立成功的旅程。
+手動流程原固定 `5bdc6db` 的[配置](assets/opening-wizard-288/manual-config.png)、[確認](assets/opening-wizard-288/confirmation.png)、[turn 0](assets/opening-wizard-288/observed-turn-zero.png)、[兩份續玩](assets/opening-wizard-288/two-worlds-continued.png)、[origin／登入／版本證據](assets/opening-wizard-288/evidence.json)及[磁碟重開](assets/opening-wizard-288/durable-evidence.json)保留其真實來源；後續新 owner／混版綠證據見最後修復報告，未把舊畫面改標新版本。
 
-Readonly native SQLite 比較證明：舊 state 及含 D20 結果的 journal UTF-8 內容、version 42、原 lease、city_started 及 legacy 原始開局 null 皆不變；新 opening_drafts 為空 0。完整命令、來源及舊內容 hash 見 [D1 證據](assets/opening-wizard-288/d1-migration-evidence.json)，[前置 migration log](assets/opening-wizard-288/d1-pre19.log)、[歷史 fixture log](assets/opening-wizard-288/d1-legacy.log)、[0019 log](assets/opening-wizard-288/d1-0019.log)保留 `Executing on local database`。沒有正式資料遷移或正式回退。
+## 失敗歷史及剩餘整合驗證
 
-最後新增的可重現邊界仍待唯一修復者：`5bdc6db` 真卡／場景／開局中，B 已有同 public save UUID 的世界，A 的建立 POST 已 commit 201 後暫留回覆；原頁不卸載、只換 B cookie，再放回覆，裸 saveId 導航會進 B 既有世界，A 真正保存的世界未被觀察。來源 `/tmp/t7-late-create-account.mjs`／`.log`，controlled 2／paid 0，兩世界未推進。伺服器原寫入仍正確屬 A，缺口在後續讀導航丟掉原帳號。此反例已交 root／唯一 T1，本分支未平行改產品；其他通過證據不等於此項已解。
+重開票的修正鏈亦已接合：#283 的帳號預算跨檔權威及用量保留見 [player-account-review-fixes](player-account-review-fixes-281.md)，其後觀察頁／恢復原 owner 守門見 [account-origin-surfaces](account-origin-surfaces-281.md)；#284 的建角草稿／人物及場景來源舊頁寫入、#285 的模型偏好與 Key fast branch 同由該 scope 包收斂，原 Key P1／四 surface P2 及後續 reader P2 獨立覆核均 0。#290 的 copy／delete／receipt 原帳號 P1 見 [save-management-account-review](save-management-account-review-290.md)，完整包保留其守門與同帳號恢復。最新 [opening-bound-review](opening-bound-review-288.md)再收斂跨頁原 owner 前提，未以 query 取代登入授權。票仍由 root 在實際整合推送後依 #283＋#284→#285、#283→#290 閉合，再處理 #288→#289；本報告不代替 GitHub 原生狀態。
 
-另一新增來源版本反例：先保存某場景 v1／public 的選用快照，原場景改 v2／private，再在同一開局新增同源 v2 實例。真 API 接納且 201 保存；sourceVersions 與 sceneSources 確為 v1／v2，但新場所 access 卻沿首筆 v1 的 public／allowedActorIds。`prepareCityAccess` 查 source 時僅比 id，未比 version；來源 `/tmp/t7-mixed-scene-versions.mjs`／`.log`（`96ca63b` 只比產品固定點多本驗證文件，產品仍同 `5bdc6db`），controlled 1／paid 0，沒有推進。已交唯一修復者作精確版本取源與真 API 回歸，未以新增產品限制拒絕合法引用來迴避。
+原 backend scope、恢復假同步／卸載後慢導航、v1 UUID 建立後不可讀、帳號模型／資產／Key／WorldApp 重綁及 pending 初讀問題，均曾以真 API 或真頁重現，再由唯一修復者收斂並獨立覆核。最後兩例為 commit 後切 cookie 裸導航誤讀另一帳號同 UUID 世界，以及同 source ID 不同版本誤取第一版 public 規則；`5face37` 修正後 Spec 兩反例各 remaining 0，Standards hard 0／judgment 0。原先正確保存的 A 世界沒有回滾、重送或重抽。
+
+**root 固定 `5bdc6db` 的 full 原結果仍是失敗**：core **1265／1267**，兩個舊 reset assertion 預期 400、產品正確回 409；補組 auth **40／40**、assets **61／61**、Workers **14／15**（唯一原 setup 缺 scope）、source-pin **21／21**。原 full 與補組 raw exit 1 logs 保留，不能合算為一次全套通過。後續兩個 core assertion 以明示退役 409 及 world/player_accounts 完整 row 不變驗證，acceptance **9／9** 綠；Workers 普通 constructor 加原 scope 後真 Workerd 全檔 **1／1** 綠。首輪受影響城市組 **23／24** 的唯一裸 `/new` selector 也已改驗路徑與原 owner，再跑 **24／24**。
+
+上述針對性綠證據不宣稱完整候選全套已綠。最終 T8 新變更完成後，root 仍須在固定 integration 跑完整現行套件及最終兩軸審查，再依技能流程決定 PR ready；本票交付不提前解除 GitHub 原生阻擋。
+
+## 隔離本機 D1 遷移與回退
+
+新增 additive `0019_opening_drafts.sql` 及對應 Drizzle schema。已使用真正 Wrangler 本機 D1，獨立 `/tmp/quiet-hours-t7-d1-5bdc6db/state` 及只有 fake local DB id 的暫存 config，所有命令明示 `--local`，沒有 `--remote`。從空庫先套至 0018，插入明示的歷史遷移 fixture，再執行：
+
+```sh
+WRANGLER_SEND_METRICS=false npm run db:migrate:local -- --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state
+```
+
+共 **16** 份專案 SQL 成功。Readonly native SQLite 證明舊 state／含 D20 結果 journal 的 UTF-8 bytes、version 42、lease、city_started 及 legacy 原始開局 null 不變；新 opening_drafts 0。fixture 僅驗遷移，不冒充玩家建立成功。完整命令與 hash 見 [D1 證據](assets/opening-wizard-288/d1-migration-evidence.json)，[前置 migration](assets/opening-wizard-288/d1-pre19.log)、[歷史 fixture](assets/opening-wizard-288/d1-legacy.log)、[0019](assets/opening-wizard-288/d1-0019.log)皆保留 local 執行證據；後續修復沒有更動 SQL。
+
+發布前須先套 additive migration。回退應保留草稿表、immutable 原始開局、已保存卡值及骰果；舊程式不支援新草稿／opening-v1 重開，不可刪資料或以原地 reset／start-city 取代回退。沒有正式遷移、部署或正式回退演練。
+
+## 未驗範圍
+
+未驗真 OAuth、跨真裝置部署、真實模型語義品質、正式世界及正式站寫入。身份 cookie、Cloudflare hosting、模型 transport 與形成骰邊界受控，其餘沿真頁、產品 API 及實際 DB 保存重讀，外網攔截、付費 0。T8 可選 AI 世界配置尚未啟動，沒有假 AI 按鈕；舊 modern browser driver 本輪只更新 bound URL assertions，沒有聲稱全部逐支重刷。最後整合全套及全分支最終審查仍由 root 完成。
