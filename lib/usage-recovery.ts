@@ -20,7 +20,7 @@ export function paidDelta(before:AIUsage|undefined,after:AIUsage):AIUsage {
   }
   return delta;
 }
-function mergePaid(world:World,desired:AIUsage,applied:AIUsage|undefined) {
+export function mergePaid(world:World,desired:AIUsage,applied:AIUsage|undefined) {
   const usage=world.aiUsage??=zero(desired.windowStartedAt);
   const window=desired.windowStartedAt;
   const sameWindow=usage.windowStartedAt===window;

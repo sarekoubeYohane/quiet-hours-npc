@@ -88,7 +88,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw Error('方法與追求焦點不一致。');
   return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void, recall?: { observer?: ModelObserver; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const direct=provider==='openai';
 const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
@@ -113,7 +113,7 @@ const requestId = crypto.randomUUID();
 // context. The route rechecks operation version/lease after completion.
 const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${direct?'openai':'ai'}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
 const {schema,context:decisionContext}=prepared;
-const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer});
+const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
 try {

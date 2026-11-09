@@ -7,6 +7,7 @@ import {Button} from './ui/button';
 
 type Source=Pick<WorldSave,'id'|'name'|'version'|'turn'|'minute'>;
 const changed='quiet-hours:save-operation';
+const copyNameKey=(accountScope:string,saveId:string)=>'quiet-hours:saves:name:'+JSON.stringify([accountScope,saveId]);
 function useSaveOperation(accountScope:string,onBefore?:()=>void) {
   const storageKey='quiet-hours:saves:pending:'+accountScope;
   const router=useRouter(),busyRef=useRef(false);
@@ -25,6 +26,7 @@ function useSaveOperation(accountScope:string,onBefore?:()=>void) {
     if(busyRef.current)return;
     const existing=sessionStorage.getItem(storageKey);
     if(existing&&!recover&&existing!==JSON.stringify(input)){setError('請先恢復上一個存檔操作。');return;}
+    if(input.operation==='copy')sessionStorage.setItem(copyNameKey(accountScope,input.saveId),input.name);
     busyRef.current=true;onBefore?.();setBusy(true);setError('');persist(input);
     try {
       if(recover){const response=await fetch('/api/saves?operationId='+encodeURIComponent(input.operationId),{credentials:'same-origin'});const value=await response.json() as {operation?:SaveOperationResult;error?:string};if(!response.ok)throw Error(value.error||'尚無法讀取原操作。');if(value.operation&&!(value.operation.operation==='delete'&&value.operation.externalCleanup==='pending')){await finish(value.operation);return;}}
@@ -45,7 +47,11 @@ export function SaveOperationRecovery({accountScope}:{accountScope:string}) {
   return <section className="panel" style={{padding:20}} aria-label="恢復存檔操作"><p>上一個存檔操作尚待確認。恢復會讀取原操作，不另建副本或重送模型。若故事已刪除，剩餘的外部記憶索引清理也會沿原操作完成。</p><Button disabled={busy} onClick={()=>void submit(pending,true)}>恢復原存檔操作</Button>{error&&<p role="alert">{error}</p>}</section>;
 }
 export default function SaveActions({save,accountScope,disabled=false,onBeforeAction}:{save:Source;accountScope:string;disabled?:boolean;onBeforeAction?:()=>void}) {
-  const [name,setName]=useState(save.name+' 副本');
+  const nameKey=copyNameKey(accountScope,save.id);
+  const subscribe=useCallback((listener:()=>void)=>{window.addEventListener(changed,listener);return()=>window.removeEventListener(changed,listener);},[]);
+  const storedName=useSyncExternalStore(subscribe,()=>sessionStorage.getItem(nameKey),()=>null);
+  const name=storedName??save.name+' 副本';
+  const setName=(value:string)=>{sessionStorage.setItem(nameKey,value);window.dispatchEvent(new Event(changed));};
   const {pending,busy,error,submit}=useSaveOperation(accountScope,onBeforeAction);
   const ownPending=pending?.saveId===save.id?pending:null;
   const locked=disabled||busy||!!pending;

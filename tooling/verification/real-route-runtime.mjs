@@ -49,11 +49,13 @@ export async function startApp({root=process.cwd(), port=0, databasePath, modelR
   const bindings=join(directory,'bindings.mjs'), auth=join(directory,'auth.mjs');
   await writeFile(bindings,`import {DatabaseSync} from 'node:sqlite';
 const db=new DatabaseSync(${JSON.stringify(sqlitePath)});
-const DB={prepare(sql){return {bind(...args){return {
+export function closeDatabase(){db.close();}
+function statement(sql,args=[]){return {bind(...values){return statement(sql,values)},
 async all(){return {results:db.prepare(sql).all(...args)}},
 async first(){return db.prepare(sql).get(...args)??null},
-async run(){return {meta:{changes:Number(db.prepare(sql).run(...args).changes)}}}
-}}}},async batch(statements){db.exec('BEGIN IMMEDIATE');try{const results=[];for(const statement of statements)results.push(await statement.run());db.exec('COMMIT');return results;}catch(error){db.exec('ROLLBACK');throw error;}}};
+execute(){return {meta:{changes:Number(db.prepare(sql).run(...args).changes)}}},
+async run(){return this.execute()}};}
+const DB={prepare:statement,async batch(statements){db.exec('BEGIN IMMEDIATE');try{const results=statements.map(value=>value.execute());db.exec('COMMIT');return results;}catch(error){db.exec('ROLLBACK');throw error;}}};
 export const env={APP_ENV:'local',AUTH_ORIGIN:${JSON.stringify(`http://127.0.0.1:${port}`)},DB,MODEL_KEY_ENCRYPTION_SECRET:${JSON.stringify(createHash('sha256').update('local-acceptance-only:'+sqlitePath).digest('hex'))}};
 `);
   await writeFile(auth,`import {headers} from 'next/headers';
@@ -85,6 +87,6 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
   }catch(error){await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});throw error;}
   const url=`http://127.0.0.1:${server.httpServer.address().port}`;
   return {url,commit,builtAt,sqlitePath,requests,modelRequests,
-    async close(){await server.close();await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});},
+    async close(){await server.environments.rsc.runner.import(bindings).then(module=>module.closeDatabase());await server.close();await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});},
   };
 }

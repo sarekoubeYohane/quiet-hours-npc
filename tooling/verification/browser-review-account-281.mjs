@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {startApp} from './real-route-runtime.mjs';
+import {launchBrowser} from './browser-runtime.mjs';
+const out=process.env.BROWSER_ARTIFACT_DIR||'/tmp/quiet-hours-review-browser';await mkdir(out,{recursive:true});
+const dir=await mkdtemp(join(tmpdir(),'account-review-281-')),databasePath=join(dir,'account.sqlite'),port=5286;
+const responder=()=>({background:'河畔的受控背景'});
+let app=await startApp({port,databasePath,modelResponder:responder}),browser,page;
+const evidence={production:false,modelSemanticQuality:false,steps:[]};
+try{
+ browser=await launchBrowser();const context=await browser.newContext({viewport:{width:1360,height:1100},reducedMotion:'reduce'});await context.addCookies([{name:'qh_local_owner',value:'review-account-281',url:app.url}]);page=await context.newPage();page.setDefaultTimeout(30000);
+ await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());
+ const get=path=>page.evaluate(async path=>{const response=await fetch(path);return {status:response.status,body:await response.json()};},path);
+ const post=(path,input)=>page.evaluate(async({path,input})=>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(input)});return {status:response.status,body:await response.json()};},{path,input});
+ const check=(value,status=200)=>{assert.equal(value.status,status,JSON.stringify(value.body));return value.body;};
+ await page.goto(app.url+'/settings');await page.getByRole('heading',{name:'帳號玩家預算與用量'}).waitFor();
+ assert.deepEqual((await get('/api/saves')).body.saves,[]);
+ await page.getByLabel('每小時 AI 呼叫上限',{exact:true}).selectOption('custom');await page.getByLabel('自訂呼叫上限',{exact:true}).fill('1');await page.getByRole('button',{name:'套用玩家預算',exact:true}).click();await page.getByText('帳號玩家預算與價格已保存；沒有派送模型。',{exact:true}).waitFor();
+ await page.getByText('自訂模型單價（USD／每百萬 tokens）',{exact:true}).click();
+ await page.getByLabel('輸入 USD 單價',{exact:true}).fill('1');await page.getByLabel('輸出 USD 單價',{exact:true}).fill('2');await page.getByLabel('價格來源',{exact:true}).fill('受控本機價格');await page.getByRole('button',{name:'保存自訂單價',exact:true}).click();await page.waitForFunction(async()=>{const response=await fetch('/api/player-budget');return (await response.json()).prices.some(value=>value.source==='受控本機價格');});
+ assert.equal(app.modelRequests.length,0);evidence.steps.push('empty account configures budget and price on real settings route without a world or dispatch');
+ check(await post('/api/model-settings',{version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}}));
+ check(await post('/api/world?workspace=account',{operation:'set-model-key',mode:'openai',key:'controlled-only-key'}));
+ const blank={name:'',appearance:'',personality:'',abilities:'',background:'',initialMemories:'',beliefs:'',preferences:'',directions:'',startLocation:''};
+ async function create(name){const person=check(await post('/api/character-templates',{id:crypto.randomUUID(),version:0,fields:{...blank,name,initialMemories:'開局記憶'}})).template;const scene=check(await post('/api/scene-templates',{id:crypto.randomUUID(),version:0,name:name+'家',note:'',rooms:[{id:'main',name:'客廳'}],connections:[],objects:[]}),201).template;return check(await post('/api/saves',{id:crypto.randomUUID(),name,city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:name+'住處'}],characters:[{templateId:person.id,version:person.version,placeId:'home',roomId:'main'}]}}),201);}
+ const first=await create('甲世界'),second=await create('乙世界');
+ async function act(save,extra){const current=check(await get('/api/world?save='+save));return post('/api/world?save='+save,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:current.operationScope,worldContext:current.world.contextId,...extra});}
+ const generation={operation:'generate-character-template',characterGeneration:{description:'受控概念',fields:blank}};
+ check(await act(first.save.id,generation));check(await act(second.save.id,generation),429);assert.equal(app.modelRequests.length,1);
+ const accountBefore=check(await get('/api/player-budget'));assert.equal(accountBefore.usage.totalCalls,1);assert.equal(accountBefore.usage.totalUnknownCalls,0);
+ evidence.steps.push('second saved world cannot refresh shared quota; controlled transport exactly once');
+ await page.goto(app.url);const region=()=>page.getByRole('region',{name:'甲世界的存檔管理'}),field=()=>region().getByLabel('甲世界的另存名稱',{exact:true});await field().fill('保留可編輯的分岔名稱');
+ let blocked=false;await page.route('**/api/saves',async route=>{if(!blocked&&route.request().method()==='POST'&&JSON.parse(route.request().postData()).operation==='copy'){blocked=true;await route.abort('failed');}else await route.continue();});
+ await region().getByRole('button',{name:'另存目前進度',exact:true}).click();await region().getByRole('button',{name:'恢復此存檔操作',exact:true}).waitFor();await page.reload();await region().getByRole('button',{name:'恢復此存檔操作',exact:true}).waitFor();
+ check(await act(first.save.id,{operation:'advance',minutes:5,timeContract:'five-minute-v1'}));
+ await region().getByRole('button',{name:'恢復此存檔操作',exact:true}).click();await region().getByRole('alert').waitFor();
+ assert.equal(await field().inputValue(),'保留可編輯的分岔名稱');assert.equal(await field().isEnabled(),true);await page.screenshot({path:join(out,'copy-conflict-input-retained.png'),fullPage:true});
+ await page.reload();assert.equal(await field().inputValue(),'保留可編輯的分岔名稱');await region().getByRole('button',{name:'另存目前進度',exact:true}).click();await page.waitForURL(/\/observe\?save=/);await page.getByRole('heading',{name:'此刻的世界'}).waitFor();
+ const copyId=new URL(page.url()).searchParams.get('save');assert.notEqual(copyId,first.save.id);const source=check(await get('/api/world?save='+first.save.id));
+ check(await post('/api/saves',{operation:'delete',operationId:crypto.randomUUID(),saveId:first.save.id,expectedVersion:source.version}));
+ const copied=check(await get('/api/world?save='+copyId));assert.equal(copied.world.aiUsage.totalCalls,0);assert.equal(copied.accountPlayer.usage.totalCalls,1);assert.equal(copied.accountPlayer.usage.windowStartedAt,accountBefore.usage.windowStartedAt);
+ evidence.steps.push('unaccepted copy survives reload and version conflict with editable name; fresh confirmation copies, source deletion leaves account charge');
+ await page.goto(app.url+'/settings');await page.getByText(/帳號本小時：1 次 AI 呼叫/).waitFor();await page.screenshot({path:join(out,'account-authority.png'),fullPage:true});
+ await page.close();await app.close();app=await startApp({port,databasePath,modelResponder:responder});page=await context.newPage();await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());await page.goto(app.url+'/settings');await page.getByText(/帳號本小時：1 次 AI 呼叫/).waitFor();
+ const persisted=check(await get('/api/player-budget'));assert.equal(persisted.usage.totalCalls,1);assert.equal(persisted.usage.windowStartedAt,accountBefore.usage.windowStartedAt);assert.equal(persisted.prices[0].source,'受控本機價格');
+ check(await act(copyId,generation),429);assert.equal(app.modelRequests.length,0);
+ evidence.steps.push('SQLite close/reopen preserves original hour, settings, price and spent call; copied world cannot dispatch');evidence.commit=app.commit;evidence.origin=app.url;evidence.status='passed';evidence.controlledCalls=1;evidence.paidCalls=0;
+ await writeFile(join(out,'evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence));
+} catch(error){if(page){await page.screenshot({path:join(out,'failure.png'),fullPage:true});await writeFile(join(out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());}throw error;} finally{await browser?.close();await app.close();await rm(dir,{recursive:true,force:true});}

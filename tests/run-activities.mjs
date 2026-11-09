@@ -37,11 +37,12 @@ try {
     db.exec(${JSON.stringify(await readFile('drizzle/0014_world_saves.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0015_save_management.sql', 'utf8'))});
     db.exec(${JSON.stringify(await readFile('drizzle/0016_model_preferences.sql', 'utf8'))});
+    db.exec(${JSON.stringify(await readFile('drizzle/0018_player_account_budget.sql', 'utf8'))});
     exports.archivedWorld = () => db.prepare('SELECT state FROM world_before_city WHERE owner = ?').get('test-owner')?.state;
     let conflict, uncertain, failBefore, failRead, budgetHook, traceWriteFailure, traceWriteHook, traceReadFailure, storageHook;
     exports.onNextBudgetReservation = hook => { budgetHook = hook; };
     exports.install = value => {
-      db.exec('DELETE FROM model_preferences; DELETE FROM save_operation_receipts; DELETE FROM deleted_world_usage; DELETE FROM save_tombstones; DELETE FROM world_saves; DELETE FROM world_before_city; DELETE FROM scene_templates; DELETE FROM character_templates; DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
+      db.exec('DELETE FROM player_dispatches; DELETE FROM player_usage_origins; DELETE FROM player_accounts; DELETE FROM model_preferences; DELETE FROM save_operation_receipts; DELETE FROM deleted_world_usage; DELETE FROM save_tombstones; DELETE FROM world_saves; DELETE FROM world_before_city; DELETE FROM scene_templates; DELETE FROM character_templates; DELETE FROM decision_traces; DELETE FROM decision_trace_retention; DELETE FROM worlds; DELETE FROM account_model_keys; DELETE FROM recall_dispatch_usage; DELETE FROM recall_index_entries'); conflict = undefined; uncertain = false; failBefore = false; failRead = false; traceWriteFailure = false; traceWriteHook = undefined; traceReadFailure=false; storageHook=undefined;
       db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?, ?, 0, 0)').run('test-owner', JSON.stringify(value));
     };
     exports.conflictOnNextSave = (replacement, options = {}) => { conflict = { replacement, ...options }; };

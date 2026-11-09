@@ -19,7 +19,11 @@ export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,m
  const {model,provider}=service;
  return JSON.stringify({model,messages,...(provider==='openai'?{store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}}}:{temperature:.8,max_tokens:options.maxOutputTokens??2048})});
 }
-export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void; fetcher?: typeof fetch; requestId?: string }): Promise<string> {
+export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
+export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: ModelRequestOptions): Promise<string> {
+  try { return await executeRequestModel(service,messages,schema,options); } finally { await options.onSettled?.(); }
+}
+async function executeRequestModel(service: ModelService, messages: ModelMessage[], schema: object, options: ModelRequestOptions): Promise<string> {
 const {key, provider} = service;
 const direct = provider === 'openai', fetcher = options.fetcher || fetch;
 let r:Response;
@@ -32,6 +36,7 @@ const requestBody=modelRequestBody(service,messages,schema,options);
 // means dispatch is unknown, not absent. No header or service key is observed.
 checkSignal(requestSignal);
 await checkpoint({kind:'prepared',requestId:options.requestId,requestBody,timing:signalTiming(requestSignal)});
+if(options.beforeDispatch)await awaitSignal(options.beforeDispatch(options.requestId,requestSignal),requestSignal);
 checkSignal(requestSignal);
 let receivedHeaders:Response|undefined;
 let knownUsage:TokenUsage|undefined,bodyReceivedAt:number|undefined;
@@ -54,10 +59,10 @@ const work=(async()=>{
     const u=parsedBody?.usage;
     if(typeof u?.prompt_tokens==='number'&&typeof u?.completion_tokens==='number'&&Number.isFinite(u.prompt_tokens)&&Number.isFinite(u.completion_tokens)&&u.prompt_tokens>=0&&u.completion_tokens>=0){
       knownUsage={inputTokens:u.prompt_tokens,outputTokens:u.completion_tokens,...(u.prompt_tokens_details?.cached_tokens===undefined?{}:{cachedInputTokens:u.prompt_tokens_details.cached_tokens})};
-      options.onUsage?.(knownUsage);
     }
   }
   await observe({kind:signalExpired(requestSignal)?'late-response':'response',responseBody:body,httpStatus:response.status,at:bodyReceivedAt,usage:knownUsage});
+  if(knownUsage)await options.onUsage?.(knownUsage);
   return {response,body};
 })();
 const bounded=awaitSignal(work,requestSignal);
@@ -67,6 +72,7 @@ bounded.catch(()=>{});
 await checkpoint({kind:'dispatch',requestId:options.requestId,requestBody});
 try { const received=await bounded;r=received.response; }
 catch(e) {
+  if(e instanceof Error&&['player_budget','account_budget_busy'].includes(String((e as Error&{code?:string}).code)))throw e;
   const timeout=signalExpired(requestSignal)||e instanceof Error&&e.name==='TimeoutError';
   await fail(timeout?'timeout':receivedHeaders?'response-body':'transport',receivedHeaders?'response-body':'dispatch');
   const knownFailure=receivedHeaders&&providerFailure(receivedHeaders.status);

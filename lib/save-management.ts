@@ -1,3 +1,4 @@
+import { playerAccount } from './player-account-budget';
 import { readDecisionTrace,type DecisionTrace } from './decision-traces';
 import { recoverPaidUsage,type UsageReceipt } from './usage-recovery';
 import { awaitSignal,deadlineSignal } from './round-time-policy';
@@ -6,7 +7,7 @@ import { z } from 'zod';
 import { database } from './store';
 import { bindWorldSave,SaveAccessError,type WorldSave } from './world-saves';
 import { copyWorldWithoutAccounting } from './acceptance-scene';
-import type { World,AIUsage } from './world';
+import type { World } from './world';
 import { costSummary } from './costs';
 
 const base={operationId:z.string().uuid().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),saveId:z.string().regex(/^(legacy|[0-9a-f-]{36})$/),expectedVersion:z.number().int().nonnegative().safe()};
@@ -76,7 +77,10 @@ export async function accountSavedUsage(owner:string):Promise<AccountUsageSummar
     UNION ALL SELECT json_extract(state,'$.aiUsage') AS usage,operations AS accounting,0 AS archived FROM worlds WHERE owner=?
     UNION ALL SELECT usage,accounting,1 AS archived FROM deleted_world_usage WHERE owner=?`).bind(owner,'account-operations:'+owner,owner).all<{usage:string|null;accounting:string;archived:number}>();
   const summary:AccountUsageSummary={totalCalls:0,totalInputTokens:0,totalOutputTokens:0,totalUnknownCalls:0,knownUsd:0,unknownCostCalls:0,archivedWorlds:0,unknownAccountingRanges:0};
-  for(const row of results){summary.archivedWorlds+=row.archived;if(accountingUnknown(JSON.parse(row.accounting)))summary.unknownAccountingRanges++;const usage=row.usage?JSON.parse(row.usage) as AIUsage|null:null;if(usage){for(const key of ['totalCalls','totalInputTokens','totalOutputTokens','totalUnknownCalls'] as const)summary[key]+=usage[key]??0;const cost=costSummary(usage).total;summary.knownUsd+=cost.knownUsd;summary.unknownCostCalls+=cost.unknownCalls;}}
+  for(const row of results){summary.archivedWorlds+=row.archived;if(accountingUnknown(JSON.parse(row.accounting)))summary.unknownAccountingRanges++;}
+  const account=await playerAccount(owner);
+  for(const key of ['totalCalls','totalInputTokens','totalOutputTokens','totalUnknownCalls'] as const)summary[key]=account.usage[key];
+  const cost=costSummary(account.usage).total;summary.knownUsd=cost.knownUsd;summary.unknownCostCalls=cost.unknownCalls;summary.unknownAccountingRanges=Math.max(summary.unknownAccountingRanges,account.unknownAccountingRanges);
   return summary;
 }
 
@@ -156,6 +160,7 @@ function accountingTrace(trace:DecisionTrace) {
     })};
 }
 async function captureDeletionAccounting(owner:string,input:Extract<SaveManagementInput,{operation:'delete'}>) {
+  await playerAccount(owner);
   let source=await sourceFor(owner,input),journal=JSON.parse(source.operations) as AccountingJournal;
   const ids=new Set([...Object.entries(journal.usage??{}).filter(([,value])=>!value.finalized).map(([id])=>id),...Object.entries(journal.results??{}).filter(([id,value])=>value.body?.operationUncertain&&!journal.usage?.[id]?.finalized).map(([id])=>id)]);
   // Read existing evidence and apply known deltas using the original markers.
