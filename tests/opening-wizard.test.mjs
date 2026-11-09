@@ -22,7 +22,7 @@ async function fixture() {
   } }] });
   const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
   const [openings,drafts,form,cards,api,world,people,scenes,saves,fromTemplate,generation] = entries;
-  async function post(route,payload,path) {if(route===openings||route===saves&&!payload.operation)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
+  async function post(route,payload,path) {if(route===openings||route===saves)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
   const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()};};
   const worldRequest=async(payload,save)=>{const suffix=save?'?save='+save:'?workspace=account';const r=await world.GET(new Request('https://test.invalid/api/world'+suffix));const scope=await r.json();return payload===undefined?{status:r.status,body:scope}:post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world'+suffix);};
 
@@ -112,4 +112,20 @@ test('new opening keeps residence, ownership, entry grant, closed doors and firs
  const id=crypto.randomUUID(),[a,b]=base.body.city.characters,body={...base.body,city:{...base.body.city,places:base.body.city.places.map(place=>({...place,version:edited.body.template.version})),characters:[{...a,homeRoomId:'secret',ownedPlaceIds:[]},{...b,placeId:'work',homeId:undefined,homeRoomId:undefined,ownedPlaceIds:[]}],accessGrants:[{placeId:'home',roomId:'secret',characterTemplateId:b.templateId}]}};
  const ready=await f.post(f.openings,{id,version:0,body},'/api/opening-drafts');assert.equal(ready.status,200);assert.deepEqual(ready.body.preview.issues,[]);const saved=await f.post(f.saves,{id,draftId:id,draftVersion:1},'/api/saves');assert.equal(saved.status,201);const world=saved.body.world,[resident,visitor]=world.characters,room='place:home:room:secret';
  assert.ok(world.configuration.access[room].allowedActorIds.includes(visitor.id));assert.equal(world.configuration.residences[visitor.id],undefined);assert.deepEqual(world.configuration.ownerships,{});assert.equal(world.scene.doors['place:home:door:door'],'closed');assert.equal(visitor.openingKnowledge.rooms.some(value=>value.location==='place:home'),false);assert.ok(resident.openingKnowledge.rooms.some(value=>value.id===room));assert.equal(resident.openingKnowledge.objects.some(value=>value.name==='隱藏信封'),false);const diary=world.objects.find(value=>value.label==='住戶日記'&&value.region===room);assert.ok(diary.knownTo.includes(resident.id));assert.equal(diary.knownTo.includes(visitor.id),false);assert.deepEqual(diary.allowedTo,[]);assert.deepEqual(world.configuration.walks,[]);
+}));
+
+
+test('copy and delete bind the original account before receipt replay even when both accounts share world and operation UUIDs',()=>controlled(async f=>{
+ const shared=crypto.randomUUID(),a=await prepared(f);assert.equal((await f.post(f.saves,{id:shared,draftId:a.id,draftVersion:1},'/api/saves')).status,201);
+ const copy={operationScope:'a',operation:'copy',operationId:crypto.randomUUID(),saveId:shared,expectedVersion:0,name:'甲原操作副本'},deletion={operationScope:'a',operation:'delete',operationId:crypto.randomUUID(),saveId:shared,expectedVersion:0};
+ f.context.owner='b';const b=await prepared(f);assert.equal((await f.post(f.saves,{id:shared,draftId:b.id,draftVersion:1},'/api/saves')).status,201);
+ assert.equal((await f.post(f.saves,{...copy,operationScope:'b',name:'乙自己的合法副本'},'/api/saves')).status,201);
+ const before=f.db.prepare('SELECT state,version FROM worlds WHERE owner=(SELECT storage_owner FROM world_saves WHERE owner=? AND id=?)').get('b',shared);
+ assert.equal((await f.post(f.saves,copy,'/api/saves')).status,409);assert.equal((await f.post(f.saves,deletion,'/api/saves')).status,409);
+ assert.deepEqual(f.db.prepare('SELECT state,version FROM worlds WHERE owner=(SELECT storage_owner FROM world_saves WHERE owner=? AND id=?)').get('b',shared),before);
+ for(const query of ['?operationId='+copy.operationId,'?operationId='+copy.operationId+'&operationScope=a'])assert.equal((await f.saves.GET(new Request('https://test.invalid/api/saves'+query))).status,409);
+ const own=await f.saves.GET(new Request('https://test.invalid/api/saves?operationId='+copy.operationId+'&operationScope=b'));assert.equal(own.status,200);assert.equal((await own.json()).operation.save.name,'乙自己的合法副本');
+ f.context.owner='a';assert.equal((await f.post(f.saves,copy,'/api/saves')).status,201);assert.equal((await f.post(f.saves,copy,'/api/saves')).status,200);
+ const missing={...deletion};delete missing.operationScope;const response=await f.saves.POST(new Request('https://test.invalid/api/saves',{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(missing)}));assert.equal(response.status,409);
+ assert.ok(f.db.prepare('SELECT id FROM world_saves WHERE owner=? AND id=?').get('a',shared));
 }));
