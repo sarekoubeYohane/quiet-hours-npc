@@ -9,10 +9,8 @@ const body=async(response,status=200)=>{const value=await response.json();assert
 const id=()=>Date.now()+':'+crypto.randomUUID();
 const read=save=>world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r));
 async function create(name='來源') {
- const person=(await body(await people.POST(req({id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name:name+'人物',initialMemories:'保存的開局記憶'}})))).template;
  const scene=(await body(await scenes.POST(req({id:crypto.randomUUID(),version:0,name:'共享來源房屋',note:'',rooms:[{id:'front',name:'前室'}],connections:[],objects:[{id:'cup',name:'杯子',roomId:'front',state:{水量:'半杯'}}]})),201)).template;
- const input={id:crypto.randomUUID(),name,city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:'本次住處'}],characters:[{templateId:person.id,version:person.version,placeId:'home',roomId:'front'}]}};
- const result=await body(await saves.POST(req(input)),201);return {input,...result};
+ const {input,saved,formationCalls}=await require('./create-world-via-opening.cjs')({load,name,scene,placeName:'本次住處',characterName:name+'人物',initialMemories:'保存的開局記憶'});return {input,...saved,formationCalls};
 }
 async function advance(save,extra={}) {const current=await read(save);return body(await world.POST(req({operation:'advance',operationId:id(),operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1',...extra},save)));}
 
@@ -21,14 +19,14 @@ test('copy saves the complete committed life and in-progress activity without ad
  const source=await create();await advance(source.save.id);
  const current=await read(source.save.id);
  assert.ok(current.world.characters[0].plan);
- const input={operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'分岔副本'};
+ const input={operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'分岔副本'};
  const copy=await body(await saves.POST(req(input)),201);
  const reread=await read(copy.save.id);
  const story=structuredClone(current.world),copiedStory=structuredClone(reread.world);delete story.aiUsage;delete copiedStory.aiUsage;
  assert.deepEqual(copiedStory,story);
  assert.equal(reread.world.aiUsage.totalCalls,0);
  assert.equal(reread.world.turn,current.world.turn);
- assert.equal(copy.save.originalOpeningAvailable,false);
+ assert.equal(copy.save.originalOpeningAvailable,true);
  assert.deepEqual(copy.save.savedFrom,{id:source.save.id,name:'來源',version:current.version,turn:current.world.turn,minute:current.world.minute});
  const replay=await body(await saves.POST(req(input)));
  assert.equal(replay.save.id,copy.save.id);
@@ -38,9 +36,9 @@ test('copy saves the complete committed life and in-progress activity without ad
 test('deleting the source leaves the copy playable and does not delete other saves or reusable assets',async()=>{
  store.install(seedWorld());auth.setUserId('test-owner');
  const source=await create();await advance(source.save.id);const current=await read(source.save.id);
- const copied=await body(await saves.POST(req({operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'獨立副本'})),201);
+ const copied=await body(await saves.POST(req({operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'獨立副本'})),201);
  const templateBefore=await body(await people.GET()),sceneBefore=await body(await scenes.GET());
- const deletion={operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
+ const deletion={operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
  await body(await saves.POST(req(deletion)));
  await body(await world.GET(new Request(origin+'/api/world?save='+source.save.id)),404);
  await advance(copied.save.id);
@@ -51,15 +49,15 @@ test('deleting the source leaves the copy playable and does not delete other sav
  await body(await saves.POST(req(deletion)));
  assert.equal((await body(await saves.GET())).saves.length,2);
  await body(await saves.POST(req(source.input)),410);
- const copiedDeletion={operation:'delete',operationId:crypto.randomUUID(),saveId:copied.save.id,expectedVersion:(await read(copied.save.id)).version};
+ const copiedDeletion={operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:copied.save.id,expectedVersion:(await read(copied.save.id)).version};
  await body(await saves.POST(req(copiedDeletion)));
- const originalCopy=await body(await saves.POST(req({operation:'copy',operationId:copied.save.id,saveId:source.save.id,expectedVersion:current.version,name:'獨立副本'})));
+ const originalCopy=await body(await saves.POST(req({operationScope:'test-owner',operation:'copy',operationId:copied.save.id,saveId:source.save.id,expectedVersion:current.version,name:'獨立副本'})));
  assert.equal(originalCopy.save.id,copied.save.id);
  assert.equal((await body(await saves.GET())).saves.length,1);
 });
 
 test('copy does not duplicate real model usage and deletion preserves the account bill without a recall billing service',async()=>{
- store.install(seedWorld());auth.setUserId('test-owner');const source=await create('費用來源');
+ store.install(seedWorld());auth.setUserId('test-owner');const source=await create('費用來源');const authoringBefore=(await body(await saves.GET())).accountUsage;
  const {fixtureDecision}=require('./pursuit-fixture.cjs');const originalFetch=global.fetch;
  global.fetch=async(_url,request)=>{const input=JSON.parse(JSON.parse(request.body).messages[1].content);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:''}))}}]});};
  const act=async(value)=>{const current=await read(source.save.id);return body(await world.POST(req({operationId:id(),operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',...value},source.save.id)));};
@@ -69,13 +67,13 @@ test('copy does not duplicate real model usage and deletion preserves the accoun
   await act({operation:'set-price',price:{provider:'openai',model:'gpt-6.1-sol',input:1,output:1,source:'受控單價',date:'2026-11-09'}});
   await advance(source.save.id,{mode:'openai',model:'gpt-6.1-sol'});
   const current=await read(source.save.id),before=(await body(await saves.GET())).accountUsage;
-  assert.equal(before.totalCalls,1);assert.equal(before.totalInputTokens,10);assert.equal(before.totalOutputTokens,5);assert.ok(Math.abs(before.knownUsd-0.000015)<1e-12);
-  const copy=await body(await saves.POST(req({operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'不帶費用的副本'})),201);
+  assert.equal(before.totalCalls-authoringBefore.totalCalls,1);assert.equal(before.totalInputTokens-authoringBefore.totalInputTokens,10);assert.equal(before.totalOutputTokens-authoringBefore.totalOutputTokens,5);assert.ok(Math.abs(before.knownUsd-0.000015)<1e-12);
+  const copy=await body(await saves.POST(req({operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'不帶費用的副本'})),201);
   assert.equal((await read(copy.save.id)).world.aiUsage.totalCalls,0);
-  assert.equal((await body(await saves.GET())).accountUsage.totalCalls,1);
-  await body(await saves.POST(req({operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})));
+  assert.equal((await body(await saves.GET())).accountUsage.totalCalls,before.totalCalls);
+  await body(await saves.POST(req({operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})));
   const after=(await body(await saves.GET())).accountUsage;
-  assert.equal(after.totalCalls,1);assert.equal(after.totalInputTokens,10);assert.equal(after.knownUsd,before.knownUsd);assert.equal(after.archivedWorlds,1);
+  assert.equal(after.totalCalls,before.totalCalls);assert.equal(after.totalInputTokens,before.totalInputTokens);assert.equal(after.knownUsd,before.knownUsd);assert.equal(after.archivedWorlds,1);
   assert.equal((await read(copy.save.id)).modelKeys.openai.configured,true);
   auth.setUserId('different-account');assert.equal((await body(await saves.GET())).accountUsage.totalCalls,0);auth.setUserId('test-owner');
  }finally{global.fetch=originalFetch;}
@@ -83,8 +81,8 @@ test('copy does not duplicate real model usage and deletion preserves the accoun
 
 test('copy/delete reject stale versions and foreign accounts and leave transactions recoverable across failures',async()=>{
  store.install(seedWorld());auth.setUserId('test-owner');const source=await create();const current=await read(source.save.id);
- const input={operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'原子副本'};
- auth.setUserId('other');await body(await saves.POST(req(input)),404);auth.setUserId('test-owner');
+ const input={operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'原子副本'};
+ auth.setUserId('other');await body(await saves.POST(req(input)),409);await body(await saves.POST(req({...input,operationScope:'other'})),404);auth.setUserId('test-owner');
  await body(await saves.POST(req({...input,expectedVersion:current.version+1})),409);
  store.onStorage(sql=>{if(sql.startsWith('INSERT OR IGNORE INTO save_operation_receipts'))throw Error('controlled before copy receipt');});
  await body(await saves.POST(req(input)),503);store.onStorage(undefined);
@@ -95,7 +93,7 @@ test('copy/delete reject stale versions and foreign accounts and leave transacti
  const restored=await body(await saves.POST(req(input)));assert.equal(restored.save.id,input.operationId);
  assert.equal((await body(await saves.GET())).saves.length,3);
  await body(await saves.POST(req({...input,name:'不同內容'})),409);
- const deletion={operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
+ const deletion={operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
  store.onStorage(sql=>{if(sql.startsWith('DELETE FROM worlds WHERE owner=?'))throw Error('controlled delete rollback');});
  await body(await saves.POST(req(deletion)),503);store.onStorage(undefined);
  assert.equal((await read(source.save.id)).world.turn,0);
@@ -132,8 +130,8 @@ test('copied long-term memory reindexes in its own scope and remains recallable 
   await advance(source.save.id,{mode:'openai',model:'gpt-6.1-sol'});
   assert.equal(vectors.size,1);const callsBeforeCopy=modelCalls;
   current=await read(source.save.id);
-  const copied=await body(await saves.POST(req({operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'獨立記憶副本'})),201);
-  const deletion={operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
+  const copied=await body(await saves.POST(req({operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'獨立記憶副本'})),201);
+  const deletion={operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
   const remove=env.MEMORY_VECTOR_INDEX.deleteByIds;env.MEMORY_VECTOR_INDEX.deleteByIds=async()=>{throw Error('controlled cleanup unavailable');};
   const pendingCleanup=await body(await saves.POST(req(deletion)));assert.equal(pendingCleanup.externalCleanup,'pending');
   await body(await world.GET(new Request(origin+'/api/world?save='+source.save.id)),404);
@@ -159,8 +157,8 @@ test('copy and delete wait for the source operation instead of cloning or discar
  const running=advance(source.save.id,{mode:'openai',model:'gpt-6.1-sol'});
  try {
   await dispatched;
-  await body(await saves.POST(req({operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'不可偷複製請求'})),409);
-  await body(await saves.POST(req({operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})),409);
+  await body(await saves.POST(req({operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'不可偷複製請求'})),409);
+  await body(await saves.POST(req({operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})),409);
   release();await running;
   assert.equal((await read(source.save.id)).world.turn,1);
   assert.equal((await body(await saves.GET())).saves.length,2);
@@ -178,13 +176,13 @@ test('a terminal legacy uncertain operation that cannot finalize remains an expl
  assert.equal((await lookup()).usageRecovery.unknownRange,true);
  await body(await world.POST(req({operation:'advance',operationId,operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1'},source.save.id)),502);
  const unresolved=await lookup();assert.equal(unresolved.usageRecovery.unknownRange,true);assert.equal(unresolved.usageRecovery.status,'pending');
- const deletion={operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
+ const deletion={operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
  const result=await body(await saves.POST(req(deletion)));
  assert.equal(result.accounting.unknownRange,true);assert.equal(result.accounting.retainedOperations,1);
  const summary=(await body(await saves.GET())).accountUsage;
  assert.equal(summary.unknownAccountingRanges,1);assert.equal(summary.archivedWorlds,1);
  await body(await world.GET(new Request(origin+'/api/world?save='+source.save.id)),404);
- const recovered=await body(await saves.GET(new Request(origin+'/api/saves?operationId='+deletion.operationId)));
+ const recovered=await body(await saves.GET(new Request(origin+'/api/saves?operationScope=test-owner&operationId='+deletion.operationId)));
  assert.equal(recovered.operation.accounting.unknownRange,true);
  assert.ok(!JSON.stringify(recovered.operation).includes('保存的開局記憶'));
 });
@@ -198,13 +196,13 @@ test('copy snapshots custom model roles and deletion keeps account defaults, oth
  const custom={npc:{provider:'openrouter',model:'vendor/npc-custom'},adjudication:{provider:'openrouter',model:'vendor/heaven-custom'}};
  await setSettings({version:0,mode:'custom',models:account});await setSettings({version:0,mode:'custom',models:custom},source.save.id);
  await body(await world.POST(req({operation:'set-model-key',mode:'ai',key:'account-shared-key'},source.save.id)));
- const current=await read(source.save.id),input={operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'保留自訂設定'};
+ const current=await read(source.save.id),input={operationScope:'test-owner',operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'保留自訂設定'};
  const copy=await body(await saves.POST(req(input)),201);
  const copiedSettings=await readSettings(copy.save.id);assert.equal(copiedSettings.source,'save');assert.deepEqual(copiedSettings.effective,custom);
  await setSettings({version:1,mode:'custom',models:account},source.save.id);
  await body(await saves.POST(req(input)));
  assert.deepEqual((await readSettings(copy.save.id)).effective,custom);
- await body(await saves.POST(req({operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})));
+ await body(await saves.POST(req({operationScope:'test-owner',operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})));
  await body(await settings.GET(new Request(origin+'/api/model-settings?save='+source.save.id)),404);
  assert.deepEqual((await readSettings(copy.save.id)).effective,custom);
  assert.deepEqual((await readSettings(other.save.id)).effective,account);
