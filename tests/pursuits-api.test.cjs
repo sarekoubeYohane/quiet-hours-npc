@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
@@ -11,7 +13,7 @@ const {candidate:fixtureCandidate}=require('./pursuit-selection-fixture.cjs');
 // Invalid contract samples below are returned as written, without transport repair.
 function declareFixtureCandidates(value,data){for(const update of value.pursuitUpdates.filter(u=>u.operation==='upsert'&&u.version===0)){const proposal=fixtureCandidate(data.self.id,'form-'+value.pursuitCandidates.length,update.node.content,update.node.scope);value.pursuitCandidates.push(proposal);value.pursuitSelection.adoptions.push({candidateId:proposal.id,pursuitId:update.id});}}
 function selectFixtureFocus(value,id,version=0){const adoption=value.pursuitSelection.adoptions.find(a=>a.pursuitId===id);value.pursuitSelection.focus=adoption?{kind:'candidate',id:adoption.candidateId,version:0}:{kind:'existing',id,version};}
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...body}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 const decision=data=>({contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:null,pursuitCandidates:[],pursuitSelection:{adoptions:[],declinedCandidateIds:[],focus:null,reason:''},pursuitUpdates:[],action:{type:'rest',target:'',content:'休息一會兒',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'',knownResults:[],choice:'new',method:'',change:{kind:'not-applicable',detail:''},reason:'',selectedAction:{type:'rest',target:''},intentIds:[]},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]});
 const node=(id,parents=[])=>({id,content:'先確認自己想做什麼',intensity:'medium',importance:'medium',urgency:'low',context:'',kind:'intent',scope:'只先安靜想一會兒',satisfaction:null,parents});

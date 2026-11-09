@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +12,7 @@ const { seedWorld, record } = load('world');
 const read = async () => (await (await GET()).json()).world;
 const request = body => new Request('https://test.invalid/api/world', {
   method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' },
-  body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }),
+  body: JSON.stringify(originalWorldInput({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }, 'test-owner')),
 });
 
 test('scene switches are replayable, reject stale other-tab operations, and never bypass the account budget', async () => {

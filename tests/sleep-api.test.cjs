@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -10,7 +12,7 @@ const reply=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion
 async function scenario(prepare=()=>{},judge){
  const world=seedWorld();world.contextId='sleep-v1';world.characters=world.characters.filter(c=>c.id==='owner');world.adjudication={provider:'openai',model:'fixture-judge'};
  const c=world.characters[0];c.needs={version:1,activatedAt:world.minute,updatedAt:world.minute,values:{hunger:39,thirst:39,fatigue:70,sleep:80},assessed:{hunger:0,thirst:0,fatigue:2,sleep:2},history:[],dropped:0};prepare(world);store.install(world);
- const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:opid(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...b})}));
+ const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...b}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});let npc=0,judgments=0,choose;const inputs=[],old=global.fetch;
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return reply(judge?judge(input):{status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:480,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}},JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;inputs.push(input);return reply(choose?choose(input,npc):npc===1?asleep:awake,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,choose:f=>{choose=f;},inputs,counts:()=>({npc,judgments}),restore:()=>{global.fetch=old;}};
