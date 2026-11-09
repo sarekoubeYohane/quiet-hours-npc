@@ -1,7 +1,7 @@
 import type { Action, Character, World } from './world';
 import { normalDecisionInput, boundDecisionRequest } from './npc-input';
-import { feelingPrompt, feelingSourceMinutes, feelingReceiptCapacity, feelingUpdatesSchema, visibleFeelingSources, parseFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
-import { processFeelingSchema, processFeelingPrompt, parseProcessFeeling, type ProcessFeeling } from './mental-process';
+import { feelingPromptFor, feelingSourceMinutes, feelingReceiptCapacity, feelingUpdatesSchema, visibleFeelingSources, parseFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
+import { processFeelingSchemaFor, processFeelingPromptFor, parseProcessFeeling, type ProcessFeeling } from './mental-process';
 import { MemoryValidationError, memoryBytes } from './memory';
 import { modelRequestBody, requestModel, type ModelService, type ModelObserver } from './model-adapter';
 import type { TokenUsage } from './activities';
@@ -9,7 +9,7 @@ import type { TokenUsage } from './activities';
 export type ControlledAssessmentState={sources:{id:string;at:number}[];activities:{id:string;at:number}[];dropped:number};
 export type ControlledFeelingCandidate={feelingUpdates:PreparedFeelingUpdate[];processFeeling:ProcessFeeling|null};
 const contractVersion='controlled-feelings.v1';
-const prompt='這是使用者控制後的本人感受評估，不是自主決策。玩家行動已實際執行，控制權仍屬使用者；只能回傳contractVersion=controlled-feelings.v1、feelingUpdates及processFeeling。可沒有心理變化。禁止輸出或替換action、控制權、意圖追求、記憶操作、習慣、回想或emotionRegulation；不得自行主動調節或花費調節電量，不產生自主選擇證據。'+feelingPrompt+processFeelingPrompt;
+const prompt='這是使用者控制後的本人感受評估，不是自主決策。玩家行動已實際執行，控制權仍屬使用者；只能回傳contractVersion=controlled-feelings.v1、feelingUpdates及processFeeling。可沒有心理變化。禁止輸出或替換action、控制權、意圖追求、記憶操作、習慣、回想或emotionRegulation；不得自行主動調節或花費調節電量，不產生自主選擇證據。';
 function checkedState(actor:Character):ControlledAssessmentState{
  const state=actor.mentalEnergy?.controlAssessments??{sources:[],activities:[],dropped:0};
  if(!Number.isSafeInteger(state.dropped)||state.dropped<0||!Array.isArray(state.sources)||!Array.isArray(state.activities)||[state.sources,state.activities].some(items=>items.length>feelingReceiptCapacity||new Set(items.map(r=>r.id)).size!==items.length||items.some(r=>!r||Object.keys(r).sort().join(',')!=='at,id'||typeof r.id!=='string'||!r.id||r.id.length>128||!Number.isFinite(r.at))))throw new MemoryValidationError('接管感受處理紀錄無效');
@@ -26,8 +26,8 @@ export function prepareControlledFeelings(world:World,actor:Character,modelKey:s
  const newActivity=!!opportunityId&&!state.activities.some(r=>r.id===opportunityId);
  const filterSources=()=>{for(const m of [...input.self.shortTerm,...input.self.longTerm])if(m.feelingSources)m.feelingSources=m.feelingSources.filter(id=>!state.sources.some(r=>r.id===id));};
  const sources=()=>actor.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):[];
- const schemaFor=()=>({type:'object',properties:{contractVersion:{type:'string',const:contractVersion},feelingUpdates:feelingUpdatesSchema(sources()),processFeeling:activityId&&actor.mentalEnergy?.policy.process?processFeelingSchema:{type:'null'}},required:['contractVersion','feelingUpdates','processFeeling'],additionalProperties:false});
- const messages=[{role:'system',content:prompt},{role:'user',content:''}];let schema=schemaFor();
+ const schemaFor=()=>({type:'object',properties:{contractVersion:{type:'string',const:contractVersion},feelingUpdates:feelingUpdatesSchema(sources(),actor.mentalEnergy?.policy.kind==='formal'),processFeeling:activityId&&actor.mentalEnergy?.policy.process?processFeelingSchemaFor(actor.mentalEnergy?.policy.kind==='formal'):{type:'null'}},required:['contractVersion','feelingUpdates','processFeeling'],additionalProperties:false});
+ const messages=[{role:'system',content:prompt+feelingPromptFor(actor.mentalEnergy?.policy.kind==='formal')+processFeelingPromptFor(actor.mentalEnergy?.policy.kind==='formal')},{role:'user',content:''}];let schema=schemaFor();
  boundDecisionRequest(world,actor,input,()=>{filterSources();schema=schemaFor();messages[1].content=JSON.stringify(input);return new TextEncoder().encode(modelRequestBody(service,messages,schema)).length<164000;});
  const finalSources=sources();if(!newActivity&&!finalSources.length)return;
  const roots=[...(actor.shortTerm||[]),...(actor.longTerm||[])].flatMap(m=>m.feelingOrigins||[]);

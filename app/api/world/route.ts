@@ -1,3 +1,4 @@
+import { enablePersonalNeeds, validateBodyNeedsSetup } from '@/lib/body-needs-policy';
 import { characterSetupSchema, formCharacterAttributes } from '@/lib/character-attributes';
 import { requestControlledFeelings } from '@/lib/controlled-feelings';
 import { readMentalEnergyTestPolicy } from '@/lib/mental-energy';
@@ -199,7 +200,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
-    let b: { characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
+    let b: { bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
@@ -215,7 +216,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -281,6 +282,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       return reply(uncertainResult.body, uncertainResult.status);
     }
     if(b.operation==='advance'&&(b.timeContract!==undefined&&b.timeContract!=='five-minute-v1'||b.minutes===5&&b.timeContract!=='five-minute-v1'||(world.timeContract==='five-minute-v1'||b.timeContract==='five-minute-v1')&&b.minutes!==5))return reply({error:'五分鐘時間契約每次只能推進 5 分鐘；請更新頁面後以五分鐘步驟推進。'},400);
+    if(b.operation==='advance'&&world.characters.some(c=>c.mentalEnergy?.policy.kind==='formal')&&world.timeContract!=='five-minute-v1'&&b.timeContract!=='five-minute-v1')return reply({error:'正式精神電量需要明示採用五分鐘時間契約，舊十五／三十分鐘操作未執行。'},400);
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
     let openingPreview: Awaited<ReturnType<typeof prepareCity>>['preview'] | undefined;
     if ((suggestingOpening || initializingCity) && city?.success) {
@@ -351,6 +353,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (!generatingSetup) normalizeWorld(world);
     const initialUsage = world.aiUsage && structuredClone(world.aiUsage);
     paidBefore=initialUsage;
+    if(b.operation==='enable-body-needs'){try{validateBodyNeedsSetup(world,b.bodyNeeds);}catch(e){return reply({error:(e as Error).message},400);}}
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
     if (world.configuration && ['direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '此世界沒有可直接控制的預設店主。' }, 400);
     if (b.operation === 'direct') {
@@ -470,6 +473,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
       }
       journal.floor = Math.max(journal.floor, issuedAt - 1);
+    } else if (b.operation === 'enable-body-needs') {
+      enablePersonalNeeds(world,validateBodyNeedsSetup(world,b.bodyNeeds));
     } else if (adoptingAttributes && characterSetup?.success) {
       formCharacterAttributes(world.characters.find(actor=>actor.id===b.target)!,characterSetup.data,world.minute);
     } else if (updatingSenseLimits && characterSetup?.success) {
