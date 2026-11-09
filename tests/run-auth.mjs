@@ -33,11 +33,21 @@ try {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(':memory:');
     const env = require('./bindings.cjs').env;
-    env.DB = { prepare(sql) { let values = []; const statement = {
-      bind(...args) { values = args; return statement; },
+    // Each bind returns independent values, just like a D1 prepared statement.
+    function prepare(sql,values=[]) { return {
+      bind(...args) { return prepare(sql,args); },
       async first() { return db.prepare(sql).get(...values) ?? null; },
-      async run() { return { meta: { changes: Number(db.prepare(sql).run(...values).changes) } }; }
-    }; return statement; } };
+      async all() { return { results: db.prepare(sql).all(...values) }; },
+      execute() { return { meta: { changes: Number(db.prepare(sql).run(...values).changes) } }; },
+      async run() { return this.execute(); },
+    }; }
+    env.DB = { prepare, async batch(statements) {
+      // No await between BEGIN and COMMIT: other ordinary reads/writes cannot
+      // observe or join a partially executed transaction on this connection.
+      db.exec('BEGIN IMMEDIATE');
+      try { const results=statements.map(statement=>statement.execute());db.exec('COMMIT');return results; }
+      catch(error) { db.exec('ROLLBACK');throw error; }
+    } };
     exports.reset = () => { for (const row of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) db.exec('DROP TABLE ' + row.name); };
     exports.migrate = sql => db.exec(sql);
     exports.installLegacyWorlds = owners => { for(const owner of owners) db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?,?,0,0)').run(owner,JSON.stringify(require('./lib/world.cjs').seedWorld())); };
@@ -46,7 +56,7 @@ try {
   const sql = (await Promise.all((await readdir('drizzle')).filter(f => f.endsWith('.sql')).sort().map(f => readFile(join('drizzle', f), 'utf8')))).join('\n');
   await writeFile(join(directory, 'migrations.sql'), sql);
   const selected = process.argv.slice(2);
-  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : ['tests/auth-api.test.cjs', 'tests/model-keys-api.test.cjs', 'tests/reset-api.test.cjs'])], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
+  const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : ['tests/auth-d1-fixture.test.cjs', 'tests/auth-api.test.cjs', 'tests/model-keys-api.test.cjs', 'tests/reset-api.test.cjs'])], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_AUTH_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }
 
