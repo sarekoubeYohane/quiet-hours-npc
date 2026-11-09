@@ -307,6 +307,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       if (settled && 'status' in settled) return settledReply(settled);
       return reply(uncertainResult.body, uncertainResult.status);
     }
+    if(b.operation==='start-city'||b.operation==='reset')return reply({error:'請從＋新開存檔建立世界；重新開始須讀原始開局並另建存檔，不會覆蓋原世界。',operationSettled:true},409);
     if(b.operation==='advance'&&(b.timeContract!==undefined&&b.timeContract!=='five-minute-v1'||b.minutes===5&&b.timeContract!=='five-minute-v1'||(world.timeContract==='five-minute-v1'||b.timeContract==='five-minute-v1')&&b.minutes!==5))return reply({error:'五分鐘時間契約每次只能推進 5 分鐘；請更新頁面後以五分鐘步驟推進。'},400);
     if(b.operation==='advance'&&world.characters.some(c=>c.mentalEnergy?.policy.kind==='formal')&&world.timeContract!=='five-minute-v1'&&b.timeContract!=='five-minute-v1')return reply({error:'正式精神電量需要明示採用五分鐘時間契約，舊十五／三十分鐘操作未執行。'},400);
     if (b.worldContext !== world.contextId) return reply({ error:'世界場景已切換，請重新讀取後再操作。', contextMismatch:true }, 409);
@@ -366,7 +367,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'reset' && world.configuration) return reply({error:'自訂城市已開始，請保留目前的世界。'},400);
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
-    if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，請明示重置測試世界後再推進；舊世界仍可讀取，用量保留。',worldResetRequired:true},409);
+    if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，舊資料仍可讀取；請從新開存檔建立新世界，原存檔與用量保留。',worldResetRequired:true},409);
     const originalAdjudication = world.adjudication && { ...world.adjudication };
     let ephemeralModels = false;
     // Resolve only after exact-ID journal recovery and before accepting a new
