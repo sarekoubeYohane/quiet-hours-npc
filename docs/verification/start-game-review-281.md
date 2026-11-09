@@ -49,3 +49,11 @@ T9 實作者另外確認：另存請求未受理、回覆不明後頁面重載�
 完整 ready tip `238f2c2` 已由 merger 合入 `b653e6f` 並推送。合後 no-network cards／drafts／models **31/31**、save-management **8/8**、typecheck、diffcheck 通過。`2355317` 的帳號、形成、推估三個固定真頁旅程及最後 `1645a05` 形成旅程、typecheck／lint／build 均通過；推估證據實際 61 秒、2 回合，沒有混入另一世界的 10 USD。
 
 本輪已提出的 Standards／Spec finding 均已獨立覆核清零，但這仍不是整份 #281 的最終審查。#287 在 #286 真正 closed 且重新讀取原生圖後才開始；T6–T8 尚待交付，最後須再以 `249f20c` 對完整固定整合分支做兩軸 review 與必要回歸。正式導覽的外部阻擋亦未解除。
+
+## T6 中途審查與修正
+
+固定 `105197b`，比較 `c2a38a3...105197b`：Standards 硬性 P2 一項、smell 0；Spec 同一 P2 交叉確認，沒有另建問題。新 appearance／外觀 alias 原先套所有版本，讓既有 v1 `attribute:null, ability:'外觀', difficulty:12` 與專長 +20 從基準門檻 75／專長 20 變成 55／0，違反 ADR0012 與 #287 的舊義保留。既有 17 項相容測試通過不否定此獨立反例。
+
+唯一修復者在 `7e9cfd7` 以一行產品變更將新 alias 限定明示 v2；新增真 API／SQLite 保存及原 ID 回放反例。兩位 reviewer 各自獨立中英四格及舊 API 19/19 通過：v1 恢復 75／20，v2 保持 55／0，兩軸 remaining 0。完整 ready `6348f9f` 合入並推送 `59bb7d9`，新版真路由 6/6、固定真觀察／分析／重載及 typecheck／lint／build 通過。
+
+後續固定 `c2a38a3` 完整回歸核心 1264/1264 通過，auth 舊 hosting 接點缺 `all`／`batch` 的失敗已確認為 tests-only。修正 `913d842` 合入 `ac3216b`，保留原 API 斷言並新增原子／值綁定契約，合後 auth 40/40 通過。原整次 exit 1 與未跑組別詳見[整合報告](start-game-integration-281.md)。最後完整兩軸 review 仍待 T7／T8 交付。
