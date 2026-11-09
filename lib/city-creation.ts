@@ -1,3 +1,5 @@
+import { listCharacterCards } from './character-card-store';
+import { applyCharacterCard } from './character-card-world';
 import { mentalOpeningSchema } from './formal-mental-enablement';
 import { characterSetupSchema } from './character-attributes';
 import { initialMemoryCapacityError } from './character-templates';
@@ -73,8 +75,8 @@ function resolveStart(selection: CityDraft['characters'][number], description: s
 }
 
 export async function prepareCity(owner: string, draft: z.infer<typeof cityDraftSchema>, previous: World) {
-  const [scenes, savedCharacters] = await Promise.all([listSceneTemplates(owner), listCharacterTemplates(owner)]);
-  const characters = [...characterPresets(), ...savedCharacters];
+  const [scenes, savedCharacters, cards] = await Promise.all([listSceneTemplates(owner), listCharacterTemplates(owner), listCharacterCards(owner)]);
+  const characters = [...characterPresets(), ...savedCharacters, ...cards.map(card=>({id:card.id,version:card.version,fields:card.fields}))];
   const configuration: NonNullable<World['configuration']> = {
     locations: [], regions: [], doors: [], residences: {}, bedrooms: {}, ownerships: {}, workplaces: {}, sceneSources: {}, privateRooms:{}, blockedRoomConnections:[],
   };
@@ -235,5 +237,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     aiUsage:previous.aiUsage && { ...structuredClone(previous.aiUsage), savedDecisions:0 },
     adjudication:previous.adjudication, modelPrices:previous.modelPrices, playerBudget:previous.playerBudget,
   });
+  for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{});}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
+  if(preview.issues.length)return {preview};
   return { preview, world };
 }

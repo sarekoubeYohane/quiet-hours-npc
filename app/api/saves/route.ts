@@ -44,7 +44,7 @@ export async function POST(request:Request) {
     if(!candidate.world)return Response.json({error:candidate.preview.issues.join(' '),preview:candidate.preview},{status:400});
     for(const actor of candidate.world.characters) {
       const selection=value.city.characters.find(person=>person.templateId===actor.profileSource?.id);
-      formCharacterAttributes(actor,selection?.characterSetup??{},candidate.world.minute);
+      if(!actor.attributes)formCharacterAttributes(actor,selection?.characterSetup??{},candidate.world.minute);
       formFormalMentalEnergy(actor,candidate.world.minute,selection?.mentalOpening??{});
     }
     candidate.world.timeContract='five-minute-v1';

@@ -1,0 +1,36 @@
+{
+  "origin": "http://127.0.0.1:45597",
+  "commit": "d920196",
+  "builtAt": "2026-11-09T13:38:01.657Z",
+  "auth": "local cookie identity boundary",
+  "database": "isolated disk SQLite with migrations; no installed worlds",
+  "dice": "18 controlled d6 faces of 4 at the character random boundary; exhaustion rejects an extra draw",
+  "modelCalls": 2,
+  "paidCalls": 0,
+  "evidence": [
+    {
+      "phase": "real character route / model setup return / AI-only trait denied / single controlled formation / text server lock / reload / allocation / lost replies / immutable completed card / real city API selection and observation",
+      "cardId": "card-72c39d53-f3d0-4734-89ef-8543e838a306",
+      "saveId": "d8a18620-7ce3-430f-bdee-809a3e5aa5de",
+      "total": 62,
+      "capacity": 80,
+      "values": {
+        "strength": 13,
+        "endurance": 12,
+        "dexterity": 13,
+        "perception": 12,
+        "appearance": 12
+      },
+      "formationLost": true,
+      "completionLost": true,
+      "modelCalls": 2
+    },
+    {
+      "phase": "explicit legacy template creation / unknown origin retained / lost creation reply recovers same draft / no automatic formation",
+      "sourceId": "d3c15894-928a-42d7-b6eb-3e5dbcef9d8c",
+      "draftId": "5499f739-de63-44d1-bc86-765ef5dbf676",
+      "sourceLost": true,
+      "modelCalls": 2
+    }
+  ]
+}
