@@ -7,7 +7,9 @@ let args=['--no-sandbox','--disable-dev-shm-usage'];
 if(process.env.CHROMIUM_MODULE){
  const chromiumModule=await import(pathToFileURL(process.env.CHROMIUM_MODULE).href);
  const chromium=chromiumModule.default;
- args=chromium.args;
+ // Acceptance must retain browser origin/CORS behavior. Serverless presets
+ // disable web security, which also suppresses Origin on same-origin writes.
+ args=chromium.args.filter(arg=>arg!=='--disable-web-security');
  executablePath ||= await chromium.executablePath();
 }
 export const launchBrowser=()=>playwright.chromium.launch({...(executablePath?{executablePath}:{}),args,headless:true});
