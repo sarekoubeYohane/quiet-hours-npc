@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-11-09T18:03:29.161Z",
+  "origin": "http://127.0.0.1:5282",
+  "commit": "d9a692f",
+  "builtAt": "2026-11-09T18:03:28.226Z",
+  "sourceStatusAtStart": "",
+  "driverSha256": "f97440fab287f0f259439202bf28fc6e4d3c140c8c1feaa3a700a2cfa5f77d80",
+  "identity": "本機 qh_local_owner cookie hosting 身分替身；非真人 GitHub OAuth／正式登入",
+  "runtime": "真正 vinext App Router、產品頁面與 API、隔離磁碟 SQLite／全 migrations，未安裝世界 fixture",
+  "trials": [
+    {
+      "name": "人物",
+      "href": "/character-templates?owner=navigation-282",
+      "before": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "after": {
+        "url": "http://127.0.0.1:5282/character-templates?owner=navigation-282",
+        "title": "Quiet Hours · NPC 觀察室",
+        "headings": [
+          "人物範本"
+        ]
+      },
+      "reloaded": {
+        "url": "http://127.0.0.1:5282/character-templates?owner=navigation-282",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "returned": {
+        "label": "返回觀察室",
+        "href": "/",
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "browserBack": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "result": "passed"
+    },
+    {
+      "name": "場景",
+      "href": "/scene-templates?owner=navigation-282",
+      "before": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "after": {
+        "url": "http://127.0.0.1:5282/scene-templates?owner=navigation-282",
+        "title": "Quiet Hours · NPC 觀察室",
+        "headings": [
+          "場景範本"
+        ]
+      },
+      "reloaded": {
+        "url": "http://127.0.0.1:5282/scene-templates?owner=navigation-282",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "returned": {
+        "label": "存檔",
+        "href": "/",
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "browserBack": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "result": "passed"
+    }
+  ],
+  "unauthenticated": {
+    "url": "http://127.0.0.1:5282/",
+    "title": "Quiet Hours · NPC 觀察室",
+    "headings": [
+      "登入你的觀察室"
+    ],
+    "routes": [
+      {
+        "path": "/character-templates",
+        "status": 307,
+        "location": "/"
+      },
+      {
+        "path": "/scene-templates",
+        "status": 307,
+        "location": "/"
+      }
+    ]
+  },
+  "authenticated": {
+    "url": "http://127.0.0.1:5282/",
+    "title": "Quiet Hours · NPC 觀察室",
+    "heading": "世界存檔",
+    "observedVersionText": "世界存檔\n本機 · 版本 d9a692f · local acceptance identity\n登出",
+    "owner": "navigation-282"
+  },
+  "pageErrors": [],
+  "modelCalls": 0,
+  "productPostRequests": 0,
+  "paidCalls": 0
+}
