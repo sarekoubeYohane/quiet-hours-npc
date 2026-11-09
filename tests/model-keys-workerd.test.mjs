@@ -77,7 +77,14 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     // Key/backup compatibility is exercised against an explicitly pre-existing world.
     await mf.dispatchFetch('http://localhost:5173/fixture-existing-world');
     const first = await signIn(), second = await signIn();
-    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body }) });
+    // Capture the actual legacy world's binding once under the original login.
+    // Never derive an account-authoring namespace or refresh it from a later cookie.
+    const initialRead = await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: first } });
+    assert.equal(initialRead.status, 200);
+    const { operationScope } = await initialRead.json();
+    assert.equal(typeof operationScope, 'string');
+    assert.ok(operationScope);
+    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operationScope, ...body }) });
     const fakeKey = 'worker-fixture-key-never-real';
     const saved = await post({ operation: 'set-model-key', mode: 'openai', key: fakeKey });
     assert.equal(saved.status, 200);
