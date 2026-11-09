@@ -23,12 +23,12 @@
 | #286／T5 形成配點 | #285 | 已完成，候選 `5c16667` 及全部 finding 修正合入並推送 `b653e6f`，獨立覆核後 closed；[矩陣](character-cards-286.md) |
 | #287／T6 新 d100 | #286 | 完成，整合並推送 `59bb7d9`，舊外觀專長 P2 修正並獨立覆核後 closed；[矩陣](versioned-d100-287.md) |
 | #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步與修正整合 `c0ca009`，[逐項報告](opening-wizard-288.md)，已推送並結案 |
-| #289／T8 AI 配置 | #288 | #288 實際 closed 且重新讀原生圖後開始，獨立 worktree 實作中 |
+| #289／T8 AI 配置 | #288 | 完整交付並整合 `d8b8a2e`，等待推送後結案；[逐項矩陣](ai-opening-arrangement-289.md) |
 | #290／T9 另存刪除 | #283 | 原交付及帳務／名稱修正保留；跨帳號原操作 P1 已修並獨立覆核，整包 `c0ca009` 已整合，待推送及前置實際閉合後結案；[矩陣](save-management-290.md) |
 
 T2 暫以既有城市建立契約提供可驗收的獨立保存邊界；T7 必須改接完成卡與最後確認開局，不能把舊尺度城市建立當成本規格的新建角。T3 的文字草稿不當作完成卡選入世界。詞彙表及 ADR0012 的 #281 延伸已合入 `1d02095`，明示新規格與舊版本各自責任。
 
-圖未變；#283／#284／#285／#286／#287／#288／#290 現已 closed。曾因新原帳號反例重開的票，全部修復、獨立覆核、整合及推送後才依圖重新結案；再讀 #289 blocked-by 為 #288 closed 後，才開始最後 AI 配置。後續固定快照 finding 與尚未通過的完整測試詳列於[兩軸審查](start-game-review-281.md)，工作中通過不等於已整合交付。
+圖未變；#283／#284／#285／#286／#287／#288／#290 現已 closed。曾因新原帳號反例重開的票，全部修復、獨立覆核、整合及推送後才依圖重新結案；再讀 #289 blocked-by 為 #288 closed 後，才開始最後 AI 配置；現已整合完整 T8，最後固定全套與全分支兩軸審查進行中。後續固定快照 finding 與尚未通過的完整測試詳列於[兩軸審查](start-game-review-281.md)，工作中通過不等於已整合交付。
 
 ## 測試接點與已執行檢查
 
@@ -62,7 +62,7 @@ pnpm build:production
 ## 尚未驗證與完成門檻
 
 - #282 正式站完整唯讀點擊試次仍未完成，須解除連線與真人登入條件；本機 cookie 身分不等同正式 OAuth。
-- T7 已完整整合並結案，T8 在前置實際結案後開始；不將手動五步通過冒充 AI 配置已交付。
+- T7／T8 已完整整合；正式 #282 未驗收與最終全套／完整審查仍是剩餘門檻。
 - 最終整合回歸、固定基準 `249f20c` 的 Standards／Spec 兩軸 code-review 及修復仍待執行。
 - 受控模型只能驗證採納、保存及產品邊界，真實模型語義品質未驗收。
 - 全部完成才可將 PR 標 ready；目前保留 draft，不合併、不部署。
@@ -100,3 +100,15 @@ root 隔離樹固定 `5bdc6db` 的完整原執行仍 **exit 1**：core **1265/12
 `0019_opening_drafts.sql` 以真正 Wrangler **--local** 演練，獨立 fake DB／state，16 份 SQL 成功；既有 state／D20 journal bytes、version、lease、city_started 及缺原始開局 null 均不變。沒有正式 migration。回退保留新增表／原始開局／卡值／骰果／帳務及收據；舊程式不能安全支援新尺度與新開局，不可 drop、重抽或以原地 reset 取代回退。
 
 合後固定 `c0ca009` opening API **16/16**、`pnpm typecheck` exit 0，產品樹與 `5face37` 相同；來源 diffcheck exit 0。完整 diffcheck exit 2 的六處均為三份原始 Wrangler stdout log 的尾空白，保留證據原樣，未新增忽略規則。
+
+## T8 完整交付與最後固定檢查
+
+T8 ready `f34849b`（產品 `2fb450b`）已由 merger 合入 `d8b8a2e`，產品樹完全相同。可選整理使用凍結卡／場景、保留明示內容，先保存可編輯候選再明示採納，沿手動的同一份草稿、合法性檢查、最後確認及原子世界保存。pending 重載、失敗解鎖、缺 Key 取消後手動完成、再次失敗取回前次已存建議與版本承接皆有真頁紅綠；不重新取骰或自動付費重派。詳 [T8 逐 AC／畫面／命令](ai-opening-arrangement-289.md)。
+
+固定相關 API **51/51**（本票 **9/9**）、世界／操作／另存／城市 **40/40**、兩條完整真頁旅程、typecheck／lint（0 errors／4 既有 warnings）／build 通過；合後 AI9＋opening16 **25/25**、typecheck 再過。模型受控 transport：主旅程 2 次、pending／失敗手動旅程 3 次，各 paid 0；真模型語義品質未驗收。
+
+`0020_opening_arrangements.sql` 真 Wrangler --local fresh **17 份 SQL**、0019→0020 升級成功，舊 state／D20 journal／version42／lease／city_started／null opening hash 前後一致。新表獨立保存 operation／proposal metadata，不入故事或原始開局／另存；回退不可刪表、換 ID 重送或重置帳務。未正式遷移／部署。
+
+最後完整檢查將固定本次完整 integration commit，在獨立驗證樹執行 `pnpm test`，另在同版 build 樹執行 typecheck、lint、build:test、build:production；Spec／Standards 各獨立 detached 樹比較 `249f20c...固定HEAD`。結果未出前不宣告全綠。原始 Wrangler stdout 的尾空白保留，來源 diffcheck 通過，不用 ignore 掩蓋 raw evidence。
+
+最新本機 T1 導覽補證亦已整合 `8176774`，固定 `d9a692f` 的真首頁兩入口、重載、產品返回／browser back、原 owner URL 皆通過，POST／model／paid 0；[報告](navigation-282-d9a692f.md)。正式無新可用已登入通道，有效新試次 0，#282 仍 open；此缺口未解除則 #281 保持 open、PR 保持 draft，不提前 ready。
