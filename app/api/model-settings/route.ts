@@ -1,3 +1,4 @@
+import {authoringScope,matchesScope,matchesReadScope} from '@/lib/account-scope';
 import { getGitHubUser } from '@/lib/auth';
 import { bindWorldSave, SaveAccessError } from '@/lib/world-saves';
 import { readModelPreference } from '@/lib/model-settings';
@@ -7,6 +8,7 @@ const reply = (body: object, status = 200) => Response.json(body, { status, head
 async function scope(request: Request) {
   const user = await getGitHubUser();
   if (!user) return;
+  if(!matchesReadScope(authoringScope(user.userId),request))throw new SaveAccessError('原帳號已變更，模型設定仍未同步。',409);
   const query = new URL(request.url).searchParams;
   if (query.has('workspace') || query.getAll('save').length > 1 || query.has('save') && !query.get('save')) throw new SaveAccessError('設定來源無效。', 400);
   return { owner: user.userId, binding: query.has('save') ? await bindWorldSave(user.userId, request) : undefined };
@@ -22,7 +24,8 @@ export async function POST(request: Request) {
     if (!context) return reply({ error: '請先登入。' }, 401);
     const raw = await request.text();
     if (raw.length > 2000) return reply({ error: '設定內容過長。' }, 400);
-    const input = JSON.parse(raw) as { version?: number };
+    const submitted=JSON.parse(raw) as {version?:number;accountScope?:unknown};if(!matchesScope(authoringScope(context.owner),submitted?.accountScope))throw new SaveAccessError('原帳號已變更或缺少識別，模型設定仍未同步。',409);
+    const input={...submitted};delete input.accountScope;
     const preference = readModelPreference(input, !!context.binding?.saveId);
     if (!preference || !Number.isSafeInteger(input.version) || input.version! < 0 || input.version! >= Number.MAX_SAFE_INTEGER) return reply({ error: '請填寫 NPC 與天上意志的合法模型，原輸入已保留。' }, 400);
     if (!await saveModelPreference(context.owner, context.binding, input.version!, preference)) return reply({ error: '未同步：另一頁已修改模型設定。請核對已存版本，原輸入已保留。' }, 409);

@@ -4,7 +4,7 @@ import { validBudgetLimits } from '@/lib/activities';
 import { validPrice } from '@/lib/costs';
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 export const dynamic='force-dynamic';
-export async function GET(){try{const user=await getGitHubUser();return user?reply(await playerAccount(user.userId)):reply({error:'請先登入。'},401);}catch{return reply({error:'暫時無法讀取帳號玩家預算。'},503);}}
+export async function GET(request?:Request){try{const user=await getGitHubUser();const expected=request&&new URL(request.url).searchParams.get('operationScope');if(user&&expected!==undefined&&expected!==null&&expected!==user.userId)return reply({error:'原帳號已變更，原設定未同步。',scopeMismatch:true},409);return user?reply(await playerAccount(user.userId)):reply({error:'請先登入。'},401);}catch{return reply({error:'暫時無法讀取帳號玩家預算。'},503);}}
 export async function POST(request:Request){
  try{
   const user=await getGitHubUser();if(!user)return reply({error:'請先登入。'},401);

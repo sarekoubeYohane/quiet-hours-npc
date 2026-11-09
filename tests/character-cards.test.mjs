@@ -38,7 +38,7 @@ test('forming locks text, rolls once in code, preserves total and capacity, and 
   const saved=await f.complete({id:draft.id,version:allocated.body.draft.version});assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.card.capacity,80);assert.equal(saved.body.card.values.dexterity,13);
   assert.equal((await f.cards()).body.cards.length,1);assert.deepEqual((await f.complete({id:draft.id,version:allocated.body.draft.version})).body.card,saved.body.card);assert.equal(f.context.dice,dice);assert.equal(calls,1);
   const read=(await f.readDrafts()).body.drafts[0];assert.equal(read.completedCard.id,saved.body.card.id);assert.equal(read.formation.capacity,80);
-  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.form(input)).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
+  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.form(input)).status,409);assert.equal((await f.form({...input,operationScope:'account-operations:foreign'})).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
 
