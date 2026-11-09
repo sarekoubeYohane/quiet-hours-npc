@@ -116,3 +116,12 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 3. **直接數字不等式未阻擋**：`lib/character-formation.ts:13` 白名單漏「高於」「大於」「greater than」；三筆真 scope API200 並形成鎖字、受控力量12。違反 #281／#286 的數字／範圍禁令，不表示模型改骰。反例 `/tmp/quiet-hours-final-numeric-inequality-spec.mjs/.log`。#286 已重新 open。
 
 窄組 47/47、49/49、6/6 及兩條 T8 真頁通過，仍不否定這三個新 RED。沒有改產品、沒有付費／正式操作；正式站及真人語義未驗，已知 #282 外部阻擋不列新產品 finding。全部交唯一修復者處理；後續每項固定覆驗才記 remaining0，尚未清零。
+
+## 最終修復的獨立覆核（全部已提出問題清零）
+
+- **Standards**：原 atomic P2 在 `a3ada6c` 原 second-write ABORT、disk reopen、receipt replay、CAS及並行各通過，remaining0。`1861ffd` 全新fixhunks掃描判斷smell0，但另確認hyphenated-age背景誤擋P2；`d1ddc36`獨立真API五合法／六非法及永久4/4通過，該P2 remaining0，最後 hard0／judgment0。人物相依修正亦以186真頁獨立確認0。
+- **Spec**：`a3ada6c`原採納故障1/1＋CAS／race1/1；`d4b3428`原人物重選真頁1/1、重載／確認／place依賴／CAS與明示清理均通過；`1861ffd`原數字三筆拒絕、合法背景與原ID不重抽。後續 `d1ddc36`再獨立驗原30非法及18–20／18-20仍拒絕、五個合法age/cm/kg／Unicode連字保存，原probe1/1＋窄4/4，無新增finding。原三項目前各remaining0。
+
+覆核各在獨立detached樹、只用真產品API／頁面／磁碟SQLite／受控transport，paid0。完成包 `c1ae5c5` 已由 merger 合入 `e581871`，產品對 `d1ddc36`完全相同，合後39/39／typecheck／source diffcheck通過。完整[紅綠與畫面](start-game-final-review-fixes-281.md)。新增修正全部已覆核，沒有以兩軸結論互相抵銷或以舊full否定新反例。
+
+原6dd完整套件1414/1414與兩環境build已exit0，屬修正前來源；新固定完整整合版本的套件／type／lint／兩build另行執行，未出結果前不宣告最終全綠。#282正式外部阻擋未解除，#281保持open／PRdraft。

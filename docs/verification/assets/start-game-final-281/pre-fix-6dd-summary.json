@@ -1,0 +1,42 @@
+{
+  "commit": "6ddae5b2f11f04138eb46250d0a7a8a0d08d9d65",
+  "command": "pnpm test",
+  "exitCode": 0,
+  "groups": [
+    {
+      "tests": 1267,
+      "pass": 1267,
+      "fail": 0,
+      "cancelled": 0
+    },
+    {
+      "tests": 40,
+      "pass": 40,
+      "fail": 0,
+      "cancelled": 0
+    },
+    {
+      "tests": 71,
+      "pass": 71,
+      "fail": 0,
+      "cancelled": 0
+    },
+    {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0
+    },
+    {
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0
+    }
+  ],
+  "tests": 1414,
+  "rawLog": "/tmp/quiet-hours-context/final-6ddae5b-full.log",
+  "rawSha256": "b2406fa7ee6dac153a39d60f96387cc719f2dacc80b1433962b8f6585ebe839f",
+  "rawBytes": 20719239,
+  "scope": "Complete pre-review-fix candidate, does not cover a3ada6c or later fixes"
+}

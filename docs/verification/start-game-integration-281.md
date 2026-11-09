@@ -20,10 +20,10 @@
 | #283／T2 選檔 | 無 | 原帳號預算 P1、背景讀取重綁 P2 均修正並獨立覆核，T7 整包 `c0ca009` 已整合，已推送並重新結案。原整合 `0f279ca`，[報告](world-saves-283.md)及[帳號修正](player-account-review-fixes-281.md) |
 | #284／T3 文字草稿 | 無 | Lineage 及普通草稿原 accountScope P2 均修正並獨立覆核，整包 `c0ca009` 已整合，已推送並重新結案。原整合 `5b8abcb`，[報告](character-drafts-284.md) |
 | #285／T4 模型設定 | #283、#284 | 設定／期限矩陣及 Key 原 scope P1、模型預設 P2 均完成修正並獨立覆核，整包 `c0ca009` 已整合，已推送、原生前置實際閉合後結案。原整合 `7634552`／`152c180`，[矩陣](model-settings-285.md) |
-| #286／T5 形成配點 | #285 | 原完整交付及中途修正保留；最終 Spec 新增數值不等式 P2，已重新 open，修正中；[矩陣](character-cards-286.md) |
+| #286／T5 形成配點 | #285 | 原完整交付保留；最終比較數值及年齡回歸 P2 已修並獨立0，整合 `e581871`，新固定全套待驗；[矩陣](character-cards-286.md) |
 | #287／T6 新 d100 | #286 | 完成，整合並推送 `59bb7d9`，舊外觀專長 P2 修正並獨立覆核後 closed；[矩陣](versioned-d100-287.md) |
-| #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步整合 `c0ca009`；最終 Spec 新增人物重選靜默刪關係／許可 P2，已重新 open，修正中；[逐項報告](opening-wizard-288.md) |
-| #289／T8 AI 配置 | #288 | 原完整交付整合 `d8b8a2e`；最終兩軸新增採納原子性 P2 已重新 open，修正中；[逐項矩陣](ai-opening-arrangement-289.md) |
+| #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步及人物重選 P2 已修並獨立0，整合 `e581871`，新固定全套待驗；[逐項報告](opening-wizard-288.md) |
+| #289／T8 AI 配置 | #288 | 完整交付及最終採納原子性 P2 已修並獨立0，整合 `e581871`，新固定全套待驗；[逐項矩陣](ai-opening-arrangement-289.md) |
 | #290／T9 另存刪除 | #283 | 原交付及帳務／名稱修正保留；跨帳號原操作 P1 已修並獨立覆核，整包 `c0ca009` 已整合，待推送及前置實際閉合後結案；[矩陣](save-management-290.md) |
 
 T2 暫以既有城市建立契約提供可驗收的獨立保存邊界；T7 必須改接完成卡與最後確認開局，不能把舊尺度城市建立當成本規格的新建角。T3 的文字草稿不當作完成卡選入世界。詞彙表及 ADR0012 的 #281 延伸已合入 `1d02095`，明示新規格與舊版本各自責任。
@@ -120,3 +120,17 @@ Spec／Standards 在固定 `6ddae5b` 各自獨立確認同一問題：真 API／
 #289 已實際重新 open；唯一修復者在全新獨立樹處理草稿 CAS／proposal revision／採納收據的同交易提交，再補中間故障、回覆遺失及原操作恢復。兩軸其餘完整檢查、固定 `6ddae5b` 全套仍繼續。該版 typecheck、lint（0 errors／4 舊 warnings）、build:test／build:production 已各 exit 0，但不能否定此新增反例。未修復、獨立覆核及整合推送前不重新結案。
 
 最終 Spec 另確認兩個 P2，#288／#286 亦已實際重新 open，全部仍交同一修復者：暫取消再選回同卡，關係／許可被 `cardToggle` filter 靜默刪除；「力量高於18」「力量大於18」「strength greater than 18」仍 200 形成鎖字。前者需保留相依輸入並明示重新核對，後者需合理辨識數值比較且保留正常背景；已存值不重新形成。兩軸最終原報告為 Standards hard1／judgment0，Spec P2三項／scope creep0（採納交易為同一問題），distinct 三項待修，不將窄組綠當清零。
+
+## 最終修復逐項獨立覆核
+
+完整修復 ready `c1ae5c5`，產品固定 `d1ddc36`，含原子採納 `a3ada6c`、人物相依設定 `d4b3428`、比較數字禁令 `1861ffd` 及修後英文連字年齡回歸 `d1ddc36`。所有已提出問題均獲獨立覆核 remaining0，Standards 最後 hard0／judgment0；Spec 原三項及新例外回歸均0。[完整紅綠、命令及畫面](start-game-final-review-fixes-281.md)。
+
+- 採納第二筆寫入失敗時，草稿及 proposal 一起 rollback；移除故障後同原 request200、版本只+1。磁碟重開、並行與 stale revision 亦驗證，恢復 model／dice0。
+- 取消／復選人物時關係及許可始終保留，重載提示未選引用並阻擋確認；只有明示清理才移除。有依賴的場所先核對解除引用，不靜默刪除安排。真頁 CAS409 保留輸入、正常保存 turn0。
+- 原30個非法比較數字形成前400／0modeldice，普通中文／年齡身高200並保存原文。新增 hyphenated-age 誤擋也由真API RED修正；5個合法年齡／cm／kg與Unicode連字號200，直接18與18–20／18-20仍拒絕。所有原ID重播不增加模型或骰。
+
+固定 `d1ddc36` 相關 API／disk **59/59**、typecheck／lint（0errors／4舊warnings）／build通過；各真頁來源明確列報，不把年齡修正前畫面改稱新版本。本輪未新增migration，沒有改寫已保存卡／骰／故事／帳務。
+
+原 `6ddae5b` 完整執行已真正 exit0：五組 **1267、40、71、15、21**，合 **1414/1414**，typecheck／lint及兩環境build各exit0；raw log SHA256 `b2406fa7ee6dac153a39d60f96387cc719f2dacc80b1433962b8f6585ebe839f`，來源與範圍見[機器摘要](assets/start-game-final-281/pre-fix-6dd-summary.json)。此為修正前完整綠，不涵蓋最後修復，不否定審查新反例。新整合完整版本另行固定執行全套與兩環境build，結果未出前不宣告完成。
+
+修復包已由 merger 精確整合 `e581871`，產品樹對 `d1ddc36` 差異0；合後 AI／opening／cards **39/39**、typecheck、來源 diffcheck 通過。#286／#288／#289 先保持 open，新固定檢查及證據推送後再依原生關係結案。
