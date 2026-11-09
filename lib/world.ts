@@ -1,4 +1,4 @@
-import { resolveActionCheck } from './action-checks';
+import { resolveActionCheck, newCheckSystem, type CheckSystem } from './action-checks';
 import { entryPermission } from './city-access';
 import { connectingDoor, defaultRegion, homeLocation, worldDoors, worldLocations, worldRegions, type WorldConfiguration } from './world-configuration';
 import { applyPhoneAction, phoneForActor, deliverPhoneMessage } from './phones';
@@ -19,7 +19,7 @@ import { perceiveEvent, probeCurrent, validateProbe, observationTargets, knownDo
 import { type Resolution, type Advantage, type Difficulty } from './d20';
 
 export type Intent={id:string;content:string;intensity:'low'|'medium'|'high';importance:'low'|'medium'|'high';urgency:'low'|'medium'|'high';context:string}&Partial<import('./pursuits').PursuitFields>;
-export type ActivityPlan={checkSystem?:'d20-v1'|'d100-v1';deferredAction?:true;mentalProcess?:import('./mental-process').MentalProcess;journey?:{location:string;region:string};pursuitOrigin?:{at:number;pursuits:{id:string;version:number}[]};pursuitIds?:string[];resumable?:boolean;sleep?:{elapsedMinutes:number;naturalWakeAt?:number;stimulusWakeAt?:number};bodyActivity?:import('./needs').BodyActivity;selectedResult?:import('./world-effects').SelectedResult;timeIntent?:import('./activities').TimeIntent;action:Action;startedAt:number;until:number;attention:string;modelKey:string;phases?:{stages:ActivityPhase[];cursor:number;origin:string}};
+export type ActivityPlan={checkSystem?:CheckSystem;attributeVersion?:1|2;deferredAction?:true;mentalProcess?:import('./mental-process').MentalProcess;journey?:{location:string;region:string};pursuitOrigin?:{at:number;pursuits:{id:string;version:number}[]};pursuitIds?:string[];resumable?:boolean;sleep?:{elapsedMinutes:number;naturalWakeAt?:number;stimulusWakeAt?:number};bodyActivity?:import('./needs').BodyActivity;selectedResult?:import('./world-effects').SelectedResult;timeIntent?:import('./activities').TimeIntent;action:Action;startedAt:number;until:number;attention:string;modelKey:string;phases?:{stages:ActivityPhase[];cursor:number;origin:string}};
 export type AIUsage={windowStartedAt:number;calls:number;inputTokens:number;outputTokens:number;unknownCalls:number;totalCalls:number;totalInputTokens:number;totalOutputTokens:number;totalUnknownCalls:number;savedDecisions:number;costs?:CostLedger};
 export type EventHabit={key:string;triggerKey:string;triggerLabel:string;activityKey:string;activityLabel:string;location:string;observedDays:number[];lastSeen:number;proposedAt:number;links:{trigger:{id:string;version:number};action:{id:string;version:number};evidenceId:string}[]};
 export type HabitEvidence={confirmedIdentity?:import('./world-effects').ActivityIdentity;semanticGap?:boolean;id:string;version:1;time:number;location:string;activityKey:string;activityLabel:string;eventId?:string;memory?:{id:string;version:number};started:true};
@@ -134,7 +134,7 @@ export function completeMovement(w:World,c:Character,destination:{location:strin
  if(permission)w.events.at(-1)!.entryPermission=permission;
 }
 
-export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean;checkSystem?:'d20-v1'|'d100-v1'}={}){
+export function resolve(w:World,c:Character,a:Action,options:{dryRun?:boolean;checkSystem?:CheckSystem}={}){
 if(!a||typeof a.type!=='string')throw Error('行動無效');const from=c.location;const fromRegion=regionOf(c);
 const target=w.characters.find(x=>x.id===a.target),content=typeof a.content==='string'?(a.type==='message'?a.content:a.content.trim().slice(0,500)):'',witnesses=w.characters.filter(x=>x.location===c.location&&!x.plan?.journey).map(x=>x.id);let text='',audience=[c.id],resolution:Resolution|undefined,project:Omit<CraftProject,'resultId'>|undefined,attemptKey:string|undefined;
 if(a.type==='phone'){
@@ -165,7 +165,7 @@ if(w.events.some(e=>e.attemptKey===attemptKey)){
   return;
 }
 const dc:Difficulty=/(不願|不想|拒絕|不信任)/.test(relationship)?16:/(信任|願意幫忙|樂意)/.test(relationship)?8:12;
-resolution=resolveActionCheck(c,{difficulty:dc,ability:'說服',...(c.attributes&&options.checkSystem!=='d20-v1'?{system:'d100-v1' as const,attribute:null,sense:null}:{})},socialAdvantage(c));
+resolution=resolveActionCheck(c,{difficulty:dc,ability:'說服',...(c.attributes&&options.checkSystem!=='d20-v1'?{system:(options.checkSystem??newCheckSystem(c)) as 'd100-v1'|'d100-v2',attribute:null,sense:null}:{})},socialAdvantage(c));
 const effects:Record<Resolution['outcome'],string>={
 'critical-success':'表達得非常清楚，對方認真聽完，但仍由對方自行決定。',
 success:'把自己的理由清楚表達出來，等待對方的想法。',
@@ -203,7 +203,7 @@ if(a.target==='study-craft'){
     record(w,c.id,text,'continue',[c.id],{from,to:c.location,fromRegion,toRegion:regionOf(c),target:a.target});
     return;
   }
-  resolution=resolveActionCheck(c,{difficulty:challenges[a.target],ability:'髮飾設計',...(c.attributes&&options.checkSystem!=='d20-v1'?{system:'d100-v1' as const,attribute:'dexterity' as const,sense:null}:{})},craftAdvantage(c));
+  resolution=resolveActionCheck(c,{difficulty:challenges[a.target],ability:'髮飾設計',...(c.attributes&&options.checkSystem!=='d20-v1'?{system:(options.checkSystem??newCheckSystem(c)) as 'd100-v1'|'d100-v2',attribute:'dexterity' as const,sense:null}:{})},craftAdvantage(c));
   const consequences:Record<Resolution['outcome'],string>={
     'critical-success':'完成精緻的髮飾草圖，還想出一種額外配色。',
     success:'完成一幅讓自己滿意的髮飾設計草圖。',

@@ -1,3 +1,4 @@
+import {newCheckSystem} from './action-checks';
 import { personalNeedsActive, maximumSleepMinutes } from './body-needs-policy';
 import { MemoryValidationError } from './memory';
 import { applyLegacyMood, settleMentalInterval, type MentalInterval } from './mental-energy';
@@ -183,7 +184,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     if(!accepted)return world.events.some(event=>!priorEvents.has(event.id)&&event.actor===character.id&&event.kind==='attempt');
     const phases=candidate.stages||[];
     if(accepted)confirmedProfile=candidate.bodyActivity;
-    if(accepted&&(phases.length||candidate.bodyActivity)){character.plan={...(candidate.resumable?{resumable:true}:{}),action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
+    if(accepted&&(phases.length||candidate.bodyActivity)){character.plan={...(candidate.check?{checkSystem:candidate.check.system??'d20-v1',...(character.attributes?{attributeVersion:character.attributes.version}:{})}:{}),...(candidate.resumable?{resumable:true}:{}),action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
   }
   else {
     if(decision.timeIntent?.kind==='completion'){
@@ -202,7 +203,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
       resolve(validation,actor,decision.action,{dryRun:true});
       const duration=decision.timeIntent?.kind==='open-ended'||!decision.timeIntent&&sustainedActions.has(decision.action.type)?decision.durationMinutes:15;
-      character.plan={deferredAction:true,checkSystem:character.attributes?'d100-v1':'d20-v1',action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
+      character.plan={deferredAction:true,checkSystem:newCheckSystem(character),...(character.attributes?{attributeVersion:character.attributes.version}:{}),action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
       character.activity='正在進行已選活動，尚未完成。';
       record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
       if(decision.action.type==='rest')character.plan.bodyActivity={version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0};

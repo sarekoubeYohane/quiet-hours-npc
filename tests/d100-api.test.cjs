@@ -121,3 +121,27 @@ test('a newly confirmed absent sense excludes an old successful trial before its
  const s=await freeScenario({roll:5,check:{difficulty:12,ability:'觀察細節',system:'d100-v1',attribute:'perception',sense:'sight'}});try{const reply=s.current();reply.branches.forEach(branch=>{branch.effects=[];});s.reply(reply);await s.advance();const before=await read();await post({operation:'set-character-sense-limits',target:'owner',operationScope:before.operationScope,expectedVersion:before.version,worldContext:before.world.contextId,characterSetup:{blockedSenses:['sight']}});const current=await s.read(),draws=s.draws();const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operation:'advance',operationId:id(),worldContext:current.contextId,mode:'openai',model:'gpt-6-luna',minutes:15})}));assert.equal(response.status,502);assert.equal(s.draws(),draws);assert.equal((await s.read()).turn,current.turn);assert.deepEqual((await s.read()).freeTrials,current.freeTrials);
  }finally{s.restore();}
 });
+
+test('saved v1 appearance-domain expertise keeps its original meaning, threshold and result across reload and replay',async()=>{
+ for(const ability of ['外觀','appearance']){
+  const s=await freeScenario({roll:70,check:{difficulty:12,ability,system:'d100-v1',attribute:null,sense:null},expertise:[{scope:ability,modifier:20}]});
+  try{
+   const operationId=id(),result=await s.advance({operationId});const resolution=Object.values(result.world.freeTrials)[0];
+   assert.equal(resolution.system,'d100-v1');assert.equal(resolution.threshold,75);assert.equal(resolution.factors.expertise,20);assert.equal(resolution.factors.attribute,null);assert.equal(resolution.outcome,'success');assert.equal(s.draws(),1);
+   assert.deepEqual(Object.values((await s.read()).freeTrials)[0],resolution);
+   const calls=s.inputs.length,replayed=await s.advance({operationId});assert.deepEqual(Object.values(replayed.world.freeTrials)[0],resolution);assert.equal(s.inputs.length,calls);assert.equal(s.draws(),1);
+  }finally{s.restore();}
+ }
+});
+
+
+test('v2 continues to exclude appearance aliases from numeric expertise while v1 retains its separate domain',()=>{
+ const {resolveActionCheck}=load('action-checks');
+ for(const ability of ['外觀','appearance']){
+  // Resolver-contract snapshot only; the real formed-card route journey is
+  // covered separately by versioned-d100.test.mjs, not replaced by this object.
+  const actor=seedWorld().characters[0];actor.attributes={version:2,authority:'formed-card',values:{strength:12,endurance:12,dexterity:12,perception:12,appearance:18},expertise:[{scope:ability,modifier:20}],senses:[],blockedSenses:[],activatedAt:0,constraints:{}};
+  let draws=0;const resolution=resolveActionCheck(actor,{difficulty:12,ability,system:'d100-v2',attribute:null,sense:null},0,0,()=>{draws++;return .695;});
+  assert.equal(resolution.system,'d100-v2');assert.equal(resolution.attributeVersion,2);assert.equal(resolution.threshold,55);assert.equal(resolution.factors.expertise,0);assert.equal(resolution.factors.attribute,null);assert.equal(resolution.outcome,'mixed');assert.equal(draws,1);
+ }
+});
