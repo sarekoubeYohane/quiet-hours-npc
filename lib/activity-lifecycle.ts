@@ -1,3 +1,4 @@
+import { personalNeedsActive, maximumSleepMinutes } from './body-needs-policy';
 import { MemoryValidationError } from './memory';
 import { applyLegacyMood, settleMentalInterval, type MentalInterval } from './mental-energy';
 import { worldLocations } from './world-configuration';
@@ -146,7 +147,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     }
     let candidate=decision.freeCandidate;
     if(candidate.status==='accepted'&&candidate.bodyActivity?.kind==='sleep'){
-      const required=sleepMinutesUntilWake(candidate.bodyActivity,character.needs!.values.sleep);
+      const required=personalNeedsActive(character)?maximumSleepMinutes(character,candidate.bodyActivity):sleepMinutesUntilWake(candidate.bodyActivity,character.needs!.values.sleep);
       if(required>adjudicationLimits.maxMinutes)candidate={status:'denied',effects:[],stages:[],check:null};
       else if(decision.timeIntent?.maxMinutes!==null&&decision.timeIntent?.maxMinutes!==undefined&&required>decision.timeIntent.maxMinutes)candidate={status:'denied',effects:[],stages:[],check:null,knownBlockedReason:'這次睡眠恢復需要超過自己選定的投入上限；尚未開始。'};
     }
@@ -230,10 +231,11 @@ export function startActivity(world:World,character:Character,decision:ActivityD
 // Waking ends actual sleep; it does not schedule a replacement action.
 export function wakeSleepingActivity(world:World,character:Character):boolean {
  if(character.plan?.bodyActivity?.kind!=='sleep')return false;
- const natural=character.plan.sleep?.naturalWakeAt!==undefined;
+ const naturalAt=character.plan.sleep?.naturalWakeAt,stimulusAt=character.plan.sleep?.stimulusWakeAt;
+ const natural=naturalAt!==undefined&&(stimulusAt===undefined||naturalAt<=stimulusAt);
  if(!natural&&character.plan.sleep?.stimulusWakeAt===undefined)return false;
  const action=character.plan.action;
- const wakeAt=character.plan.sleep?.naturalWakeAt??character.plan.sleep?.stimulusWakeAt??world.minute;
+ const wakeAt=Math.min(naturalAt??Infinity,stimulusAt??Infinity);
  // Effects are committed now under current conditions, only for work that was
  // already due before actual sleep ended. Later stages remain unexecuted.
  if(character.plan.phases)advancePhases(world,character,Math.min(world.minute,wakeAt));

@@ -1,3 +1,4 @@
+import { finishPendingNeeds } from './body-needs-policy';
 import { prepareControlledFeelings, acknowledgeControlledFeelings, type ControlledFeelingRequest, type ControlledFeelingCandidate } from './controlled-feelings';
 import { applyEmotionRegulation, type EmotionRegulation } from './emotion-regulation';
 import { applyProcessAssessment, type ProcessFeeling } from './mental-process';
@@ -122,11 +123,13 @@ export async function advanceActivities(world: World, options: {
   // A due external consequence may end actual sleep inside this interval.
   // Establish its endpoint before consuming process slots or natural time.
   advanceNaturalChanges(world,roundTo,emitExternalConsequences);
-  const mental=mentalIntervals(world,roundTo);
-  for(const actor of world.characters){const interval=mental.get(actor.id);if(interval)settleMentalInterval(actor,interval);}
   const bodyBases=new Map(world.characters.map(actor=>[actor.id,bodyIntervalBase(actor,roundTo)]));
   const bodyMinutes=new Map(world.characters.map(actor=>[actor.id,minutes-activeBodyMinutes(actor,roundFrom,roundTo)]));
   advanceBodyNeeds(world);
+  // Actual body recovery now establishes the already elapsed natural wake
+  // point. Psychological time reads that point, never a future recovery roll.
+  const mental=mentalIntervals(world,roundTo);
+  for(const actor of world.characters){const interval=mental.get(actor.id);if(interval)settleMentalInterval(actor,interval);}
   const traveling = new Set(world.characters.filter(actor => actor.plan?.journey).map(actor => actor.id));
   for (const character of world.characters) if (traveling.has(character.id)) finishJourney(world,character);
   const offset = world.turn % world.characters.length;
@@ -256,6 +259,7 @@ export async function advanceActivities(world: World, options: {
     noteAttention(world, character, character.control?.mode === 'taken-over' || character.control?.active ? '使用者控制，等待指定行動' : reason ? `${reason}；留待下次決策` : '一般線索，等待正常決策', observation.id);
   }
   for (const character of world.characters) validateMemoryState(character);
+  finishPendingNeeds(world);
   world.turn++;
 }
 
