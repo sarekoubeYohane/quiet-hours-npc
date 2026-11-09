@@ -1,3 +1,4 @@
+import { adjudicationLimits } from './adjudication-limits';
 import { attributeLabels, attributeNames, type AttributeName } from './character-attributes';
 import { judgeD20, rollD20, type Difficulty, type Advantage, type Resolution } from './d20';
 import type { Character } from './world';
@@ -5,12 +6,12 @@ export type CheckSense = 'sight'|'hearing'|'touch';
 export type ActionCheck = {difficulty:Difficulty;ability:string;system?:'d100-v1';attribute?:AttributeName|null;sense?:CheckSense|null};
 export type CheckFactors = {attribute:AttributeName|null;level:number|null;ability:number;difficulty:number;expertise:number;sense:number;senseName:CheckSense|null;attention:number};
 const object=(properties:Record<string,unknown>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
-const baseProperties={difficulty:{type:'integer',enum:[8,12,16]},ability:{type:'string',minLength:1,maxLength:100}};
+const baseProperties={difficulty:{type:'integer',enum:[...adjudicationLimits.difficulties]},ability:{type:'string',minLength:1,maxLength:adjudicationLimits.maxValueLength}};
 export const actionCheckSchema={anyOf:[object(baseProperties),object({...baseProperties,system:{type:'string',const:'d100-v1'},attribute:{type:['string','null'],enum:[...attributeNames,null]},sense:{type:['string','null'],enum:['sight','hearing','touch',null]}})]};
 export function validActionCheck(value:unknown):value is ActionCheck {
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
  const v=value as ActionCheck,keys=Object.keys(value).sort().join(',');
- return [8,12,16].includes(v.difficulty)&&typeof v.ability==='string'&&!!v.ability.trim()&&v.ability.length<=100&&
+ return adjudicationLimits.difficulties.includes(v.difficulty)&&typeof v.ability==='string'&&!!v.ability.trim()&&v.ability.length<=adjudicationLimits.maxValueLength&&
  (keys==='ability,difficulty'||keys==='ability,attribute,difficulty,sense,system'&&v.system==='d100-v1'&&(v.attribute===null||attributeNames.includes(v.attribute as AttributeName))&&(v.sense===null||['sight','hearing','touch'].includes(v.sense as string)));
 }
 /** Called only on a fresh adjudication, never when loading/reusing an old rule. */

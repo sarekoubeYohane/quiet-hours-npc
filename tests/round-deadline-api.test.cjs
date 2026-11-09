@@ -49,6 +49,9 @@ for(const config of [
   for(const actor of saved.world.characters){assert.ok(actor.intents.some(node=>node.id===actor.id+':purpose'));assert.ok(actor.shortTerm.length>0,'normal denied result is persisted as feedback');}
   const trace=saved.decisionTrace;assert.equal(trace.outcome,'committed');assert.equal(trace.dispatches.length,sent);
   const timing=trace.steps.find(x=>x.kind==='time-policy').data;
+  for(const key of ['version','leaseCreatedAt','workDeadline','leaseDeadline','clientMs'])assert.equal(timing[key],trace.timePolicy[key],'timing evidence remains consistent after bounded transcript omission');
+  assert.ok(Buffer.byteLength(JSON.stringify(trace))<=1024*1024,'timing evidence respects the existing archive cap');
+  if(config.recall)console.log('TRACE_BUDGET '+JSON.stringify({case:config.name,gap:trace.gap,omittedOriginalBytes:trace.omittedOriginalBytes,retainedBytes:Buffer.byteLength(JSON.stringify(trace))}));
   assert.equal(timing.workDeadline-timing.leaseCreatedAt,400000);assert.equal(timing.leaseDeadline-timing.leaseCreatedAt,430000);assert.equal(timing.clientMs,445000);
   for(const d of trace.dispatches){assert.ok(d.fetchStartedAt>=d.startedAt);assert.ok(d.signal.deadline>d.fetchStartedAt);assert.ok(d.signal.deadline-d.signal.createdAt<=25000);assert.ok(d.headersReceivedAt<=d.receivedAt);assert.ok(d.usageKnownAt);}
   assert.ok(trace.checkpoints.some(x=>x.completedAt>x.startedAt)||!config.checkpoint);
