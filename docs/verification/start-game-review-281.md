@@ -131,3 +131,9 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 固定 `7e4bb5aa5b5b91ca053c050d8f3defe459431fb8` 的現行全套 **1417/1417、exit0**（1267／40／74／15／21，全部 fail0／cancelled0），typecheck、lint0errors4舊warnings及兩環境build均exit0。各組／raw log SHA與來源見[機器摘要](assets/start-game-final-281/final-7e4bb5a-summary.json)。此版確實包含所有最終修正，不是把舊1414或窄組混算為新版full。
 
 原完整兩軸審查與後續新增hunks覆核已全部完成，所有已提出finding現在remaining0；正式#282仍是已知外部驗收阻擋。這份工程驗證不代表真模型語義品質／真人OAuth已驗，#281保持open、PR保持draft。
+
+## 最後交付狀態
+
+完整修後驗證與證據已推送後，#286／#288／#289依原生前置重新closed，#283–#290八票完成。最後產品測試來源仍為`7e4bb5a`（1417/1417及兩環境build全過），其後只補文件／摘要；產品差異0。兩軸全部已提出finding均有獨立remaining0，沒有未處理工程finding。
+
+所有子代理與程序停止後，27個本輪輔助worktree經clean preflight後移除；非建置ignored設定先移至本機保留目錄，原工作樹與integration保留。#282正式唯讀旅程仍有既知外部阻擋，故#281open／PR291draft，不提前ready。
