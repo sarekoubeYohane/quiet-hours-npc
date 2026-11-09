@@ -34,13 +34,13 @@ const candidateReasons:Record<CandidateFailureReason,string> = {
 function JsonDetails({label,value}:{label:string;value:unknown}) {
   return <details><summary>{label}</summary><pre style={contentStyle}>{typeof value==='string'?value:JSON.stringify(value,null,2)}</pre></details>;
 }
-async function readTrace(operationId?:string,signal?:AbortSignal) {
-  const response=await fetch(`/api/world${operationId?`?operationId=${encodeURIComponent(operationId)}`:''}`,{credentials:'same-origin',signal});
+async function readTrace(worldEndpoint:string,operationId?:string,signal?:AbortSignal) {
+  const response=await fetch(`${worldEndpoint}${operationId?`${worldEndpoint.includes('?')?'&':'?'}operationId=${encodeURIComponent(operationId)}`:''}`,{credentials:'same-origin',signal});
   const body=await readWorldResponse<TraceResponse>(response);
   if(!response.ok)throw Error(body.error||'暫時無法讀取決策追溯。');
   return body;
 }
-export default function DecisionTraces({operationId,lastResponse}:{operationId?:string;lastResponse?:TraceStatus&{operationId:string}}) {
+export default function DecisionTraces({worldEndpoint='/api/world',operationId,lastResponse}:{worldEndpoint?:string;operationId?:string;lastResponse?:TraceStatus&{operationId:string}}) {
   const [index,setIndex]=useState<TraceIndex>();
   const [shown,setShown]=useState<Trace|null>();
   const [selected,setSelected]=useState('');
@@ -51,20 +51,20 @@ export default function DecisionTraces({operationId,lastResponse}:{operationId?:
     const controller=new AbortController();
     async function load() {
       try {
-        const body=await readTrace(undefined,controller.signal);
+        const body=await readTrace(worldEndpoint,undefined,controller.signal);
         if(controller.signal.aborted)return;
         setIndex(body.decisionTraces);
         const id=operationId||body.decisionTraces?.records[0]?.operationId;
-        if(id){const detail=await readTrace(id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);setOperationStatus(detail.operation);setUsageRecovery(detail.usageRecovery);}}
+        if(id){const detail=await readTrace(worldEndpoint,id,controller.signal);if(!controller.signal.aborted){setShown(detail.decisionTrace??null);setSelected(id);setOperationStatus(detail.operation);setUsageRecovery(detail.usageRecovery);}}
         else setShown(null);
       } catch(error) { if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。'); }
       finally {if(!controller.signal.aborted)setLoading(false);}
     }
     void load();return ()=>controller.abort();
-  },[operationId]);
+  },[operationId,worldEndpoint]);
   async function select(id:string) {
     setLoading(true);setMessage('');setSelected(id);setShown(undefined);setOperationStatus(undefined);setUsageRecovery(undefined);
-    try { const body=await readTrace(id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null);setOperationStatus(body.operation);setUsageRecovery(body.usageRecovery); }
+    try { const body=await readTrace(worldEndpoint,id,AbortSignal.timeout(15000));setShown(body.decisionTrace??null);setOperationStatus(body.operation);setUsageRecovery(body.usageRecovery); }
     catch(error) {setMessage(error instanceof Error?error.message:'暫時無法讀取決策追溯。');}
     finally {setLoading(false);}
   }

@@ -40,6 +40,7 @@ try {
     }; return statement; } };
     exports.reset = () => { for (const row of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) db.exec('DROP TABLE ' + row.name); };
     exports.migrate = sql => db.exec(sql);
+    exports.installLegacyWorlds = owners => { for(const owner of owners) db.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?,?,0,0)').run(owner,JSON.stringify(require('./lib/world.cjs').seedWorld())); };
     exports.env = env;
   `);
   const sql = (await Promise.all((await readdir('drizzle')).filter(f => f.endsWith('.sql')).sort().map(f => readFile(join('drizzle', f), 'utf8')))).join('\n');

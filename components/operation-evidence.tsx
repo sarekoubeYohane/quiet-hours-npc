@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { readWorldResponse } from '@/lib/world-response';
 import type { OperationEvidence, OperationSummary, ReplayAdvance } from '@/lib/operation-evidence';
 
-export default function OperationEvidenceDetails({ evidence, recent, disabled, onReplay }: {
-  evidence?: OperationEvidence; recent: OperationSummary[]; disabled:boolean; onReplay:(payload:ReplayAdvance)=>Promise<boolean>;
+export default function OperationEvidenceDetails({ worldEndpoint='/api/world', evidence, recent, disabled, onReplay }: {
+  worldEndpoint?:string; evidence?: OperationEvidence; recent: OperationSummary[]; disabled:boolean; onReplay:(payload:ReplayAdvance)=>Promise<boolean>;
 }) {
   const [selected,setSelected]=useState<OperationEvidence|null>();
   const [message,setMessage]=useState(''),[loading,setLoading]=useState(false);
@@ -14,7 +14,7 @@ export default function OperationEvidenceDetails({ evidence, recent, disabled, o
   async function select(operationId:string) {
     setLoading(true);setMessage('');
     try {
-      const response=await fetch(`/api/world?operationId=${encodeURIComponent(operationId)}`,{credentials:'same-origin',signal:AbortSignal.timeout(15000)});
+      const response=await fetch(`${worldEndpoint}${worldEndpoint.includes('?')?'&':'?'}operationId=${encodeURIComponent(operationId)}`,{credentials:'same-origin',signal:AbortSignal.timeout(15000)});
       const body=await readWorldResponse<{error?:string;operation?:{state:string;evidence?:OperationEvidence|null}}>(response);
       if(!response.ok)throw Error(body.error||'暫時無法讀取操作證據。');
       setSelected(body.operation?.evidence||null);
