@@ -1,0 +1,12 @@
+{
+  "commit": "5face37",
+  "url": "http://127.0.0.1:45841/?accountChanged=1",
+  "showsB": false,
+  "showsA": false,
+  "aSavedName": "A原建立世界",
+  "bSavedName": "B既有世界",
+  "controlled": 2,
+  "paid": 0,
+  "sameAccountContinues": true,
+  "otherBoundEntriesRejected": true
+}
