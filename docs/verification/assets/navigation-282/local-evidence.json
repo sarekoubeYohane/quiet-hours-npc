@@ -1,0 +1,70 @@
+{
+  "checkedAt": "2026-11-09T12:05:31.244Z",
+  "origin": "http://127.0.0.1:5282",
+  "commit": "249f20c",
+  "builtAt": "2026-11-09T12:05:29.790Z",
+  "identity": "本機 cookie 身分替身 qh_local_owner；非真人 OAuth",
+  "runtime": "真正 vinext App Router、產品頁面與 API、隔離 SQLite；未安裝世界 fixture",
+  "trials": [
+    {
+      "name": "人物範本",
+      "href": "/character-templates",
+      "before": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "after": {
+        "url": "http://127.0.0.1:5282/character-templates",
+        "title": "Quiet Hours · NPC 觀察室",
+        "heading": [
+          "人物範本"
+        ]
+      },
+      "reloaded": {
+        "url": "http://127.0.0.1:5282/character-templates",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "returned": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "browserBack": "http://127.0.0.1:5282/",
+      "result": "passed"
+    },
+    {
+      "name": "場景範本",
+      "href": "/scene-templates",
+      "before": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "after": {
+        "url": "http://127.0.0.1:5282/scene-templates",
+        "title": "Quiet Hours · NPC 觀察室",
+        "heading": [
+          "場景範本"
+        ]
+      },
+      "reloaded": {
+        "url": "http://127.0.0.1:5282/scene-templates",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "returned": {
+        "url": "http://127.0.0.1:5282/",
+        "title": "Quiet Hours · NPC 觀察室"
+      },
+      "browserBack": "http://127.0.0.1:5282/",
+      "result": "passed"
+    }
+  ],
+  "unauthenticated": {
+    "url": "http://127.0.0.1:5282/",
+    "title": "Quiet Hours · NPC 觀察室",
+    "heading": [
+      "登入你的觀察室"
+    ]
+  },
+  "pageErrors": [],
+  "modelCalls": 0,
+  "productPostRequests": 0
+}
