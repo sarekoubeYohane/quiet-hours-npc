@@ -1,7 +1,7 @@
 {
-  "origin": "http://127.0.0.1:33647",
-  "commit": "42ec76b",
-  "builtAt": "2026-11-09T12:39:47.178Z",
+  "origin": "http://127.0.0.1:34859",
+  "commit": "7634552",
+  "builtAt": "2026-11-09T12:46:26.575Z",
   "auth": "local cookie identity boundary; not production OAuth",
   "database": "isolated disk SQLite with migrations; worlds created through product APIs",
   "modelCalls": 1,
@@ -9,19 +9,28 @@
   "evidence": [
     {
       "phase": "missing models / cancel / failed save / saved key / explicit generation",
-      "url": "http://127.0.0.1:33647/character-templates",
+      "url": "http://127.0.0.1:34859/character-templates",
       "modelCalls": 1
     },
     {
       "phase": "account inheritance / custom save / default changes do not override custom / original input",
-      "save": "6db05ab9-5b1f-401d-8cca-47658cdf6a3e",
-      "url": "http://127.0.0.1:33647/observe?save=6db05ab9-5b1f-401d-8cca-47658cdf6a3e",
+      "save": "fb3e051e-2981-45ae-92ef-97f80f63352f",
+      "url": "http://127.0.0.1:34859/observe?save=fb3e051e-2981-45ae-92ef-97f80f63352f",
+      "turn": 0,
+      "modelCalls": 1
+    },
+    {
+      "phase": "another device clears key / original AI attempt opens local settings / input and save retained / no dispatch or automatic retry",
+      "save": "fb3e051e-2981-45ae-92ef-97f80f63352f",
+      "url": "http://127.0.0.1:34859/observe?save=fb3e051e-2981-45ae-92ef-97f80f63352f",
+      "status": 400,
+      "modelSettingsRequired": true,
       "turn": 0,
       "modelCalls": 1
     },
     {
       "phase": "observation missing models / cancel retains input / rules work without keys",
-      "save": "4a74f44a-941a-4103-9a13-244d8eb13d7f",
+      "save": "5a45fd9b-37dc-4934-b98a-97b8ce20005c",
       "turn": 1,
       "modelCalls": 1
     }
