@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createRequire} from 'node:module';
 const {fixtureDecision}=createRequire(import.meta.url)('./pursuit-fixture.cjs');
 import {startApp} from '../tooling/verification/real-route-runtime.mjs';
 import {journey,operationId,advanceCraft} from '../tooling/verification/versioned-d100-journey.mjs';
 test('formed card is used by the real world route as explicit d100-v2, persists, and replays its original operation',async()=>{
- const app=await startApp({diceFaces:Array(20).fill(4),checkRolls:[60],modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task?{bonuses:[]}:fixtureDecision(input,{type:'work',target:'craft-challenge',content:'星月'});}});
+ const directory=await mkdtemp(join(tmpdir(),'versioned-d100-'));const databasePath=join(directory,'world.sqlite');
+ let app=await startApp({databasePath,diceFaces:Array(20).fill(4),checkRolls:[60],modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task?{bonuses:[]}:fixtureDecision(input,{type:'work',target:'craft-challenge',content:'星月'});}});
  try{
   const j=await journey(app),save=await j.create();const initial=await j.world(save);assert.equal(initial.world.turn,0);assert.equal(initial.world.characters[0].attributes.version,2);
   const actor=initial.world.characters[0].id;
@@ -18,7 +22,10 @@ test('formed card is used by the real world route as explicit d100-v2, persists,
   const stored=(await j.world(save)).world;assert.deepEqual(stored.events.findLast(e=>e.actor===actor&&e.resolution).resolution,resolution);
   const replay=await j.send(save,{operation:'advance',mode:'openai',model:'gpt-6-luna',operationId:op,minutes:5,timeContract:'five-minute-v1'});assert.deepEqual(replay.world.events.findLast(e=>e.actor===actor&&e.resolution).resolution,resolution);
   assert.equal(app.modelRequests.length,2);
- }finally{await app.close();}
+  await app.close();app=await startApp({databasePath,checkRolls:[],modelResponder:()=>{throw Error('Reopening/replaying cannot dispatch');}});
+  const reopened=await journey(app,'d100-a',{configure:false});assert.deepEqual((await reopened.world(save)).world.events.findLast(e=>e.resolution).resolution,resolution);
+  const recovered=await reopened.send(save,{operation:'advance',mode:'openai',model:'gpt-6-luna',operationId:op,minutes:5,timeContract:'five-minute-v1'});assert.deepEqual(recovered.world.events.findLast(e=>e.resolution).resolution,resolution);assert.equal(app.modelRequests.length,0);
+ }finally{await app.close();await rm(directory,{recursive:true,force:true});}
 });
 
 test('real saved card worlds cover 5/60/90/95 thresholds, extremes, partial bands and continuation without an extra draw',async()=>{

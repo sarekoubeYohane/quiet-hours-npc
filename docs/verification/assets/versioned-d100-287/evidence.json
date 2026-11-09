@@ -1,0 +1,32 @@
+{
+  "origin": "http://127.0.0.1:46381",
+  "commit": "105197b",
+  "builtAt": "2026-11-09T14:42:25.218Z",
+  "auth": "local cookie identity boundary",
+  "database": "isolated disk SQLite, full migrations; card formed and saved via product APIs, city save via product API; no installed world fixture",
+  "saveId": "b56457f8-2055-41dc-9701-c4a041fac4bf",
+  "route": "http://127.0.0.1:46381/observe?save=b56457f8-2055-41dc-9701-c4a041fac4bf&view=analysis",
+  "resolution": {
+    "system": "d100-v2",
+    "attributeVersion": 2,
+    "roll": 61,
+    "modifier": 5,
+    "dc": 12,
+    "total": -1,
+    "threshold": 60,
+    "factors": {
+      "attribute": "dexterity",
+      "level": 12,
+      "senseName": null,
+      "ability": 5,
+      "difficulty": 0,
+      "expertise": 0,
+      "sense": 0,
+      "attention": 0
+    },
+    "outcome": "mixed"
+  },
+  "modelCalls": 2,
+  "paidCalls": 0,
+  "dice": "20 controlled d6 faces of 4 for the card; one d100 face 61, exhaustion rejects extra rolls"
+}
