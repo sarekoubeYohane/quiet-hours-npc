@@ -37,3 +37,30 @@ scope 沿用原責任：製作資產與帳號模型設定為 `account-operations
 receipt GET 現要求原 operationScope，普通初次 GET 保留 bootstrap；缺 scope 的新恢復讀取直接 409，既存 journal／結果不改義。各驗證 helper 在 Request 建立處明示原 fixture binding，沒有放寬產品檢查或以目前 Cookie 補舊請求。
 
 `87fe5d0` 真五步旅程也已通過，step 3 實際設定甲屋住處／客廳臥室／乙屋工作／甲屋所有權，確認頁顯示上述人類名稱，保存後實際 configuration 與確認候選完整一致；受控模型 1。原始開局另建第二份及兩世界各自續玩仍通過。獨立 `opening-durable-journey-288.mjs` 真資料庫關閉／重開旅程也通過，模型 1；未以直接安裝世界替代新建。
+
+## 研究正例的責任與限制
+
+既存 sealed 研究旅程本來就使用隔離歷史 scene fixture；不再呼叫已退役的玩家 reset，不冒充玩家新建成功。`initializeHistoricalTrial` 保留實際中央 payer、原預算、journal 與 Key；故事診斷與中央帳單分開讀。
+
+原 `1a3ea10` source-pin 全檔結果為 20/21，原 log `/tmp/quiet-hours-context/t7-research-source-pin-full.log` 保留。唯一失敗把世界診斷開始時間與中央帳務開始時間直接相等比較（差 26ms）；修正為對真正已計費的中央原 window，逐 trial 與最終 SQLite 重讀保持相同，仍斷言原 12 calls／30,000 tokens 額度不刷新、calls=12。
+
+`ddad506` 固定執行 `node --experimental-strip-types --test --test-name-pattern='default 12-call|positive forwarded' tooling/experiments/pursuit-runner-228.test.mjs`：2/2。正例 10 trials／80 advances，17 controlled provider + 64 partner fixture = 81 engine calls，實際 SQLite 關閉重開、原中央 payer 累計與原 100 calls／1,000,000 tokens 預算保存，真付費 0；未改 wall clock。log `/tmp/quiet-hours-context/account-surfaces-source-pin-narrow.log`。其餘 19 項沒有以本輪固定源重刷，最終整合仍須完整現行套件。
+
+## 最後接合檢查
+
+已接合純 CJS／auth scope helper `770371b`、兩費用 browser helper `898e9cd`、T7 完整報告 `3892a6f`、最新 integration `1829384`，並採納 README 指南 `e4a5eaf` 的相同 patch；沒有改寫正式資料。
+
+`e92f53c`（產品含原帳號所有 guards、SSR／sticky 表單、世界首次恢復、兩私人證據 consumer 原 binding、確認頁角色名稱映射、規則模式文案）：
+
+- 資產／製作／開局／模型／migration／新增 scope API：55/55。
+- world saves／save management：16/16。
+- budgets／costs／pursuits／operation evidence／decision traces：65/65。原退休 reset 相關舊正例改 409＋歷史／帳單保留；首輪誤以 activities runner 跑 auth-only reset 的工具錯誤另保留 log，完整 auth runner 改正後 40/40。
+- `pnpm typecheck`、`pnpm build` 通過；`pnpm lint` 0 errors、4 個原有 warnings（圖片與既有 act effect）。移除了本輪 helper 遷移留下的無用 bindings。
+- 原獨立 Spec 的 Key P1／四帳號 surface P2 及 Standards 的同帳號恢復／兩分析 consumer P2 均已各自重現覆核為 0；這不是整份 #281 的最終完整 review 或 full suite。
+
+兩分析 consumer 修正前的同腳本 RED 明確收到缺 scope 的 409：`/tmp/quiet-hours-context/account-analysis-read-red.log`；修正後由已驗證 evidenceScope 傳原 binding endpoint，server guard 未放寬。產品 `operationId` GET caller 盤點為 WorldApp 恢復、OperationEvidenceDetails、DecisionTraces；SaveActions 是另一個已固定 raw owner 的恢復 endpoint。歷史 `tooling/verification/browser14x` 等舊直接世界 fixture 工具未冒稱本輪全部重跑，完整當前測試由最終整合處理。
+
+最後正常頁面固定 `e92f53c`：
+
+- `browser-opening-wizard-288.mjs` 全程真首頁→形成卡→場景→五步開局／返回修改／離頁草稿接續／重載／最後確認→提交後回覆遺失恢復→原始開局另建→兩份各自續玩 2／1，controlled 1、paid 0。最後確認角色住處／臥室／工作／所有權與保存 configuration 相同；`opening-evidence.json`、`opening-confirmation.png`。
+- `browser-world-recovery-scope-281.mjs` 先恢復已提交原 operation，再實際切分析頁讀兩私有證據 consumer；三個 receipt GET 全 200，原 world POST 仍只有 1、turn 1、pending 清除，controlled 1、paid 0；`analysis-evidence.json`、`analysis-recovered.png`。
