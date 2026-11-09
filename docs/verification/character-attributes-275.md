@@ -25,3 +25,7 @@
 畫面：[舊人物導入](character-attributes-275/character-275-profile.png)、[新城市人物](character-attributes-275/character-275-city.png)；機械證據：[browser摘要](character-attributes-275/character-275-browser.json)。既有畫面確認衝突保留輸入、已確認專長／感官、SQLite重載、新城市編輯器預覽／開始及新城市正常受控模型推進，零付費派送。
 
 沒有呼叫付費模型、部署、推進正式世界或自行合併main。受控模型只證明流程與保存，沒有宣稱真實模型語義品質。後續 #277 仍須獨立完成骰制接入與防洗骰驗收；目前畫面明說新資料尚未影響行動／感知判定。
+
+## 合併前整合同步
+
+主實作提交 `f5fe912`，再於 `c6b836f` 合入 integration 的 #276（`14d95e3`）。局部合併 route 的 `characterSetup`／`timeContract`、WorldApp 的新導入操作與既有五分鐘批次，以及兩票測試清單；維持 #276 的每步保存及預算停止，不倒退為15分鐘單步。同步後 `npm run typecheck` exit0，兩票共同API／WorldApp測試17/17通過，無fail/skip；`git diff --check` 通過。此同步沒有開始 #277。
