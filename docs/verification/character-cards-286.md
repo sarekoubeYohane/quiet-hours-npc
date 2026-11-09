@@ -1,6 +1,6 @@
 # #286 人物卡形成、配點與保存驗收
 
-狀態：T5 固定分支供獨立修復接合；不表示 #281 全部完成。開始時 #285 已關閉，原生 blocked-by 已由整合者重新查核。中途 #283／#284 因獨立審查重開，已承接 integration `17cc67c` 的 AI 血緣修復，仍待共用帳號預算 P1 與 T9 最終整合接合驗證；不啟動 T6、不提前關票。
+狀態：T5 已接合帳號預算並完成兩軸 finding 修正及固定提交驗證；票狀態交由整合者處理，不表示 #281 全部完成。開始時 #285 已關閉，原生 blocked-by 已由整合者重新查核。中途 #283／#284 因獨立審查重開，已承接 integration `17cc67c` 的 AI 血緣修復，仍待共用帳號預算 P1 與 T9 最終整合接合驗證；不啟動 T6、不提前關票。
 
 ## 固定來源與執行邊界
 
@@ -66,4 +66,7 @@ T5 API **10／10**；上述相關 API 組合 **22／22**；舊屬性／UI／生�
 文字來源保存與形成判讀共同使用輕量 `lib/text-equivalence.ts` 的 `meaningfulText`，沿用 NFKC／und 小寫／去標點空白符號及 Cf 的原等價責任，避免兩份規則漂移；沒有引入 server 模型到 client。cards 與 drafts 合計 **16/16**，包含既有 AI 血緣／未知範本與新自然語句案例。獨立反例 log `/tmp/quiet-hours-context/review-t5-natural-{red,green}.log`；固定提交的接合驗證待下列最後證據補入，不以此段宣告票已完成。
 
 
-固定整合 `2355317` 完成 API 32/32（含 cards／drafts／model-settings／migration）、六回歸與 T9 共 14/14、typecheck／lint／build、fresh 本機 D1 migration 及本頁完整真路由旅程（受控 2 次、實付 0）。中途覆核另指出新精確語法漏了 `strength must be 18`／`endurance between 8 and 18`，再次用同一產品 API／SQLite 先 red200→green400；補入 must be／between／should be／set to／from to／比較符號等明示連接，未恢復跨任意文字掃數字。新增英語與既有自然中文／來源測試仍 **16/16**，獨立英語反例 **1/1**。英語補正後的固定提交 type／lint／build 及形成真頁仍待最後記錄；票狀態由整合者依兩軸覆核處理，這裡不自行關票。
+固定整合 `2355317` 完成 API 32/32（含 cards／drafts／model-settings／migration）、六回歸與 T9 共 14/14、typecheck／lint／build、fresh 本機 D1 migration 及本頁完整真路由旅程（受控 2 次、實付 0）。中途覆核另指出新精確語法漏了 `strength must be 18`／`endurance between 8 and 18`，再次用同一產品 API／SQLite 先 red200→green400；補入 must be／between／should be／set to／from to／比較符號等明示連接，未恢復跨任意文字掃數字。新增英語與既有自然中文／來源測試仍 **16/16**，獨立英語反例 **1/1**。英語補正後固定 `1645a05` 再通過 typecheck、lint（0 errors／4 原有 warnings）、build 及完整形成真頁（受控 2 次、實付 0）；票狀態由整合者依兩軸覆核處理，這裡不自行關票。
+
+
+最新畫面與機器證據已更新至 `1645a05`，origin `http://127.0.0.1:39185`；四張畫面依同一固定 runtime 產生。Spec 對最終英語及原自然中文反例獨立覆核 remaining 0，Standards 對共用文字等價規則覆核 remaining 0。最後文件／證據提交不改產品來源。
