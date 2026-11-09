@@ -41,3 +41,13 @@ export const worldSaves = sqliteTable('world_saves', {
   name:text('name').notNull(),createdAt:integer('created_at').notNull(),creationRequest:text('creation_request'),
   originalOpening:text('original_opening'),savedFrom:text('saved_from'),
 },table=>[primaryKey({columns:[table.owner,table.id]})]);
+
+export const saveOperationReceipts=sqliteTable('save_operation_receipts',{
+  owner:text('owner').notNull(),operationId:text('operation_id').notNull(),request:text('request').notNull(),result:text('result').notNull(),cleanup:text('cleanup').notNull().default('[]'),
+},table=>[primaryKey({columns:[table.owner,table.operationId]})]);
+export const deletedWorldUsage=sqliteTable('deleted_world_usage',{
+  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),usage:text('usage').notNull(),deletedAt:integer('deleted_at').notNull(),
+},table=>[primaryKey({columns:[table.owner,table.storageOwner]})]);
+export const saveTombstones=sqliteTable('save_tombstones',{
+  owner:text('owner').notNull(),id:text('id').notNull(),deletedAt:integer('deleted_at').notNull(),
+},table=>[primaryKey({columns:[table.owner,table.id]})]);
