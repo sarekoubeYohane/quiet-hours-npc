@@ -125,3 +125,9 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 覆核各在獨立detached樹、只用真產品API／頁面／磁碟SQLite／受控transport，paid0。完成包 `c1ae5c5` 已由 merger 合入 `e581871`，產品對 `d1ddc36`完全相同，合後39/39／typecheck／source diffcheck通過。完整[紅綠與畫面](start-game-final-review-fixes-281.md)。新增修正全部已覆核，沒有以兩軸結論互相抵銷或以舊full否定新反例。
 
 原6dd完整套件1414/1414與兩環境build已exit0，屬修正前來源；新固定完整整合版本的套件／type／lint／兩build另行執行，未出結果前不宣告最終全綠。#282正式外部阻擋未解除，#281保持open／PRdraft。
+
+## 修後完整整合驗證
+
+固定 `7e4bb5aa5b5b91ca053c050d8f3defe459431fb8` 的現行全套 **1417/1417、exit0**（1267／40／74／15／21，全部 fail0／cancelled0），typecheck、lint0errors4舊warnings及兩環境build均exit0。各組／raw log SHA與來源見[機器摘要](assets/start-game-final-281/final-7e4bb5a-summary.json)。此版確實包含所有最終修正，不是把舊1414或窄組混算為新版full。
+
+原完整兩軸審查與後續新增hunks覆核已全部完成，所有已提出finding現在remaining0；正式#282仍是已知外部驗收阻擋。這份工程驗證不代表真模型語義品質／真人OAuth已驗，#281保持open、PR保持draft。

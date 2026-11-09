@@ -1,0 +1,80 @@
+{
+  "commit": "7e4bb5aa5b5b91ca053c050d8f3defe459431fb8",
+  "command": "pnpm test",
+  "exitCode": 0,
+  "groups": [
+    {
+      "tests": 1267,
+      "pass": 1267,
+      "fail": 0,
+      "cancelled": 0,
+      "name": "core"
+    },
+    {
+      "tests": 40,
+      "pass": 40,
+      "fail": 0,
+      "cancelled": 0,
+      "name": "auth"
+    },
+    {
+      "tests": 74,
+      "pass": 74,
+      "fail": 0,
+      "cancelled": 0,
+      "name": "assets-and-opening"
+    },
+    {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "name": "workers"
+    },
+    {
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "name": "source-pin"
+    }
+  ],
+  "tests": 1417,
+  "rawLog": "/tmp/quiet-hours-context/final-7e4bb5a-full.log",
+  "rawSha256": "7ab4231552e8f91e38f85565f16e91c3d44060bca90aaf7dd57ae18297fab153",
+  "rawBytes": 20765385,
+  "checks": [
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "rawLog": "/tmp/quiet-hours-context/final-7e4bb5a-typecheck.log",
+      "rawSha256": "38288cce0993f69f084aa0a0910d241021a084834f8732549591bbd16b11d899",
+      "rawBytes": 35
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "rawLog": "/tmp/quiet-hours-context/final-7e4bb5a-lint.log",
+      "rawSha256": "33a56bfa723024f02f31a58ade5b65e17d2300ab84b866e9fcce903330039dbc",
+      "rawBytes": 1432,
+      "errors": 0,
+      "existingWarnings": 4
+    },
+    {
+      "command": "WRANGLER_SEND_METRICS=false pnpm build:test",
+      "exitCode": 0,
+      "rawLog": "/tmp/quiet-hours-context/final-7e4bb5a-build-test.log",
+      "rawSha256": "f8b3b8084dbbc56fde6f465211568a9278e213d8845675dec1a44d644ac6cadf",
+      "rawBytes": 4161
+    },
+    {
+      "command": "WRANGLER_SEND_METRICS=false pnpm build:production",
+      "exitCode": 0,
+      "rawLog": "/tmp/quiet-hours-context/final-7e4bb5a-build-production.log",
+      "rawSha256": "a12e5cb6db86491fb02021311a8b0f6a359a4768d109de81970c7fee57895eed",
+      "rawBytes": 4140
+    }
+  ],
+  "scope": "Complete integrated final review fixes; real model semantics and formal #282 remain unverified",
+  "realPaidModelDispatches": 0
+}
