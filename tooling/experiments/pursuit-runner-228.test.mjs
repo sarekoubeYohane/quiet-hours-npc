@@ -201,7 +201,7 @@ test('runtime helper, SQL and an untracked product module cannot bypass the seal
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('a positive forwarded journey really commits, reopens file SQLite and retains payer usage across story reset', async () => {
+test('a positive forwarded journey really commits, reopens file SQLite and retains central payer usage across isolated historical trial fixtures', async () => {
   const directory = process.env.PURSUIT_EVIDENCE_DIR || await mkdtemp(join(tmpdir(), 'pursuit-positive-'));
   const random=Math.random;Math.random=()=>.675; // Only the approved external perception die seam.
   try {

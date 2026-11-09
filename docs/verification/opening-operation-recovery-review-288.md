@@ -14,3 +14,5 @@ Spec 的原真 App Router／Chromium反例 `/tmp/quiet-hours-opening-watchpoints
 確認頁可讀性另沿用既有 `CityAccessPreview`：實際場所／房間名稱與繁中權限標籤共用原映射，卡來源顯示已保存快照姓名及版本。固定 `09f30d0` 的正常五步真頁再次通過，包含精神容量 70／手動目前值 56、權限可理解名稱及原始開局另建世界；沒有改動初值或規則。
 
 另補一項產品 API 身分一致性反例：非 v4 的 opening ID 原回 200 且留草稿；合法 v4 草稿用非 v4 save ID 原回 201，但觀察路由只接受 v4。將既有 v4 pattern 移到輕量 `lib/save-identities.ts`，由新草稿／確認／世界路由與 UI 共用，既有 `legacy` 選檔別名保留。真 API red→green 覆蓋 v1、v5 草稿及確認拒絕，資料庫無新 draft／world／save 殘留、合法草稿未被標成已建立；API 組 **15/15**。此項固定來源後尚待最後 type／lint／build 及正常真頁覆驗，原正常 v4 旅程沒有換成 fixture。
+
+原 copied fixture 的判讀問題另收斂為 `tests/support/character-api-fixture.mjs`：SQLite migration、原子 D1／before-after fault、auth／骰 hosting 與實際 API 編譯只維護一份。卡片組與開局組僅保留各自真正使用的 API driver；開局組只編譯八個需要的 route，移除 copied 未使用範本／生成／卡片建世界方法。原故障、鎖定、來源、版本與跨帳號斷言不變，兩組 **26/26** 通過；不是新增產品測試捷徑。

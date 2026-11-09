@@ -1,33 +1,12 @@
 import '../tooling/verification/no-network.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createRequire } from 'node:module';
-import { DatabaseSync } from 'node:sqlite';
-import { readFile, readdir } from 'node:fs/promises';
-const require = createRequire(import.meta.url);
-const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('vite')] }));
-async function fixture() {
-  const db = new DatabaseSync(':memory:');
-  for (const name of (await readdir('drizzle')).filter(n => n.endsWith('.sql')).sort()) db.exec(await readFile('drizzle/' + name, 'utf8'));
-  const context = { owner: 'a', fault: null, dice:0, random:()=>{context.dice++;return .5;} };
-  context.env = { APP_ENV: 'local', AUTH_ORIGIN: 'https://test.invalid', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32), DB: { prepare(sql) { return { bind(...values) { return {
-    async first() {const formedWrite=sql.startsWith('UPDATE character_drafts')&&typeof values[0]==='string'&&JSON.parse(values[0]).formation;const fault=formedWrite&&context.formFault||sql.includes('RETURNING')&&context.fault;if(formedWrite&&context.formFault)context.formFault=null;else if(fault)context.fault=null;if(fault==='before')throw Error('before');const result=db.prepare(sql).get(...values)??null;if(fault==='after')throw Error('after');return result;},
-    async all() { return { results: db.prepare(sql).all(...values) }; }, async run() { const fault=sql.startsWith('INSERT INTO opening_drafts')&&context.draftFault;if(fault)context.draftFault=null;if(fault==='before')throw Error('before draft');const result={meta:{changes:Number(db.prepare(sql).run(...values).changes)}};if(fault==='after')throw Error('after draft');return result; },
-  }; } }; } } };
-  context.env.DB.batch=async statements=>{const fault=context.batchFault;context.batchFault=null;if(context.beforeBatch){const before=context.beforeBatch;context.beforeBatch=null;await before();}if(fault==='before')throw Error('before batch');db.exec('BEGIN');let committed=false;try{const result=[];for(const statement of statements)result.push(await statement.run());db.exec('COMMIT');committed=true;if(fault==='after')throw Error('after batch');return result;}catch(error){if(!committed)db.exec('ROLLBACK');throw error;}};
-  const built = await esbuild.build({ entryPoints: ['app/api/opening-drafts/route.ts','app/api/character-drafts/route.ts','app/api/character-drafts/form/route.ts','app/api/character-cards/route.ts','app/api/model-settings/route.ts','app/api/world/route.ts','app/api/character-templates/route.ts','app/api/scene-templates/route.ts','app/api/saves/route.ts','app/api/character-drafts/from-template/route.ts','app/api/character-drafts/generate/route.ts'], outdir:'/tmp/character-drafts-test', bundle: true, write: false, platform: 'node', format: 'cjs', alias: { '@': process.cwd() }, plugins: [{ name: 'boundaries', setup(b) {
-    b.onLoad({filter:/character-formation\.ts$/},async args=>({contents:(await readFile(args.path,'utf8')).replaceAll('Math.random','context.random'),loader:'ts'}));
-    b.onResolve({ filter: /^(cloudflare:workers|@\/lib\/auth)$/ }, a => ({ path: a.path, namespace: 'boundary' }));
-    b.onLoad({ filter: /.*/, namespace: 'boundary' }, a => ({ contents: a.path === 'cloudflare:workers' ? 'export const env = context.env;' : 'export const getGitHubUser = async () => context.owner ? {userId:context.owner} : null;' }));
-  } }] });
-  const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
-  const [openings,drafts,form,cards,api,world,people,scenes,saves,fromTemplate,generation] = entries;
-  async function post(route,payload,path) {if(route===openings||route===saves)payload={operationScope:context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
-  const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()};};
-  const worldRequest=async(payload,save)=>{const suffix=save?'?save='+save:'?workspace=account';const r=await world.GET(new Request('https://test.invalid/api/world'+suffix));const scope=await r.json();return payload===undefined?{status:r.status,body:scope}:post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world'+suffix);};
-
-  return {db,context,request,worldRequest,post,openings,scenes,saves,readOpening:async id=>{const r=await openings.GET(new Request('https://test.invalid/api/opening-drafts?id='+id+'&preview=1'));return {status:r.status,body:await r.json()};},source:payload=>post(people,payload,'/api/character-templates'),importTemplate:payload=>post(fromTemplate,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/from-template'),generate:payload=>post(generation,payload,'/api/character-drafts/generate'),readOperation:async id=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account&operationId='+id));return r.json();},saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),readDrafts:async()=>{const r=await drafts.GET();return {status:r.status,body:await r.json()};},form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:async()=>{const r=await cards.GET();return {status:r.status,body:await r.json()};}};
+import {characterApiFixture} from './support/character-api-fixture.mjs';
+async function fixture(){
+ const base=await characterApiFixture(['openings','drafts','form','cards','settings','world','scenes','saves']);const {context,post,read}=base,{openings,drafts,form,cards,scenes,saves}=base.routes;
+ return {...base,openings,scenes,saves,readOpening:id=>read(openings,'/api/opening-drafts?id='+id+'&preview=1'),saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:()=>read(cards,'/api/character-cards')};
 }
+
 
 const fields={name:'時雨',appearance:'35歲，身高175公分',personality:'安靜',abilities:'沒有特殊設定',background:'河畔長大',initialMemories:'記得老屋',beliefs:'重視承諾',preferences:'沒有特殊設定',directions:'修好老鐘',startLocation:''};
 const models={npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
