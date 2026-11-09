@@ -1,0 +1,191 @@
+{
+  "status": "passed",
+  "modelCalls": 1,
+  "paidModelCalls": 0,
+  "phases": [
+    "legacy conflict preserves input",
+    "owner-confirmed expertise/sense",
+    "profile SQLite reload",
+    "new-city existing editor and preview",
+    "new-city profile reload",
+    "new-city controlled model advance"
+  ],
+  "legacy": {
+    "blockedSenses": [],
+    "version": 1,
+    "activatedAt": 1260,
+    "authority": "owner-confirmed",
+    "values": {
+      "strength": 2,
+      "endurance": 3,
+      "dexterity": 4,
+      "perception": 4
+    },
+    "constraints": {
+      "strength": {
+        "value": 2,
+        "max": 2
+      }
+    },
+    "expertise": [
+      {
+        "scope": "髮飾設計",
+        "modifier": 10
+      }
+    ],
+    "senses": [
+      {
+        "scope": "hearing",
+        "modifier": -10
+      }
+    ]
+  },
+  "city": {
+    "blockedSenses": [],
+    "version": 1,
+    "activatedAt": 1260,
+    "authority": "owner-confirmed",
+    "values": {
+      "strength": 2,
+      "endurance": 3,
+      "dexterity": 4,
+      "perception": 4
+    },
+    "constraints": {
+      "strength": {
+        "max": 2
+      },
+      "dexterity": {
+        "value": 4
+      }
+    },
+    "expertise": [],
+    "senses": []
+  },
+  "formalOpening": {
+    "version": 1,
+    "policy": {
+      "version": 1,
+      "kind": "formal",
+      "id": "mental-energy-271-v1",
+      "initial": 3,
+      "maximum": 65,
+      "awakePerHour": 2,
+      "regulationCost": 5,
+      "lowAt": 13,
+      "process": {
+        "seed": 925109481,
+        "slotMinutes": 5,
+        "levels": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "multipliers": [
+          1
+        ]
+      },
+      "experience": {
+        "levels": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "value": 3,
+    "activatedAt": 1260,
+    "updatedAt": 1260,
+    "history": [],
+    "dropped": 0,
+    "formal": {
+      "sleepUnits": 0
+    }
+  },
+  "firstStep": {
+    "minute": 1265,
+    "timeContract": "five-minute-v1",
+    "mentalEnergy": {
+      "version": 1,
+      "policy": {
+        "version": 1,
+        "kind": "formal",
+        "id": "mental-energy-271-v1",
+        "initial": 3,
+        "maximum": 65,
+        "awakePerHour": 2,
+        "regulationCost": 5,
+        "lowAt": 13,
+        "process": {
+          "seed": 925109481,
+          "slotMinutes": 5,
+          "levels": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "multipliers": [
+            1
+          ]
+        },
+        "experience": {
+          "levels": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "value": 3,
+      "activatedAt": 1260,
+      "updatedAt": 1265,
+      "history": [
+        {
+          "kind": "natural",
+          "from": 1260,
+          "minute": 1265,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 3,
+          "after": 3,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 0,
+          "processMinutes": 0,
+          "processSlots": [],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 252,
+              "source": "natural",
+              "die": 6,
+              "face": 3,
+              "rawDelta": 0
+            }
+          ]
+        }
+      ],
+      "dropped": 0,
+      "formal": {
+        "sleepUnits": 0
+      },
+      "processSequence": 1,
+      "experiences": {
+        "receipts": [],
+        "dropped": 0
+      }
+    }
+  },
+  "operations": [
+    "adopt-character-attributes",
+    "adopt-character-attributes",
+    "preview-city",
+    "start-city",
+    "set-model-key",
+    "set-adjudication",
+    "advance"
+  ]
+}

@@ -96,7 +96,7 @@ test('a saved journey occupies world time, survives replay and arrives with the 
     return Response.json({usage:{prompt_tokens:9,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,action))}}]});
   };
   const ui=await mountScene();
-  const advance=()=>({operation:'advance',operationId:operationId(),worldContext:context,mode:'openai',model:'gpt-6.1-sol',minutes:15});
+  const advance=()=>({operation:'advance',operationId:operationId(),worldContext:context,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'});
   try {
     const beforeView=await read();
     await ui.render(beforeView.world);
@@ -112,7 +112,7 @@ test('a saved journey occupies world time, survives replay and arrives with the 
     const moving=firstRead.world.characters.find(actor=>actor.name==='雨槐');
     assert.equal(moving.location,'place:origin','the destination is reached only after the saved walk duration');
     assert.equal(moving.plan.journey.location,'place:destination');
-    assert.equal(moving.plan.until-started.world.minute,35);
+    assert.equal(moving.plan.until-started.world.minute,40);
     assert.match(moving.activity,/前往抵達屋/);
     await ui.render(firstRead.world);
     scene=document.querySelector('[aria-label="目前觀看場所"]');
@@ -130,13 +130,13 @@ test('a saved journey occupies world time, survives replay and arrives with the 
     assert.equal(replay.version,departed.version);
     assert.deepEqual(replay.world.characters.find(actor=>actor.id===moving.id).plan,moving.plan);
 
-    await expect(await post(route,advance()),200);
+    for(let step=0;step<5;step++)await expect(await post(route,advance()),200);
     const midpoint=await read();
     assert.equal(midpoint.world.characters.find(actor=>actor.id===moving.id).plan.until,moving.plan.until);
     assert.equal(midpoint.world.characters.find(actor=>actor.name==='枕溪').location,'place:destination');
     assert.match(midpoint.world.phones.devices.find(device=>device.objectId===phone.id).inbox[0].text,/抵達後/);
     assert.equal(midpoint.world.events.find(event=>event.kind==='phone-notification').audience.includes('npc:2'),false);
-    await expect(await post(route,advance()),200);
+    for(let step=0;step<2;step++)await expect(await post(route,advance()),200);
     const finished=await read();
     const arrived=finished.world.characters.find(actor=>actor.id===moving.id);
     assert.equal(arrived.location,'place:destination');
@@ -148,7 +148,7 @@ test('a saved journey occupies world time, survives replay and arrives with the 
     assert.equal(document.querySelector('[aria-label="移動途中"]'),null);
     assert.equal(finished.world.objects.find(object=>object.id===phone.id).region,arrived.region);
     assert.equal(finished.world.objects.find(object=>object.id===phone.id).holder,arrived.id);
-    assert.equal(finished.world.minute-started.world.minute,45);
+    assert.equal(finished.world.minute-started.world.minute,40);
     assert.equal(finished.world.events.filter(event=>event.kind==='move'&&event.actor===arrived.id).length,1);
     assert.equal(finished.world.events.find(event=>event.kind==='move'&&event.actor===arrived.id).entryPermission.allowed,true);
     assert.equal(inputs.filter(input=>input.self.name==='雨槐').length,1);

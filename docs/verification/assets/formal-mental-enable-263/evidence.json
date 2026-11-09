@@ -1,0 +1,952 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "counts": {
+    "npc": 2,
+    "judgments": 1,
+    "feelings": 2
+  },
+  "checks": {
+    "explicitOpening": true,
+    "actualProcess": true,
+    "realResult": true,
+    "voluntaryPayment": true,
+    "controlledAuthority": true,
+    "rawVersusActual": true,
+    "sqliteReload": true,
+    "originalIdReplay": true,
+    "invalidStateSafe": true
+  },
+  "character": {
+    "id": "owner",
+    "name": "店主",
+    "color": "#a5c9b3",
+    "location": "cafe",
+    "mood": "有人陪伴而安心",
+    "personality": "務實而溫和，喜歡把咖啡館打理舒適；尊重客人的空間，也會留意需要幫忙的人。",
+    "goal": "整理咖啡館，照顧自己的生活與來訪的客人。",
+    "activity": "正在進行已選活動，尚未完成。",
+    "relationships": {},
+    "memories": [
+      {
+        "id": "legacy:owner:memory:0:1260",
+        "time": 1260,
+        "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
+      },
+      {
+        "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
+        "time": 1265,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。"
+      },
+      {
+        "id": "65535b05-593e-4e03-a495-e69d4cc7097b",
+        "time": 1280,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。"
+      },
+      {
+        "id": "5b19711a-de92-4684-a407-016497193880",
+        "time": 1285,
+        "text": "店主 開始進行已選活動，完整結果尚未發生。"
+      },
+      {
+        "id": "143c7db1-efab-4652-abc3-7913596f234c",
+        "time": 1290,
+        "text": "店主 開始進行已選活動，完整結果尚未發生。"
+      },
+      {
+        "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
+        "time": 1295,
+        "text": "觀察者對 店主 說：「接管期間，我仍在這裡陪你。」"
+      }
+    ],
+    "intents": [
+      {
+        "id": "owner:direction",
+        "content": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "intensity": "medium",
+        "importance": "medium",
+        "urgency": "low",
+        "context": "",
+        "version": 1,
+        "kind": "direction",
+        "scope": "整理咖啡館，照顧自己的生活與來訪的客人。",
+        "satisfaction": null,
+        "parents": [],
+        "references": [],
+        "status": "active",
+        "reason": "角色設定提供的初始方向"
+      },
+      {
+        "id": "owner:create",
+        "content": "繼續創作",
+        "intensity": "medium",
+        "importance": "medium",
+        "urgency": "low",
+        "context": "",
+        "version": 1,
+        "kind": "intent",
+        "scope": "繼續創作",
+        "satisfaction": null,
+        "parents": [],
+        "references": [],
+        "status": "active",
+        "reason": "明示合成測試起點的追求"
+      }
+    ],
+    "control": {
+      "mode": "taken-over",
+      "experiences": [
+        {
+          "id": "143c7db1-efab-4652-abc3-7913596f234c",
+          "time": 1290,
+          "text": "店主 開始進行已選活動，完整結果尚未發生。"
+        },
+        {
+          "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
+          "time": 1295,
+          "text": "觀察者對 店主 說：「接管期間，我仍在這裡陪你。」"
+        }
+      ],
+      "active": true
+    },
+    "attentionConditions": [],
+    "observationCursor": 0,
+    "region": "cafe-front",
+    "observations": [],
+    "shortTerm": [
+      {
+        "id": "legacy:owner:memory:0:1260",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1260,
+        "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。",
+        "source": {
+          "kind": "legacy-unclassified"
+        }
+      },
+      {
+        "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1265,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "33f72c21-de90-4914-a4fa-de024f6634b2"
+      },
+      {
+        "id": "65535b05-593e-4e03-a495-e69d4cc7097b",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1280,
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+        "feelingOrigins": [
+          {
+            "id": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+            "actorId": "owner",
+            "version": 1,
+            "at": 1280,
+            "kind": "result"
+          }
+        ]
+      },
+      {
+        "id": "5b19711a-de92-4684-a407-016497193880",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1285,
+        "text": "店主 開始進行已選活動，完整結果尚未發生。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "8f50902a-2bab-4d36-a158-fb45df05a025"
+      },
+      {
+        "id": "143c7db1-efab-4652-abc3-7913596f234c",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1290,
+        "text": "店主 開始進行已選活動，完整結果尚未發生。",
+        "source": {
+          "kind": "experience",
+          "person": "owner",
+          "region": "cafe-front"
+        },
+        "eventId": "1972d504-3b49-4eff-886e-0a8a07bb1d6a",
+        "controlled": true
+      },
+      {
+        "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
+        "characterId": "owner",
+        "version": 1,
+        "time": 1295,
+        "text": "觀察者對 店主 說：「接管期間，我仍在這裡陪你。」",
+        "source": {
+          "kind": "experience",
+          "person": "observer",
+          "region": "cafe-front"
+        },
+        "eventId": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+        "controlled": true,
+        "feelingOrigins": [
+          {
+            "id": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+            "actorId": "owner",
+            "version": 1,
+            "at": 1295,
+            "kind": "experience"
+          }
+        ]
+      }
+    ],
+    "longTerm": [],
+    "mentalEnergy": {
+      "version": 1,
+      "policy": {
+        "version": 1,
+        "kind": "formal",
+        "id": "mental-energy-271-v1",
+        "initial": 3,
+        "maximum": 65,
+        "awakePerHour": 2,
+        "regulationCost": 5,
+        "lowAt": 13,
+        "process": {
+          "seed": 216479089,
+          "slotMinutes": 5,
+          "levels": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "multipliers": [
+            1
+          ]
+        },
+        "experience": {
+          "levels": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "value": 14,
+      "activatedAt": 1260,
+      "updatedAt": 1300,
+      "history": [
+        {
+          "kind": "natural",
+          "from": 1260,
+          "minute": 1265,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 3,
+          "after": 2,
+          "awakeMinutes": 5,
+          "naturalDelta": -1,
+          "processDelta": 0,
+          "processMinutes": 0,
+          "processSlots": [],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 252,
+              "source": "natural",
+              "die": 6,
+              "face": 1,
+              "rawDelta": -1
+            }
+          ]
+        },
+        {
+          "kind": "process",
+          "from": 1265,
+          "minute": 1270,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 2,
+          "after": 3,
+          "awakeMinutes": 5,
+          "naturalDelta": -1,
+          "processDelta": 2,
+          "processMinutes": 5,
+          "processSlots": [
+            {
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
+              "slot": 253,
+              "draw": 1
+            }
+          ],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 253,
+              "source": "natural",
+              "die": 6,
+              "face": 1,
+              "rawDelta": -1
+            },
+            {
+              "level": 3,
+              "direction": "positive",
+              "reason": "享受真正創作的過程",
+              "revision": 1,
+              "slot": 253,
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
+              "die": 3,
+              "face": 1,
+              "rawDelta": 2
+            }
+          ]
+        },
+        {
+          "kind": "process",
+          "from": 1270,
+          "minute": 1275,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 3,
+          "after": 5,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 2,
+          "processMinutes": 5,
+          "processSlots": [
+            {
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
+              "slot": 254,
+              "draw": 1
+            }
+          ],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 254,
+              "source": "natural",
+              "die": 6,
+              "face": 4,
+              "rawDelta": 0
+            },
+            {
+              "level": 3,
+              "direction": "positive",
+              "reason": "享受真正創作的過程",
+              "revision": 1,
+              "slot": 254,
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
+              "die": 3,
+              "face": 1,
+              "rawDelta": 2
+            }
+          ]
+        },
+        {
+          "kind": "process",
+          "from": 1275,
+          "minute": 1280,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 5,
+          "after": 8,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 3,
+          "processMinutes": 5,
+          "processSlots": [
+            {
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
+              "slot": 255,
+              "draw": 2
+            }
+          ],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 255,
+              "source": "natural",
+              "die": 6,
+              "face": 4,
+              "rawDelta": 0
+            },
+            {
+              "level": 3,
+              "direction": "positive",
+              "reason": "享受真正創作的過程",
+              "revision": 1,
+              "slot": 255,
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
+              "die": 3,
+              "face": 2,
+              "rawDelta": 3
+            }
+          ]
+        },
+        {
+          "kind": "natural",
+          "from": 1280,
+          "minute": 1285,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 8,
+          "after": 8,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 0,
+          "processMinutes": 0,
+          "processSlots": [],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 256,
+              "source": "natural",
+              "die": 6,
+              "face": 4,
+              "rawDelta": 0
+            }
+          ]
+        },
+        {
+          "kind": "experience",
+          "from": 1285,
+          "minute": 1285,
+          "reason": "真實成果帶來獨立成就感",
+          "before": 8,
+          "after": 13,
+          "awakeMinutes": 0,
+          "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+          "moodBefore": "低落",
+          "moodAfter": "有成就感",
+          "draws": [
+            {
+              "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+              "die": 4,
+              "face": 1,
+              "rawDelta": 5
+            }
+          ],
+          "rawDelta": 5,
+          "groupId": "experience:1285:1280"
+        },
+        {
+          "kind": "regulation",
+          "from": 1285,
+          "minute": 1285,
+          "reason": "有餘裕讓自己能承受",
+          "effort": "慢慢呼吸整理想法",
+          "before": 13,
+          "after": 8,
+          "awakeMinutes": 0,
+          "moodBefore": "有成就感",
+          "moodAfter": "稍微穩住"
+        },
+        {
+          "kind": "natural",
+          "from": 1285,
+          "minute": 1290,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 8,
+          "after": 8,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 0,
+          "processMinutes": 0,
+          "processSlots": [],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 257,
+              "source": "natural",
+              "die": 6,
+              "face": 5,
+              "rawDelta": 0
+            }
+          ]
+        },
+        {
+          "kind": "process",
+          "from": 1290,
+          "minute": 1295,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 8,
+          "after": 9,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 1,
+          "processMinutes": 5,
+          "processSlots": [
+            {
+              "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+              "slot": 258,
+              "draw": 1
+            }
+          ],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 258,
+              "source": "natural",
+              "die": 6,
+              "face": 2,
+              "rawDelta": 0
+            },
+            {
+              "level": 2,
+              "direction": "positive",
+              "reason": "本人覺得這段受控休息放鬆",
+              "revision": 1,
+              "slot": 258,
+              "source": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+              "die": 3,
+              "face": 1,
+              "rawDelta": 1
+            }
+          ]
+        },
+        {
+          "kind": "process",
+          "from": 1295,
+          "minute": 1300,
+          "reason": "正式五分鐘時間來源共同結算",
+          "before": 9,
+          "after": 11,
+          "awakeMinutes": 5,
+          "naturalDelta": 0,
+          "processDelta": 2,
+          "processMinutes": 5,
+          "processSlots": [
+            {
+              "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+              "slot": 259,
+              "draw": 2
+            }
+          ],
+          "sleepDelta": 0,
+          "draws": [
+            {
+              "slot": 259,
+              "source": "natural",
+              "die": 6,
+              "face": 4,
+              "rawDelta": 0
+            },
+            {
+              "level": 2,
+              "direction": "positive",
+              "reason": "本人覺得這段受控休息放鬆",
+              "revision": 1,
+              "slot": 259,
+              "source": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+              "die": 3,
+              "face": 2,
+              "rawDelta": 2
+            }
+          ]
+        },
+        {
+          "kind": "experience",
+          "from": 1300,
+          "minute": 1300,
+          "reason": "真正新陪伴帶來獨立支持",
+          "before": 11,
+          "after": 14,
+          "awakeMinutes": 0,
+          "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+          "moodBefore": "稍微穩住",
+          "moodAfter": "有人陪伴而安心",
+          "draws": [
+            {
+              "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+              "die": 4,
+              "face": 1,
+              "rawDelta": 3
+            }
+          ],
+          "rawDelta": 3,
+          "groupId": "experience:1300:1295"
+        }
+      ],
+      "dropped": 0,
+      "formal": {
+        "sleepUnits": 0
+      },
+      "processSequence": 3,
+      "experiences": {
+        "receipts": [
+          {
+            "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+            "direction": "positive",
+            "level": 3,
+            "reason": "真實成果帶來獨立成就感",
+            "mood": "有成就感",
+            "originKind": "result",
+            "at": 1285,
+            "expiresAt": 11360,
+            "before": 8,
+            "after": 13,
+            "moodBefore": "低落",
+            "moodAfter": "有成就感",
+            "draw": {
+              "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
+              "die": 4,
+              "face": 1,
+              "rawDelta": 5
+            },
+            "rawDelta": 5,
+            "groupId": "experience:1285:1280"
+          },
+          {
+            "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+            "direction": "positive",
+            "level": 2,
+            "reason": "真正新陪伴帶來獨立支持",
+            "mood": "有人陪伴而安心",
+            "originKind": "experience",
+            "at": 1300,
+            "expiresAt": 11375,
+            "before": 11,
+            "after": 14,
+            "moodBefore": "稍微穩住",
+            "moodAfter": "有人陪伴而安心",
+            "draw": {
+              "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+              "die": 4,
+              "face": 1,
+              "rawDelta": 3
+            },
+            "rawDelta": 3,
+            "groupId": "experience:1300:1295"
+          }
+        ],
+        "dropped": 0
+      },
+      "lastRegulationChoice": "4:1285:owner",
+      "controlAssessments": {
+        "sources": [
+          {
+            "id": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
+            "at": 1295
+          }
+        ],
+        "activities": [
+          {
+            "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+            "at": 1290
+          }
+        ],
+        "dropped": 0
+      }
+    },
+    "needs": {
+      "version": 1,
+      "activatedAt": 1260,
+      "updatedAt": 1300,
+      "values": {
+        "hunger": 22,
+        "thirst": 24,
+        "fatigue": 14.14,
+        "sleep": 22.64
+      },
+      "assessed": {
+        "hunger": 0,
+        "thirst": 0,
+        "fatigue": 0,
+        "sleep": 0
+      },
+      "history": [
+        {
+          "minute": 1265,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20,
+            "thirst": 20,
+            "fatigue": 15,
+            "sleep": 20
+          },
+          "after": {
+            "hunger": 20.25,
+            "thirst": 20.5,
+            "fatigue": 15.08,
+            "sleep": 20.33
+          }
+        },
+        {
+          "minute": 1270,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20.25,
+            "thirst": 20.5,
+            "fatigue": 15.08,
+            "sleep": 20.33
+          },
+          "after": {
+            "hunger": 20.5,
+            "thirst": 21,
+            "fatigue": 15.16,
+            "sleep": 20.66
+          }
+        },
+        {
+          "minute": 1275,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20.5,
+            "thirst": 21,
+            "fatigue": 15.16,
+            "sleep": 20.66
+          },
+          "after": {
+            "hunger": 20.75,
+            "thirst": 21.5,
+            "fatigue": 15.24,
+            "sleep": 20.99
+          }
+        },
+        {
+          "minute": 1280,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 20.75,
+            "thirst": 21.5,
+            "fatigue": 15.24,
+            "sleep": 20.99
+          },
+          "after": {
+            "hunger": 21,
+            "thirst": 22,
+            "fatigue": 15.32,
+            "sleep": 21.32
+          }
+        },
+        {
+          "minute": 1285,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 21,
+            "thirst": 22,
+            "fatigue": 15.32,
+            "sleep": 21.32
+          },
+          "after": {
+            "hunger": 21.25,
+            "thirst": 22.5,
+            "fatigue": 15.4,
+            "sleep": 21.65
+          }
+        },
+        {
+          "minute": 1290,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 21.25,
+            "thirst": 22.5,
+            "fatigue": 15.4,
+            "sleep": 21.65
+          },
+          "after": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.48,
+            "sleep": 21.98
+          }
+        },
+        {
+          "minute": 1295,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 21.5,
+            "thirst": 23,
+            "fatigue": 15.48,
+            "sleep": 21.98
+          },
+          "after": {
+            "hunger": 21.75,
+            "thirst": 23.5,
+            "fatigue": 14.81,
+            "sleep": 22.31
+          }
+        },
+        {
+          "minute": 1300,
+          "reason": "世界時間與實際活動",
+          "before": {
+            "hunger": 21.75,
+            "thirst": 23.5,
+            "fatigue": 14.81,
+            "sleep": 22.31
+          },
+          "after": {
+            "hunger": 22,
+            "thirst": 24,
+            "fatigue": 14.14,
+            "sleep": 22.64
+          }
+        }
+      ],
+      "dropped": 0
+    },
+    "attentionDiagnostics": [
+      {
+        "time": 1265,
+        "reason": "正常決策或重新評估時取得待用觀察"
+      },
+      {
+        "time": 1285,
+        "reason": "正常決策或重新評估時取得待用觀察"
+      },
+      {
+        "time": 1290,
+        "reason": "正常決策或重新評估時取得待用觀察"
+      }
+    ],
+    "eventHabits": [],
+    "memoryTrace": [],
+    "pursuitArchived": [],
+    "pursuitArchivedDropped": 0,
+    "pursuitTrace": [],
+    "pursuitTraceDropped": 0,
+    "focusIntentId": null,
+    "habitEvidenceDropped": 0,
+    "habitEvidence": [
+      {
+        "id": "33f72c21-de90-4914-a4fa-de024f6634b2",
+        "version": 1,
+        "time": 1265,
+        "location": "cafe",
+        "activityKey": "unclassified",
+        "activityLabel": "完成作品",
+        "semanticGap": true,
+        "eventId": "33f72c21-de90-4914-a4fa-de024f6634b2",
+        "memory": {
+          "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
+          "version": 1
+        },
+        "started": true
+      },
+      {
+        "id": "8f50902a-2bab-4d36-a158-fb45df05a025",
+        "version": 1,
+        "time": 1285,
+        "location": "cafe",
+        "activityKey": "rest:",
+        "activityLabel": "休息",
+        "eventId": "8f50902a-2bab-4d36-a158-fb45df05a025",
+        "memory": {
+          "id": "5b19711a-de92-4684-a407-016497193880",
+          "version": 1
+        },
+        "started": true
+      }
+    ],
+    "habits": [
+      {
+        "activityKey": "rest:",
+        "activityLabel": "休息",
+        "evidenceIds": [
+          "8f50902a-2bab-4d36-a158-fb45df05a025"
+        ],
+        "key": "activity.v1:3:cafe:rest:",
+        "type": "rest",
+        "target": "",
+        "location": "cafe",
+        "period": 3,
+        "observedDays": [
+          1
+        ],
+        "lastSeen": 1285
+      }
+    ],
+    "plan": {
+      "deferredAction": true,
+      "checkSystem": "d20-v1",
+      "action": {
+        "type": "rest"
+      },
+      "startedAt": 1290,
+      "until": 1350,
+      "attention": "",
+      "modelKey": "openai:gpt-6-luna",
+      "timeIntent": {
+        "kind": "open-ended",
+        "maxMinutes": null
+      },
+      "bodyActivity": {
+        "version": 1,
+        "kind": "rest",
+        "fatiguePerHour": -9,
+        "sleepPerHour": 0
+      },
+      "mentalProcess": {
+        "version": 1,
+        "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+        "randomState": 693145709,
+        "draws": 2,
+        "effectiveAt": 1300,
+        "updatedAt": 1300,
+        "activeMinutes": 10,
+        "revision": 2,
+        "assessment": {
+          "direction": "positive",
+          "level": 2,
+          "reason": "本人覺得這段受控休息放鬆"
+        }
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "workpiece",
+      "source": "fixture",
+      "label": "練習作品",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "revision": 2,
+      "state": {
+        "progress": "complete"
+      },
+      "lifecycle": "active",
+      "kind": "utensil",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ],
+      "stateTransitions": {
+        "progress": [
+          "raw",
+          "complete"
+        ]
+      }
+    },
+    {
+      "id": "phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333",
+      "source": "phone-baseline-v1",
+      "label": "店主 的手機",
+      "kind": "phone",
+      "region": "cafe-front",
+      "holder": "owner",
+      "owner": "owner",
+      "revision": 1,
+      "state": {
+        "condition": "sound"
+      },
+      "lifecycle": "active",
+      "knownTo": [
+        "owner"
+      ],
+      "allowedTo": [
+        "owner"
+      ]
+    }
+  ]
+}

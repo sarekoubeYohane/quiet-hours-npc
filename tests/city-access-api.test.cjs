@@ -100,8 +100,10 @@ test('entry permission uses the actual place and the room override and is record
     return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(action)}}]});
   };
   try {
-    await response(await send(route, { operation:'advance', worldContext:world.contextId, operationId:operationId(), mode:'openai', model:'gpt-6.1-sol', minutes:15 }), 200);
-    await response(await send(route, { operation:'advance', worldContext:world.contextId, operationId:operationId(), mode:'openai', model:'gpt-6.1-sol', minutes:15 }), 200);
+    // New choices begin forward; complete the fifteen-minute movement before judging a new room proposal.
+    for(let step=0;step<5;step++){
+    await response(await send(route, { operation:'advance', worldContext:world.contextId, operationId:operationId(), mode:'openai', model:'gpt-6.1-sol', minutes:5,timeContract:'five-minute-v1' }), 200);
+    }
   } finally {
     global.fetch = transport;
   }

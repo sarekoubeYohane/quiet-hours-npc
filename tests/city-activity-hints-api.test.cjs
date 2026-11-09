@@ -120,7 +120,7 @@ test('known city fixtures suggest optional methods without exposing hidden restr
         const hint=input.activityHints?.find(item=>item.target.endsWith(':object:regulator'));
         assert.ok(hint,'a known fixture has a suggestion');
         action={type:'propose',target:hint.target,content:hint.content,purpose:'調整眼前裝置',timeIntent};
-      }else if(input.self.name==='杉'){
+      }else if(phase==='free'&&input.self.name==='杉'){
         const tray=input.objects.find(item=>item.label==='小托盤');
         assert.ok(tray);
         assert.ok(!input.activityHints.some(item=>item.target===tray.id));
@@ -144,7 +144,7 @@ test('known city fixtures suggest optional methods without exposing hidden restr
   };
 
   try {
-    const step={operation:'advance',operationId:operationId(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:15};
+    const step={operation:'advance',operationId:operationId(),worldContext:world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'};
     store.throwAfterNextSave();
     const result=await response(await post(route,step),200);
     const hints=decisions.slice(0,2).map(input=>input.activityHints.map(({kind,content})=>({kind,content})));
@@ -155,23 +155,27 @@ test('known city fixtures suggest optional methods without exposing hidden restr
     assert.equal(replay.version,result.version);
     assert.equal(decisions.length,2);
     assert.equal((await read()).world.aiUsage.totalCalls,4);
+    phase='wait';
+    for(let part=0;part<3;part++)await response(await post(route,{...step,operationId:operationId()}),200);
     assert.equal((await read()).world.objects.find(item=>item.id==='place:clear:object:regulator').state.指示,'已調整');
     assert.equal((await read()).world.objects.find(item=>item.id==='place:blocked:object:regulator').state.指示,'待調整');
 
     phase='free';
+    await response(await post(route,{operation:'intervene',operationId:operationId(),worldContext:world.contextId,mode:'openai',target:'npc:2',text:'可以重新考慮其他自由方法。'}),200);
     await response(await post(route,{...step,operationId:operationId()}),200);
+    for(let part=0;part<3;part++)await response(await post(route,{...step,operationId:operationId()}),200);
     const after=(await read()).world;
     assert.equal(adjudications.length,3);
     assert.equal(adjudications[2].action.content,'把托盤倒扣當成共鳴底座');
     assert.equal(after.objects.find(item=>item.id==='place:blocked:object:tray').state.用途,'共鳴底座');
-    assert.equal(after.aiUsage.totalCalls,7);
-    assert.equal(after.aiUsage.totalInputTokens,70);
-    assert.equal(after.aiUsage.totalOutputTokens,35);
-    assert.equal(after.turn,2);
+    assert.equal(after.aiUsage.totalCalls,8);
+    assert.equal(after.aiUsage.totalInputTokens,80);
+    assert.equal(after.aiUsage.totalOutputTokens,40);
+    assert.equal(after.turn,8);
     assert.deepEqual(after.characters.map(actor=>actor.name),['澄','杉']);
     const actor=after.characters.find(person=>person.name==='杉');
-    assert.ok(after.events.some(event=>event.actor===actor.id&&event.kind==='blocked'&&event.time===1275));
-    assert.ok(after.events.some(event=>event.actor===actor.id&&event.kind==='work'&&event.time===1290));
+    assert.ok(after.events.some(event=>event.actor===actor.id&&event.kind==='blocked'&&event.time===1265));
+    assert.ok(after.events.some(event=>event.actor===actor.id&&event.kind==='work'&&event.time===1300));
     await verifyObservedResults();
   } finally {
     global.fetch=originalFetch;
