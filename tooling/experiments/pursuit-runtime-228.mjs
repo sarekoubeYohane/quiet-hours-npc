@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
-export async function createRuntime({ root = process.cwd(), databasePath, owner = 'pursuit-experiment-payer', readonly = false, storageFault } = {}) {
+export async function createRuntime({ root = process.cwd(), databasePath, owner = 'pursuit-experiment-payer', readonly = false, storageFault, legacySeed = false } = {}) {
   if (!databasePath) throw Error('A private file SQLite path is required');
   const require = createRequire(join(resolve(root), 'package.json'));
   const ts = require('typescript');
@@ -32,6 +32,9 @@ export async function createRuntime({ root = process.cwd(), databasePath, owner 
       db.prepare('INSERT INTO experiment_migrations VALUES (?)').run(file);
     }
   }
+  // Explicit legacy/research fixture only. Product reads never create a seed,
+  // and this setup is not evidence that the user's new-world journey succeeded.
+  if (!readonly && legacySeed && !db.prepare('SELECT owner FROM worlds WHERE owner=?').get(owner)) db.prepare('INSERT OR IGNORE INTO worlds (owner,state,version,locked_until) VALUES (?,?,0,0)').run(owner,JSON.stringify(load('world').seedWorld()));
   const adapter = { prepare(sql) { return { bind(...values) { return {
     async all() { return { results: db.prepare(sql).all(...values) }; },
     async first() { return db.prepare(sql).get(...values) ?? null; },
