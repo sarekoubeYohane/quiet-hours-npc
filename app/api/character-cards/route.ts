@@ -9,9 +9,13 @@ export async function POST(request:Request){
  if(request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'請從人物頁操作。'},403);
  try{
   const user=await getGitHubUser();if(!user)return reply({error:'請先登入。'},401);
-  const input=await request.json() as {id?:string;version?:number};
-  if(Object.keys(input).sort().join(',')!=='id,version'||typeof input.id!=='string'||!Number.isSafeInteger(input.version)||input.version!<0)return reply({error:'完成人物卡保存身分無效。'},400);
+  const raw=await request.text();if(raw.length>3000)return reply({error:'操作內容過長。'},400);
+  let parsed:unknown;try{parsed=JSON.parse(raw);}catch{return reply({error:'請提供有效的操作內容。'},400);}
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return reply({error:'操作格式無效。'},400);
+  const input=parsed as {id?:string;version?:number;operationScope?:string};
+  if(Object.keys(input).sort().join(',')!=='id,operationScope,version'||typeof input.id!=='string'||!Number.isSafeInteger(input.version)||input.version!<0)return reply({error:'完成人物卡保存身分無效。'},400);
+  if(input.operationScope!=='account-operations:'+user.userId)return reply({error:'原帳號已變更，請回原帳號恢復完成人物卡保存。'},409);
   const card=await completeCharacterCard(user.userId,input.id,input.version!);if(!card)return reply({error:'草稿尚未形成、配點不合法或版本已變更；原輸入已保留。'},409);
-  const draft=await loadCharacterDraft(user.userId,input.id);return reply({card,...(draft?{draft:characterDraftForClient(draft)}:{})});
+  const draft=await loadCharacterDraft(user.userId,input.id);return reply({card,...(draft?{draft:characterDraftForClient(draft,user.userId)}:{})});
  }catch{return reply({error:'完成人物卡保存結果尚未確認，請用原草稿恢復保存。'},503);}
 }

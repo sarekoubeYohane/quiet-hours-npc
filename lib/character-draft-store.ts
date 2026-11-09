@@ -26,5 +26,5 @@ export async function saveCharacterDraft(owner: string, input: NonNullable<Retur
   if(current?.formation||current?.pendingFormation)return;
   if (sameText && (current.version === input.version || current.version === input.version + 1)) return current;
   if ((current?.version ?? 0) !== input.version) return;
-  return writeCharacterDraft(owner, { ...input, provenance: userTextProvenance(current, input.fields), ...(current?.completedGeneration ? { completedGeneration: current.completedGeneration } : {}), ...(current?.pendingGeneration ? { pendingGeneration: current.pendingGeneration } : {}) });
+  return writeCharacterDraft(owner, { ...input, provenance: userTextProvenance(current, input.fields), ...(current?.sourceTemplate?{sourceTemplate:current.sourceTemplate}:{}), ...(current?.completedGeneration ? { completedGeneration: current.completedGeneration } : {}), ...(current?.pendingGeneration ? { pendingGeneration: current.pendingGeneration } : {}) });
 }

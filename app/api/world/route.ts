@@ -500,7 +500,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           }
         }
       } catch (error) {
-        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
+        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(assessingCard ? '人物背景未能判讀，尚未形成數值，原文字已保留。' : characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
       }
     } else if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {

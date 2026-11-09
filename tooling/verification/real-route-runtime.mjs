@@ -12,7 +12,7 @@ import {createHash} from 'node:crypto';
 import './no-network.mjs';
 import http from 'node:http';
 
-export async function startApp({root=process.cwd(), port=0, databasePath, modelResponder}={}) {
+export async function startApp({root=process.cwd(), port=0, databasePath, modelResponder, diceFaces}={}) {
   root=resolve(root);
   if(!port){const probe=http.createServer();await new Promise(done=>probe.listen(0,'127.0.0.1',done));port=probe.address().port;await new Promise(done=>probe.close(done));}
   const require=createRequire(join(root,'package.json'));
@@ -47,6 +47,8 @@ export async function startApp({root=process.cwd(), port=0, databasePath, modelR
   await new Promise(done=>relay.listen(0,'127.0.0.1',done));
   const modelUrl=`http://127.0.0.1:${relay.address().port}/model`;
   const bindings=join(directory,'bindings.mjs'), auth=join(directory,'auth.mjs');
+  let dicePath;
+  if(diceFaces!==undefined){if(!Array.isArray(diceFaces)||diceFaces.some(face=>!Number.isInteger(face)||face<1||face>6))throw Error('Controlled dice must contain d6 faces');dicePath=join(directory,'dice.mjs');await writeFile(dicePath,`const faces=${JSON.stringify(diceFaces)};let cursor=0;export function cardRandom(){if(cursor>=faces.length)throw Error('Controlled character dice exhausted');return (faces[cursor++]-1)/6;}`);}
   await writeFile(bindings,`import {DatabaseSync} from 'node:sqlite';
 const db=new DatabaseSync(${JSON.stringify(sqlitePath)});
 const DB={prepare(sql){return {bind(...args){return {
@@ -71,6 +73,7 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
       if(source==='@/lib/auth'||source===join(root,'lib/auth.ts')||source===join(root,'lib/auth')||(source==='./auth'&&importer?.startsWith(join(root,'lib'))))return auth;
     },
     transform(source,id){
+      if(dicePath&&id.split('?')[0]===join(root,'lib/character-formation.ts')){const marker='const sample=Math.random();';if(!source.includes(marker))throw Error('Character dice boundary changed');return `import {cardRandom} from ${JSON.stringify(dicePath)};\n`+source.replace(marker,'const sample=cardRandom();');}
       if(id.split('?')[0]!==join(root,'lib/model-adapter.ts'))return;
       const expected='options.fetcher || fetch';
       if(!source.includes(expected))throw Error('Model boundary changed: update the acceptance harness before testing');
