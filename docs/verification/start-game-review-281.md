@@ -39,3 +39,13 @@ T9 實作者另外確認：另存請求未受理、回覆不明後頁面重載�
 全部修正仍由同一實作者處理。最新工作樹的未知費用真頁兩處已通過，費用推估自動採樣仍在驗證；尚未提供新的固定 ready tip，因此未以工作中結果關票或宣告所有 finding 清零。T5 的兩項 finding 尚待同一實作者接合修正。
 
 該修復分支一次完整測試執行的核心結果為 **1258/1264，6 failed**，後續 auth／Workers／source-pin 組未執行。六個反例修正後窄測 6/6、帳號與草稿 20/20 及 typecheck 通過；不將此記成完整回歸通過。原始 log 保留，最後仍須對固定整合版本完成完整檢查。
+
+## 已整合修正的獨立覆核
+
+- `0ccfef3`：Standards 固定來源確認推估改用 `currentUsage(world)` 及帳號有效價格／版本，原 Forecast P2 remaining 0；Spec 重跑真正 API／SQLite 反例並渲染共用 flag 及兩處 JSX，未知費用 P2 1/1 通過、remaining 0。
+- `2355317`：Standards 原 T5 正規化 P3 remaining 0，無依賴的 `text-equivalence.ts` 共用原等價規則；形成、數字禁令、跨檔預算及並行／回放窄測 4/4。Spec 原三筆自然中文已 200，卻新增發現英文 `strength must be 18`、`endurance between 8 and 18` 也被允許形成，數值禁令有 P2 一項，不宣稱模型因此控制了骰果。
+- `1645a05`：同一修復實作者補正英文數值語法；Spec 原獨立反例兩筆均 400，同批七筆中英指定／範圍均拒絕，原三筆自然中文仍 200，年齡／身高及中文 2/2、兩份獨立反例各 1/1，remaining 0。
+
+完整 ready tip `238f2c2` 已由 merger 合入 `b653e6f` 並推送。合後 no-network cards／drafts／models **31/31**、save-management **8/8**、typecheck、diffcheck 通過。`2355317` 的帳號、形成、推估三個固定真頁旅程及最後 `1645a05` 形成旅程、typecheck／lint／build 均通過；推估證據實際 61 秒、2 回合，沒有混入另一世界的 10 USD。
+
+本輪已提出的 Standards／Spec finding 均已獨立覆核清零，但這仍不是整份 #281 的最終審查。#287 在 #286 真正 closed 且重新讀取原生圖後才開始；T6–T8 尚待交付，最後須再以 `249f20c` 對完整固定整合分支做兩軸 review 與必要回歸。正式導覽的外部阻擋亦未解除。
