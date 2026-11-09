@@ -1,4 +1,4 @@
-import {latestArrangement,actionableArrangement} from './opening-arrangement-store';
+import {latestArrangement,actionableArrangement,readArrangement,type ArrangementRow} from './opening-arrangement-store';
 import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
@@ -31,12 +31,7 @@ async function selectedSources(owner:string,body:Body,old?:Sources):Promise<Sour
  const pick=<T extends {id:string;version:number}>(refs:{templateId:string;version:number}[],saved:T[],live:T[])=>refs.map(ref=>saved.find(item=>item.id===ref.templateId&&item.version===ref.version)??live.find(item=>item.id===ref.templateId&&item.version===ref.version)).filter((item):item is T=>!!item);
  return {cards:pick(body.city.characters,old?.cards??[],cards),scenes:pick(body.city.places,old?.scenes??[],scenes)};
 }
-export async function saveOpeningDraft(owner:string,input:z.infer<typeof openingInputSchema>){
- if(input.operationScope!==owner)throw new SaveAccessError('原帳號已切換，請回到原帳號恢復此操作。',409);
- const previous=await rowFor(owner,input.id),request=JSON.stringify(input);
- if(previous?.last_request===request)return readOpeningDraft(owner,input.id);
- const pending=await database().prepare("SELECT operation_id FROM opening_arrangements WHERE owner=? AND draft_id=? AND state='pending'").bind(owner,input.id).first();if(pending)throw new SaveAccessError('已有AI整理操作，請先恢復原操作，原輸入已保留。',409);
- if(previous?.finalized_save_id||previous&&previous.version!==input.version||!previous&&input.version!==0)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留，請重新核對。',409);
+async function prepareOpeningWrite(owner:string,input:z.infer<typeof openingInputSchema>,previous?:Row|null){
  let body:Body,sources:Sources;
  if('restartSaveId' in input){
   const original=await database().prepare('SELECT original_opening FROM world_saves WHERE owner=? AND id=?').bind(owner,input.restartSaveId).first<{original_opening:string|null}>();
@@ -49,11 +44,47 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
  const candidate:Candidate=previous&&JSON.stringify(JSON.parse(previous.body).city)===JSON.stringify(body.city)?JSON.parse(previous.candidate):await prepareCity(owner,body.city,{minute:1260,turn:0,characters:[],events:[],lastMode:'demo'},sources);
  if(body.city.characters.some(ref=>!sources.cards.some(card=>card.id===ref.templateId&&card.version===ref.version))){candidate.preview.issues.push('請選用已完成人物卡；文字範本及未形成草稿不能進入世界。');delete candidate.world;}
  if(candidate.world)candidate.world.timeContract='five-minute-v1';
+ return {body,sources,candidate};
+}
+export async function saveOpeningDraft(owner:string,input:z.infer<typeof openingInputSchema>){
+ if(input.operationScope!==owner)throw new SaveAccessError('原帳號已切換，請回到原帳號恢復此操作。',409);
+ const previous=await rowFor(owner,input.id),request=JSON.stringify(input);
+ if(previous?.last_request===request)return readOpeningDraft(owner,input.id);
+ const pending=await database().prepare("SELECT operation_id FROM opening_arrangements WHERE owner=? AND draft_id=? AND state='pending'").bind(owner,input.id).first();if(pending)throw new SaveAccessError('已有AI整理操作，請先恢復原操作，原輸入已保留。',409);
+ if(previous?.finalized_save_id||previous&&previous.version!==input.version||!previous&&input.version!==0)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留，請重新核對。',409);
+ const {body,sources,candidate}=await prepareOpeningWrite(owner,input,previous);
  await database().prepare(`INSERT INTO opening_drafts (owner,id,version,body,sources,candidate,last_request) VALUES (?,?,1,?,?,?,?)
   ON CONFLICT(owner,id) DO UPDATE SET version=opening_drafts.version+1,body=excluded.body,sources=excluded.sources,candidate=excluded.candidate,last_request=excluded.last_request
   WHERE opening_drafts.version=? AND opening_drafts.finalized_save_id IS NULL AND NOT EXISTS (SELECT 1 FROM opening_arrangements a WHERE a.owner=opening_drafts.owner AND a.draft_id=opening_drafts.id AND a.state='pending')`).bind(owner,input.id,JSON.stringify(body),JSON.stringify(sources),JSON.stringify(candidate),request,input.version).run();
  const stored=await rowFor(owner,input.id);
  if(stored?.last_request!==request)throw new SaveAccessError('未同步：另一頁已修改開局草稿，請保留輸入重新核對。',409);
+ return readOpeningDraft(owner,input.id);
+}
+/** The draft CAS and its adoption receipt commit or roll back together. */
+export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer<typeof openingInputSchema>,{body:unknown}>,proposal:ArrangementRow,adoption:string){
+ if(input.operationScope!==owner||proposal.owner!==owner||proposal.draft_id!==input.id||proposal.state!=='complete'||!proposal.result)throw new SaveAccessError('原整理操作已變更，請保留輸入並核對。',409);
+ const previous=await rowFor(owner,input.id);
+ if(!previous||previous.finalized_save_id)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留。',409);
+ if(previous.version!==input.version){
+  const completed=await readArrangement(owner,input.id,proposal.operation_id);
+  // Only the committed receipt for this exact operation can explain a raced
+  // version; matching city text or a later version is never proof of adoption.
+  if(completed?.state==='adopted'&&completed.adoption_request===adoption)return readOpeningDraft(owner,input.id);
+  throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留。',409);
+ }
+ const {body,sources,candidate}=await prepareOpeningWrite(owner,input,previous),db=database();
+ // Both statements use the same proposal revision and frozen result. The unique
+ // adoption request marks this operation, rather than an unrelated manual save
+ // that happens to contain the same city at the next draft version.
+ const eligible="owner=? AND draft_id=? AND operation_id=? AND revision=? AND state='complete' AND result=? AND snapshot=? AND request=? AND adoption_request IS NULL AND rowid=(SELECT rowid FROM opening_arrangements latest WHERE latest.owner=? AND latest.draft_id=? AND latest.state IN ('pending','complete','adopted') ORDER BY rowid DESC LIMIT 1)";
+ const bindings=[owner,input.id,proposal.operation_id,proposal.revision,proposal.result,proposal.snapshot,proposal.request,owner,input.id];
+ const noPending="NOT EXISTS (SELECT 1 FROM opening_arrangements pending WHERE pending.owner=? AND pending.draft_id=? AND pending.state='pending')";
+ await db.batch([
+  db.prepare(`UPDATE opening_drafts SET version=version+1,body=?,sources=?,candidate=?,last_request=? WHERE owner=? AND id=? AND version=? AND finalized_save_id IS NULL AND ${noPending} AND EXISTS (SELECT 1 FROM opening_arrangements WHERE ${eligible})`).bind(JSON.stringify(body),JSON.stringify(sources),JSON.stringify(candidate),adoption,owner,input.id,input.version,owner,input.id,...bindings),
+  db.prepare(`UPDATE opening_arrangements SET state='adopted',adoption_request=? WHERE ${eligible} AND ${noPending} AND EXISTS (SELECT 1 FROM opening_drafts d WHERE d.owner=? AND d.id=? AND d.version=? AND d.last_request=? AND d.finalized_save_id IS NULL)`).bind(adoption,...bindings,owner,input.id,owner,input.id,input.version+1,adoption),
+ ]);
+ const receipt=await readArrangement(owner,input.id,proposal.operation_id);
+ if(receipt?.state!=='adopted'||receipt.adoption_request!==adoption)throw new SaveAccessError('未同步：開局或建議版本已變更，原輸入已保留，請重新核對。',409);
  return readOpeningDraft(owner,input.id);
 }
 export const confirmOpeningSchema=z.object({operationScope,id:identity,draftId:identity,draftVersion:z.number().int().positive()}).strict();

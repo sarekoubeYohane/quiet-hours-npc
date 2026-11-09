@@ -1,10 +1,9 @@
 import {z} from 'zod';
 import {getGitHubUser} from '@/lib/auth';
-import {readOpeningDraft,saveOpeningDraft} from '@/lib/opening-drafts';
+import {readOpeningDraft,adoptOpeningArrangement} from '@/lib/opening-drafts';
 import {readArrangement,reserveArrangement,settleArrangement,arrangementForClient,editArrangement,actionableArrangement} from '@/lib/opening-arrangement-store';
 import {cityDraftSchema} from '@/lib/city-creation';
 import {SaveAccessError} from '@/lib/world-saves';
-import {database} from '@/lib/store';
 import {POST as worldOperation} from '@/app/api/world/route';
 import {roundTimePolicy,timePolicyHeader} from '@/lib/round-time-policy';
 import {saveUuidPattern} from '@/lib/save-identities';
@@ -34,8 +33,7 @@ export async function POST(request:Request){
    if(row.adoption_request&&row.adoption_request!==adoption)return reply({error:'原建議已採納，後續修改請使用手動配置。'},409);
    if(input.proposalVersion!==row.revision||!row.result||JSON.stringify(JSON.parse(row.result).city)!==JSON.stringify(input.city))return reply({error:'建議已變更，請先保存修改並核對原版本。'},409);
    if(!JSON.parse(row.result).world||JSON.parse(row.result).preview.issues.length)return reply({error:'建議仍有開局阻擋問題，請修改後再採納。',preview:JSON.parse(row.result).preview},422);
-   const result=await saveOpeningDraft(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:input.city}});
-   await database().prepare('UPDATE opening_arrangements SET state=\'adopted\',adoption_request=? WHERE owner=? AND draft_id=? AND operation_id=?').bind(adoption,owner,input.id,input.operationId).run();
+   const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:input.city}},row,adoption);
    return reply({operationScope:owner,...result,arrangement:arrangementForClient((await readArrangement(owner,input.id,input.operationId))!)});
   }
   if(row){if(input.worldContext!==undefined&&JSON.parse(row.request).worldContext!==input.worldContext)return reply({error:'原整理操作來源不符。'},409);if(row.input_version!==input.version)return reply({error:'原整理操作版本不符。'},409);if(row.state!=='pending')return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});}
