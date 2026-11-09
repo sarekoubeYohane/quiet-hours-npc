@@ -4,7 +4,7 @@ const accepted=(result,status=200)=>{assert.equal(result.status,status,JSON.stri
 /** Product API driver; auth/model/dice remain at the caller's explicit boundaries. */
 export async function formCharacterCard(request,{name='開局人物',fields=completeCharacterFields(name),concept='修鐘的人'}={}){
  const scope=accepted(await request('/api/world?workspace=account'));
- const draft=accepted(await request('/api/character-drafts',{id:crypto.randomUUID(),version:0,concept,fields})).draft;
+ const draft=accepted(await request('/api/character-drafts',{id:crypto.randomUUID(),version:0,concept,fields,accountScope:scope.operationScope})).draft;
  const formed=accepted(await request('/api/character-drafts/form',{id:draft.id,version:draft.version,operationId:Date.now()+':'+crypto.randomUUID(),operationScope:scope.operationScope,worldContext:scope.world.contextId})).draft;
  return accepted(await request('/api/character-cards',{id:draft.id,version:formed.version,operationScope:scope.operationScope})).card;
 }

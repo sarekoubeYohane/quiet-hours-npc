@@ -1,10 +1,11 @@
+import { authoringScope, matchesReadScope, accountScopeMismatch } from '@/lib/account-scope';
 import { getGitHubUser } from '@/lib/auth';
 import { listCharacterCards, completeCharacterCard } from '@/lib/character-card-store';
 import { loadCharacterDraft } from '@/lib/character-draft-store';
 import { characterDraftForClient } from '@/lib/character-drafts';
 export const dynamic='force-dynamic';
 const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{const user=await getGitHubUser();return user?reply({cards:await listCharacterCards(user.userId)}):reply({error:'請先登入。'},401);}catch{return reply({error:'暫時無法讀取完成人物卡。'},503);}}
+export async function GET(request?:Request){try{const user=await getGitHubUser();if(!user)return reply({error:'請先登入。'},401);const accountScope=authoringScope(user.userId);if(!matchesReadScope(accountScope,request))return reply(accountScopeMismatch,409);return reply({accountScope,cards:await listCharacterCards(user.userId)});}catch{return reply({error:'暫時無法讀取完成人物卡。'},503);}}
 export async function POST(request:Request){
  if(request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'請從人物頁操作。'},403);
  try{
