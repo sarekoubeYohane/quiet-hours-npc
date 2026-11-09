@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import type { FormEvent } from 'react';
 import { stateChangeLimits } from '@/lib/adjudication-limits';
 import { entryRules, entryRuleLabels, type EntryRule } from '@/lib/entry-rules';
@@ -44,7 +45,10 @@ function RoomSelect({ label, value, rooms, onChange }: {
   </select>;
 }
 
-export default function SceneTemplateEditor() {
+export default function SceneTemplateEditor({originalAccountScope}:{originalAccountScope?:string}) {
+  const {accountScope,capture,scoped}=useOriginalAccountScope(originalAccountScope);
+  const alive=useRef(true);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const [templates, setTemplates] = useState<SceneTemplate[]>([]);
   const [draft, setDraft] = useState<Draft>();
   const [busy, setBusy] = useState(false);
@@ -56,9 +60,10 @@ export default function SceneTemplateEditor() {
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/scene-templates', { signal, cache: 'no-store' });
-      const body = await response.json() as { templates?: SceneTemplate[]; error?: string };
+      const response = await fetch(scoped('/api/scene-templates'), { signal, cache: 'no-store' });
+      const body = await response.json() as { accountScope?:string; templates?: SceneTemplate[]; error?: string };
       if (!response.ok || !body.templates) throw Error(body.error ?? '場景範本讀取失敗。');
+      if(!alive.current)return;capture(body.accountScope);
       setTemplates(body.templates);
       setDraft(undefined);
     } catch (failure) {
@@ -66,7 +71,7 @@ export default function SceneTemplateEditor() {
     } finally {
       if (!signal?.aborted) setBusy(false);
     }
-  }, []);
+  }, [capture,scoped]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -99,11 +104,12 @@ export default function SceneTemplateEditor() {
       const response = await fetch('/api/scene-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, objects }),
+        body: JSON.stringify({ ...draft, objects, accountScope }),
       });
-      const body = await response.json() as { template?: SceneTemplate; error?: string };
+      const body = await response.json() as { accountScope?:string; template?: SceneTemplate; error?: string };
       if (!response.ok || !body.template) throw Error(body.error ?? '場景範本保存失敗。');
       const saved = body.template;
+      if(!alive.current)return;capture(body.accountScope);
       setTemplates(previous => [...previous.filter(template => template.id !== saved.id), saved]);
       setDraft(editTemplate(saved));
       setMessage('場景範本已保存。');
