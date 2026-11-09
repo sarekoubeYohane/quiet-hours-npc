@@ -85,3 +85,15 @@ test('all four needs remain bounded while real rest cannot substitute for sleep 
  const upper=setup();await upper.post({operation:'enable-body-needs',bodyNeeds:[{id:'owner',initial:{hunger:100,thirst:100,fatigue:100,sleep:100}}]});await upper.post({operation:'advance',minutes:30});assert.deepEqual((await upper.read()).characters[0].needs.values,{hunger:100,thirst:100,fatigue:100,sleep:100});
  const lower=setup();await lower.post({operation:'enable-body-needs',bodyNeeds:[{id:'owner',initial:{hunger:0,thirst:0,fatigue:0,sleep:0}}]});await lower.post({operation:'direct',action:{type:'rest',content:'安靜休息'}});await lower.post({operation:'advance',minutes:15});const c=(await lower.read()).characters[0];assert.equal(c.needs.values.fatigue,0);assert.ok(c.needs.values.hunger>0&&c.needs.values.thirst>0&&c.needs.values.sleep>0);
 });
+test('five-minute application sleep starts forward with zero prepaid recovery and later wakes at a real grid boundary',async()=>{
+ const {fixtureDecision}=require('./pursuit-fixture.cjs'),old=global.fetch;
+ const s=setup(w=>{w.characters[0].control={mode:'autonomous'};w.adjudication={provider:'openai',model:'fixture-judge'};});
+ try{
+  await s.post({operation:'enable-body-needs',bodyNeeds:[{id:'owner',traits:{hunger:[1],thirst:[1],sleep:[1]},initial:{sleep:21,fatigue:70}}]});await s.post({operation:'set-model-key',mode:'openai',key:'fixture-key'});
+  let npc=0;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);const v=input.contractVersion==='world-adjudication.v1'?{status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:480,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}}:++npc===1?{type:'propose',target:'cafe',content:'在安全角落睡一覺',purpose:'睡眠恢復',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}}:{type:'reflect',target:'',content:'醒來安靜想想',mood:'平靜',durationMinutes:90,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}};return Response.json({usage:{prompt_tokens:10,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(input,v))}}]});};
+  const advance=async()=>{const r=await s.post({operation:'advance',minutes:5,timeContract:'five-minute-v1',mode:'openai',model:'gpt-6-luna'});assert.equal(r.status,200,await r.clone().text());return s.read();};
+  let w=await advance(),c=w.characters[0];assert.equal(c.plan.startedAt,w.minute);assert.equal(c.plan.sleep.elapsedMinutes,0);assert.ok(c.needs.values.fatigue>=70&&c.needs.values.sleep>21);const first=c.needs.values;
+  w=await advance();c=w.characters[0];assert.equal(c.plan.sleep.elapsedMinutes,5);assert.ok(c.needs.values.fatigue<first.fatigue&&c.needs.values.sleep<first.sleep);assert.ok(c.needs.values.hunger>first.hunger&&c.needs.values.thirst>first.thirst);
+  for(let i=0;i<4&&c.plan?.bodyActivity?.kind==='sleep';i++){w=await advance();c=w.characters[0];}assert.notEqual(c.plan?.bodyActivity?.kind,'sleep');assert.ok(w.events.some(e=>e.text.includes('自然醒')));assert.equal(w.minute%5,0);assert.equal(npc,2);
+ }finally{global.fetch=old;}
+});

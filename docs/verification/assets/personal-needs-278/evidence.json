@@ -1,0 +1,88 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "checks": {
+    "explicitOwnerSetup": true,
+    "backgroundConstraints": true,
+    "initialValue": true,
+    "sqliteReload": true,
+    "actualAdvance": true,
+    "sameOperationReplay": true,
+    "stableTraits": true
+  },
+  "needs": {
+    "version": 1,
+    "activatedAt": 1260,
+    "updatedAt": 1265,
+    "values": {
+      "hunger": 0.24,
+      "thirst": 20.5,
+      "fatigue": 15.1,
+      "sleep": 20.4
+    },
+    "assessed": {
+      "hunger": 0,
+      "thirst": 0,
+      "fatigue": 0,
+      "sleep": 0
+    },
+    "history": [
+      {
+        "minute": 1265,
+        "reason": "個人化需求與實際五分鐘時段",
+        "before": {
+          "hunger": 0,
+          "thirst": 20,
+          "fatigue": 15,
+          "sleep": 20
+        },
+        "after": {
+          "hunger": 0.24,
+          "thirst": 20.5,
+          "fatigue": 15.1,
+          "sleep": 20.4
+        }
+      }
+    ],
+    "dropped": 0,
+    "personal": {
+      "version": 2,
+      "status": "active",
+      "requestedAt": 1260,
+      "activatedAt": 1260,
+      "source": "已確認背景：飢餓較慢，睡意累積較快",
+      "traits": {
+        "hunger": 0.8,
+        "thirst": 1,
+        "sleep": 1.2
+      },
+      "constraints": {
+        "hunger": [
+          0.8
+        ],
+        "thirst": [
+          1
+        ],
+        "sleep": [
+          1.2
+        ]
+      },
+      "seed": 3719962282,
+      "units": {
+        "hunger": 14400000,
+        "thirst": 1230000000,
+        "fatigue": 906000000,
+        "sleep": 1224000000
+      },
+      "grid": {
+        "start": 1260,
+        "dice": {
+          "hunger": 6,
+          "thirst": 4,
+          "fatigue": 5,
+          "sleep": 4
+        }
+      }
+    }
+  }
+}
