@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-11-09T18:05:08.236Z",
+  "scope": "僅查可用工具 metadata，沒有新正式站連線試次",
+  "extensionBrowserControlTools": [],
+  "displayOnlyTool": "codex_app__open_in_codex 顯示 browser tab，沒有瀏覽器控制介面",
+  "documentControlSurfaces": [
+    "excel",
+    "powerpoint",
+    "sheets",
+    "word"
+  ],
+  "artifactJavascript": "Spaces artifact callback 操作文件模型，不是已登入 Chrome extension",
+  "knownCua": "既有 mcp__cua_repl 為 cloud Chrome／Sky 路徑，沒有新增本機已登入 extension 通道；本輪未再次呼叫",
+  "productionAttempted": false,
+  "productionStatus": "未取得新有效試次；既有 CONNECT403 / CUA requirements / AT-SPI 證據仍列未涵蓋條件，不當作當下產品失敗",
+  "issue282": "open / 尚未完成"
+}
