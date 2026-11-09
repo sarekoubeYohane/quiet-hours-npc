@@ -1,0 +1,21 @@
+{
+  "origin": "http://127.0.0.1:32953",
+  "commit": "4ea27a1",
+  "builtAt": "2026-11-09T12:18:05.449Z",
+  "auth": "local cookie identity boundary; not production OAuth",
+  "sqlite": "/tmp/quiet-real-routes-3Q4wfD/acceptance.sqlite",
+  "evidence": [
+    {
+      "phase": "manual draft",
+      "url": "http://127.0.0.1:32953/character-templates",
+      "title": "Quiet Hours · NPC 觀察室"
+    },
+    {
+      "phase": "reload/second device/conflict",
+      "url": "http://127.0.0.1:32953/character-templates",
+      "modelCalls": 1
+    }
+  ],
+  "modelCalls": 1,
+  "paidCalls": 0
+}

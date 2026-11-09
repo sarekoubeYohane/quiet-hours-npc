@@ -63,10 +63,13 @@ async function fixture({ withWorld = false } = {}) {
     return { status: response.status, body: await response.json() };
   }
   async function worldRequest(payload) {
-    const url = 'https://test.invalid/api/world';
-    return payload === undefined ? worldRoute.GET(new Request(url)) : worldRoute.POST(new Request(url, {
+    const url = 'https://test.invalid/api/world?workspace=account';
+    const current = await worldRoute.GET(new Request(url));
+    if (payload === undefined) return current;
+    const scope = await current.json();
+    return worldRoute.POST(new Request(url, {
       method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
-      body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...payload }),
+      body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', operationScope: scope.operationScope, worldContext: scope.world.contextId, ...payload }),
     }));
   }
   return { db, context, request, worldRequest };
@@ -149,7 +152,7 @@ test('the editor creates, edits, and reopens two custom characters through the r
       paidCalls++;
       return Response.json({ usage: { prompt_tokens: 5, completion_tokens: 3 }, choices: [{ message: { content: candidate } }] });
     }
-    if (url === '/api/world') return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
+    if (url === '/api/world?workspace=account') return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
     assert.equal(url, '/api/character-templates');
     const result = await request(options?.body ? JSON.parse(options.body) : undefined);
     return Response.json(result.body, { status: result.status });
