@@ -32,9 +32,9 @@ test('test policy remains isolated from formal enablement and production never f
  const fresh=scenario();env.APP_ENV='production';try{const r=await fresh.post(enable());assert.equal(r.status,200,await r.clone().text());assert.equal((await fresh.read()).characters[0].mentalEnergy.policy.kind,'formal');}finally{env.APP_ENV='local';}
 });
 const {fixtureDecision,savedPursuit}=require('./pursuit-fixture.cjs');
-async function lifeScene(prepare=()=>{}){
+async function lifeScene(prepare=()=>{},opening){
  const s=scenario(w=>{w.characters[0].control={mode:'autonomous'};w.characters[0].mood='低落';w.characters[0].intents.push(savedPursuit('owner',{id:'create',content:'繼續創作',intensity:'medium',importance:'medium',urgency:'low',context:''}));w.adjudication={provider:'openai',model:'fixture-judge'};w.objects=[{id:'workpiece',source:'fixture',label:'練習作品',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{progress:'raw'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{progress:['raw','complete']}}];prepare(w);});
- const r=await s.post(enable());assert.equal(r.status,200,await r.clone().text());await s.post({operation:'set-model-key',mode:'openai',key:'fixture-key'});
+ const r=await s.post(enable(opening));assert.equal(r.status,200,await r.clone().text());await s.post({operation:'set-model-key',mode:'openai',key:'fixture-key'});
  const requests=[],old=global.fetch;let normal=()=>({type:'reflect',target:'',content:'低電量也想繼續',durationMinutes:60,timeIntent:{kind:'open-ended',maxMinutes:null}}),controlled=()=>({contractVersion:'controlled-feelings.v1',feelingUpdates:[],processFeeling:null});
  global.fetch=async(_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);requests.push({body,input});const value=input.contractVersion==='world-adjudication.v1'?{status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'workpiece',expectedRevision:1,key:'progress',value:'complete'}],stages:[],check:null,routine:null}:input.contractVersion==='controlled-feelings.v1'?controlled(input):fixtureDecision(input,normal(input));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});};
  const step=async(extra={})=>{const r=await s.post({operation:'advance',minutes:5,timeContract:'five-minute-v1',mode:'openai',model:'gpt-6-luna',...extra});assert.equal(r.status,200,await r.clone().text());return s.read();};
@@ -108,4 +108,32 @@ test('exact openings must fit every declared capacity before drawing instead of 
   for(const opening of [{current:80},{minimum:60,maximum:90,current:40,stage:'尚可'},{capacity:65,current:3,stage:'充沛'}]){const s=scenario();let draws=0;Math.random=()=>{draws++;return .5;};const r=await s.post(enable(opening));assert.equal(r.status,400);assert.equal(draws,0);assert.equal((await s.read()).characters[0].mentalEnergy,undefined);}
   for(const [sample,expected] of [[0,80],[.999999,90]]){const s=scenario();Math.random=()=>sample;const r=await s.post(enable({minimum:80,maximum:90,current:80}));assert.equal(r.status,200,await r.clone().text());const c=(await s.read()).characters[0];assert.equal(c.mentalEnergy.policy.maximum,expected);assert.equal(c.mentalEnergy.value,80);}
  }finally{Math.random=random;}
+});
+
+// Runtime already passed review. These are original-contract boundary evidence,
+// not a claimed RED/bug fix. Only creation randomness, time and transport vary.
+test('actual formal enablement projects all stage boundaries and payment availability without numeric energy in provider requests',async()=>{
+ const random=Math.random;Math.random=()=>0; // Saved seed0: owner/natural/slot0 is d6 face2, no first-slot loss.
+ const cases=[[0,'見底',false],[1,'見底',false],[2,'吃緊',false],[3,'吃緊',false],[4,'尚可',false],[5,'尚可',true],[6,'有餘',true],[7,'有餘',true],[8,'充沛',true],[9,'充沛',true],[10,'充沛',true]];
+ try{for(const [current,feeling,canRegulate] of cases){
+  const s=await lifeScene(w=>{w.minute=0;},{capacity:10,current});try{
+   const enabled=(await s.read()).characters[0].mentalEnergy;assert.equal(enabled.policy.process.seed,0);assert.equal(enabled.value,current);
+   s.normal(()=>({type:'rest',target:'',content:'依自己的餘裕選擇休息',durationMinutes:60,timeIntent:{kind:'open-ended',maxMinutes:null},emotionRegulation:null}));
+   const w=await s.step(),request=s.requests.find(r=>r.input.self);assert.ok(request,'actual provider dispatch');assert.deepEqual(request.input.self.mentalEnergy,{feeling,canRegulate},`current ${current}/10`);
+   const saved=w.characters[0].mentalEnergy;assert.equal(saved.value,current);assert.equal(saved.policy.maximum,10);assert.equal(saved.history[0].draws.find(d=>d.source==='natural').face,2);assert.equal(saved.history.some(h=>h.kind==='regulation'),false);assert.deepEqual((await s.read()).characters[0].mentalEnergy,saved);
+  }finally{s.restore();}
+ }}finally{Math.random=random;}
+});
+test('exactly five pays once to zero, four rejects the whole candidate, and either may voluntarily retain energy',async()=>{
+ const random=Math.random;Math.random=()=>0;
+ try{for(const [current,regulate] of [[5,true],[4,true],[5,false],[4,false]]){
+  const s=await lifeScene(w=>{w.minute=0;},{capacity:10,current});try{
+   const before=await s.read();s.normal(()=>({type:'rest',target:'',content:'調節與保留都由自己選擇',durationMinutes:60,timeIntent:{kind:'open-ended',maxMinutes:null},mood:'頂層文字不能免費改心情',emotionRegulation:regulate?{effort:'放慢呼吸',reason:'願意照顧現在的低落',mood:'稍微穩住'}:null}));
+   const op={operation:'advance',minutes:5,timeContract:'five-minute-v1',mode:'openai',model:'gpt-6-luna',operationId:id()},response=await s.post(op),body=await response.json(),w=await s.read(),c=w.characters[0];
+   assert.deepEqual(s.requests[0].input.self.mentalEnergy,{feeling:'尚可',canRegulate:current===5});assert.equal(s.requests.length,1);
+   if(current===4&&regulate){assert.equal(response.status,502);assert.deepEqual(w.characters,before.characters);assert.equal(w.minute,before.minute);assert.equal(w.aiUsage.totalCalls,1);assert.equal(c.mood,'低落');}
+   else{assert.equal(response.status,200,body.error);assert.equal(c.mentalEnergy.value,regulate?0:current);assert.equal(c.mood,regulate?'稍微穩住':'低落');const payments=c.mentalEnergy.history.filter(h=>h.kind==='regulation');assert.equal(payments.length,regulate?1:0);if(regulate){assert.equal(payments[0].before,5);assert.equal(payments[0].after,0);}assert.equal(c.plan.action.content,'調節與保留都由自己選擇');}
+   assert.deepEqual(await(await s.post(op)).json(),body);assert.equal(s.requests.length,1,'original ID never dispatches or charges again');assert.deepEqual((await s.read()).characters,w.characters);
+  }finally{s.restore();}
+ }}finally{Math.random=random;}
 });
