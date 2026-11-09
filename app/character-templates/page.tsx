@@ -19,7 +19,7 @@ export default async function CharacterTemplatesPage({ searchParams }: { searchP
       </header>
       <SaveNavigation saveId={(await searchParams).save} />
       {returnTo&&<Link href={returnTo}>返回本次開局（保留已選內容）</Link>}
-      <div className="pt-6"><CharacterDraftEditor /><details className="mt-6"><summary>文字範本來源庫（與建角草稿分開）</summary><CharacterTemplateEditor /></details></div>
+      <div className="pt-6"><CharacterDraftEditor key={'drafts:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/><details className="mt-6"><summary>文字範本來源庫（與建角草稿分開）</summary><CharacterTemplateEditor key={'templates:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/></details></div>
     </main>
   );
 }

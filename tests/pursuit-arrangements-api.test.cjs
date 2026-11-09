@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
 const {decision,candidate,adoption,choose}=require('./pursuit-selection-fixture.cjs');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 const post=async body=>POST(request({worldContext:(await read()).contextId,...body}));
 const advance=extra=>post({operation:'advance',minutes:15,...extra});

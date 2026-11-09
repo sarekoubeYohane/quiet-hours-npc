@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API fixtures. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name + '.cjs'));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
 const read = async () => (await (await GET()).json()).world;
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(originalWorldInput({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'demo', ...body }, 'test-owner')) });
 const retained = (c, id, text, source = { kind: 'experience' }) => ({ id, characterId: c.id, version: 1, time: 1, text, source, origin: { id: `origin-${id}`, version: 1 }, reason: '我想記住' });
 const operation = (type, targets, text = '', unresolved = []) => ({ type, targets, text, unresolved, reason: '重新考慮這些經歷' });
 async function withModel(choose, run) {

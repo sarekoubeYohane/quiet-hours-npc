@@ -11,14 +11,14 @@
   "formationBaseline": {
     "calls": 1,
     "totalCalls": 1,
-    "windowStartedAt": 1794237309766
+    "windowStartedAt": 1794240887171
   },
   "accountAfterGeneration": {
     "calls": 2,
     "totalCalls": 2,
-    "windowStartedAt": 1794237309766
+    "windowStartedAt": 1794240887171
   },
-  "commit": "3c8e7d0",
+  "commit": "cee4947",
   "origin": "http://127.0.0.1:5286",
   "status": "passed",
   "controlledCalls": 3,

@@ -1,20 +1,21 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalAccountInput, originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
 const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name+'.cjs'));
 const saves = load('saves-route');
 const world = load('route');
-const people = load('character-templates-route');
 const scenes = load('scene-templates-route');
 const store = load('store');
 const auth = load('auth');
 const { seedWorld } = load('world');
-const { blankCharacterTemplateFields } = load('character-templates');
+const originalSaveScopes=new Map();
 const origin = 'https://test.invalid';
-const req = (body, save) => new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+const req = (body, save) => new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(originalWorldInput(body, save?originalSaveScopes.get(save):'test-owner'))});
 const body = async (response,status=200) => {const value=await response.json();assert.equal(response.status,status,JSON.stringify(value));return value;};
-const read = save => world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r));
+const read = save => world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r)).then(value=>{if(!originalSaveScopes.has(save))originalSaveScopes.set(save,value.operationScope);return value;});
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 
 test('existing story is listed and selection reads exactly its committed values without advancing', async()=>{
@@ -41,8 +42,8 @@ test('an empty account sees no saves and cannot install a seed by reading observ
 });
 
 async function create(name) {
-  const scene=(await body(await scenes.POST(req({id:crypto.randomUUID(),version:0,name:name+'的場景',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})),201)).template;
-  const {input,saved,draft}=await require('./create-world-via-opening.cjs')({load,name,scene});return {request:input,saved,draft};
+  const scene=(await body(await scenes.POST(new Request(origin+'/api/scene-templates',{method:'POST',headers:{origin},body:JSON.stringify(originalAccountInput({id:crypto.randomUUID(),version:0,name:name+'的場景',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]},'account-operations:test-owner'))})),201)).template;
+  const {input,saved,draft}=await require('./create-world-via-opening.cjs')({load,name,scene});await read(saved.save.id);return {request:input,saved,draft};
 }
 
 test('two worlds created through real templates and the product API resume independently and recover one creation', async()=>{
@@ -75,7 +76,7 @@ test('foreign accounts and stale source scopes cannot read, recover or mutate an
   auth.setUserId('other-account');
   assert.deepEqual((await body(await saves.GET())).saves,[]);
   await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id)),404);
-  await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationId='+attempt.operationId)),404);
+  await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(a.saved.save.id))+'&operationId='+attempt.operationId)),404);
   await body(await world.POST(req(attempt,a.saved.save.id)),404);
   auth.setUserId('test-owner');
   assert.equal((await read(a.saved.save.id)).world.turn,0);
@@ -108,9 +109,9 @@ test('a slow accepted operation and recovery remain attached to the source world
     release();await body(await accepted);
     assert.equal((await read(a.saved.save.id)).world.turn,1);
     assert.equal((await read(b.saved.save.id)).world.turn,1);
-    const recovered=await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationId='+sent.operationId)));
+    const recovered=await body(await world.GET(new Request(origin+'/api/world?save='+a.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(a.saved.save.id))+'&operationId='+sent.operationId)));
     assert.equal(recovered.operation.state,'settled');
-    const other=await body(await world.GET(new Request(origin+'/api/world?save='+b.saved.save.id+'&operationId='+sent.operationId)));
+    const other=await body(await world.GET(new Request(origin+'/api/world?save='+b.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(b.saved.save.id))+'&operationId='+sent.operationId)));
     assert.equal(other.operation.state,'unknown');
     await body(await world.POST(req(sent,b.saved.save.id)),409);
     const replay=req(sent,a.saved.save.id);replay.headers.set('X-World-Time-Policy','round-v1');
@@ -125,7 +126,7 @@ test('standalone authoring has an account operation ledger but cannot create or 
   const original=await body(await world.GET(new Request(workspace)));
   assert.deepEqual(original.world.characters,[]);assert.deepEqual(original.world.events,[]);
   assert.deepEqual((await body(await saves.GET())).saves,[]);
-  const request=new Request(workspace,{method:'POST',headers:{origin},body:JSON.stringify({operation:'advance',operationScope:original.operationScope,worldContext:original.world.contextId,operationId:operationId(),mode:'demo',minutes:5,timeContract:'five-minute-v1'})});
+  const request=new Request(workspace,{method:'POST',headers:{origin},body:JSON.stringify(originalWorldInput({operation:'advance',operationScope:original.operationScope,worldContext:original.world.contextId,operationId:operationId(),mode:'demo',minutes:5,timeContract:'five-minute-v1'}, 'test-owner'))});
   await body(await world.POST(request),400);
   assert.deepEqual((await body(await saves.GET())).saves,[]);
   assert.equal((await body(await world.GET(new Request(workspace)))).world.turn,0);

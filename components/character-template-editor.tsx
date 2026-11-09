@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import ModelSettingsPanel from '@/components/model-settings-panel';
 import { modelRoleReady, type ModelSettingsView } from '@/lib/model-settings';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { initialMemoryCapacityError, blankCharacterTemplateFields, characterDesc
 
 import { roundClientMs, roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
 
-type Library = { presets: CharacterTemplate[]; templates: CharacterTemplate[] };
+type Library = { accountScope?:string; presets: CharacterTemplate[]; templates: CharacterTemplate[] };
 const endpoint = '/api/character-templates';
 const worldEndpoint = '/api/world?workspace=account';
 type GenerationReceipt = { error?: string; retryable?: boolean; operationUncertain?: boolean; operationSettled?: boolean; generatedCharacter?: unknown };
@@ -17,7 +18,10 @@ function newDraft(fields = blankCharacterTemplateFields()): CharacterTemplate {
   return { id: crypto.randomUUID(), version: 0, fields: { ...fields } };
 }
 
-export default function CharacterTemplateEditor() {
+export default function CharacterTemplateEditor({originalAccountScope}:{originalAccountScope?:string}) {
+  const {accountScope,capture,scoped}=useOriginalAccountScope(originalAccountScope);
+  const alive=useRef(true);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const [library, setLibrary] = useState<Library>({ presets: [], templates: [] });
   const [draft, setDraft] = useState<CharacterTemplate>();
   const [modelPanel, setModelPanel] = useState(false);
@@ -35,10 +39,11 @@ export default function CharacterTemplateEditor() {
 
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch(endpoint, { signal });
+      const response = await fetch(scoped(endpoint), { signal });
       const body = await response.json() as Library & { error?: string };
       if (!response.ok) throw Error(body.error || '暫時無法讀取人物範本。');
       if (signal?.aborted) return;
+      capture(body.accountScope);
       setLibrary(body);
       setError('');
     } catch (cause) {
@@ -46,7 +51,7 @@ export default function CharacterTemplateEditor() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [capture,scoped]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,16 +78,18 @@ export default function CharacterTemplateEditor() {
     setError('');
     setFeedback('');
     try {
-      const availabilityResponse = await fetch('/api/model-settings');
+      const availabilityResponse = await fetch(scoped('/api/model-settings'));
       const availability = await availabilityResponse.json() as ModelSettingsView;
       if (!availabilityResponse.ok) throw Error('暫時無法讀取模型設定。');
+      capture(availability.accountScope);
       if (!modelRoleReady(availability, 'adjudication')) { setModelPanel(true); return; }
       const characterGeneration = { description, fields: draft.fields };
       const input = JSON.stringify(characterGeneration);
       if (pendingGeneration.current?.input !== input) {
-        const response = await fetch(worldEndpoint, { signal: AbortSignal.timeout(roundTimePolicy.deliveryMs) });
+        const response = await fetch(scoped(worldEndpoint,'operationScope'), { signal: AbortSignal.timeout(roundTimePolicy.deliveryMs) });
         const data = await response.json() as { error?: string; operationScope?: string; world?: { contextId?: string } };
         if (!response.ok || !data.operationScope || !data.world) throw Error(data.error || '暫時無法讀取生成設定。');
+        capture(data.operationScope);
         pendingGeneration.current = {
           input,
           payload: JSON.stringify({
@@ -106,12 +113,13 @@ export default function CharacterTemplateEditor() {
       if (!response.ok) throw Error(result.error || '人物草稿未能生成，原設定已保留。');
       const fields = readCharacterTemplateFields(result.generatedCharacter);
       if (!fields) throw Error('模型沒有回傳有效的人物草稿，原設定已保留。');
+      if(!alive.current)return;
       setDraft({ ...draft, fields });
       setFeedback('已更新空白欄位。檢查並修改後，可保存為人物範本。');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '人物草稿未能生成，原設定已保留。');
+      if(alive.current)setError(cause instanceof Error ? cause.message : '人物草稿未能生成，原設定已保留。');
     } finally {
-      setGenerating(false);
+      if(alive.current)setGenerating(false);
     }
   }
 
@@ -125,10 +133,11 @@ export default function CharacterTemplateEditor() {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
+        body: JSON.stringify({...draft,accountScope}),
       });
-      const body = await response.json() as { template: CharacterTemplate; error?: string };
+      const body = await response.json() as { accountScope?:string; template: CharacterTemplate; error?: string };
       if (!response.ok) throw Error(body.error || '暫時無法保存人物範本。');
+      if(!alive.current)return;capture(body.accountScope);
       const template: CharacterTemplate = body.template;
       setDraft(template);
       setLibrary(previous => ({
@@ -137,15 +146,15 @@ export default function CharacterTemplateEditor() {
       }));
       setFeedback('已保存人物範本。');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '暫時無法保存人物範本。');
+      if(alive.current)setError(cause instanceof Error ? cause.message : '暫時無法保存人物範本。');
     } finally {
-      setSaving(false);
+      if(alive.current)setSaving(false);
     }
   }
 
   return (
     <div className="space-y-6 pb-10">
-      {modelPanel && <ModelSettingsPanel onClose={() => setModelPanel(false)} />}
+      {modelPanel && <ModelSettingsPanel originalAccountScope={accountScope} onClose={() => setModelPanel(false)} />}
       <section className="panel space-y-4 p-6" aria-label="人物範本清單">
         <div className="flex flex-wrap gap-2">
           <Button type="button" disabled={busy} onClick={() => edit(newDraft())}>新建人物</Button>

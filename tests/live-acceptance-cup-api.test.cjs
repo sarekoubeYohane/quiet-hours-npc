@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,7 +20,7 @@ async function setup({ oldCapabilities = false, version = 2 } = {}) {
   store.install(world);
   const post = async body => POST(new Request('https://test.invalid/api/world', {
     method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' },
-    body: JSON.stringify({ operationId: operationId(), worldContext: (await read()).contextId, mode: 'openai', model: 'gpt-6-luna', ...body }),
+    body: JSON.stringify(originalWorldInput({ operationId: operationId(), worldContext: (await read()).contextId, mode: 'openai', model: 'gpt-6-luna', ...body }, 'test-owner')),
   }));
   assert.equal((await post({ operation: 'set-model-key', key: 'fixture-key' })).status, 200);
   assert.equal((await post({ operation: 'enter-acceptance' })).status, 200);

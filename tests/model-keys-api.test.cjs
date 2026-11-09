@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Tests use a temporary transpiled Worker. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+const originalScopes = new Map();
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
@@ -12,7 +14,7 @@ const fakeKey = 'test-only-model-key-never-real';
 const cookies = response => response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
 const request = (path, cookie = '', init = {}) => new Request(fixture.env.AUTH_ORIGIN + path, { ...init, headers: { cookie, ...init.headers } });
 function reset() {
-  fixture.reset(); fixture.migrate(readFileSync(join(root, 'migrations.sql'), 'utf8'));
+  originalScopes.clear();fixture.reset(); fixture.migrate(readFileSync(join(root, 'migrations.sql'), 'utf8'));
   // These auth/key/reset cases exercise pre-existing legacy worlds, not creation.
   fixture.installLegacyWorlds(['github:123','github:456']);
   Object.assign(fixture.env, { APP_ENV: 'local', AUTH_ORIGIN: origin, GITHUB_CLIENT_ID: 'local-client', GITHUB_CLIENT_SECRET: 'test-only-client-secret', SESSION_SECRET: 'test-only-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123,456', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) });
@@ -23,12 +25,13 @@ async function signIn(id = 123) {
   const state = new URL(start.headers.get('location')).searchParams.get('state');
   const original = global.fetch;
   global.fetch = async url => String(url).includes('/login/oauth/access_token') ? Response.json({ access_token: 'fake-github-token' }) : Response.json({ id, login: 'owner' + id });
-  try { return cookies(await load('app/api/auth/github/callback/route').GET(request('/api/auth/github/callback?code=fake&state=' + state, cookies(start)))); }
+  try { const cookie=cookies(await load('app/api/auth/github/callback/route').GET(request('/api/auth/github/callback?code=fake&state=' + state, cookies(start))));if(cookie.includes('qh_session='))originalScopes.set(cookie,'github:'+id);return cookie; }
   finally { global.fetch = original; }
 }
 async function post(cookie, body, originHeader = fixture.env.AUTH_ORIGIN) {
   headers.set(new Headers({ cookie }));
-  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body}) }));
+  const payload={operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body},scope=originalScopes.get(cookie);
+  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(scope?originalWorldInput(payload,scope):payload) }));
 }
 async function status(cookie) {
   headers.set(new Headers({ cookie }));

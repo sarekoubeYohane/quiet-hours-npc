@@ -44,10 +44,10 @@ export async function createRuntime({ root = process.cwd(), databasePath, owner 
   const env = load('cloudflare-workers').env;
   Object.assign(env, { APP_ENV: 'local', AUTH_ORIGIN: 'https://pursuit-experiment.invalid', DB: adapter, GIT_COMMIT: 'isolated-runner', ...(readonly ? {} : { MODEL_KEY_ENCRYPTION_SECRET: randomBytes(32).toString('hex') }) });
   const { GET, POST } = load('route');
-  const get = operationId => GET(new Request('https://pursuit-experiment.invalid/api/world' + (operationId ? '?operationId=' + encodeURIComponent(operationId) : '')));
+  const get = operationId => GET(new Request('https://pursuit-experiment.invalid/api/world' + (operationId ? '?operationScope=' + encodeURIComponent(owner) + '&operationId=' + encodeURIComponent(operationId) : '')));
   const post = body => {
     if (readonly) throw Error('Readback mode permits GET only');
-    return POST(new Request('https://pursuit-experiment.invalid/api/world', { method: 'POST', headers: { origin: 'https://pursuit-experiment.invalid', 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(body) }));
+    return POST(new Request('https://pursuit-experiment.invalid/api/world', { method: 'POST', headers: { origin: 'https://pursuit-experiment.invalid', 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify({ operationScope: owner, ...body }) }));
   };
   // Explicit isolated historical research fixture, not the player's new-world
   // or restart API. Preserve account billing, journal and keys across trials.

@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +10,7 @@ const { seedWorld, record } = build('world');
 const { aiDecision } = build('models');
 const { GET, POST } = build('route');
 const store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(originalWorldInput({ operationId: `${Date.now()}:${crypto.randomUUID()}`, mode: 'openai', ...body }, 'test-owner')) });
 const advance = async () => { await POST(request({ operation: 'set-model-key', mode: 'openai', key: 'unit-test-key' })); return POST(request({ operation: 'advance', minutes: 15, model: 'gpt-6-luna', limits: { calls: 120, tokens: 500000 } })) };
 const queue = [{ id: 'reply-later', content: '稍後回覆', intensity: 'medium', importance: 'medium', urgency: 'low', context: '先完成手上工作' }];
 const action = type => ({ type, target: '', content: '', mood: '平靜', durationMinutes: 90, intents: queue });

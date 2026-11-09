@@ -22,8 +22,8 @@ async function fixture() {
   } }] });
   const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
   const [api,world,people,scenes,saves,budget,openings,drafts,form,cards,worldModule] = entries;
-  async function post(route,payload,path) {const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
-  const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()};};
+  async function post(route,payload,path) {if([api,people,scenes,drafts].includes(route))payload={accountScope:'account-operations:'+context.owner,...payload};const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
+  const request=async(body,save)=>{const url='https://test.invalid/api/model-settings'+(save?'?save='+save:'');const response=body===undefined?await api.GET(new Request(url)):await api.POST(new Request(url,{method:'POST',headers:{Origin:'https://test.invalid'},body:JSON.stringify({accountScope:'account-operations:'+context.owner,...body})}));return {status:response.status,body:await response.json()};};
   const worldRequest=async(payload,save)=>{const suffix=save?'?save='+save:'?workspace=account';const r=await world.GET(new Request('https://test.invalid/api/world'+suffix));const scope=await r.json();return payload===undefined?{status:r.status,body:scope}:post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world'+suffix);};
   const routes={'/api/world':world,'/api/opening-drafts':openings,'/api/character-drafts':drafts,'/api/character-drafts/form':form,'/api/character-cards':cards,'/api/saves':saves};
   const productRequest=async(path,payload)=>{const route=routes[path.split('?')[0]];if(payload!==undefined)return post(route,payload,path);const response=await route.GET(new Request('https://test.invalid'+path));return {status:response.status,body:await response.json()};};
@@ -105,7 +105,7 @@ test('new operations resolve fresh defaults on the server, capture both roles on
 });
 
 test('existing explicit world adjudication remains legacy until the save explicitly chooses account inheritance', async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch;const calls=[];
+ const {db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch;const calls=[];
  globalThis.fetch=async(_url,init)=>{const p=JSON.parse(init.body);calls.push(p.model);return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"background":"受控背景"}'}}]});};
  try {
    const id=await createWorld('已有設定');
@@ -125,7 +125,7 @@ test('existing explicit world adjudication remains legacy until the save explici
 });
 
 test('explicit inheritance with no account defaults projects missing settings without rewriting the stored legacy result', async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture();
+ const {db,request,worldRequest,createWorld}=await fixture();
  try {
    const id=await createWorld('待補設定');
    const set=await worldRequest({operation:'set-adjudication',adjudication:{provider:'openai',model:'legacy-A'}},id);assert.equal(set.status,200);
@@ -138,7 +138,7 @@ test('explicit inheritance with no account defaults projects missing settings wi
 
 test('cleared or expired account keys return the original settings flag before any AI dispatch and keep the selected story', async()=>{
  for(const failure of ['clear','expire']) {
-   const {context,db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch,oldNow=Date.now;let calls=0;
+   const {db,request,worldRequest,createWorld}=await fixture();const oldFetch=globalThis.fetch,oldNow=Date.now;let calls=0;
    globalThis.fetch=async()=>{calls++;throw Error('a missing key must never dispatch');};
    try {
      const id=await createWorld('保留來源世界');
@@ -155,7 +155,7 @@ test('cleared or expired account keys return the original settings flag before a
 });
 
 test('player budget and spent calls are shared by two saved worlds rather than reset by selecting another',async()=>{
- const {context,db,request,worldRequest,createWorld}=await fixture(),oldFetch=globalThis.fetch;let calls=0;
+ const {db,request,worldRequest,createWorld}=await fixture(),oldFetch=globalThis.fetch;let calls=0;
  globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:3,completion_tokens:2},choices:[{message:{content:'{"background":"受控背景"}'}}]});};
  try{
    const first=await createWorld('第一世界'),second=await createWorld('第二世界');
@@ -288,7 +288,7 @@ test('known and unknown paid failures remain account facts after source deletion
 });
 
 test('legacy uncertain operations without recoverable evidence retain an account unknown range after source deletion',async()=>{
- const {context,db,createLegacyWorld,budgetRequest,saveRequest}=await fixture();
+ const {db,createLegacyWorld,budgetRequest,saveRequest}=await fixture();
  try{
    const source=createLegacyWorld('舊的未知帳單'),storage=db.prepare('SELECT storage_owner FROM world_saves WHERE owner=? AND id=?').get('a',source).storage_owner;
    const operationId=Date.now()+':'+crypto.randomUUID();

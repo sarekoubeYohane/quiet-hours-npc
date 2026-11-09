@@ -4,6 +4,7 @@ export type ModelChoice = { provider: 'openai' | 'openrouter'; model: string };
 export type ModelRoles = { npc?: ModelChoice; adjudication?: ModelChoice };
 export type ModelPreference = { mode: 'inherit' } | { mode: 'custom'; models: ModelRoles };
 export type ModelSettingsView = {
+  accountScope:string;
   version: number; preference: ModelPreference; effective: ModelRoles;
   accountVersion: number; accountModels: ModelRoles;
   source: 'account' | 'save' | 'legacy' | 'missing';

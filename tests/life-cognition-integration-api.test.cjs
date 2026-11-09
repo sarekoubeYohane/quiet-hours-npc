@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API fixtures, only model transport and RNG are controlled. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
@@ -10,7 +12,7 @@ async function setup(initial=seedWorld()){
  initial.adjudication={provider:'openai',model:'fixture-world'};
  for(const c of initial.characters)if(c.id!=='owner')c.control={mode:'taken-over'};
  store.install(initial);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});await post({operation:'set-budget',limits:{calls:120,tokens:500000}});
  const original=global.fetch,inputs=[],bodies=[];let choose=()=>action();
  global.fetch=async(_url,init)=>{const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);inputs.push(input);bodies.push(body);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),choose(input)))}}]});};

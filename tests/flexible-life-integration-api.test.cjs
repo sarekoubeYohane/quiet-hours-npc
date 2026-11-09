@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public route, SQLite and external transport fixtures. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${n}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store'),{env}=load('cloudflare-workers'),auth=load('auth'),fixture=require('./fixtures/flexible-life-loop.cjs');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const read=async()=>{const r=await GET();assert.equal(r.status,200);return(await r.json()).world;};
 async function setup(initial=fixture.initialWorld(seedWorld)){
  store.install(initial);const transport=fixture.transport(),oldFetch=global.fetch,oldRandom=Math.random;global.fetch=async(_url,init)=>transport.respond(JSON.parse(init.body));Math.random=()=>0.8;
@@ -87,7 +89,7 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
    if(committed){assert.equal(fixture.actor(after).arrangements.items[0].version,2);assert.ok(fixture.actor(after).intents.some(node=>node.id==='owner:after-new-info'));assert.ok(fixture.device(after).notifications.length);if(operation==='read')assert.equal(fixture.device(after).calendar[0].readers[0].actorId,'owner');else assert.equal(after.phones.devices.find(d=>after.objects.find(o=>o.id===d.objectId).owner==='cass').inbox.length,1);}
    else assert.deepEqual(story(after),story(before),`${operation}/${fault} story must roll back together`);
    assert.ok(after.aiUsage.totalCalls>=before.aiUsage.totalCalls+1,`${fault} retains known dispatch usage`);
-   if(fault==='save-unknown'){assert.equal(response.status,502);assert.equal(body.operationUncertain,true);const queried=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(operationId)))).json();assert.equal(queried.operation.state,'settled');}
+   if(fault==='save-unknown'){assert.equal(response.status,502);assert.equal(body.operationUncertain,true);const queried=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(operationId)))).json();assert.equal(queried.operation.state,'settled');}
    else assert.equal(response.status,committed?200:502,`${operation}/${fault}`);
    const replay=await s.post({operation:'advance',minutes:15,operationId});assert.deepEqual(s.transport.counts(),calls);assert.deepEqual(story(await read()),story(after));if(body.operationSettled)assert.deepEqual(await replay.json(),body);
   }finally{store.onStorage(undefined);Date.now=clock;s.restore();}
@@ -96,10 +98,10 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
 test('真API跨帳號、跨世界與場景舊引用被拒絕，另一世界與角色輸入不取得私人原文',async()=>{
  const s=await setup();try{
   s.transport.choose(input=>fixture.action('phone',{target:input.phones[0].objectId,content:JSON.stringify(fixturePursuitDecision(input,{collection:'memos',operation:'create',id:'private-a',version:0,text:'ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'}))}));await s.advance();const first=await read(),foreignPhone=fixture.device(first).objectId,firstScope=(await(await GET()).json()).operationScope;
-  const other=fixture.initialWorld(seedWorld);other.contextId='other-world-193';store.installForOwner('other-owner',other);auth.setUserId('other-owner');await s.post({operation:'set-model-key',key:'other-fixture-key',worldContext:other.contextId});
+  const other=fixture.initialWorld(seedWorld);other.contextId='other-world-193';store.installForOwner('other-owner',other);auth.setUserId('other-owner');await s.post({operationScope:'other-owner',operation:'set-model-key',key:'other-fixture-key',worldContext:other.contextId});
   const starts=s.transport.inputs.length;s.transport.choose(()=>fixture.action('phone',{target:foreignPhone,content:JSON.stringify({collection:'memos',operation:'read',id:'private-a',version:1})}));
-  assert.equal((await s.post({operation:'advance',minutes:15,worldContext:other.contextId})).status,502);assert.equal(JSON.stringify(s.transport.inputs.slice(starts)).includes('ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'),false);assert.equal((await read()).phones,undefined);
-  const calls=s.transport.counts();assert.equal((await s.post({operation:'advance',minutes:15,worldContext:'flexible-life-193'})).status,409);assert.equal((await s.post({operation:'advance',minutes:15,worldContext:other.contextId,operationScope:firstScope})).status,409);assert.deepEqual(s.transport.counts(),calls);
+  assert.equal((await s.post({operationScope:'other-owner',operation:'advance',minutes:15,worldContext:other.contextId})).status,502);assert.equal(JSON.stringify(s.transport.inputs.slice(starts)).includes('ACCOUNT_A_ONLY_PRIVATE_ORIGINAL'),false);assert.equal((await read()).phones,undefined);
+  const calls=s.transport.counts();assert.equal((await s.post({operationScope:'other-owner',operation:'advance',minutes:15,worldContext:'flexible-life-193'})).status,409);assert.equal((await s.post({operation:'advance',minutes:15,worldContext:other.contextId,operationScope:firstScope})).status,409);assert.deepEqual(s.transport.counts(),calls);
   auth.setUserId('test-owner');assert.deepEqual(await read(),first);
  }finally{auth.setUserId('test-owner');s.restore();}
 });

@@ -4,14 +4,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {characterApiFixture} from './support/character-api-fixture.mjs';
 async function fixture(){
- const base=await characterApiFixture(),{db,context,request,worldRequest,post}=base,{openings,drafts,form,cards,world,people,scenes,saves,fromTemplate,generation}=base.routes;
+ const base=await characterApiFixture(),{context,post}=base,{openings,drafts,form,cards,world,people,scenes,saves,fromTemplate,generation}=base.routes;
   async function createWorld(name,card) {
-    assert.ok(card,'New worlds must use the card formed in this product journey');const person={body:{template:card}};
+    assert.ok(card,'New worlds must use the card formed in this product journey');
     const scene=await post(scenes,{id:crypto.randomUUID(),version:0,name:name+'的家',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]},'/api/scene-templates');assert.equal(scene.status,201);
     const apiRequest=async(path,payload)=>{const route=path==='/api/saves'?saves:openings;if(payload!==undefined)return post(route,payload,path);const response=await route.GET(new Request('https://test.invalid'+path));return {status:response.status,body:await response.json()};};
     const {saved}=await confirmOpening(apiRequest,{name,city:{places:[{id:'home',templateId:scene.body.template.id,version:scene.body.template.version,name:name+'的家'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}});return saved.save.id;
   }
-  return {...base,createWorld,source:payload=>post(people,payload,'/api/character-templates'),importTemplate:payload=>post(fromTemplate,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/from-template'),generate:payload=>post(generation,payload,'/api/character-drafts/generate'),readOperation:async id=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account&operationId='+id));return r.json();},saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),readDrafts:async()=>{const r=await drafts.GET();return {status:r.status,body:await r.json()};},form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:async()=>{const r=await cards.GET();return {status:r.status,body:await r.json()};}};
+  return {...base,createWorld,source:payload=>post(people,payload,'/api/character-templates'),importTemplate:payload=>post(fromTemplate,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/from-template'),generate:payload=>post(generation,payload,'/api/character-drafts/generate'),readOperation:async id=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account&operationScope='+encodeURIComponent('account-operations:'+context.owner)+'&operationId='+id));return r.json();},saveDraft:payload=>post(drafts,payload,'/api/character-drafts'),readDrafts:async()=>{const r=await drafts.GET();return {status:r.status,body:await r.json()};},form:payload=>post(form,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/form'),complete:payload=>post(cards,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-cards'),cards:async()=>{const r=await cards.GET();return {status:r.status,body:await r.json()};}};
 }
 
 
@@ -38,7 +38,7 @@ test('forming locks text, rolls once in code, preserves total and capacity, and 
   const saved=await f.complete({id:draft.id,version:allocated.body.draft.version});assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.card.capacity,80);assert.equal(saved.body.card.values.dexterity,13);
   assert.equal((await f.cards()).body.cards.length,1);assert.deepEqual((await f.complete({id:draft.id,version:allocated.body.draft.version})).body.card,saved.body.card);assert.equal(f.context.dice,dice);assert.equal(calls,1);
   const read=(await f.readDrafts()).body.drafts[0];assert.equal(read.completedCard.id,saved.body.card.id);assert.equal(read.formation.capacity,80);
-  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.form(input)).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
+  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.form(input)).status,409);assert.equal((await f.form({...input,operationScope:'account-operations:foreign'})).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
 

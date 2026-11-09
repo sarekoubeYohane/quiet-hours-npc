@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API and model boundary fixtures. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -7,7 +9,7 @@ const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.
 const {seedWorld}=build('world');
 const {GET,POST}=build('route');
 const store=build('store');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
 const read=async()=>(await (await GET()).json()).world;
 const owner=w=>w.characters.find(c=>c.id==='owner');
 const advance=()=>POST(req({operation:'advance',minutes:15,mode:'openai',model:'gpt-6-luna',limits:{calls:120,tokens:500000}}));

@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert=require('node:assert/strict'),test=require('node:test'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const route=load('route'),store=load('store'),{seedWorld}=load('world');
 const op=()=>Date.now()+':'+crypto.randomUUID();
 const read=async()=> (await route.GET()).json();
-const send=async body=>{const r=await route.POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({mode:'demo',operationId:op(),...body})}));return {status:r.status,body:await r.json()};};
+const send=async body=>{const r=await route.POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({mode:'demo',operationId:op(),...body}, 'test-owner'))}));return {status:r.status,body:await r.json()};};
 const setup={attributes:{strength:{min:1,max:2},endurance:{value:4},dexterity:{value:3},perception:{value:2}},expertise:[{scope:'髮飾設計',modifier:10}],senses:[{scope:'hearing',modifier:-10}]};
 test('owner explicitly forms stable background-bounded attributes through world API, SQLite read and original-operation replay',async()=>{
  store.install(seedWorld());const before=await read();assert.equal(before.world.characters[0].attributes,undefined);
@@ -48,7 +50,7 @@ test('save-before, lost-response and CAS failures never leave partial or rerolle
 });
 test('retired start-city does not form values or overwrite an existing legacy world',async()=>{
  store.install(seedWorld());const before=await read();const scenes=load('scene-templates-route'),people=load('character-templates-route');
- const api=async(api,body)=>{const r=await api.POST(new Request('https://test.invalid',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(body)}));assert.ok(r.status<300,await r.clone().text());return r.json();};
+ const api=async(api,body)=>{const r=await api.POST(new Request('https://test.invalid',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(originalAccountInput(body, 'account-operations:test-owner'))}));assert.ok(r.status<300,await r.clone().text());return r.json();};
  const person=(await api(people,{id:crypto.randomUUID(),version:0,fields:{...load('character-templates').blankCharacterTemplateFields(),name:'定衡',background:'力量較弱'}})).template;
  const scene=(await api(scenes,{id:crypto.randomUUID(),version:0,name:'屋',note:'',rooms:[{id:'front',name:'室'}],objects:[],connections:[]})).template;
  const city={places:[{id:'one',templateId:scene.id,version:1,name:'屋'}],characters:[{templateId:person.id,version:1,placeId:'one',roomId:'front',characterSetup:setup}]};

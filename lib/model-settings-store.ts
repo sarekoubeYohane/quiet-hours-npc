@@ -1,3 +1,4 @@
+import {authoringScope} from './account-scope';
 import { database } from './store';
 import { modelKeyStatus, modelKeyStorageAvailable } from './model-keys';
 import type { ModelPreference, ModelRoles, ModelSettingsView } from './model-settings';
@@ -28,7 +29,7 @@ export async function modelSettingsView(owner: string, binding?: SaveBinding) : 
   const storage = binding?.storageOwner ?? 'account-operations:' + owner;
   const row = await database().prepare('SELECT state FROM worlds WHERE owner = ?').bind(storage).first<{ state: string }>();
   if (row) { const old = JSON.parse(row.state); if (old.adjudication) legacy = { adjudication: old.adjudication }; }
-  return { ...await readEffectiveModels(owner, binding, legacy), modelKeys: await modelKeyStatus(owner), modelKeyStorageAvailable: modelKeyStorageAvailable() };
+  return { accountScope:authoringScope(owner), ...await readEffectiveModels(owner, binding, legacy), modelKeys: await modelKeyStatus(owner), modelKeyStorageAvailable: modelKeyStorageAvailable() };
 }
 export async function saveModelPreference(owner: string, binding: SaveBinding | undefined, version: number, preference: ModelPreference) {
   const target = binding?.saveId ? saveTarget(binding.saveId) : accountTarget;
