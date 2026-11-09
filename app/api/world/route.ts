@@ -1,3 +1,7 @@
+import { playerAccount, playerBilling, setPlayerAccount, reconcileOperationUsage } from '@/lib/player-account-budget';
+import { assessCharacterCard, characterFormationIssue } from '@/lib/character-formation';
+import { saveCardAssessment } from '@/lib/character-card-store';
+import { loadCharacterDraft } from '@/lib/character-draft-store';
 import { readEffectiveModels, modelSettingsView } from '@/lib/model-settings-store';
 import { bindWorldSave, ensureAccountOperationLedger, SaveAccessError } from '@/lib/world-saves';
 import { adoptFormalMentalEnergy, validateMentalAdoption, formFormalMentalEnergy } from '@/lib/formal-mental-enablement';
@@ -15,7 +19,7 @@ import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, boundUs
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
-import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace } from '@/lib/decision-traces';
+import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace, omitDecisionTraceContent } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
@@ -23,7 +27,7 @@ import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, rou
 import { enterAcceptanceScene, exitAcceptanceScene, worldForClient } from '@/lib/acceptance-scene';
 import { requiresWorldEffects, authorityForProposal,  EffectValidationError } from '@/lib/world-effects';
 import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type WorldTaskServices } from '@/lib/adjudication';
-import { validPrice, savePrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
+import { validPrice, beginCost, costSummary, type PriceInput } from '@/lib/costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories, boundRecallStorage } from '@/lib/recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDatabase, RecallServiceError } from '@/lib/recall-services';
@@ -32,7 +36,7 @@ import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
 import { record, normalizeWorld, resetWorld, resolve, type Action, type AIUsage, type World } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
-import { accountUsage, advanceActivities, BudgetExceeded, currentUsage, defaultLimits, validBudgetLimits, budgetReached, type BudgetLimits } from '@/lib/activities';
+import { accountUsage, advanceActivities, BudgetExceeded, currentUsage, validBudgetLimits, budgetReached, type BudgetLimits } from '@/lib/activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable, ModelKeyError } from '@/lib/model-keys';
 
 export const dynamic = 'force-dynamic';
@@ -145,15 +149,17 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
+    const accountPlayer=await playerAccount(accountId);
+    if(decisionTrace?.operation==='assess-character-card')decisionTrace=omitDecisionTraceContent(decisionTrace,'character-formation-private');
     const modelSettings = await modelSettingsView(accountId, binding);
     if (modelSettings.effective.adjudication) loaded.world.adjudication = { ...modelSettings.effective.adjudication };
     else if (modelSettings.source !== 'legacy') delete loaded.world.adjudication;
-    return reply({ ...loaded, modelSettings, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), accountId) : { enabled: false } });
+    return reply({ ...loaded, accountPlayer, modelSettings, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), accountCostSummary:costSummary(accountPlayer.usage), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), accountId) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
 type OperationResult = { status: number; body: Record<string, unknown> };
-const settledReply = (result: OperationResult) => reply({ ...result.body, operationSettled: true }, result.status);
+const settledReply=(result:OperationResult)=>reply({...result.body,operationSettled:true},result.status);
 const uncertainResult: OperationResult = { status: 502, body: { error: '上次操作的結果無法確認，請重新讀取世界；此操作不會再次呼叫模型。', operationUncertain: true } };
 const waiting = () => reply({ error: '世界正處理另一個回合，正在等待後重試。', retryable: true }, 409);
 const operationIdPattern = /^\d{13}:[0-9a-f-]{36}$/;
@@ -210,13 +216,14 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   };
   let paidBefore:AIUsage|undefined,paidAfter:AIUsage|undefined,paidRetained=false;
   let journal: Journal = { floor: 0, results: {} }, operationId = '';
+  let billing:ReturnType<typeof playerBilling>|undefined;
   try {
     const raw = await request.text();
     if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
     let b: { mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
-    if(binding.accountWorkspace&&!['generate-character-template','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
+    if(binding.accountWorkspace&&!['generate-character-template','assess-character-card','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
     const initializingCity = b.operation === 'initialize-city';
     const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
@@ -230,7 +237,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if ((binding.saveId&&new URL(request.url).searchParams.has('save')&&b.operationScope!==id) || (b.operationScope !== undefined && b.operationScope !== id)) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'assess-character-card', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -241,8 +248,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
 
     }
     if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return reply({error:'請填寫裁定服務與模型。'},400);
+    const assessingCard = b.operation === 'assess-character-card';
+    const assessingDraft = assessingCard && typeof b.target === 'string' ? await loadCharacterDraft(accountId,b.target) : undefined;
+    if(assessingCard&&(!binding.accountWorkspace||!assessingDraft?.pendingFormation||assessingDraft.pendingFormation.operationId!==b.operationId||assessingDraft.formation||characterFormationIssue(assessingDraft)))return reply({error:'請從已確認文字的原建角草稿恢復形成。'},400);
     const generatingCharacter = b.operation === 'generate-character-template';
-    const generatingSetup = generatingCharacter || suggestingOpening || initializingCity;
+    const generatingSetup = assessingCard || generatingCharacter || suggestingOpening || initializingCity;
     if (initializingCity && b.operationScope !== id) return reply({ error:'請重新讀取城市後再初始化。' },400);
     const openingDescription = suggestingOpening ? readOpeningDescription(b.openingDescription) : undefined;
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {
@@ -272,9 +282,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
 
 
     // Legacy request limits remain valid replay payloads, but only set-budget changes policy.
-    const limits = b.operation === 'set-budget' ? b.limits! : validBudgetLimits(world.playerBudget) ? world.playerBudget : defaultLimits;
+    const accountPlayer=await playerAccount(accountId);
+
     if (typeof b.operationId !== 'string' || !operationIdPattern.test(b.operationId)) return reply({ error: '請更新頁面，使用有效的操作識別碼。' }, 400);
     operationId = b.operationId;
+    billing=playerBilling(accountId,id,operationId,accountPlayer.prices,accountPlayer.usage);
     trace.operationId = operationId; trace.version = version;
     traceWorld(trace, 'journal-read');
     const issuedAt = Number(operationId.split(':')[0]);
@@ -447,9 +459,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       try {
         const config = world.adjudication!;
         const usage = world.aiUsage = currentUsage(world);
-        const price = world.modelPrices?.find(value => value.provider === config.provider && value.model === config.model);
+        const price = accountPlayer.prices.find(value => value.provider === config.provider && value.model === config.model);
         const runSetup = async <T,>(task:string, invoke:(service:ModelService,options:Parameters<typeof requestModel>[3])=>Promise<T>) => {
-          if (budgetReached(usage, limits)) throw new BudgetExceeded();
+          if (budgetReached((await playerAccount(accountId)).usage, (await playerAccount(accountId)).limits)) throw new BudgetExceeded();
           await verifyLease();
           if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
             recallBudgetDatabase(), accountId, 'chat', id + ':' + operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
@@ -459,20 +471,25 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           let reportCost: ReturnType<typeof beginCost> | undefined;
           const result = await invoke({ ...config, key }, {
             signal: modelSignal(),
+            onSettled:billing!.finish,
             requestId: operationId + ':' + task,
-            observer: decisionTrace!.observer('adjudication', undefined, world, config.provider, config.model, key),
-            fetcher: (url, init) => {
+            observer: decisionTrace!.observer('adjudication', undefined, {...world,modelPrices:accountPlayer.prices}, config.provider, config.model, key),
+            beforeDispatch:billing!.beforeDispatch(config.provider,config.model,'adjudication'),
+            fetcher: billing!.fetcher((url, init) => {
               traceWorld(trace, 'model-dispatch');
               usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
               reportCost = beginCost(usage, config.provider, config.model, price, 'adjudication');
               return fetch(url, init);
-            },
-            onUsage: tokens => { accountUsage(usage, tokens); reportCost?.(tokens); },
+            }),
+            onUsage: async tokens => { await billing!.report(tokens); accountUsage(usage, tokens); reportCost?.(tokens); },
           });
           await verifyLease();
           return result;
         };
-        if (characterGeneration) {
+        if (assessingCard && assessingDraft) {
+          const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
+          await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
+        } else if (characterGeneration) {
           generatedCharacter = await runSetup('character-generation',(service,options)=>generateCharacterFields(characterGeneration,service,options));
         } else if (openingPreview && city?.success) {
           const draft = city.data;
@@ -490,7 +507,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           }
         }
       } catch (error) {
-        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
+        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(assessingCard ? '人物背景未能判讀，尚未形成數值，原文字已保留。' : characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
       }
     } else if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {
@@ -502,7 +519,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       world.timeContract='five-minute-v1';
       for (const actor of world.characters) {
         const selected = city?.success && city.data.characters.find(item=>item.templateId===actor.profileSource?.id);
-        formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
+        if(!actor.attributes)formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
         formFormalMentalEnergy(actor,world.minute,selected?.mentalOpening??{});
       }
       journal.floor = Math.max(journal.floor, issuedAt - 1);
@@ -515,11 +532,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     } else if (updatingSenseLimits && characterSetup?.success) {
       world.characters.find(actor=>actor.id===b.target)!.attributes!.blockedSenses=[...new Set(characterSetup.data.blockedSenses!)];
     } else if (b.operation === 'set-price') {
-      savePrice(world,b.price!);
+      world.modelPrices=(await setPlayerAccount(accountId,{price:b.price!})).prices;
     } else if (b.operation === 'set-adjudication') {
       world.adjudication={provider:b.adjudication!.provider,model:b.adjudication!.model.trim()};
     } else if (b.operation === 'set-budget') {
-      world.playerBudget = { ...b.limits! };
+      await setPlayerAccount(accountId,{limits:b.limits!});
+      world.playerBudget = { calls:b.limits!.calls,tokens:b.limits!.tokens };
     } else if (b.operation === 'takeover') {
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';
@@ -549,14 +567,16 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     } else {
       const before = structuredClone(world);
       try {
+        if(b.mode!=='demo'){const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();}
         let dispatchKey = '';
         if(b.timeContract==='five-minute-v1')world.timeContract='five-minute-v1';
         await advanceActivities(world, {
           mentalEnergyPolicy:readMentalEnergyTestPolicy(env,world),
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
-          limits,
+          limits:{calls:null,tokens:null},
           beforeDecision: async () => {
+            const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
             await verifyLease();
             if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
             dispatchKey = await workWait(readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter'));
@@ -564,30 +584,31 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
             traceWorld(trace, 'model-dispatch'); },
           evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
             const provider=b.mode==='openai'?'openai':'openrouter',model=b.model!.trim();
-            const cost=beginCost(w.aiUsage!,provider,model,w.modelPrices?.find(p=>p.provider===provider&&p.model===model),'feelings');
+            const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
             traceWorld(trace,'controlled-feelings-dispatch');
-            const observer=decisionTrace?.observer('feelings',c,w,provider,model,dispatchKey,evidence?.observer('feelings',c.id,provider,model,dispatchKey));
-            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:observer?event=>workWait(Promise.resolve(observer(event))):undefined,onUsage:tokens=>{onUsage(tokens);cost(tokens);},verifyCurrent:verifyLease});
+            const observer=decisionTrace?.observer('feelings',c,{...w,modelPrices:accountPlayer.prices},provider,model,dispatchKey,evidence?.observer('feelings',c.id,provider,model,dispatchKey));
+            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:observer?event=>workWait(Promise.resolve(observer(event))):undefined,fetcher:billing!.fetcher(),beforeDispatch:billing!.beforeDispatch(provider,model,'feelings'),onSettled:billing!.finish,onUsage:async tokens=>{await billing!.report(tokens);onUsage(tokens);cost(tokens);},verifyCurrent:verifyLease});
           },
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
             const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
-            const price=w.modelPrices?.find(p=>p.provider===provider && p.model===b.model!.trim());
+            const price=accountPlayer.prices.find(p=>p.provider===provider && p.model===b.model!.trim());
             let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
             let dispatch = 0;
             const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
               await verifyLease();
               // Keep the same logical-round ledger captured by advanceActivities.
               // A rolling-hour boundary may reset only the next round, not this guard.
-              const usage = w.aiUsage!;
-              if (kind === 'chat' && budgetReached(usage, limits)) throw new BudgetExceeded();
+              if (kind === 'chat' && budgetReached((await playerAccount(accountId)).usage,(await playerAccount(accountId)).limits)) throw new BudgetExceeded();
               const reservationId = `${id}:${operationId}:${c.id}:${dispatch++}`;
               if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
-            const npcObserver=decisionTrace?.observer('npc',c,w,provider,b.model!.trim(),dispatchKey,evidence?.observer('npc',c.id,provider,b.model!.trim(),dispatchKey));
-            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', fetch, tokens=>{onUsage(tokens);reportCost(tokens);}, {
+            const npcObserver=decisionTrace?.observer('npc',c,{...w,modelPrices:accountPlayer.prices},provider,b.model!.trim(),dispatchKey,evidence?.observer('npc',c.id,provider,b.model!.trim(),dispatchKey));
+            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', billing!.fetcher(), async tokens=>{await billing!.report(tokens);onUsage(tokens);reportCost(tokens);}, {
+              beforeDispatch:billing!.beforeDispatch(provider,b.model!.trim(),'npc'),
+              onSettled:billing!.finish,
               observer: npcObserver?event=>workWait(Promise.resolve(npcObserver(event))):undefined,
               enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
               verifyCurrent: verifyLease,
@@ -620,11 +641,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               const key=await workWait(readModelKey(accountId,config.provider));
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
-              const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
+              const cost=beginCost(usage,config.provider,config.model,accountPlayer.prices.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
               const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c,decision.action),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,w,config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),onUsage:tokens=>{onUsage(tokens);cost(tokens);}});
+              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:decisionTrace?.observer('adjudication',c,{...w,modelPrices:accountPlayer.prices},config.provider,config.model,key,evidence?.observer('adjudication',c.id,config.provider,config.model,key)),fetcher:billing!.fetcher(),beforeDispatch:billing!.beforeDispatch(config.provider,config.model,'adjudication'),onSettled:billing!.finish,onUsage:async tokens=>{await billing!.report(tokens);onUsage(tokens);cost(tokens);}});
               await verifyLease();
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
@@ -668,10 +689,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     // Effective account/save preferences belong to the captured dispatch, not
     // to a newly invented legacy world setting on a later read.
     if (ephemeralModels) { if (originalAdjudication) world.adjudication = originalAdjudication; else delete world.adjudication; }
-    const usage = currentUsage(world);
+    const settledAccount=await playerAccount(accountId);
+    if(generatingSetup||b.operation==='advance'&&b.mode!=='demo')await reconcileOperationUsage(accountId,id,operationId,initialUsage,world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
-      : { status: 200, body: { world:worldForClient(world), version: version + 1, limitReached: (b.mode !== 'demo' || generatingSetup) && budgetReached(usage, limits), ...(generatedCharacter ? { generatedCharacter } : {}), ...(suggestedOpening ? { suggestedOpening } : {}), ...(finalizedCity ? { finalizedCity, preview:finalizationPreview } : {}) } };
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, accountPlayer:settledAccount, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
+      : { status: 200, body: { world:worldForClient(world), version: version + 1, accountPlayer:settledAccount, limitReached: (b.mode !== 'demo' || generatingSetup) && budgetReached(settledAccount.usage, settledAccount.limits), ...(generatedCharacter ? { generatedCharacter } : {}), ...(suggestedOpening ? { suggestedOpening } : {}), ...(finalizedCity ? { finalizedCity, preview:finalizationPreview } : {}) } };
     decisionTrace?.step('world-candidate',undefined,{outcome:failure?'rolled-back':'candidate',failure:failure?.message});
     candidateWorld=world;
     decisionTrace?.step('commit-start',undefined,{candidateOutcome:failure?'rolled-back':'committed',candidateVersion:version+1});
@@ -680,6 +702,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     finishSignal!.throwIfAborted();responseSignal?.throwIfAborted();request.signal.throwIfAborted();
     result.body.decisionTraceStatus=traceWriteFailed?{status:'write-failed',gap:'trace-write-failed'}:{status:'pending',gap:'world-and-trace-are-separate-transactions'};
     result.body.operationEvidence=finishEvidence(world,failure?'rolled-back':'committed',version+1);
+    if(assessingCard&&result.body.operationEvidence){const safe=result.body.operationEvidence as OperationEvidence;result.body.operationEvidence={...safe,dispatches:safe.dispatches.map(({candidate,...dispatch})=>{void candidate;return dispatch;})};}
     journal.results[operationId] = result;
     if(journal.usage?.[operationId])journal.usage[operationId]={applied:paidDelta(paidBefore,world.aiUsage!),finalized:true};
     // The current exact response may exceed the historical byte budget by itself.
@@ -754,6 +777,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (e instanceof ModelKeyError) return reply({ error: e.message, modelSettingsRequired: true }, e.status);
     return reply({ error: e instanceof Error ? e.message : '操作失敗，請稍後再試。', stopReason:stopReason(e) }, 502);
   } finally {
+    if(billing)try{await billing.finish();}catch{traceWorld(trace,'account-accounting-pending',{outcome:'unknown-usage-retained'});}
     if (locked) try { await finishWait(database().prepare('UPDATE worlds SET locked_until = 0 WHERE owner = ? AND locked_until = ?').bind(id, lease).run()); } catch { traceWorld(trace, 'lease-release-failed', { outcome: 'lease-will-expire' }); }
   }
 }

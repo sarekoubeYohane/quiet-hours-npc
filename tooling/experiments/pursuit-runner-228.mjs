@@ -84,7 +84,7 @@ export async function runExperiment({root=process.cwd(),planPath=join(root,'tool
   await durableWrite(join(runDirectory,'run-manifest.json'),JSON.stringify({plan:checked.plan,authorization,priceSnapshot}),64*1024);
   const save=async()=>{account.persist(state);await durableWrite(stateFile,JSON.stringify(state,null,2),256*1024);};
   const plan=checked.plan,limits=Object.fromEntries(Object.keys(plan.limits).map(key=>[key,Math.min(plan.limits[key],authorization.remaining[key])]));
-  const runtime=await createRuntime({root,databasePath:account.databasePath,storageFault});
+  const runtime=await createRuntime({root,databasePath:account.databasePath,storageFault,legacySeed:true});
   const oldFetch=globalThis.fetch;
   let key='',currentTrial,roundStart,roundDispatches=0,roundTokens=0,traceFrames=[],trialBytes=0,partner;
   const require=createRequire(import.meta.url);

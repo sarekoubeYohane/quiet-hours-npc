@@ -46,7 +46,29 @@ export const worldSaves = sqliteTable('world_saves', {
   originalOpening:text('original_opening'),savedFrom:text('saved_from'),
 },table=>[primaryKey({columns:[table.owner,table.id]})]);
 
+export const saveOperationReceipts=sqliteTable('save_operation_receipts',{
+  owner:text('owner').notNull(),operationId:text('operation_id').notNull(),request:text('request').notNull(),result:text('result').notNull(),cleanup:text('cleanup').notNull().default('[]'),
+},table=>[primaryKey({columns:[table.owner,table.operationId]})]);
+export const deletedWorldUsage=sqliteTable('deleted_world_usage',{
+  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),usage:text('usage').notNull(),accounting:text('accounting').notNull().default('{}'),deletedAt:integer('deleted_at').notNull(),
+},table=>[primaryKey({columns:[table.owner,table.storageOwner]})]);
+export const saveTombstones=sqliteTable('save_tombstones',{
+  owner:text('owner').notNull(),id:text('id').notNull(),deletedAt:integer('deleted_at').notNull(),
+},table=>[primaryKey({columns:[table.owner,table.id]})]);
 export const modelPreferences = sqliteTable('model_preferences', {
   owner: text('owner').notNull(), target: text('target').notNull(),
   version: integer('version').notNull(), body: text('body').notNull(),
 }, table => [primaryKey({ columns: [table.owner, table.target] })]);
+
+// Account billing contains no story, transcript or service credential.
+export const playerAccounts=sqliteTable('player_accounts',{
+  owner:text('owner').primaryKey(),version:integer('version').notNull(),settingsVersion:integer('settings_version').notNull().default(0),lastRequest:text('last_request').notNull().default(''),token:text('token').notNull(),usage:text('usage').notNull(),budget:text('budget').notNull(),prices:text('prices').notNull(),initialized:integer('initialized').notNull().default(0),
+});
+export const playerUsageOrigins=sqliteTable('player_usage_origins',{
+  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),recovery:text('recovery').notNull(),unknownRange:integer('unknown_range').notNull().default(0),
+},table=>[primaryKey({columns:[table.owner,table.storageOwner]})]);
+export const playerDispatches=sqliteTable('player_dispatches',{
+  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),requestId:text('request_id').notNull(),operationId:text('operation_id').notNull(),token:text('token').notNull(),usage:text('usage').notNull(),phase:text('phase').notNull(),pendingUntil:integer('pending_until').notNull(),
+},table=>[primaryKey({columns:[table.owner,table.storageOwner,table.requestId]})]);
+export const characterCards = sqliteTable('character_cards', {owner:text('owner').notNull(),id:text('id').notNull(),version:integer('version').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.id]})]);
+export const characterCardAssessments = sqliteTable('character_card_assessments', {owner:text('owner').notNull(),draftId:text('draft_id').notNull(),operationId:text('operation_id').notNull(),body:text('body').notNull()},table=>[primaryKey({columns:[table.owner,table.draftId,table.operationId]})]);

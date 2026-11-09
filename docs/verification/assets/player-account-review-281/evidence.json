@@ -1,0 +1,16 @@
+{
+  "production": false,
+  "modelSemanticQuality": false,
+  "steps": [
+    "empty account configures budget and price on real settings route without a world or dispatch",
+    "second saved world cannot refresh shared quota; controlled transport exactly once",
+    "unaccepted copy survives reload and version conflict with editable name; fresh confirmation copies, source deletion leaves account charge",
+    "SQLite close/reopen preserves original hour, settings, price and spent call; copied world cannot dispatch",
+    "deleted historical uncertain source remains unknown in both compact summary and account cost panel of another real saved world"
+  ],
+  "commit": "2355317",
+  "origin": "http://127.0.0.1:5286",
+  "status": "passed",
+  "controlledCalls": 1,
+  "paidCalls": 0
+}

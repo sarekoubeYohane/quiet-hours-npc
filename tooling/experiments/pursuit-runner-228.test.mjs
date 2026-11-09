@@ -26,7 +26,7 @@ async function registration(directory,mutate=()=>{}) {
 
 async function existingPayer(directory) {
   await mkdir(join(directory,'account'),{recursive:true});
-  const runtime=await createRuntime({databasePath:join(directory,'account','account.sqlite')});
+  const runtime=await createRuntime({databasePath:join(directory,'account','account.sqlite'),legacySeed:true});
   const before=await(await runtime.get()).json();
   const result=await runtime.post({operation:'set-budget',mode:'openai',worldContext:before.world.contextId,operationId:Date.now()+':'+crypto.randomUUID(),limits:{calls:100,tokens:1000000}});
   assert.equal(result.status,200);await runtime.close();

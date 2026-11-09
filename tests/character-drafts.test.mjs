@@ -14,6 +14,7 @@ async function fixture() {
     async first() { const fault = sql.includes('RETURNING') && context.fault; if (fault) context.fault = null; if (fault === 'before') throw Error('before'); const r = db.prepare(sql).get(...values) ?? null; if (fault === 'after') throw Error('after'); return r; },
     async all() { return { results: db.prepare(sql).all(...values) }; }, async run() { return { meta: { changes: Number(db.prepare(sql).run(...values).changes) } }; },
   }; } }; } } };
+  context.env.DB.batch=async statements=>{db.exec('BEGIN');try{const result=[];for(const statement of statements)result.push(await statement.run());db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}};
   const built = await esbuild.build({ entryPoints: ['app/api/character-drafts/route.ts', 'app/api/character-drafts/generate/route.ts', 'app/api/world/route.ts'], outdir:'/tmp/character-drafts-test', bundle: true, write: false, platform: 'node', format: 'cjs', alias: { '@': process.cwd() }, plugins: [{ name: 'boundaries', setup(b) {
     b.onResolve({ filter: /^(cloudflare:workers|@\/lib\/auth)$/ }, a => ({ path: a.path, namespace: 'boundary' }));
     b.onLoad({ filter: /.*/, namespace: 'boundary' }, a => ({ contents: a.path === 'cloudflare:workers' ? 'export const env = context.env;' : 'export const getGitHubUser = async () => context.owner ? {userId:context.owner} : null;' }));
