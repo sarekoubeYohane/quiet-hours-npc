@@ -13,6 +13,8 @@ const cookies = response => response.headers.getSetCookie().map(value => value.s
 const request = (path, cookie = '', init = {}) => new Request(fixture.env.AUTH_ORIGIN + path, { ...init, headers: { cookie, ...init.headers } });
 function reset() {
   fixture.reset(); fixture.migrate(readFileSync(join(root, 'migrations.sql'), 'utf8'));
+  // These auth/key/reset cases exercise pre-existing legacy worlds, not creation.
+  fixture.installLegacyWorlds(['github:123','github:456']);
   Object.assign(fixture.env, { APP_ENV: 'local', AUTH_ORIGIN: origin, GITHUB_CLIENT_ID: 'local-client', GITHUB_CLIENT_SECRET: 'test-only-client-secret', SESSION_SECRET: 'test-only-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123,456', MODEL_KEY_ENCRYPTION_SECRET: 'ab'.repeat(32) });
   headers.set(new Headers());
 }

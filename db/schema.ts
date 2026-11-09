@@ -39,3 +39,9 @@ export const characterDrafts = sqliteTable('character_drafts', {
   owner: text('owner').notNull(), id: text('id').notNull(),
   version: integer('version').notNull(), body: text('body').notNull(),
 }, table => [primaryKey({ columns: [table.owner, table.id] })]);
+// The account identity is separate from world-local leases, journals and memory.
+export const worldSaves = sqliteTable('world_saves', {
+  owner:text('owner').notNull(), id:text('id').notNull(), storageOwner:text('storage_owner').notNull().unique(),
+  name:text('name').notNull(),createdAt:integer('created_at').notNull(),creationRequest:text('creation_request'),
+  originalOpening:text('original_opening'),savedFrom:text('saved_from'),
+},table=>[primaryKey({columns:[table.owner,table.id]})]);

@@ -1,3 +1,4 @@
+import { bindWorldSave, ensureAccountOperationLedger, SaveAccessError } from '@/lib/world-saves';
 import { adoptFormalMentalEnergy, validateMentalAdoption, formFormalMentalEnergy } from '@/lib/formal-mental-enablement';
 import { enablePersonalNeeds, validateBodyNeedsSetup } from '@/lib/body-needs-policy';
 import { characterSetupSchema, formCharacterAttributes } from '@/lib/character-attributes';
@@ -99,13 +100,17 @@ export async function POST(request: Request, services?: WorldTaskServices) {
 }
 
 async function readWorld(request: Request | undefined, trace: WorldTrace) {
-  const id = await owner();
-  if (id instanceof Response) return id;
+  const accountId = await owner();
+  if (accountId instanceof Response) return accountId;
+  let binding:Awaited<ReturnType<typeof bindWorldSave>>;
+  try { binding=await bindWorldSave(accountId,request); } catch(error) { return reply({error:error instanceof Error?error.message:'無法讀取存檔。'},error instanceof SaveAccessError?error.status:503); }
+  const id=binding.storageOwner;
   try {
     const operationId = request && new URL(request.url).searchParams.get('operationId');
     if (operationId && !operationIdPattern.test(operationId)) return reply({ error: '操作識別碼無效。' }, 400);
     if (operationId) trace.operationId = operationId;
     traceWorld(trace, 'world-read');
+    await ensureAccountOperationLedger(binding);
     const loaded = await loadWorld(id);
     let operation;
     let decisionTrace=null,decisionTraces;let traceReadFailed=false;
@@ -139,7 +144,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
     traceWorld(trace, 'world-read-complete', { outcome: operation?.state || 'read' });
     normalizeWorld(loaded.world);
     loaded.world.aiUsage = currentUsage(loaded.world);
-    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), id) : { enabled: false } });
+    return reply({ ...loaded, decisionTrace, decisionTraces, world:worldForClient(loaded.world), costSummary:costSummary(loaded.world.aiUsage!), usageRecovery:operationId?recoveryStatus(journal,operationId,decisionTrace,traceReadFailed):undefined, unresolvedUsageRecovery:!!journal.unresolvedUsageEvicted||Object.entries(journal.results).some(([key])=>{const status=recoveryStatus(journal,key,key===operationId?decisionTrace:null);return !!status?.unknownRange;}), operation, operationEvidence, recentOperations, adjudicationFailure, operationScope: id, modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable(), recallUsage: env.RECALL_ENABLED === 'true' && !loaded.world.acceptance ? await recallUsage(recallBudgetDatabase(), accountId) : { enabled: false } });
   } catch (error) { traceWorld(trace, 'world-read-failed', { outcome: 'read-error' }); return reply({ error: error instanceof MemoryValidationError ? error.message : '暫時無法讀取世界，請稍後重試。', stopReason:stopReason(error) }, 503); }
 }
 
@@ -168,9 +173,12 @@ function trimJournal(journal: Journal, maxResults: number, protectedId?: string)
 
 
 async function mutateWorld(request: Request, trace: WorldTrace, services?: WorldTaskServices,responseSignal?:AbortSignal,receivedAt=Date.now()) {
-  const id = await owner();
-  if (id instanceof Response) return id;
+  const accountId = await owner();
+  if (accountId instanceof Response) return accountId;
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '請從觀察室操作。' }, 403);
+  let binding:Awaited<ReturnType<typeof bindWorldSave>>;
+  try { binding=await bindWorldSave(accountId,request); } catch(error) { return reply({error:error instanceof Error?error.message:'無法讀取存檔。'},error instanceof SaveAccessError?error.status:503); }
+  const id=binding.storageOwner;
   let locked = false, lease = 0, workDeadline=0;
   let workSignal:AbortSignal|undefined,finishSignal:AbortSignal|undefined;
   const workWait=<T,>(promise:Promise<T>)=>workSignal?awaitSignal(promise,workSignal):promise;
@@ -204,6 +212,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let b: { mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
+    if(binding.accountWorkspace&&!['generate-character-template','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
     const initializingCity = b.operation === 'initialize-city';
     const cityOperation = b.operation === 'preview-city' || b.operation === 'start-city' || suggestingOpening || initializingCity;
@@ -211,11 +220,11 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (['set-model-key', 'clear-model-key'].includes(b.operation || '')) {
       if (!['ai', 'openai'].includes(b.mode || '')) return reply({ error: '請選擇要設定 Key 的模型服務。' }, 400);
       const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
-      if (b.operation === 'set-model-key') await saveModelKey(id, provider, b.key);
-      else await clearModelKey(id, provider);
-      return reply({ modelKeys: await modelKeyStatus(id), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+      if (b.operation === 'set-model-key') await saveModelKey(accountId, provider, b.key);
+      else await clearModelKey(accountId, provider);
+      return reply({ modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable() });
     }
-    if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
+    if ((binding.saveId&&new URL(request.url).searchParams.has('save')&&b.operationScope!==id) || (b.operationScope !== undefined && b.operationScope !== id)) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
     if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
@@ -245,6 +254,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (generatingCharacter && (!characterGeneration || b.operationScope !== id)) {
       return reply({ error: '請重新讀取人物範本，並提供描述或已填設定及至少一個空白欄位。' }, 400);
     }
+    await ensureAccountOperationLedger(binding);
     const loaded = await loadWorld(id);
     let world = loaded.world;
     const version = loaded.version;
@@ -253,7 +263,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'preview-city' && city?.success) {
       if (b.worldContext !== world.contextId || b.expectedVersion !== version) return reply({error:'原世界已變更，請重新讀取後再預覽。'}, 409);
       if (world.configuration || world.acceptance) return reply({error:'目前世界無法另建城市。'}, 400);
-      const {preview} = await prepareCity(id, city.data, world);
+      const {preview} = await prepareCity(accountId, city.data, world);
       return reply({ preview, version });
     }
 
@@ -289,7 +299,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if ((suggestingOpening || initializingCity) && city?.success) {
       if (b.expectedVersion !== version) return reply({ error:'原世界已變更，請重新讀取後再整理。' }, 409);
       if (world.configuration || world.acceptance) return reply({ error:'目前世界無法另建城市。' }, 400);
-      const { preview } = await prepareCity(id, city.data, world);
+      const { preview } = await prepareCity(accountId, city.data, world);
       const invalidMemory = preview.characters.some(actor => initialMemoryCapacityError(actor.fields.initialMemories));
       if (invalidMemory || (initializingCity && preview.issues.length > (preview.missingStarts ?? 0))) {
         return reply({ error:preview.issues.join(' '), preview },400);
@@ -316,7 +326,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'start-city' && city?.success) {
       if (b.expectedVersion !== version) return reply({error:'原世界已變更，請重新預覽後開始。',operationSettled:true}, 409);
       if (world.configuration || world.acceptance) return reply({error:'目前世界無法另建城市。'}, 400);
-      const candidate = await prepareCity(id, city.data, world);
+      const candidate = await prepareCity(accountId, city.data, world);
       if (!candidate.world) return reply({error:candidate.preview.issues.join(' '), preview:candidate.preview}, 400);
       startedCity = candidate.world;
     }
@@ -342,15 +352,15 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，請明示重置測試世界後再推進；舊世界仍可讀取，用量保留。',worldResetRequired:true},409);
-    if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter');
+    if (b.operation === 'advance' && b.mode !== 'demo') await readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter');
     if(b.operation==='advance'&&b.mode!=='demo'){
       if(!world.adjudication)return reply({error:'請先設定天上意志的裁定服務、模型與 API Key。'},400);
-      const status=await modelKeyStatus(id);
+      const status=await modelKeyStatus(accountId);
       if(!status[world.adjudication.provider].configured)return reply({error:'請先保存裁定服務的 API Key。'},400);
     }
 
     if (generatingSetup && !world.adjudication) return reply({ error: '請先在觀察室設定天上意志的服務、模型與 API Key。' }, 400);
-    if (generatingSetup && world.adjudication) await readModelKey(id, world.adjudication.provider);
+    if (generatingSetup && world.adjudication) await readModelKey(accountId, world.adjudication.provider);
     if (!generatingSetup) normalizeWorld(world);
     const initialUsage = world.aiUsage && structuredClone(world.aiUsage);
     paidBefore=initialUsage;
@@ -398,8 +408,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     // All configured service credentials must be known before the first private
     // checkpoint: an NPC input can accidentally contain the other provider key.
     decisionTrace.step('time-policy',undefined,{version:roundTimePolicy.version,leaseCreatedAt,leaseAcquiredAt:Date.now(),workDeadline,leaseDeadline:lease,clientMs:roundClientMs});
-    const configuredKeys=await workWait(modelKeyStatus(id));
-    for(const provider of ['openai','openrouter'] as const)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await workWait(readModelKey(id,provider)));}catch{decisionTrace.omitUnsafeContent();}}
+    const configuredKeys=await workWait(modelKeyStatus(accountId));
+    for(const provider of ['openai','openrouter'] as const)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await workWait(readModelKey(accountId,provider)));}catch{decisionTrace.omitUnsafeContent();}}
     await workWait(decisionTrace.persist());
     const verifyLease = async () => {
       workSignal!.throwIfAborted();
@@ -423,9 +433,9 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           if (budgetReached(usage, limits)) throw new BudgetExceeded();
           await verifyLease();
           if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
-            recallBudgetDatabase(), id, 'chat', operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
+            recallBudgetDatabase(), accountId, 'chat', id + ':' + operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
           ))).replayed) throw Error('付費請求結果不明，禁止重送。');
-          const key = await workWait(readModelKey(id, config.provider));
+          const key = await workWait(readModelKey(accountId, config.provider));
           await verifyLease();
           let reportCost: ReturnType<typeof beginCost> | undefined;
           const result = await invoke({ ...config, key }, {
@@ -452,7 +462,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               runSetup(task,(service,options)=>requestModel(service,messages,schema,{...options,maxOutputTokens:4096})));
             const validated = cityDraftSchema.safeParse(finalizedCity);
             if (!validated.success) throw Error('場所定稿超出城市容量。');
-            const {preview} = await workWait(prepareCity(id,validated.data,world));
+            const {preview} = await workWait(prepareCity(accountId,validated.data,world));
             if (preview.issues.length > (preview.missingStarts ?? 0)) throw Error('場所定稿無法套用。');
             finalizationPreview = preview;
           } else if (openingDescription !== undefined) {
@@ -529,8 +539,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           limits,
           beforeDecision: async () => {
             await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), id, 'chat', `${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await workWait(readModelKey(id, b.mode === 'openai' ? 'openai' : 'openrouter'));
+            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+            dispatchKey = await workWait(readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter'));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
@@ -552,8 +562,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               // A rolling-hour boundary may reset only the next round, not this guard.
               const usage = w.aiUsage!;
               if (kind === 'chat' && budgetReached(usage, limits)) throw new BudgetExceeded();
-              const reservationId = `${operationId}:${c.id}:${dispatch++}`;
-              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), id, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+              const reservationId = `${id}:${operationId}:${c.id}:${dispatch++}`;
+              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
@@ -588,7 +598,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
               await guard('chat',1);
-              const key=await workWait(readModelKey(id,config.provider));
+              const key=await workWait(readModelKey(accountId,config.provider));
               await verifyLease();
               const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
               const cost=beginCost(usage,config.provider,config.model,w.modelPrices?.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
