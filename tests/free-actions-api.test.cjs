@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {POST,GET}=load('route'),store=load('store'),{seedWorld}=load('world');
-const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b})});
+const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 test('AI requires persisted adjudication configuration while old worlds and rules remain readable',async()=>{
  store.install(seedWorld());let dispatched=0;const old=global.fetch;global.fetch=async()=>{dispatched++;throw Error('must not dispatch');};

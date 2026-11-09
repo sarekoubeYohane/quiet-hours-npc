@@ -11,7 +11,7 @@ const store = load('store');
 const { scenario, proposal, approval } = require('./routine-program-fixture.cjs');
 const instant = 1793246600000;
 const operation = { operation:'advance', minutes:15, operationId:instant + ':00000000-0000-4000-8000-000000000001' };
-const lookup = async () => (await (await GET(new Request('https://test.invalid/api/world?operationId=' + operation.operationId))).json());
+const lookup = async () => (await (await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId=' + operation.operationId))).json());
 const response = (_fixtureInput) => Response.json({usage:{prompt_tokens:30,completion_tokens:10,...(process.env.CRASH_CACHE==='yes'?{prompt_tokens_details:{cached_tokens:5}}:{})},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,{...proposal,type:'rest',target:'',content:'Synthetic rest'}))}}]});
 
 async function child() {

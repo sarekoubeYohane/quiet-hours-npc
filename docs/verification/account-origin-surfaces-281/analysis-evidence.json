@@ -1,0 +1,23 @@
+{
+  "commit": "e92f53c",
+  "recovered": [
+    {
+      "url": "http://127.0.0.1:46475/api/world?save=fd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationScope=save%3Aa%3Afd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationId=1794242135211%3A5c916cc3-e1d2-47b4-8bc9-90aa3c55ab1f",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:46475/api/world?save=fd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationScope=save%3Aa%3Afd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationId=1794242135211%3A5c916cc3-e1d2-47b4-8bc9-90aa3c55ab1f",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:46475/api/world?save=fd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationScope=save%3Aa%3Afd0d541a-88ab-4be2-86eb-b09df4edc5f5&operationId=1794242135211%3A5c916cc3-e1d2-47b4-8bc9-90aa3c55ab1f",
+      "status": 200
+    }
+  ],
+  "turn": 1,
+  "worldPosts": 1,
+  "pendingCleared": true,
+  "analysisReaders": true,
+  "controlled": 1,
+  "paid": 0
+}

@@ -1,0 +1,15 @@
+{
+  "commit": "f9d2345",
+  "recovered": [
+    {
+      "url": "http://127.0.0.1:38311/api/world?save=6a9c72d6-428c-43db-9cb0-d1038e12428a&operationScope=save%3Aa%3A6a9c72d6-428c-43db-9cb0-d1038e12428a&operationId=1794241364468%3Ae55fbaed-7226-4892-aade-5025e6ff3525",
+      "status": 200,
+      "state": "settled"
+    }
+  ],
+  "turn": 1,
+  "worldPosts": 1,
+  "pendingCleared": true,
+  "controlled": 1,
+  "paid": 0
+}

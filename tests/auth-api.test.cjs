@@ -78,7 +78,7 @@ test('two invited accounts get separate worlds keyed by stable GitHub id, not lo
   reset(); fixture.env.GITHUB_ALLOWED_IDS = '123,456';
   const first = cookies(await signIn());
   headers.set(new Headers({ cookie: first }));
-  const advanced = await world.POST(authRequest('/api/world', first, { method: 'POST', headers: { origin }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', mode: 'demo', minutes: 15 }) }));
+  const advanced = await world.POST(authRequest('/api/world', first, { method: 'POST', headers: { origin }, body: JSON.stringify({ operationScope:'github:123',operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', mode: 'demo', minutes: 15 }) }));
   assert.equal(advanced.status, 200);
   assert.equal((await advanced.json()).world.turn, 1);
   const second = cookies(await signIn({ id: 456, login: 'owner' }));

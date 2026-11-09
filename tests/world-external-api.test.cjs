@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -16,7 +18,7 @@ async function scenario({reply=accepted([change('object','cup','volume','full','
  w.objects=[{id:'cup',source:'fixture-cup',label:'熱茶杯',region:'cafe-front',holder:'owner',owner:'owner',revision:1,state:{volume:'full'},lifecycle:'active',kind:'utensil',knownTo:['owner','vera'],allowedTo:['owner']}];
  w.scene={doors:{'cafe-door':'open'},noise:{},occluded:[],external:{'cafe-front':{revision:0,state:{桌面:'乾燥'}}}};
  prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});
  const oldFetch=global.fetch,oldRandom=Math.random;let npc=0,judgments=0,dice=0;const requests=[],choices={};
  global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);requests.push({input,request});if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(typeof reply==='function'?reply(input):reply,JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(choices[input.self.id]||(input.self.id==='owner'?decision:rest),JSON.parse(JSON.parse(init.body).messages[1].content));};
@@ -38,7 +40,7 @@ test('one actual activity atomically saves cup environment and body consequences
   assert.ok(w.characters.find(c=>c.id==='vera').observations.some(o=>o.sense==='touch'&&/燙紅/.test(o.text)));
   assert.deepEqual(s.counts(),{npc:3,judgments:1,dice:0});
   const counts=s.counts();await advance(s,{operationId:id});const reread=await s.read();assert.deepEqual(reread.objects,w.objects);assert.deepEqual(reread.scene,w.scene);assert.deepEqual(reread.characters.map(c=>c.physical),w.characters.map(c=>c.physical));assert.deepEqual(s.counts(),counts);
-  const receipt=await(await GET(new Request('https://test.invalid/api/world?operationId='+id))).json();
+  const receipt=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+id))).json();
   const bodyEvidence=receipt.operation.evidence.result.externalStates.find(item=>item.target.type==='body'&&item.target.id==='vera');
   assert.equal(bodyEvidence.before,null);assert.deepEqual(bodyEvidence.after.stateEntries,[{key:'手背',value:'燙紅'}]);
   const environmentEvidence=receipt.operation.evidence.result.externalStates.find(item=>item.target.type==='environment');assert.deepEqual(environmentEvidence.before.stateEntries,[{key:'桌面',value:'乾燥'}]);assert.deepEqual(environmentEvidence.after.stateEntries,[{key:'桌面',value:'濕潤'}]);
@@ -187,7 +189,7 @@ test('new hidden object state is preserved as an authority fact and observer evi
   const vera=s.requests.find(r=>r.input.self?.id==='vera').input;assert.equal(vera.objects.find(o=>o.id==='cup').state.volume,'full');
   s.choose({...proposal,content:'繼續整理這個杯子'});s.reply({...accepted([]),stages:[{afterMinutes:15,preconditions:[condition('object','cup','隱藏配方','HIDDEN_RECIPE')],effects:[change('object','cup','volume','full','less',2)]}]});w=await advance(s);assert.equal(w.objects[0].state.volume,'less');
   for(const request of s.requests.filter(r=>r.input.self))assert.doesNotMatch(JSON.stringify(request.input),/HIDDEN_RECIPE|隱藏配方/);
-  const receipt=await(await GET(new Request('https://test.invalid/api/world?operationId='+id))).json();assert.ok(receipt.operation.evidence.result.objects[0].stateEntries.some(entry=>entry.value==='HIDDEN_RECIPE'));
+  const receipt=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+id))).json();assert.ok(receipt.operation.evidence.result.objects[0].stateEntries.some(entry=>entry.value==='HIDDEN_RECIPE'));
   assert.equal(s.counts().dice,0);
  }finally{s.restore();}
 });

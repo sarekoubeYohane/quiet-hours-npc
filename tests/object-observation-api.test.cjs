@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Model transport fixture; real World API, perception and SQLite. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+":"+crypto.randomUUID(),mode:'demo',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+":"+crypto.randomUUID(),mode:'demo',...body}, 'test-owner'))});
 const post=body=>POST(request(body));
 const read=async()=>(await(await GET()).json()).world;
 const rest={type:'rest',target:'',content:'',mood:'',durationMinutes:15,intents:[]};

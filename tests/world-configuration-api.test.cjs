@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
@@ -13,7 +15,7 @@ const { configuration, configuredWorld } = require('./fixtures/world-configurati
 
 const send = body => POST(new Request('https://test.invalid/api/world', {
   method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
-  body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }),
+  body: JSON.stringify(originalWorldInput({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }, 'test-owner')),
 }));
 const read = async () => {
   const response = await GET();

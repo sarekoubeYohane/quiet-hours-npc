@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-function setup(prepare=()=>{}){const w=seedWorld();w.contextId='needs-278';w.characters=w.characters.filter(c=>c.id==='owner');w.characters[0].control={mode:'taken-over',experiences:[]};prepare(w);store.install(w);return {post:b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'demo',...b})})),read:async()=>(await(await GET()).json()).world};}
+function setup(prepare=()=>{}){const w=seedWorld();w.contextId='needs-278';w.characters=w.characters.filter(c=>c.id==='owner');w.characters[0].control={mode:'taken-over',experiences:[]};prepare(w);store.install(w);return {post:b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:w.contextId,mode:'demo',...b}, 'test-owner'))})),read:async()=>(await(await GET()).json()).world};}
 const settings=(traits={hunger:[0.8],thirst:[1],sleep:[1.2]})=>({operation:'enable-body-needs',bodyNeeds:[{id:'owner',traits}]});
 test('owner explicitly enables bounded need traits once; GET, SQLite reload and original operation replay preserve them',async()=>{
  const s=setup();assert.equal((await s.read()).characters[0].needs,undefined);

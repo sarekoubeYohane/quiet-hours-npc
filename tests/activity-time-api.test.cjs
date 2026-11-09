@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -8,7 +10,7 @@ const completion=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,compl
 const timings=tea=>['tea','coffee','food','drink','wash','return'].map(operation=>({operation,minutes:operation==='tea'?tea:operation==='coffee'?45:15}));
 async function scenario(minutes,estimate=15,overrides={},adjust=approval=>approval){
  const w=seedWorld();w.contextId='activity-time';w.adjudication={provider:'openai',model:'gpt-6.1-sol'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture-key'});
  let npc=0,judgments=0,decision={type:'propose',target:'cafe',content:'泡一杯普通茶',purpose:'飲用',mood:'平靜',durationMinutes:estimate,intents:[]};const old=global.fetch;
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;assert.ok(input.routineOffer.templates.every(t=>!('minutes' in t.result)),'first offer must not preselect completion time');return completion({status:'accepted',effects:[],stages:[],check:null,routine:adjust({family:'cafe-service',version:1,operation:'tea',subject:'茶',timings:timings(minutes).map(t=>({...t,minutes:overrides[t.operation]??t.minutes}))})},JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;return completion(decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=old;},counts:()=>({npc,judgments}),choose:d=>{decision={...decision,...d};}};

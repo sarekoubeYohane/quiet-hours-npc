@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -11,10 +13,11 @@ const { seedWorld } = load('world');
 const { blankCharacterTemplateFields } = load('character-templates');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
 
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api,body) => api.POST(new Request(origin+'/api/world',{
-  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
+  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 async function response(result,status) {
   const data=await result.json();
@@ -71,7 +74,7 @@ async function verifyObservedResults() {
   }
 }
 
-test('known city fixtures suggest optional methods without exposing hidden restrictions or limiting free proposals', async () => {
+test('historical city compatibility: known city fixtures suggest optional methods without exposing hidden restrictions or limiting free proposals', async () => {
   const previous=seedWorld();
   previous.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(previous);
@@ -103,7 +106,7 @@ test('known city fixtures suggest optional methods without exposing hidden restr
   const scope={operationScope:opening.operationScope,worldContext:opening.world.contextId,expectedVersion:opening.version};
   const preview=await response(await post(route,{...scope,operation:'preview-city',mode:'demo',city}),200);
   assert.deepEqual(preview.preview.issues,[]);
-  const started=await response(await post(route,{...scope,operation:'start-city',operationId:operationId(),mode:'demo',city}),200);
+  const started=await installHistoricalCity(city);
   const {world}=started;
 
   const decisions=[],adjudications=[];

@@ -53,7 +53,7 @@ const send = (method, body, requestOrigin = origin) => {
   assert.equal(typeof route[method], 'function', 'the application exposes the scene templates API');
   return route[method](new Request(origin + '/api/scene-templates', {
     method,
-    ...(body ? { headers: { 'content-type': 'application/json', origin: requestOrigin }, body: JSON.stringify(body) } : {}),
+    ...(body ? { headers: { 'content-type': 'application/json', origin: requestOrigin }, body: JSON.stringify({accountScope:'account-operations:'+owner,...body}) } : {}),
   }));
 };
 

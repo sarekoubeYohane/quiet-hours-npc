@@ -8,7 +8,7 @@ test('private trace rereads actual dispatched bytes and unchanged facts without 
  global.fetch=async(url,init)=>{const response=await original(url,init);wire.push({request:init.body,response:await response.clone().text()});return response;};
  try{
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()},r=await s.post(op);assert.equal(r.status,200);
-  const read=async()=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json());
+  const read=async()=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(op.operationId)))).json());
   const first=await read(),trace=first.decisionTrace;assert.ok(trace,'completed operation must expose durable private transcript');
   assert.equal(trace.outcome,'committed');assert.equal(trace.requestId,r.headers.get('X-World-Request-Id'));
   assert.equal(trace.dispatches.length,2);
@@ -24,7 +24,7 @@ test('normal denial retains the full cup and raw reply even with no changed obje
  const s=await scenario({reply:denied,modify:w=>{w.objects.find(o=>o.id==='cup-a').state.contents='tea';}});
  try{
   const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200);
-  const data=await(await GET()).json(),trace=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(data.decisionTraces.records[0].operationId)))).json();
+  const data=await(await GET()).json(),trace=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(data.decisionTraces.records[0].operationId)))).json();
   const d=trace.decisionTrace.dispatches.find(item=>item.task==='adjudication');
   assert.equal(d.worldSnapshot.objects.find(o=>o.id==='cup-a').state.contents,'tea');
   assert.equal(JSON.parse(JSON.parse(d.responseBody).choices[0].message.content).status,'denied');
@@ -33,22 +33,22 @@ test('normal denial retains the full cup and raw reply even with no changed obje
 });
 module.exports={proposal};
 
-test('trace history survives journal eviction and time passage, stays private, and reset clears the old history',async()=>{
+test('trace history survives journal eviction and time passage, stays private, and retired reset retains the old history',async()=>{
  const s=await scenario({modify:w=>{w.characters[0].shortTerm[0].text='FORGOTTEN-PRIVATE-CONTEXT';w.characters[0].memories[0].text='FORGOTTEN-PRIVATE-CONTEXT';}});const store=load('store'),auth=load('auth');
  try{
   const r=await s.post({operation:'advance',minutes:15}),first=(await r.json()).operationEvidence;
-  const before=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(first.operationId)))).json()).decisionTrace;
+  const before=(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json()).decisionTrace;
   for(let i=0;i<9;i++)assert.equal((await s.post({operation:'takeover'})).status,200);
-  const saved=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(first.operationId)))).json();
+  const saved=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();
   assert.equal(saved.operation.state,'expired');assert.deepEqual(saved.decisionTrace,before);assert.equal(saved.decisionTraces.retention.count,10);
   const current=store.snapshot();current.characters[0].shortTerm=[];current.characters[0].longTerm=[];current.characters[0].memories=[];store.replaceCommittedWorld(current);
   await s.post({operation:'return-control'});s.choose({...proposal,type:'rest',target:'',content:'休息',purpose:'休息',timeIntent:{kind:'open-ended',maxMinutes:null}});await s.post({operation:'advance',minutes:15});
   assert.ok(JSON.stringify(before).includes('FORGOTTEN-PRIVATE-CONTEXT'));assert.ok(!JSON.stringify(s.inputs.at(-1).request).includes('FORGOTTEN-PRIVATE-CONTEXT'));
   const clock=Date.now;Date.now=()=>clock()+8*86400000;
-  try{const later=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(first.operationId)))).json();assert.deepEqual(later.decisionTrace,before);}finally{Date.now=clock;}
+  try{const later=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.deepEqual(later.decisionTrace,before);}finally{Date.now=clock;}
   store.installForOwner('other-owner',load('world').seedWorld());auth.setUserId('other-owner');
-  try{const isolated=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(first.operationId)))).json();assert.equal(isolated.decisionTrace,null);assert.equal(isolated.decisionTraces.retention.count,0);}finally{auth.setUserId('test-owner');}
-  await s.post({operation:'reset'});const reset=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(first.operationId)))).json();assert.equal(reset.decisionTrace,null);assert.equal(reset.decisionTraces.retention.count,1);
+  try{const isolated=await(await GET(new Request('https://test.invalid/api/world?operationScope=other-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.equal(isolated.decisionTrace,null);assert.equal(isolated.decisionTraces.retention.count,0);}finally{auth.setUserId('test-owner');}
+  const beforeRetirement=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.equal((await s.post({operation:'reset'})).status,409);const reset=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(first.operationId)))).json();assert.deepEqual(reset.decisionTrace,beforeRetirement.decisionTrace);assert.deepEqual(reset.decisionTraces,beforeRetirement.decisionTraces);
  }finally{auth.setUserId('test-owner');s.restore();}
 });
 
@@ -66,7 +66,7 @@ test('archive enforces count, total bytes and single-record limits through world
    if(kind==='count')assert.equal(index.retention.evicted,2);
    if(kind==='bytes')assert.ok(index.retention.evicted>0);
    if(kind==='record'){
-    const trace=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(index.records[0].operationId)))).json()).decisionTrace;
+    const trace=(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(index.records[0].operationId)))).json()).decisionTrace;
     assert.equal(trace.gap,'single-record-limit');assert.ok(trace.omittedOriginalBytes>1024*1024);assert.deepEqual(trace.gaps,['single-record-limit']);
    }
   }finally{s.restore();}
@@ -77,7 +77,7 @@ test('nested request and snapshot credential fields are masked while hidden fact
  const s=await scenario({modify:w=>{w.objects[0].state.authorization='opaque-state-secret';w.objects[0].state.hiddenDiagnostic='OBS-HIDDEN';w.objects[0].stateExposure={authorization:'hidden',hiddenDiagnostic:'hidden'};w.characters[0].goal='泡茶 {"api_key":"opaque-goal-secret"}';}});
  try{
   await s.post({operation:'advance',minutes:15});const index=await(await GET()).json();
-  const trace=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(index.decisionTraces.records[0].operationId)))).json()).decisionTrace;
+  const trace=(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(index.decisionTraces.records[0].operationId)))).json()).decisionTrace;
   const text=JSON.stringify(trace);for(const secret of ['fixture-key','opaque-state-secret','opaque-goal-secret'])assert.ok(!text.includes(secret),secret);
   assert.equal(trace.redacted,true);assert.ok(text.includes('OBS-HIDDEN'));assert.ok(!s.inputs[0].request.messages[1].content.includes('OBS-HIDDEN'));
   const rest={type:'rest',target:'',content:'休息',purpose:'休息',mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},intents:[]};
@@ -90,7 +90,7 @@ test('each actor dispatch freezes its own sequential world, including unchanged 
  const previous=global.fetch;global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{...proposal,type:input.self.id==='owner'?'move':'rest',target:input.self.id==='owner'?'kris-home':'',content:'繼續生活',purpose:'',timeIntent:{kind:input.self.id==='owner'?'completion':'open-ended',maxMinutes:null}}))}}]});};
  try{
   const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const id=(await r.json()).operationEvidence.operationId;
-  const trace=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;
+  const trace=(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json()).decisionTrace;
   assert.equal(trace.dispatches.length,2);assert.equal(trace.dispatches[0].worldSnapshot.actors.find(a=>a.id==='owner').location,'cafe');assert.equal(trace.dispatches[1].worldSnapshot.actors.find(a=>a.id==='owner').location,'kris-home');
   assert.deepEqual(trace.dispatches[0].worldSnapshot.scene.occluded,['cafe-storeroom']);assert.deepEqual(trace.dispatches[1].worldSnapshot.scene.doors,{'cafe-door':'closed'});
  }finally{global.fetch=previous;s.restore();}
@@ -107,7 +107,7 @@ test('single-variable wording, purpose and depleted-source controls show actual 
   }});
   try{
    const r=await s.post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());const id=(await r.json()).operationEvidence.operationId;
-   const trace=(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;
+   const trace=(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json()).decisionTrace;
    const checks=trace.steps.filter(step=>step.kind==='rule-selection').map(step=>step.data);
    if(variant==='base'){assert.equal(s.counts().judgments,0);assert.ok(checks.some(item=>item.branch==='program-result'));}
    if(variant==='wording'){assert.equal(s.counts().judgments,1);assert.ok(checks.some(item=>item.check==='template'&&item.wording===false));}
@@ -121,7 +121,7 @@ test('trace storage failure leaves a visible gap without undoing or repeating a 
  const s=await scenario(),store=load('store');
  try{
   store.failTraceWrites(true);const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()},r=await s.post(op);assert.equal(r.status,200);const body=await r.json();assert.equal(body.decisionTraceStatus.status,'write-failed');
-  const saved=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json();assert.equal(saved.world.turn,1);assert.equal(saved.decisionTrace,null);assert.equal(saved.decisionTraces.gap,'trace-write-failed');assert.equal(saved.operation.decisionTraceStatus.gap,'trace-write-failed');
+  const saved=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(op.operationId)))).json();assert.equal(saved.world.turn,1);assert.equal(saved.decisionTrace,null);assert.equal(saved.decisionTraces.gap,'trace-write-failed');assert.equal(saved.operation.decisionTraceStatus.gap,'trace-write-failed');
   const replay=await s.post(op);assert.equal(replay.status,200);assert.equal((await replay.json()).decisionTraceStatus.status,'write-failed');assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:0});
  }finally{store.failTraceWrites(false);s.restore();}
 });

@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +10,7 @@ const { POST, GET } = build('route');
 const store = build('store');
 const { seedWorld } = build('world');
 const operationId = () => `${Date.now()}:${crypto.randomUUID()}`;
-const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({mode:'demo',...body})});
+const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({mode:'demo',...body}, 'test-owner'))});
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
 test('reloaded API replays the exact result for an operation instead of advancing twice', async () => {
@@ -116,7 +118,7 @@ test('read-only operation lookup confirms a lost response without executing the 
  store.install(worldWithAdjudication());
  const body={operation:'advance',operationId:operationId(),minutes:15};
  const accepted=await POST(request(body));assert.equal(accepted.status,200);
- const lookup=()=>GET(new Request(`https://test.invalid/api/world?operationId=${encodeURIComponent(body.operationId)}`));
+ const lookup=()=>GET(new Request(`https://test.invalid/api/world?operationScope=test-owner&operationId=${encodeURIComponent(body.operationId)}`));
  const latest=await (await lookup()).json();
  assert.equal(latest.operation.state,'settled');assert.equal(latest.operation.status,200);
  assert.equal(latest.world.turn,1);assert.equal(latest.version,1);
@@ -129,7 +131,7 @@ test('operation lookup does not dispatch unknown requests or settle an active or
  const ready=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
  global.fetch=async()=>{calls++;entered();await gate;throw Error('provider unavailable');};
  const body={operation:'advance',operationId:operationId(),minutes:15,mode:'openai',model:'gpt-6-luna'};
- const lookup=id=>GET(new Request(`https://test.invalid/api/world?operationId=${encodeURIComponent(id)}`));
+ const lookup=id=>GET(new Request(`https://test.invalid/api/world?operationScope=test-owner&operationId=${encodeURIComponent(id)}`));
  let running;
  try{
   assert.equal((await (await lookup(body.operationId)).json()).operation.state,'unknown');assert.equal(calls,0);
@@ -154,7 +156,7 @@ test('paid lost-response lookup preserves latest world, events and usage without
   assert.equal(calls,4);
   assert.equal((await POST(request({operation:'intervene',operationId:operationId(),target:'all',text:'下一個共同事件'}))).status,200);
   const before=await (await GET()).json();
-  const url=`https://test.invalid/api/world?operationId=${encodeURIComponent(body.operationId)}`;
+  const url=`https://test.invalid/api/world?operationScope=test-owner&operationId=${encodeURIComponent(body.operationId)}`;
   for(let i=0;i<3;i++){
    const data=await (await GET(new Request(url))).json();
    assert.deepEqual(data.world,before.world);assert.equal(data.version,2);

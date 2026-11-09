@@ -10,7 +10,7 @@ const action=(target='last-food',alias=false)=>({...proposal,target,content:alia
 const source=(id,remaining=1)=>({id,label:'有限點心',region:'cafe-front',remaining,owner:'owner',knownTo:['owner'],allowedTo:['owner'],kind:'food',consumable:true,initialState:{}});
 const program=()=>f.program('take-portion','取用這份點心','用餐',[f.binding('meal','supply','target',[],{kind:'food'})],[f.phase(15,[{kind:'materialize',supplyId:'$meal',expectedRemaining:0}])]);
 const knownReply=()=>{const p=program();p.methods[0].aliases=[{content:'拿取這份點心',purpose:'食用'}];return f.approval([p],'take-portion','點心');};
-const trace=async op=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json()).decisionTrace;
+const trace=async op=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(op.operationId)))).json()).decisionTrace;
 
 test('verified depleted target is rechecked free across aliases and unrelated changes while a new source remains usable',async()=>{
  const s=await scenario({decision:action(),reply:knownReply(),supplies:[source('last-food'),source('other-food')],modify:w=>{w.objects=[];}});

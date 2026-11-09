@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
@@ -6,13 +8,14 @@ const realNow=Date.now;
 test.before(()=>{Date.now=()=>1793836800000;});
 test.after(()=>{Date.now=realNow;});
 const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name + '.cjs'));
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const people = load('character-templates-route');
 const route = load('route');
 const store = load('store');
 const {fixtureDecision} = require('./pursuit-fixture.cjs');
 const id = () => Date.now()+':'+crypto.randomUUID();
 const send = (api, body) => api.POST(new Request('https://test.invalid', {
-  method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(body),
+  method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(body, 'test-owner') : originalAccountInput(body, 'account-operations:test-owner')),
 }));
 const json = async (response,status) => { const body=await response.json(); assert.equal(response.status,status,JSON.stringify(body)); return body; };
 const read = async () => json(await route.GET(),200);
@@ -25,7 +28,7 @@ const cityFor = async template => {
 };
 
 for(const value of ['憶'.repeat(1365),'憶'.repeat(1366),'憶'.repeat(1500),'x'.repeat(2400),'憶'.repeat(1365)+'a','憶'.repeat(1365)+'ab','x'.repeat(2401)]) {
-  test(`initial memory ${value.length} chars / ${Buffer.byteLength(value)} bytes: save, reload and city lifecycle`, async () => {
+  test(`initial memory ${value.length} chars / ${Buffer.byteLength(value)} bytes: save, reload and historical city lifecycle`, async () => {
     store.install(load('world').seedWorld());
     const original=await read();
     const input=draft(value);
@@ -43,7 +46,7 @@ for(const value of ['憶'.repeat(1365),'憶'.repeat(1366),'憶'.repeat(1500),'x'
     const preview=await json(await send(route,{...scope(original),operation:'preview-city',city}),200);
     assert.deepEqual(preview.preview.issues,[]);
     assert.deepEqual(await read(),original);
-    const {world}=await json(await send(route,{...scope(original),operation:'start-city',operationId:id(),city}),200);
+    const {world}=await installHistoricalCity(city);
     assert.equal((await read()).world.characters[0].profile.initialMemories,value);
     assert.ok((await read()).world.characters[0].shortTerm.some(m=>m.text===value));
     await json(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled'}),200);
@@ -79,9 +82,9 @@ test('legacy oversized templates stay readable and editable; all city operations
   global.fetch=async ()=>{calls++;throw Error('must not dispatch');};
   try {
     for(const operation of ['preview-city','start-city','initialize-city','suggest-opening-relationships']) {
-      const result=await json(await send(route,{...scope(original),operation,operationId:id(),city,openingDescription:'孟澄在測試屋居住'}),operation==='preview-city'?200:400);
+      const result=await json(await send(route,{...scope(original),operation,operationId:id(),city,openingDescription:'孟澄在測試屋居住'}),operation==='preview-city'?200:operation==='start-city'?409:400);
       const message=operation==='preview-city'?result.preview.issues.join(' '):result.error;
-      assert.match(message,/孟澄.*初始記憶.*4500.*4096.*人物範本.*縮短/);
+      if(operation==='start-city')assert.match(message,/新開存檔/);else assert.match(message,/孟澄.*初始記憶.*4500.*4096.*人物範本.*縮短/);
       assert.equal(result.stopReason,undefined);
       assert.deepEqual(await read(),original);
       assert.equal(store.archivedWorld(),undefined);

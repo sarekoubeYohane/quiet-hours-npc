@@ -17,6 +17,7 @@ export async function POST(request:Request){
   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return reply({error:'形成操作格式無效。'},400);
   const input=parsed as {id?:string;version?:number;action?:string;values?:unknown;operationId?:string;operationScope?:string;worldContext?:string};
   if(typeof input.id!=='string'||!Number.isSafeInteger(input.version)||input.version!<0)return reply({error:'草稿身分或版本無效。'},400);
+  if(input.operationScope!=='account-operations:'+user.userId)return reply({error:'原帳號已變更，原輸入未同步。',scopeMismatch:true},409);
   let draft=await loadCharacterDraft(user.userId,input.id);if(!draft)return reply({error:'找不到本帳號的建角草稿。'},404);
   if(input.action==='allocate'){
    if(input.operationScope!=='account-operations:'+user.userId)return reply({error:'原帳號已變更，請回原帳號恢復配點。'},409);

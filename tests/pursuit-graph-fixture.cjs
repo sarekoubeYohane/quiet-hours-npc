@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const node=(id,parents=[],extra={})=>({id,content:id.split(':').at(-1),kind:'task',scope:'做一份自己想做的設計',satisfaction:'完成一份設計',intensity:'medium',importance:'medium',urgency:'low',context:'',parents,...extra});
 const upsert=(id,parents=[],extra={},version=0)=>({operation:'upsert',id,version,node:node(id,parents,extra),references:[],reason:'這是我願意承接的方向'});
 const reorder=(id,version,members,scope='children')=>({operation:'reorder',id,version,node:{scope,members},references:[],reason:'依現在的情境調整這個範圍的順序'});
