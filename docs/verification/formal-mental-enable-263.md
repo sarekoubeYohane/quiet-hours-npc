@@ -8,9 +8,9 @@
 - `node tests/run-activities.mjs tests/formal-mental-enable-api.test.cjs`：13/13。新檔已列入預設 runner。其中新城市預覽同時驗不合法目前80／未指定容量：無骰拒絕，合法草稿才於成功 start 形成65/46，原 ID 不重抽。
 - 同 runner：啟用13、新城市六組22、人物建角6，共41/41（`263-city-final.log`）。新正式城市 fixture 改用真實五分鐘、向後開始與真正完成後觀察，沒有把新規則改為選配或放寬 inactive schema。
 - 正式政策、既有精神／來源／成果／過程／調節／受控、個人需求與五分鐘九組125/125（`263-related-regression.log`）。這些正式 core 測試和既存隔離政策測試分開維持。
-- typecheck 通過（`263-typecheck-final.log`），diffcheck 通過。合入最新 integration 後會補記共享路徑重驗結果；最終全套及 build 由整合者統一記錄，不將本地適當回歸寫成完整 npm test。
+- typecheck 通過（`263-typecheck-final.log`），diffcheck 通過。同步 `25c790f` 後13組108/108（`263-integrated-regression.log`，含d100、時間修復、正式政策、個人需求、新城市），typecheck及diffcheck通過；lint 0 errors／4既有warnings（`263-lint-integrated.log`）。最終全套及 build 由整合者統一記錄，不將本地適當回歸寫成完整 npm test。
 
-日誌根目錄：`/private/tmp/npc-handoff-20261109/`。本票最終同步、lint 及 browser 重跑結果附於下方；歷史首輪證據不被覆寫成較新執行結果。
+日誌根目錄：`/private/tmp/npc-handoff-20261109/`。首輪與最終browser日誌分開保留；資產連結對應最終合後版本。
 
 ## #255 T1–T14 正式承接
 
@@ -46,11 +46,11 @@
 
 ## 真實 WorldApp
 
-可重跑 `tooling/verification/browser-formal-mental-energy.mjs`；受控固定時鐘，每次新 mutation遞增毫秒，原 ID回放不換 ID。首輪由整合者執行及目視四張圖，log `263-browser.log`，[JSON](assets/formal-mental-enable-263/evidence.json)：NPC2、judge1、feelings2；真實付費0。
+可重跑 `tooling/verification/browser-formal-mental-energy.mjs`；受控固定時鐘，每次新 mutation遞增毫秒，原 ID回放不換 ID。首輪由整合者執行及目視四張圖，log `263-browser.log`；同步25c後定稿runtime的第二輪也PASS，log `263-browser-final.log`。本頁資產已更新為該最終輪，[JSON](assets/formal-mental-enable-263/evidence.json)：NPC2、judge1、feelings2；真實付費0。
 
 - [明示啟用3/65、心情獨立](assets/formal-mental-enable-263/formal-opening.png)
 - [實際d3過程、獨立d4成果與五點調節](assets/formal-mental-enable-263/formal-income-result-payment.png)
 - [接管、新過程／陪伴與重載](assets/formal-mental-enable-263/formal-controlled-reloaded.png)
 - [壞狀態安全呈現](assets/formal-mental-enable-263/formal-unavailable.png)
 
-沒有部署、合併main、真實付費模型或正式世界推進。這份首輪旅程沒有宣稱覆蓋其後另發現的 #276 branches提前效果／demo60分反例；共享修復由該票及最終整合另驗。
+沒有部署、合併main、真實付費模型或正式世界推進。browser旅程沒有宣稱覆蓋 #276 branches提前效果／demo60分反例；合後108項已包含該票修復的真實API反例，最終全套由整合另驗。
