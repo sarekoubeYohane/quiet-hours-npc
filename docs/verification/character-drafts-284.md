@@ -33,3 +33,11 @@
 新增 `0013_character_drafts.sql`，只加帳號建角草稿表；本票沒有轉換世界或已形成角色。只在隔離資料庫套用，沒有正式遷移。回退舊程式可保留新表；刪表會失去新草稿，不應作無資料備份的回退方式。
 
 舊人物文字範本來源庫保留，與建角草稿分開呈現。本票不交付完成卡、鎖定／配點、五步開局或數值形成；缺模型時原頁設定由 #285 接續。本機身分是 cookie 替身，非正式 OAuth；沒有操作正式世界、部署、合併 main 或使用真實付費模型。
+
+## T1／T2 接合後驗收
+
+`af60b6f` 接合最新 integration，人物頁同時保留共同導覽與建角編輯器；`4ea27a1` 將原文字範本補完也接至帳號製作空間，不隱式建立舊世界。5 項 API 再次全過、typecheck 通過、lint 0 errors／4 既有 warnings、diffcheck 通過。
+
+真正 App Router／磁碟 SQLite／Chromium 以 runtime **`4ea27a1`** 重跑通過（畫面及 evidence 已更新）：首次存檔空狀態 → 共同導覽人物 → 手填建角 → 受控補完 → 保存重載／另一裝置 → 衝突保留輸入 → 返回存檔仍空狀態。製作前後 `/api/saves` 均為空，未指定存檔的 `/api/world` 回 409；建角與模型設定不建立可玩世界。受控模型 1 次，正式模型及付費 0 次。
+
+命令：`PLAYWRIGHT_MODULE=/tmp/quiet-hours-browser/node_modules/playwright CHROMIUM_EXECUTABLE=/tmp/chromium BROWSER_ARTIFACT_DIR=/tmp/t3-integration-browser node tooling/verification/browser-character-drafts-284.mjs`。此試次直接使用整合的共享 runner，無額外 REAL_ROUTE_RUNTIME 覆寫。
