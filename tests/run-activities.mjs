@@ -11,7 +11,7 @@ const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
   const sources = (await readdir('lib')).filter(file => file.endsWith('.ts')).map(file => ['lib/' + file, file.slice(0, -3)]);
   sources.push(['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route'],
-    ['app/api/saves/route.ts', 'saves-route'], ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
+    ['app/api/model-settings/route.ts', 'model-settings-route'], ['app/api/saves/route.ts', 'saves-route'], ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
   for (const [source, output] of sources) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
     const code = result.outputText.replace(/require\("(?:@\/lib\/|\.\/)([^"/]+)"\)/g, 'require("./$1.cjs")')

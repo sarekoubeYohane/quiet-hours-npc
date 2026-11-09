@@ -11,6 +11,7 @@ CREATE TABLE deleted_world_usage (
   owner TEXT NOT NULL,
   storage_owner TEXT NOT NULL,
   usage TEXT NOT NULL,
+  accounting TEXT NOT NULL DEFAULT '{}',
   deleted_at INTEGER NOT NULL,
   PRIMARY KEY(owner, storage_owner)
 );

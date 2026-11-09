@@ -50,7 +50,7 @@ export const saveOperationReceipts=sqliteTable('save_operation_receipts',{
   owner:text('owner').notNull(),operationId:text('operation_id').notNull(),request:text('request').notNull(),result:text('result').notNull(),cleanup:text('cleanup').notNull().default('[]'),
 },table=>[primaryKey({columns:[table.owner,table.operationId]})]);
 export const deletedWorldUsage=sqliteTable('deleted_world_usage',{
-  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),usage:text('usage').notNull(),deletedAt:integer('deleted_at').notNull(),
+  owner:text('owner').notNull(),storageOwner:text('storage_owner').notNull(),usage:text('usage').notNull(),accounting:text('accounting').notNull().default('{}'),deletedAt:integer('deleted_at').notNull(),
 },table=>[primaryKey({columns:[table.owner,table.storageOwner]})]);
 export const saveTombstones=sqliteTable('save_tombstones',{
   owner:text('owner').notNull(),id:text('id').notNull(),deletedAt:integer('deleted_at').notNull(),

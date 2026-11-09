@@ -166,3 +166,48 @@ test('copy and delete wait for the source operation instead of cloning or discar
   assert.equal((await body(await saves.GET())).saves.length,2);
  }finally{release();await running;global.fetch=originalFetch;}
 });
+
+test('a terminal legacy uncertain operation that cannot finalize remains an explicit accounting gap and does not permanently forbid deletion',async()=>{
+ store.install(seedWorld());auth.setUserId('test-owner');const source=await create('舊帳務缺口');const current=await read(source.save.id),operationId=id();
+ // Historical fault setup only: the world itself was created through the product API.
+ // This is the legacy settled-uncertain/empty-marker state, with no durable trace.
+ const usage={windowStartedAt:Date.now(),calls:0,inputTokens:0,outputTokens:0,unknownCalls:0,totalCalls:0,totalInputTokens:0,totalOutputTokens:0,totalUnknownCalls:0,savedDecisions:0};
+ const journal={floor:0,results:{[operationId]:{status:502,body:{error:'舊操作派送與費用未知',operationUncertain:true}}},usage:{[operationId]:{applied:usage,finalized:false}}};
+ await store.database().prepare('UPDATE worlds SET operations = ? WHERE owner = ?').bind(JSON.stringify(journal),current.operationScope).run();
+ const lookup=()=>world.GET(new Request(origin+'/api/world?save='+source.save.id+'&operationId='+operationId)).then(r=>body(r));
+ assert.equal((await lookup()).usageRecovery.unknownRange,true);
+ await body(await world.POST(req({operation:'advance',operationId,operationScope:current.operationScope,worldContext:current.world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1'},source.save.id)),502);
+ const unresolved=await lookup();assert.equal(unresolved.usageRecovery.unknownRange,true);assert.equal(unresolved.usageRecovery.status,'pending');
+ const deletion={operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version};
+ const result=await body(await saves.POST(req(deletion)));
+ assert.equal(result.accounting.unknownRange,true);assert.equal(result.accounting.retainedOperations,1);
+ const summary=(await body(await saves.GET())).accountUsage;
+ assert.equal(summary.unknownAccountingRanges,1);assert.equal(summary.archivedWorlds,1);
+ await body(await world.GET(new Request(origin+'/api/world?save='+source.save.id)),404);
+ const recovered=await body(await saves.GET(new Request(origin+'/api/saves?operationId='+deletion.operationId)));
+ assert.equal(recovered.operation.accounting.unknownRange,true);
+ assert.ok(!JSON.stringify(recovered.operation).includes('保存的開局記憶'));
+});
+
+test('copy snapshots custom model roles and deletion keeps account defaults, other saves and account Keys',async()=>{
+ store.install(seedWorld());auth.setUserId('test-owner');const source=await create('自訂模型來源'),other=await create('其他設定');
+ const settings=load('model-settings-route');
+ const readSettings=save=>settings.GET(new Request(origin+'/api/model-settings'+(save?'?save='+save:''))).then(r=>body(r));
+ const setSettings=(value,save)=>settings.POST(new Request(origin+'/api/model-settings'+(save?'?save='+save:''),{method:'POST',headers:{origin},body:JSON.stringify(value)})).then(r=>body(r));
+ const account={npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
+ const custom={npc:{provider:'openrouter',model:'vendor/npc-custom'},adjudication:{provider:'openrouter',model:'vendor/heaven-custom'}};
+ await setSettings({version:0,mode:'custom',models:account});await setSettings({version:0,mode:'custom',models:custom},source.save.id);
+ await body(await world.POST(req({operation:'set-model-key',mode:'ai',key:'account-shared-key'},source.save.id)));
+ const current=await read(source.save.id),input={operation:'copy',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version,name:'保留自訂設定'};
+ const copy=await body(await saves.POST(req(input)),201);
+ const copiedSettings=await readSettings(copy.save.id);assert.equal(copiedSettings.source,'save');assert.deepEqual(copiedSettings.effective,custom);
+ await setSettings({version:1,mode:'custom',models:account},source.save.id);
+ await body(await saves.POST(req(input)));
+ assert.deepEqual((await readSettings(copy.save.id)).effective,custom);
+ await body(await saves.POST(req({operation:'delete',operationId:crypto.randomUUID(),saveId:source.save.id,expectedVersion:current.version})));
+ await body(await settings.GET(new Request(origin+'/api/model-settings?save='+source.save.id)),404);
+ assert.deepEqual((await readSettings(copy.save.id)).effective,custom);
+ assert.deepEqual((await readSettings(other.save.id)).effective,account);
+ assert.deepEqual((await readSettings()).effective,account);
+ assert.equal((await readSettings()).modelKeys.openrouter.configured,true);
+});

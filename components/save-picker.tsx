@@ -16,7 +16,7 @@ export default function SavePicker({displayName,environment}:{displayName:string
   },[]);
   return <main><header className="topbar"><h1>世界存檔</h1><div>{environment.caption} · {displayName}<form method="post" action="/api/auth/logout"><button type="submit">登出</button></form></div></header>
     <SaveNavigation/>{accountScope&&<SaveOperationRecovery accountScope={accountScope}/>}
-    {usage&&<p aria-label="帳號累計模型用量">帳號累計：{usage.totalCalls} 次模型呼叫 · 已知費用 USD {usage.knownUsd.toFixed(6)}{usage.unknownCostCalls?` · ${usage.unknownCostCalls} 次費用未完整確定`:''}。刪除存檔仍保留實際用量。</p>}
+    {usage&&<p aria-label="帳號累計模型用量">帳號累計：{usage.totalCalls} 次模型呼叫 · 已知費用 USD {usage.knownUsd.toFixed(6)}{usage.unknownCostCalls?` · ${usage.unknownCostCalls} 次費用未完整確定`:''}{usage.unknownAccountingRanges?' · 模型費用仍有未能核對的紀錄':''}。刪除存檔仍保留實際用量。</p>}
     <section className="panel" style={{padding:24}} aria-label="選擇存檔"><p>選擇要繼續的世界。選檔不會推進時間。</p>
       {error&&<p role="alert">{error}</p>}{!error&&!saves&&<p role="status">正在讀取存檔…</p>}
       {saves?.length===0&&<p>尚無世界存檔。你可以先準備人物與場景。</p>}
