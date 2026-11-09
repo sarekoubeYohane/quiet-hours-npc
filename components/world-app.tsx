@@ -86,11 +86,12 @@ const readLatest=useCallback(async()=>{
 type Latest={accountPlayer?:PlayerAccountView;modelSettings?:ModelSettingsView;unresolvedUsageRecovery?:boolean;operationEvidence?:OperationEvidence;recentOperations?:OperationSummary[];adjudicationFailure?:AdjudicationFailure;recallUsage?:OwnerUsage;stopReason?:StopReason;world:World;version:number;operationScope:string;modelKeys:ModelKeyStatus;modelKeyStorageAvailable:boolean;error?:string;operation?:{state:string;status?:number;error?:string;stopReason?:StopReason}};
 const read=async(path:string)=>{const r=await fetch(path,{credentials:'same-origin',signal:AbortSignal.timeout(15000)});if(r.status===401)setSignInRequired(true);const d=await readWorldResponse<Latest>(r);if(!r.ok)throw Error(reasonLabel(d.stopReason)+(d.error||`讀取世界失敗（HTTP ${r.status}）。`));if(!d.world||typeof d.version!=='number'||typeof d.operationScope!=='string'||!d.modelKeys?.openai||!d.modelKeys?.openrouter)throw new WorldResponseError(r.status,'application/json');return d;};
 const originalBinding=scopeRef.current.slice('quiet-hours:pending:'.length);
-const scopedEndpoint=worldEndpoint+(worldEndpoint.includes('?')?'&':'?')+'operationScope='+encodeURIComponent(originalBinding);
-let d=await read(originalBinding?scopedEndpoint:worldEndpoint);
+const initialEndpoint=worldEndpoint+(worldEndpoint.includes('?')?'&':'?')+'operationScope='+encodeURIComponent(originalBinding);
+let d=await read(originalBinding?initialEndpoint:worldEndpoint);
 if(accountScope&&d.accountPlayer?.accountOwner!==accountScope)throw Error('登入帳號已變更，原世界未同步。');
 if(originalBinding&&d.operationScope!==originalBinding)throw Error('登入帳號或存檔已變更，原世界未同步。');
 if(!mountedRef.current)return;
+const scopedEndpoint=worldEndpoint+(worldEndpoint.includes('?')?'&':'?')+'operationScope='+encodeURIComponent(d.operationScope);
 const scope=`quiet-hours:pending:${d.operationScope}`;
 const initialScope=!scopeRef.current;
 if(scopeRef.current!==scope){if(scopeRef.current)sessionStorage.removeItem(scopeRef.current+':trace-focus');scopeRef.current=scope;versionRef.current=-1;worldContextRef.current=undefined;setTraceFocusOperationId(undefined);setTraceResponseStatus(undefined);setEvidenceScope(scope);}
