@@ -1,3 +1,4 @@
+import { characterSetupSchema } from './character-attributes';
 import { initialMemoryCapacityError } from './character-templates';
 import { seedOpeningKnowledge } from './opening-knowledge';
 import { z } from 'zod';
@@ -20,7 +21,7 @@ export const cityDraftSchema = z.object({
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
-    homeId: instanceId.optional(), homeRoomId: templateId.optional(),
+    characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     homeDescription: z.string().trim().max(300).optional(), workDescription: z.string().trim().max(300).optional(),

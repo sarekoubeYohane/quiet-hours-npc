@@ -15,7 +15,7 @@ export type CityDraft = {
   places: { id: string; templateId: string; version: number; name: string }[];
   characters: {
     templateId: string; version: number; placeId: string; roomId: string; homeId?: string; homeRoomId?: string;
-    ownedPlaceIds?: string[]; workplaceIds?: string[]; homeDescription?: string; workDescription?: string;
+    characterSetup?:import('./character-attributes').CharacterSetup; ownedPlaceIds?: string[]; workplaceIds?: string[]; homeDescription?: string; workDescription?: string;
   }[];
   backgroundPeople?: { id: string; name: string }[];
   relationships?: OpeningRelationship[];
