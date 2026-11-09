@@ -39,6 +39,8 @@ async function fixture({ withWorld = false } = {}) {
   for (const name of migrations) db.exec(await readFile('drizzle/' + name, 'utf8'));
   context.env.DB = {
     prepare(sql) {
+      // Each bind creates an independent closure; subsequent binds cannot
+      // replace values already captured by another statement in a batch.
       return { bind(...values) {
         const statement = db.prepare(sql.replaceAll("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)", String(Date.now())));
         return {
@@ -51,9 +53,17 @@ async function fixture({ withWorld = false } = {}) {
             if (fault === 'after') throw Error('unavailable after write');
             return result;
           },
-          async run() { return { meta: { changes: Number(statement.run(...values).changes) } }; },
+          execute() { return { meta: { changes: Number(statement.run(...values).changes) } }; },
+          async run() { return this.execute(); },
         };
       } };
+    },
+    async batch(statements) {
+      // Keep the whole SQLite transaction synchronous so ordinary queries
+      // cannot observe or join partially executed writes.
+      db.exec('BEGIN IMMEDIATE');
+      try { const results=statements.map(statement=>statement.execute());db.exec('COMMIT');return results; }
+      catch(error) { db.exec('ROLLBACK');throw error; }
     },
   };
   async function request(payload, origin = 'https://test.invalid') {
@@ -68,6 +78,7 @@ async function fixture({ withWorld = false } = {}) {
     const current = await worldRoute.GET(new Request(url));
     if (payload === undefined) return current;
     const scope = await current.json();
+    assert.equal(current.status,200,JSON.stringify(scope));
     return worldRoute.POST(new Request(url, {
       method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
       body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', operationScope: scope.operationScope, worldContext: scope.world.contextId, ...payload }),
@@ -229,4 +240,17 @@ test('the editor creates, edits, and reopens two custom characters through the r
     db.close();
     await window.happyDOM.close();
   }
+});
+
+test('the editor D1 fixture preserves bound values and atomic rollback visibility',async()=>{
+ const {db,context}=await fixture();
+ try{
+  db.exec('CREATE TABLE fixture_atomic (id TEXT PRIMARY KEY,value TEXT NOT NULL)');const d1=context.env.DB;
+  const prepared=d1.prepare('INSERT INTO fixture_atomic(id,value) VALUES (?,?)'),first=prepared.bind('a','first'),second=prepared.bind('b','second');
+  await d1.batch([first,second]);
+  assert.deepEqual((await d1.prepare('SELECT id,value FROM fixture_atomic ORDER BY id').bind().all()).results.map(row=>({...row})),[{id:'a',value:'first'},{id:'b',value:'second'}]);
+  const failed=d1.batch([d1.prepare('UPDATE fixture_atomic SET value=? WHERE id=?').bind('partial','a'),d1.prepare('INSERT INTO fixture_atomic(id,value) VALUES (?,?)').bind('a','duplicate')]);
+  const read=d1.prepare('SELECT value FROM fixture_atomic WHERE id=?').bind('a').first();await assert.rejects(failed,/UNIQUE/);assert.equal((await read).value,'first');
+  await d1.prepare('UPDATE fixture_atomic SET value=? WHERE id=?').bind('after rollback','b').run();assert.equal((await d1.prepare('SELECT value FROM fixture_atomic WHERE id=?').bind('b').first()).value,'after rollback');
+ }finally{db.close();}
 });
