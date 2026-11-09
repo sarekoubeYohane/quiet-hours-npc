@@ -26,6 +26,7 @@ test('original account owns asset edits, model settings, key writes and recovery
   for(const [route,path,payload] of [[f.routes.generation,'/api/character-drafts/generate',{id:ids.drafts,version:1,discard:true}],[f.routes.form,'/api/character-drafts/form',{id:ids.drafts,version:1,action:'allocate',values:{}}]])assert.equal((await f.post(route,{...payload,operationScope:'account-operations:a'},path)).status,409);
   assert.equal(JSON.stringify(f.db.prepare('SELECT * FROM character_drafts WHERE owner=?').all('b')),snapshot);
   assert.equal((await f.read(f.routes.world,'/api/world?workspace=account&operationScope=account-operations%3Aa')).status,409);
+  assert.equal((await f.read(f.routes.world,'/api/world?workspace=account&operationId='+encodeURIComponent(Date.now()+':'+crypto.randomUUID()))).status,409);
   f.context.owner='a';assert.equal((await f.post(f.routes.drafts,{...payloads.drafts,version:1,accountScope:'account-operations:a'},paths.drafts)).status,200);
  }finally{f.db.close();}
 });

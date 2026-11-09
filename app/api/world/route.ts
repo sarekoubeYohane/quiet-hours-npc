@@ -110,7 +110,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
   let binding:Awaited<ReturnType<typeof bindWorldSave>>;
   try { binding=await bindWorldSave(accountId,request); } catch(error) { return reply({error:error instanceof Error?error.message:'無法讀取存檔。'},error instanceof SaveAccessError?error.status:503); }
   const id=binding.storageOwner;
-  const readScope=request&&new URL(request.url).searchParams.get('operationScope');if(readScope!==undefined&&readScope!==null&&readScope!==id)return reply({error:'原世界或帳號已變更，請回原帳號恢復。',scopeMismatch:true},409);
+  const readScope=request&&new URL(request.url).searchParams.get('operationScope');if((request&&new URL(request.url).searchParams.has('operationId')&&!readScope)||(readScope!==undefined&&readScope!==null&&readScope!==id))return reply({error:'原世界或帳號已變更，請回原帳號恢復。',scopeMismatch:true},409);
   try {
     const operationId = request && new URL(request.url).searchParams.get('operationId');
     if (operationId && !operationIdPattern.test(operationId)) return reply({ error: '操作識別碼無效。' }, 400);

@@ -10,5 +10,5 @@ export default async function ObservePage({searchParams}:{searchParams:Promise<{
   try{await bindWorldSave(user.userId,new Request('https://internal.invalid/?save='+encodeURIComponent(query.save)));}catch{redirect('/');}
   const save=(await listWorldSaves(user.userId)).find(save=>save.id===query.save);
   if(!save)redirect('/');
-  return <WorldApp key={save.id+':'+(query.view||'observation')} accountScope={user.userId} saveId={save.id} saveName={save.name} originalOpeningAvailable={save.originalOpeningAvailable} initialView={query.view==='analysis'||query.view==='settings'?query.view:'observation'} signInPath={githubSignInPath} displayName={user.displayName} environment={currentEnvironment()}/>;
+  return <WorldApp key={user.userId+':'+save.id+':'+(query.view||'observation')} accountScope={user.userId} saveId={save.id} saveName={save.name} originalOpeningAvailable={save.originalOpeningAvailable} initialView={query.view==='analysis'||query.view==='settings'?query.view:'observation'} signInPath={githubSignInPath} displayName={user.displayName} environment={currentEnvironment()}/>;
 }
