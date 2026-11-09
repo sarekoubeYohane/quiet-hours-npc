@@ -1,6 +1,6 @@
 # #288 五步開局與原始開局驗證
 
-狀態：本票主要實作及已知 guard 修正已接合，固定 `5bdc6db` 的必要驗證通過；另保留最後實測的已受理後切帳號導航 P2，尚未 ready。未宣告 #281 完成，未關 #288，未啟動 #289。2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），由 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012；不沿被 #281 取代的五級新建角或覆寫世界流程。
+狀態：本票主要實作及已知 guard 修正已接合，固定 `5bdc6db` 的必要驗證通過；另保留最後實測的已受理後切帳號導航與混合場景版本許可兩項 P2，尚未 ready。未宣告 #281 完成，未關 #288，未啟動 #289。2026-11-09 開始前重讀 #281／#288 最新本文、留言及原生 blocked-by（僅 #287，已 closed），由 integration `59bb7d9` 建立獨立 `feat/opening-wizard-288`。已讀 AGENTS、代理／issue-tracker 指示、GLOSSARY、implement-spec／TDD／code-review／PR 技能及 ADR 0004／0008／0012；不沿被 #281 取代的五級新建角或覆寫世界流程。
 
 ## 已交付行為
 
@@ -74,3 +74,5 @@
 Readonly native SQLite 比較證明：舊 state 及含 D20 結果的 journal UTF-8 內容、version 42、原 lease、city_started 及 legacy 原始開局 null 皆不變；新 opening_drafts 為空 0。完整命令、來源及舊內容 hash 見 [D1 證據](assets/opening-wizard-288/d1-migration-evidence.json)，[前置 migration log](assets/opening-wizard-288/d1-pre19.log)、[歷史 fixture log](assets/opening-wizard-288/d1-legacy.log)、[0019 log](assets/opening-wizard-288/d1-0019.log)保留 `Executing on local database`。沒有正式資料遷移或正式回退。
 
 最後新增的可重現邊界仍待唯一修復者：`5bdc6db` 真卡／場景／開局中，B 已有同 public save UUID 的世界，A 的建立 POST 已 commit 201 後暫留回覆；原頁不卸載、只換 B cookie，再放回覆，裸 saveId 導航會進 B 既有世界，A 真正保存的世界未被觀察。來源 `/tmp/t7-late-create-account.mjs`／`.log`，controlled 2／paid 0，兩世界未推進。伺服器原寫入仍正確屬 A，缺口在後續讀導航丟掉原帳號。此反例已交 root／唯一 T1，本分支未平行改產品；其他通過證據不等於此項已解。
+
+另一新增來源版本反例：先保存某場景 v1／public 的選用快照，原場景改 v2／private，再在同一開局新增同源 v2 實例。真 API 接納且 201 保存；sourceVersions 與 sceneSources 確為 v1／v2，但新場所 access 卻沿首筆 v1 的 public／allowedActorIds。`prepareCityAccess` 查 source 時僅比 id，未比 version；來源 `/tmp/t7-mixed-scene-versions.mjs`／`.log`（`96ca63b` 只比產品固定點多本驗證文件，產品仍同 `5bdc6db`），controlled 1／paid 0，沒有推進。已交唯一修復者作精確版本取源與真 API 回歸，未以新增產品限制拒絕合法引用來迴避。
