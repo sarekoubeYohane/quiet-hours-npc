@@ -26,7 +26,7 @@ const cityFor = async template => {
 };
 
 for(const value of ['憶'.repeat(1365),'憶'.repeat(1366),'憶'.repeat(1500),'x'.repeat(2400),'憶'.repeat(1365)+'a','憶'.repeat(1365)+'ab','x'.repeat(2401)]) {
-  test(`initial memory ${value.length} chars / ${Buffer.byteLength(value)} bytes: save, reload and city lifecycle`, async () => {
+  test(`initial memory ${value.length} chars / ${Buffer.byteLength(value)} bytes: save, reload and historical city lifecycle`, async () => {
     store.install(load('world').seedWorld());
     const original=await read();
     const input=draft(value);

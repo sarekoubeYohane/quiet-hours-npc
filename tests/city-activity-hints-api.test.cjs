@@ -72,7 +72,7 @@ async function verifyObservedResults() {
   }
 }
 
-test('known city fixtures suggest optional methods without exposing hidden restrictions or limiting free proposals', async () => {
+test('historical city compatibility: known city fixtures suggest optional methods without exposing hidden restrictions or limiting free proposals', async () => {
   const previous=seedWorld();
   previous.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(previous);
