@@ -15,7 +15,7 @@ export type CityDraft = {
   places: { id: string; templateId: string; version: number; name: string }[];
   characters: {
     templateId: string; version: number; placeId: string; roomId: string; homeId?: string; homeRoomId?: string;
-    mentalOpening?:import('./formal-mental-enablement').MentalOpeningInput; characterSetup?:import('./character-attributes').CharacterSetup; ownedPlaceIds?: string[]; workplaceIds?: string[]; homeDescription?: string; workDescription?: string;
+    openingNeeds?:import('./needs').NeedValues; openingFeelings?:Partial<Record<import('./needs').Need,number>>; mentalOpening?:import('./formal-mental-enablement').MentalOpeningInput; characterSetup?:import('./character-attributes').CharacterSetup; ownedPlaceIds?: string[]; workplaceIds?: string[]; homeDescription?: string; workDescription?: string;
   }[];
   backgroundPeople?: { id: string; name: string }[];
   relationships?: OpeningRelationship[];

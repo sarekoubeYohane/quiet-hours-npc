@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -8,7 +10,7 @@ const accepted=()=>({status:'accepted',effects:[],stages:[],check:null,completio
 const proposal={type:'propose',target:'shared-tea-kit',content:'我想用這套共用茶具取熱水和茶包，替自己泡一杯普通的茶。',purpose:'飲用',mood:'平靜',durationMinutes:15,intents:[],timeIntent:{kind:'completion',maxMinutes:null}};
 async function setup(adjust=x=>x,adjustNpc=x=>x){
  const w=seedWorld();w.contextId='routine-contract';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};w.objects=[{id:'ordinary-mug',source:'fixture',label:'杯子',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{contents:'empty'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner'],stateTransitions:{contents:['empty','water','tea','coffee','dirty']}},{id:'shared-tea-kit',source:'fixture',label:'共用茶具',region:'cafe-front',holder:null,owner:'owner',revision:1,state:{available:'yes'},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner']}];store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch;let calls=0,contract,request;
  global.fetch=async(_url,init)=>{calls++;const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);const value=input.contractVersion==='world-adjudication.v1'?(contract=input,request=body,adjust(accepted())):adjustNpc(structuredClone(proposal));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),value))}}]});};
  return {post,read:async()=>await(await GET()).json(),restore:()=>{global.fetch=previous;},calls:()=>calls,contract:()=>contract,request:()=>request};
@@ -17,7 +19,7 @@ test('successful operation keeps the original proposal and unaligned candidate r
  const s=await setup();try{
   const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};
   const response=await s.post(op);assert.equal(response.status,200);
-  const saved=await (await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json();
+  const saved=await (await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(op.operationId)))).json();
   assert.ok(saved.operation.evidence,'settled success must expose original proposal and raw adjudication evidence');
   const e=saved.operation.evidence;
   assert.equal(e.requestId,response.headers.get('X-World-Request-Id'));assert.equal(e.operationId,op.operationId);
@@ -97,9 +99,9 @@ test('journal retention expires old evidence without re-execution and isolates a
   const response=await s.post({operation:'advance',minutes:15}),e=(await response.json()).operationEvidence;
   const base=Date.now();for(let i=0;i<9;i++)assert.equal((await s.post({operation:'takeover',operationId:(base+i+1)+':'+crypto.randomUUID()})).status,200);
   const latest=await s.read();assert.ok(latest.recentOperations.length<=8);assert.ok(!latest.recentOperations.some(item=>item.operationId===e.operationId));
-  const lookup=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();assert.equal(lookup.operation.state,'expired');assert.equal((await s.post(e.replay)).status,410);assert.equal(s.calls(),2);
+  const lookup=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();assert.equal(lookup.operation.state,'expired');assert.equal((await s.post(e.replay)).status,410);assert.equal(s.calls(),2);
   store.installForOwner('other-owner',seedWorld());load('auth').setUserId('other-owner');
-  const isolated=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();assert.equal(isolated.operation.evidence,undefined);assert.deepEqual(isolated.recentOperations,[]);assert.equal(isolated.operationEvidence,undefined);
+  const isolated=await(await GET(new Request('https://test.invalid/api/world?operationScope=other-owner&operationId='+encodeURIComponent(e.operationId)))).json();assert.equal(isolated.operation.evidence,undefined);assert.deepEqual(isolated.recentOperations,[]);assert.equal(isolated.operationEvidence,undefined);
  }finally{load('auth').setUserId('test-owner');s.restore();}
 });
 test('untrusted cached usage does not enter the diagnostic object graph',async()=>{
@@ -158,7 +160,7 @@ test('v2 first approval retains raw programs and phases in its original API rece
   const e=body.operationEvidence,candidate=e.dispatches.find(d=>d.task==='adjudication').candidate;
   assert.deepEqual(candidate.value,raw,'the original v2 programs must be readable, not reconstructed from aligned saved rules');
   assert.equal(candidate.truncated,false);assert.equal(e.truncated,false);
-  const reread=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();
+  const reread=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();
   assert.deepEqual(reread.operation.evidence,e);assert.equal(reread.world.routineRules[0].programs[0].stages[1].afterMinutes,30);
   assert.equal((await s.post(e.replay)).status,200);assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:0});
  }finally{s.restore();}
@@ -173,7 +175,7 @@ test('a routine result receipt keeps every confirmed branch and the selected out
   const plan=e.result.actors[0].plan;assert.equal(plan.selectedResult.outcome,'mixed');assert.equal(plan.selectedResult.branch,1);assert.equal(plan.selectedResult.resolution.roll,6);assert.equal(plan.phaseCursor,1);
   assert.equal(plan.stages[0].afterMinutes,15);assert.ok(plan.stages[0].effects.some(effect=>effect.kind==='state'&&effect.value==='water'));
   assert.deepEqual(e.result.rules[0].programs,reply.routine.programs);
-  const saved=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(saved.operation.evidence,e);
+  const saved=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(saved.operation.evidence,e);
   assert.equal((await s.post(e.replay)).status,200);assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:1});
  }finally{s.restore();}
 });
@@ -187,7 +189,7 @@ test('free branches and phase preconditions retain their raw candidate and bound
   assert.equal(e.outcome,'committed');assert.deepEqual(e.dispatches[1].candidate.value,reply);assert.equal(e.dispatches[1].candidate.truncated,false);
   assert.equal(e.result.actors[0].plan.selectedResult.branch,0);assert.equal(e.result.actors[0].plan.phaseCursor,1);assert.deepEqual(e.result.actors[0].plan.stages[0].preconditions,reply.branches[0].stages[0].preconditions);
   const finished=await(await s.post({operation:'advance',minutes:15})).json();assert.equal(finished.operationEvidence.result.actors[0].plan,null);assert.equal(finished.world.objects[0].state.contents,'tea');assert.deepEqual(finished.operationEvidence.counts,{npc:0,adjudication:0});
-  const reread=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(reread.operation.evidence,e);
+  const reread=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();assert.deepEqual(reread.operation.evidence,e);
   assert.equal((await s.post(e.replay)).status,200);assert.equal(s.calls(),2);assert.equal((await s.read()).world.objects[0].state.contents,'tea');
  }finally{s.restore();}
 });
@@ -233,7 +235,7 @@ test('a legacy truncated receipt is returned unchanged and cannot backfill progr
   for(const actor of old.result.actors)if(actor.plan){delete actor.plan.selectedResult;delete actor.plan.stages;}
   const candidate=old.dispatches.find(d=>d.task==='adjudication').candidate;delete candidate.value.branches;delete candidate.value.routine.programs;candidate.truncated=true;
   await store.database().prepare('UPDATE worlds SET operations = ? WHERE owner = ?').bind(JSON.stringify(journal),'test-owner').run();
-  const saved=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(e.operationId)))).json();
+  const saved=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(e.operationId)))).json();
   assert.ok(saved.world.routineRules[0].programs.length===6);assert.deepEqual(saved.operation.evidence,old);assert.equal(saved.operation.evidence.schemaVersion,1);
   const replay=await s.post(old.replay);assert.equal(replay.status,200);assert.deepEqual((await replay.json()).operationEvidence,old);assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:0});
  }finally{s.restore();}

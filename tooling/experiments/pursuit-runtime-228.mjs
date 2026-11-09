@@ -44,13 +44,14 @@ export async function createRuntime({ root = process.cwd(), databasePath, owner 
   const env = load('cloudflare-workers').env;
   Object.assign(env, { APP_ENV: 'local', AUTH_ORIGIN: 'https://pursuit-experiment.invalid', DB: adapter, GIT_COMMIT: 'isolated-runner', ...(readonly ? {} : { MODEL_KEY_ENCRYPTION_SECRET: randomBytes(32).toString('hex') }) });
   const { GET, POST } = load('route');
-  const get = operationId => GET(new Request('https://pursuit-experiment.invalid/api/world' + (operationId ? '?operationId=' + encodeURIComponent(operationId) : '')));
+  const get = operationId => GET(new Request('https://pursuit-experiment.invalid/api/world' + (operationId ? '?operationScope=' + encodeURIComponent(owner) + '&operationId=' + encodeURIComponent(operationId) : '')));
   const post = body => {
     if (readonly) throw Error('Readback mode permits GET only');
-    return POST(new Request('https://pursuit-experiment.invalid/api/world', { method: 'POST', headers: { origin: 'https://pursuit-experiment.invalid', 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(body) }));
+    return POST(new Request('https://pursuit-experiment.invalid/api/world', { method: 'POST', headers: { origin: 'https://pursuit-experiment.invalid', 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify({ operationScope: owner, ...body }) }));
   };
-  // Only at a trial's initial boundary after real reset. Keep payer, journal and keys.
-  async function initializeStory(scene) {
+  // Explicit isolated historical research fixture, not the player's new-world
+  // or restart API. Preserve account billing, journal and keys across trials.
+  async function initializeHistoricalTrial(scene) {
     if (readonly) throw Error('Readback mode permits GET only');
     const row = db.prepare('SELECT * FROM worlds WHERE owner=?').get(owner);
     if (!row || row.locked_until > Date.now()) throw Error('Cannot initialize a locked world');
@@ -68,7 +69,7 @@ export async function createRuntime({ root = process.cwd(), databasePath, owner 
     if (updated.changes !== 1) throw Error('Initial story CAS conflict');
     return (await (await get()).json());
   }
-  const payerState=()=>{const value=JSON.parse(db.prepare('SELECT state FROM worlds WHERE owner=?').get(owner).state);return {usage:value.aiUsage?{...value.aiUsage,savedDecisions:0}:undefined,budget:value.playerBudget};};
+  const payerState=()=>{const value=db.prepare('SELECT usage,budget FROM player_accounts WHERE owner=? AND initialized=1').get(owner);if(!value)throw Error('Account payer is not initialized');return {usage:{...JSON.parse(value.usage),savedDecisions:0},budget:JSON.parse(value.budget)};};
   async function archive(file){if((await stat(databasePath)).size>16*1024*1024)throw Error('evidence-gap');await copyFile(databasePath,file);await chmod(file,0o600);}
-  return { get, post, load, initializeStory, payerState, archive, async close() { delete env.MODEL_KEY_ENCRYPTION_SECRET; db.close(); await rm(directory, { recursive: true, force: true }); } };
+  return { get, post, load, initializeHistoricalTrial, payerState, archive, async close() { delete env.MODEL_KEY_ENCRYPTION_SECRET; db.close(); await rm(directory, { recursive: true, force: true }); } };
 }

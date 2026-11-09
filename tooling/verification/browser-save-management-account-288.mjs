@@ -1,0 +1,25 @@
+import {boundPageURL} from './bound-page-url.mjs';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {startApp} from './real-route-runtime.mjs';
+import {launchBrowser} from './browser-runtime.mjs';
+import {formCharacterCard,confirmOpening} from './opening-journey.mjs';
+const output=process.env.BROWSER_ARTIFACT_DIR||'/tmp/save-management-account-288';await mkdir(output,{recursive:true});
+const app=await startApp({diceFaces:Array(40).fill(4),modelResponder:()=>({bonuses:[]})});let browser,page;const evidence=[];
+const request=owner=>async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
+const okay=result=>{assert.ok(result.status>=200&&result.status<300,JSON.stringify(result));return result.body;};
+try{
+ const shared=crypto.randomUUID();for(const owner of ['a','b']){const api=request(owner);okay(await api('/api/model-settings',{version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}}));okay(await api('/api/world?workspace=account',{operation:'set-model-key',mode:'openai',key:'controlled-only'}));const card=await formCharacterCard(api,{name:owner+'人物'});const scene=okay(await api('/api/scene-templates',{id:crypto.randomUUID(),version:0,name:'住處',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})).template;await confirmOpening(api,{id:shared,name:owner==='a'?'甲來源':'乙來源',city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:'住處'}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId:'front'}]}});}
+ browser=await launchBrowser();const context=await browser.newContext({viewport:{width:1280,height:1000}});await context.addCookies([{name:'qh_local_owner',value:'a',url:app.url}]);page=await context.newPage();page.setDefaultTimeout(30000);await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());page.on('dialog',dialog=>dialog.accept());
+ const apiA=request('a'),apiB=request('b');let copyId;
+ for(const operation of ['copy','delete']){
+  await page.goto(app.url);const region=page.getByRole('region',{name:'甲來源的存檔管理'});let captured,intercepted=false;
+  const stop=async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():null;if(!intercepted&&body?.operation===operation){intercepted=true;captured=body;await context.addCookies([{name:'qh_local_owner',value:'b',url:app.url}]);await route.abort('failed');}else await route.continue();};await page.route('**/api/saves',stop);
+  await region.getByRole('button',{name:operation==='copy'?'另存目前進度':'刪除存檔',exact:true}).click();await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).waitFor();assert.equal(captured.operationScope,'a');assert.equal(captured.saveId,shared);
+  await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).click();await region.getByRole('alert').filter({hasText:/原帳號/}).waitFor();assert.equal((await apiA('/api/world?save='+shared)).status,200);assert.equal((await apiB('/api/world?save='+shared)).status,200);assert.equal(okay(await apiB('/api/saves')).saves.length,1);await page.screenshot({path:output+'/'+operation+'-other-account-rejected.png',fullPage:true});
+  await context.addCookies([{name:'qh_local_owner',value:'a',url:app.url}]);const restored=page.waitForResponse(response=>response.url()===app.url+'/api/saves'&&response.request().method()==='POST'&&response.request().postDataJSON()?.operation===operation);await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).click();await restored;
+  if(operation==='copy'){copyId=captured.operationId;await page.waitForURL(boundPageURL(app.url,'a','/observe',{save:copyId}));assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal(okay(await apiA('/api/saves')).saves.length,2);}else{await page.waitForURL(app.url+'/');assert.equal((await apiA('/api/world?save='+shared)).status,404);assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal((await apiB('/api/world?save='+shared)).status,200);}
+  evidence.push({operation,requestScope:captured.operationScope,sourceSaveId:shared,operationId:captured.operationId,otherAccountUnchanged:true,originalAccountRecovered:true});await page.unroute('**/api/saves',stop);
+ }
+ assert.equal(app.modelRequests.length,2);await writeFile(output+'/evidence.json',JSON.stringify({commit:app.commit,origin:app.url,status:'passed',controlledCalls:2,paidCalls:0,evidence},null,2));console.log(JSON.stringify({status:'passed',commit:app.commit,evidence}));
+}catch(error){if(page){await page.screenshot({path:output+'/failure.png',fullPage:true});console.log(await page.locator('body').innerText());}throw error;}finally{await browser?.close();await app.close();}

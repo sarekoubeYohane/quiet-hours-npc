@@ -9,7 +9,7 @@ const rest={type:'rest',target:'',content:'自行決定先休息',purpose:'',moo
 const {wire}=require('./method-assessment-fixture.cjs');
 const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const active=c=>c.intents.filter(node=>node.kind!=='direction'&&node.status==='active');
-async function trace(id){return (await(await load('route').GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;}
+async function trace(id){return (await(await load('route').GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json()).decisionTrace;}
 
 test('one actual decision connects sourced results, chosen purpose, intentions and action in saved observer trace',async()=>{
  const s=await scenario({decision:wire({...proposal,intents:[intent]},{choice:'switch',change:{kind:'source',detail:'改用另一份來源'}}),reply:denied});

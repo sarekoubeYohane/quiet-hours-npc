@@ -5,6 +5,7 @@ import { cardAttributeLabels,cardAttributeNames,validCardAllocation,type CardVal
 import type { CharacterDraft } from '@/lib/character-drafts';
 import { missingCharacterText } from '@/lib/character-drafts';
 import { modelRoleReady,type ModelSettingsView } from '@/lib/model-settings';
+import { accountScopeMismatch } from '@/lib/account-scope';
 import { roundClientMs } from '@/lib/round-time-policy';
 type Reply={draft?:CharacterDraft;error?:string;modelSettingsRequired?:boolean};
 class SaveFailure extends Error {constructor(message:string,readonly status:number){super(message);}}
@@ -13,16 +14,16 @@ export default function CharacterFormationControls({draft,onPrepare,onSaved,onBu
  const key=JSON.stringify(draft.formation?.values);
  useEffect(()=>{queueMicrotask(()=>setAllocation(key?JSON.parse(key):undefined));},[key,draft.id]);
  function working(value:boolean){setBusy(value);onBusy(value);}
- async function post(path:string,input:object){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(roundClientMs)});const body=await response.json() as Reply;if(body.draft&&response.status!==409)onSaved(body.draft);if(body.modelSettingsRequired)onModels();if(!response.ok)throw new SaveFailure(body.error||'保存結果尚未確認，請恢復原操作。',response.status);return body;}
- async function recover(apply=true){try{const response=await fetch('/api/character-drafts');const data=await response.json() as {drafts?:CharacterDraft[]};const saved=data.drafts?.find(value=>value.id===draft.id);if(response.ok&&saved){if(apply)onSaved(saved);return saved;}}catch{/* Original inputs remain visible; recovery never dispatches a model. */}}
+ async function post(path:string,input:object){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(roundClientMs)});const body=await response.json() as Reply;if(body.draft&&response.status!==409){if(body.draft.accountScope!==draft.accountScope)throw new SaveFailure(accountScopeMismatch.error,409);onSaved(body.draft);}if(body.modelSettingsRequired)onModels();if(!response.ok)throw new SaveFailure(body.error||'保存結果尚未確認，請恢復原操作。',response.status);return body;}
+ async function recover(apply=true){try{const response=await fetch('/api/character-drafts?accountScope='+encodeURIComponent(draft.accountScope??''));const data=await response.json() as {accountScope?:string;drafts?:CharacterDraft[]};const saved=data.drafts?.find(value=>value.id===draft.id);if(response.ok&&saved&&data.accountScope===draft.accountScope&&saved.accountScope===draft.accountScope){if(apply)onSaved(saved);return saved;}}catch{/* Original inputs remain visible; recovery never dispatches a model. */}}
  async function form(){if(busy)return;working(true);setError('');setNotice('');try{
    const current=await onPrepare();if(!current)return;
    let payload:object;
    if(current.pendingFormation)payload={id:current.id,version:current.pendingFormation.inputVersion,operationId:current.pendingFormation.operationId,operationScope:current.pendingFormation.operationScope,worldContext:current.pendingFormation.worldContext};
    else{
-    const availability=await fetch('/api/model-settings');const config=await availability.json() as ModelSettingsView;
-    if(!availability.ok)throw Error('暫時無法讀取模型設定，文字已保留。');if(!modelRoleReady(config,'adjudication')){onModels();return;}
-    const response=await fetch('/api/world?workspace=account');const context=await response.json() as {operationScope?:string;world?:{contextId?:string};error?:string};if(!response.ok||!context.operationScope||!context.world)throw Error(context.error||'暫時無法讀取形成操作設定。');
+    const availability=await fetch('/api/model-settings?accountScope='+encodeURIComponent(current.accountScope??''));const config=await availability.json() as ModelSettingsView;
+    if(!availability.ok||config.accountScope!==current.accountScope)throw Error('暫時無法讀取模型設定，文字已保留。');if(!modelRoleReady(config,'adjudication')){onModels();return;}
+    const response=await fetch('/api/world?workspace=account&operationScope='+encodeURIComponent(current.accountScope??''));const context=await response.json() as {operationScope?:string;world?:{contextId?:string};error?:string};if(!response.ok||!context.operationScope||!context.world)throw Error(context.error||'暫時無法讀取形成操作設定。');
     if(current.accountScope&&current.accountScope!==context.operationScope)throw new SaveFailure('原帳號已變更，請回原帳號確認這份人物。',409);
     payload={id:current.id,version:current.version,operationId:Date.now()+':'+crypto.randomUUID(),operationScope:context.operationScope,worldContext:context.world.contextId};
    }

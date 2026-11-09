@@ -1,9 +1,13 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import { Button } from '@/components/ui/button';
 import { modelSourceLabel, type ModelChoice, type ModelRoles, type ModelSettingsView } from '@/lib/model-settings';
 const blank: Required<ModelRoles> = { npc: { provider: 'openai', model: 'gpt-6-luna' }, adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } };
-export default function ModelSettingsPanel({ saveId, onClose, onSaved }: { saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void }) {
+export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalAccountScope }: { originalAccountScope?: string; saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void }) {
+  const { capture, scoped } = useOriginalAccountScope(originalAccountScope);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [scope, setScope] = useState<'account' | 'save'>(saveId ? 'save' : 'account');
   const [view, setView] = useState<ModelSettingsView>();
   const [models, setModels] = useState<Required<ModelRoles>>(blank);
@@ -14,38 +18,43 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved }: { saveI
   const endpoint = '/api/model-settings' + (scope === 'save' && saveId ? '?save=' + encodeURIComponent(saveId) : '');
   const reload = useCallback(async (signal: AbortSignal) => {
     try {
-      const response = await fetch(endpoint, { signal });
+      const response = await fetch(scoped(endpoint), { signal });
       const body = await response.json() as ModelSettingsView & { error?: string };
       if (!response.ok) throw Error(body.error || '無法讀取模型設定。');
       if (signal.aborted) return;
+      capture(body.accountScope);
       setView(body); setModels({ npc: body.effective.npc ?? blank.npc, adjudication: body.effective.adjudication ?? blank.adjudication });
       setInherit(scope === 'save' && body.preference.mode === 'inherit'); setError('');
     } catch (cause) { if (!signal.aborted) setError(cause instanceof Error ? cause.message : '無法讀取模型設定。'); }
     finally { if (!signal.aborted) setLoading(false); }
-  }, [endpoint, scope]);
+  }, [endpoint, scope, capture, scoped]);
   useEffect(() => { const controller = new AbortController(); queueMicrotask(() => { if (!controller.signal.aborted) void reload(controller.signal); }); return () => controller.abort(); }, [reload]);
   async function save() {
     if (!view || saving) return;
     setSaving(true); setError(''); setNotice('');
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: view.version, ...(scope === 'save' && inherit ? { mode: 'inherit' } : { mode: 'custom', models }) }) });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountScope: view.accountScope, version: view.version, ...(scope === 'save' && inherit ? { mode: 'inherit' } : { mode: 'custom', models }) }) });
       const body = await response.json() as ModelSettingsView & { error?: string };
       if (!response.ok) throw Error(body.error || '未同步：保存模型設定失敗，原輸入已保留。');
+      if (!alive.current) return;
+      capture(body.accountScope);
       setView(body); setNotice('模型設定已保存；僅供後續新操作使用。尚未呼叫模型或推進世界。');
       onSaved?.(body);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '未同步：保存結果尚未確認，請保留輸入並恢復保存。'); }
-    finally { setSaving(false); }
+    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : '未同步：保存結果尚未確認，請保留輸入並恢復保存。'); }
+    finally { if (alive.current) setSaving(false); }
   }
   async function manageKey(clear = false) {
-    if (saving || (!clear && !key.trim())) return;
+    if (!view || saving || (!clear && !key.trim())) return;
     setSaving(true); setError('');
     try {
-      const response = await fetch('/api/world?workspace=account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operation: clear ? 'clear-model-key' : 'set-model-key', mode: provider === 'openai' ? 'openai' : 'ai', ...(clear ? {} : { key }) }) });
-      const body = await response.json() as Pick<ModelSettingsView, 'modelKeys' | 'modelKeyStorageAvailable'> & { error?: string };
+      const response = await fetch('/api/world?workspace=account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operationScope: view.accountScope, operation: clear ? 'clear-model-key' : 'set-model-key', mode: provider === 'openai' ? 'openai' : 'ai', ...(clear ? {} : { key }) }) });
+      const body = await response.json() as Pick<ModelSettingsView, 'modelKeys' | 'modelKeyStorageAvailable'> & { operationScope?: string; error?: string };
       if (!response.ok) throw Error(body.error || 'Key 保存失敗，輸入仍保留。');
+      if (!alive.current) return;
+      capture(body.operationScope);
       setView(previous => previous && { ...previous, ...body }); setKey(''); setNotice(clear ? '此帳號的服務 Key 已清除。' : '服務 Key 已加密保存；固定 14 天，不會因讀取、使用或重新登入延長。');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Key 保存失敗，輸入仍保留。'); }
-    finally { setSaving(false); }
+    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Key 保存失敗，輸入仍保留。'); }
+    finally { if (alive.current) setSaving(false); }
   }
   return <section className="panel space-y-4 p-6" role={onClose ? 'dialog' : undefined} aria-modal={onClose ? true : undefined} aria-label="模型設定面板">
     <h2>模型設定</h2>

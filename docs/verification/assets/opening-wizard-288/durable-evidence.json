@@ -1,0 +1,15 @@
+{
+  "commit": "5bdc6db",
+  "origins": [
+    "http://127.0.0.1:37193",
+    "http://127.0.0.1:42255"
+  ],
+  "database": "same isolated disk SQLite actually closed and reopened, all migrations; no installed world",
+  "sourceSaveId": "17ff21b1-f124-4426-84b4-96dd07e36b2f",
+  "restartSaveId": "ba22bd05-f02d-478e-8b4c-862545f10a7a",
+  "originalAfterSourceUpdate": true,
+  "closedDraftRecovered": true,
+  "sameCreationReplayed": true,
+  "controlledModelCalls": 1,
+  "paidCalls": 0
+}

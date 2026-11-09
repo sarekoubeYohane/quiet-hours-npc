@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -7,7 +9,7 @@ const response=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,complet
 const action=(overrides={})=>({type:'rest',target:'',content:'稍微休息',mood:'平靜',durationMinutes:15,intents:[],...overrides});
 async function setup(reply={status:'denied',effects:[],stages:[],check:null},choice=action({type:'propose',target:'cafe',purpose:'飲用',content:'泡一杯茶'})){
  const w=seedWorld();w.contextId='life-habits';w.adjudication={provider:'openai',model:'fixture-judge'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});const old=global.fetch;let calls=0,inputs=[];
  global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return response(input.contractVersion==='world-adjudication.v1'?reply:typeof choice==='function'?choice(input):choice,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=old;},setChoice:v=>{choice=v;},setReply:v=>{reply=v;},calls:()=>calls,inputs};

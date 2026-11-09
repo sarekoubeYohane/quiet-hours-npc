@@ -1,0 +1,13 @@
+{
+  "commit": "7aa2346",
+  "origin": "http://127.0.0.1:35417",
+  "checks": [
+    "Key old A input rejected under B and retained",
+    "model defaults old A input rejected under B and retained",
+    "draft autosave rejected under B and retained",
+    "text template save rejected under B and retained",
+    "scene save rejected under B and retained"
+  ],
+  "controlled": 0,
+  "paid": 0
+}

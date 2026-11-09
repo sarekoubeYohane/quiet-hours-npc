@@ -1,0 +1,30 @@
+{
+  "origin": "http://127.0.0.1:38341",
+  "commit": "5bdc6db",
+  "builtAt": "2026-11-09T16:39:35.943Z",
+  "auth": "local cookie identity boundary",
+  "database": "isolated disk SQLite, all migrations; actual character, scene and wizard pages; no installed world fixture",
+  "draftId": "e286ff98-966c-4d24-9443-5616749b7c93",
+  "restartId": "6997b6d1-9771-4765-a4a0-130483e6ffaa",
+  "lostCreationReply": true,
+  "finalTurns": {
+    "first": 2,
+    "second": 1
+  },
+  "modelCalls": 1,
+  "paidCalls": 0,
+  "checks": [
+    "empty home",
+    "real card form/complete",
+    "same-flow scene return",
+    "same-source places",
+    "manual configuration",
+    "draft leave/resume/reload",
+    "back edit",
+    "exact confirmation persisted",
+    "lost commit reply recovery",
+    "turn zero",
+    "original restart new save",
+    "two saves selection/reload"
+  ]
+}

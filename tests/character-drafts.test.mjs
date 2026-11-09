@@ -21,9 +21,9 @@ async function fixture() {
   } }] });
   const entries = built.outputFiles.map(file => { const compiled={exports:{}}; new Function('module','exports','require','context',file.text)(compiled,compiled.exports,require,context); return compiled.exports; });
   const [api,generation,world] = entries;
-  async function request(body, origin = 'https://test.invalid') { const response = body === undefined ? await api.GET() : await api.POST(new Request('https://test.invalid/api/character-drafts', { method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(body) })); return { status:response.status,body:await response.json() }; }
+  async function request(body, origin = 'https://test.invalid') { const response = body === undefined ? await api.GET() : await api.POST(new Request('https://test.invalid/api/character-drafts', { method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({accountScope:'account-operations:'+context.owner,...body}) })); return { status:response.status,body:await response.json() }; }
   async function post(route,payload,path) {const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
-  const generate=payload=>post(generation,payload,'/api/character-drafts/generate');
+  const generate=payload=>post(generation,{operationScope:'account-operations:'+context.owner,...payload},'/api/character-drafts/generate');
   const worldRequest=async payload=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account')); const scope=await r.json(); return payload===undefined ? {status:r.status,body:scope} : post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world?workspace=account');};
   return { db, context, request, generate, worldRequest };
 }

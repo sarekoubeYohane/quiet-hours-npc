@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Real world API/SQLite, controlled clock, model transport and die. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -7,7 +9,7 @@ async function branches(){
  const w=seedWorld();w.contextId='timed-branch-review';w.characters=[w.characters.find(c=>c.id==='owner')];const actor=w.characters[0];actor.control={mode:'autonomous'};w.adjudication={provider:'openai',model:'fixture'};
  w.objects=[{id:'cup-review',source:'known-cup',label:'杯',region:actor.region,holder:'owner',owner:'owner',revision:1,state:{clean:'no'},stateTransitions:{clean:['no','yes']},lifecycle:'active',kind:'utensil',knownTo:['owner'],allowedTo:['owner']}];store.install(w);
  const clock=Date.now;let now=clock();Date.now=()=>now;
- const post=b=>{now+=1000;return POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:now+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',worldContext:w.contextId,...b})}));};
+ const post=b=>{now+=1000;return POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:now+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',worldContext:w.contextId,...b}, 'test-owner'))}));};
  const read=async()=>(await(await GET()).json()).world;
  await post({operation:'set-model-key',key:'bounded-timing-provider'});
  const view=await(await GET()).json();await post({operation:'adopt-character-attributes',target:'owner',expectedVersion:view.version,operationScope:view.operationScope,characterSetup:{attributes:Object.fromEntries(['strength','endurance','dexterity','perception'].map(name=>[name,{value:3}]))}});
@@ -33,7 +35,7 @@ for(const fault of ['before','conflict','after'])test('timed branch selection is
 });
 test('demo without timeIntent keeps its confirmed sixty-minute rest after five-minute adoption',async()=>{
  const w=seedWorld();w.contextId='demo-confirmed-duration';w.characters=[w.characters.find(c=>c.id==='cass')];store.install(w);
- const post=()=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),operation:'advance',mode:'demo',minutes:5,timeContract:'five-minute-v1',worldContext:w.contextId})}));
+ const post=()=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),operation:'advance',mode:'demo',minutes:5,timeContract:'five-minute-v1',worldContext:w.contextId}, 'test-owner'))}));
  let response=await post();assert.equal(response.status,200,await response.clone().text());let after=(await(await GET()).json()).world;const start=after.minute;assert.equal(after.characters[0].plan.action.type,'rest');assert.equal(after.characters[0].plan.until,start+60);assert.equal(after.characters[0].plan.startedAt,start);
  for(let i=0;i<11;i++){response=await post();assert.equal(response.status,200,await response.clone().text());}after=(await(await GET()).json()).world;assert.equal(after.minute,start+55);assert.equal(after.characters[0].plan.until,start+60);
  response=await post();assert.equal(response.status,200,await response.clone().text());after=(await(await GET()).json()).world;assert.equal(after.minute,start+60);assert.equal(after.characters[0].plan,undefined);

@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -9,10 +11,11 @@ const route = load('route');
 const characters = load('character-templates-route');
 const store = load('store');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api, body) => api.POST(new Request(origin+'/api/world',{
-  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(body),
+  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(body, 'test-owner') : originalAccountInput(body, 'account-operations:test-owner')),
 }));
 const read = async () => (await route.GET()).json();
 async function expect(result, status) {
@@ -55,11 +58,11 @@ async function mountScene() {
   };
 }
 
-test('a saved journey occupies world time, survives replay and arrives with the same carried phone', async () => {
+test('historical city compatibility: a saved journey occupies world time, survives replay and arrives with the same carried phone', async () => {
   const legacy=seedWorld();
   legacy.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(legacy);
-  const opening=await read();
+  await read();
   const create=async name=>(await expect(await post(characters,{
     id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name},
   }),200)).template;
@@ -76,10 +79,7 @@ test('a saved journey occupies world time, survives replay and arrives with the 
     ],
     finalization:{spaces:[],walks:[{places:['origin','destination'],minutes:35},{places:['destination','blocked'],minutes:null}]},
   };
-  const started=await expect(await post(route,{
-    operation:'start-city',operationId:operationId(),operationScope:opening.operationScope,
-    worldContext:opening.world.contextId,expectedVersion:opening.version,mode:'demo',city,
-  }),200);
+  const started=await installHistoricalCity(city);
   const context=started.world.contextId;
   await expect(await post(route,{operation:'set-model-key',mode:'openai',key:'controlled'}),200);
   const nativeFetch=global.fetch;

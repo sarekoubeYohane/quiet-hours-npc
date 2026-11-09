@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
@@ -8,7 +10,7 @@ const completion=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,compl
 const operationId=()=>Date.now()+':'+crypto.randomUUID();
 async function setup(decide,adjudicate=()=>{throw Error('no adjudication expected');},prepare=()=>{}){
  const w=seedWorld();w.contextId='time-semantics';w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-world'};prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:operationId(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:operationId(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture-key'});
  const old=global.fetch;let npc=0,judgments=0;const inputs=[];
  global.fetch=async(_url,init)=>{const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return completion(adjudicate(input,request),JSON.parse(JSON.parse(init.body).messages[1].content));}inputs.push(input);npc++;return completion(decide(input,npc,request),JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=old;},counts:()=>({npc,judgments}),inputs};

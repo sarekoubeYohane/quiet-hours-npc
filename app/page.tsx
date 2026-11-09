@@ -3,7 +3,7 @@ import SavePicker from '@/components/save-picker';
 import { currentEnvironment } from '@/lib/environment';
 import { getGitHubUser, githubSignInPath } from '@/lib/auth';
 export const dynamic='force-dynamic';
-export default async function Page(){
+export default async function Page({searchParams}:{searchParams:Promise<{accountChanged?:string}>}){
   const {user,unavailable}=await getGitHubUser().then(user=>({user,unavailable:false})).catch(()=>({user:null,unavailable:true}));
   const signInPath=githubSignInPath;
   const environment=currentEnvironment();
@@ -15,5 +15,5 @@ export default async function Page(){
     <p className="auth-note">請使用已受邀的 GitHub 帳號。登入後會回到這裡。</p>
     <p className="auth-note environment-note">{environment.caption}{environment.builtAtLabel!=='unknown'?` · 建置於 ${environment.builtAtLabel}`:''}</p>
   </section></main>;
-  return <SavePicker displayName={user.displayName} environment={environment}/>;
+  return <SavePicker key={user.userId} owner={user.userId} accountChanged={(await searchParams).accountChanged==='1'} displayName={user.displayName} environment={environment}/>;
 }

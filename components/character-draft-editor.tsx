@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import CharacterFormationControls from '@/components/character-formation-controls';
 import ModelSettingsPanel from '@/components/model-settings-panel';
 import { modelRoleReady, type ModelSettingsView } from '@/lib/model-settings';
@@ -9,8 +10,9 @@ import { characterTemplateFields, initialMemoryCapacityError, type CharacterTemp
 import { roundClientMs } from '@/lib/round-time-policy';
 const endpoint = '/api/character-drafts';
 const workspace = '/api/world?workspace=account';
-type DraftReply = { draft?: CharacterDraft; error?: string };
-export default function CharacterDraftEditor() {
+type DraftReply = { accountScope?: string; draft?: CharacterDraft; error?: string };
+export default function CharacterDraftEditor({originalAccountScope}:{originalAccountScope?:string}) {
+  const { accountScope, capture, scoped } = useOriginalAccountScope(originalAccountScope);
   const pendingTemplate=useRef<{id:string;templateId:string;templateVersion:number;operationScope:string}>(null);
   const [templatePending,setTemplatePending]=useState(false);
   const [sources, setSources] = useState<CharacterTemplate[]>([]);
@@ -34,15 +36,16 @@ export default function CharacterDraftEditor() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(endpoint);
-      const body = await response.json() as { drafts?: CharacterDraft[]; error?: string };
+      const response = await fetch(scoped(endpoint));
+      const body = await response.json() as { accountScope?: string; drafts?: CharacterDraft[]; error?: string };
       if (!response.ok || !body.drafts) throw Error(body.error || '無法讀取建角草稿。');
       if (!alive.current) return;
+      capture(body.accountScope);
       setDrafts(body.drafts); setError('');
-      const libraryResponse=await fetch('/api/character-templates');const library=await libraryResponse.json() as {presets?:CharacterTemplate[];templates?:CharacterTemplate[]};if(libraryResponse.ok&&alive.current)setSources([...(library.presets??[]),...(library.templates??[])]);
+      const libraryResponse=await fetch(scoped('/api/character-templates'));const library=await libraryResponse.json() as {accountScope?:string;presets?:CharacterTemplate[];templates?:CharacterTemplate[]};if(libraryResponse.ok&&alive.current){capture(library.accountScope);setSources([...(library.presets??[]),...(library.templates??[])]);}
     } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : '無法讀取建角草稿。'); }
     finally { if (alive.current) setLoading(false); }
-  }, []);
+  }, [capture, scoped]);
   useEffect(() => { alive.current = true; queueMicrotask(() => { if (alive.current) void load(); }); return () => { alive.current = false; }; }, [load]);
   async function save(value = failedSave.current ?? current.current) {
     if (!value || saving) return;
@@ -52,6 +55,8 @@ export default function CharacterDraftEditor() {
       const body = await response.json() as DraftReply;
       if (!response.ok || !body.draft) { setConflict(response.status === 409); throw Error(body.error || '未同步：保存失敗，原輸入已保留。'); }
       if (!alive.current) return body.draft;
+      capture(body.accountScope);
+      capture(body.draft.accountScope);
       const saved = body.draft;
       record(saved); failedSave.current = undefined; setSaveFailed(false); setConflict(false);
       if (current.current?.id === value.id) {
@@ -82,9 +87,10 @@ export default function CharacterDraftEditor() {
     if(saving||generating||forming||(!pendingTemplate.current&&!canSwitch))return;
     setSaving(true);setError('');
     try{
-      if(!pendingTemplate.current){if(!source)return;const scopeResponse=await fetch('/api/world?workspace=account');const scope=await scopeResponse.json() as {operationScope?:string};if(!scopeResponse.ok||!scope.operationScope)throw Error('無法確認原帳號，來源文字已保留。');pendingTemplate.current={id:crypto.randomUUID(),templateId:source.id,templateVersion:source.version,operationScope:scope.operationScope};setTemplatePending(true);}
+      if(!pendingTemplate.current){if(!source)return;const scopeResponse=await fetch(scoped('/api/world?workspace=account','operationScope'));const scope=await scopeResponse.json() as {operationScope?:string};if(!scopeResponse.ok||!scope.operationScope)throw Error('無法確認原帳號，來源文字已保留。');capture(scope.operationScope);pendingTemplate.current={id:crypto.randomUUID(),templateId:source.id,templateVersion:source.version,operationScope:scope.operationScope};setTemplatePending(true);}
       const response=await fetch('/api/character-drafts/from-template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingTemplate.current)});const body=await response.json() as DraftReply;
       if(!response.ok||!body.draft)throw Error(body.error||'草稿尚未保存，請恢復原操作。');
+      if(!alive.current)return;capture(body.draft.accountScope);
       pendingTemplate.current=null;setTemplatePending(false);show(body.draft);record(body.draft);setDirty(false);setStatus('已保存至帳號');
     }catch(cause){setStatus('未同步');setError(cause instanceof Error?cause.message:'無法建立範本草稿，請恢復原操作。');}finally{setSaving(false);}
   }
@@ -99,21 +105,24 @@ export default function CharacterDraftEditor() {
         input = saved;
       }
       let payload: object;
-      if (discard) payload = { id: input.id, version: input.version, discard: true };
+      if (discard) payload = { id: input.id, version: input.version, operationScope: input.accountScope, discard: true };
       else if (input.pendingGeneration) payload = { id: input.id, version: input.pendingGeneration.baseVersion, ...input.pendingGeneration };
       else {
-        const availabilityResponse = await fetch('/api/model-settings');
+        const availabilityResponse = await fetch(scoped('/api/model-settings'));
         const availability = await availabilityResponse.json() as ModelSettingsView;
         if (!availabilityResponse.ok) throw Error('暫時無法讀取模型設定，原輸入已保留。');
+        capture(availability.accountScope);
         if (!modelRoleReady(availability, 'adjudication')) { setModelPanel(true); return; }
-        const response = await fetch(workspace);
+        const response = await fetch(scoped(workspace,'operationScope'));
         const settings = await response.json() as { operationScope?: string; world?: { contextId?: string }; error?: string };
         if (!response.ok || !settings.operationScope || !settings.world) throw Error(settings.error || '暫時無法讀取帳號模型設定。');
+        capture(settings.operationScope);
         payload = { id: input.id, version: input.version, operationId: Date.now() + ':' + crypto.randomUUID(), operationScope: settings.operationScope, worldContext: settings.world.contextId };
       }
       const response = await fetch(endpoint + '/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(roundClientMs) });
       const body = await response.json() as DraftReply;
       if (!alive.current) return;
+      if(body.draft)capture(body.draft.accountScope);
       if (body.draft && current.current?.id === input.id) { show(body.draft); record(body.draft); setDirty(false); setStatus('已保存至帳號'); }
       if (!response.ok) throw Error(body.error || 'AI 補完失敗，原輸入已保留。');
       setStatus(discard ? '已保留草稿並放棄套用原 AI 結果' : '已補完空白並保存至帳號');
@@ -122,7 +131,8 @@ export default function CharacterDraftEditor() {
       setError(cause instanceof Error ? cause.message : 'AI 結果尚未確認，原輸入已保留。');
       // Read recovery metadata only; reload must never dispatch another model request.
       try {
-        const response = await fetch(endpoint); const body = await response.json() as { drafts?: CharacterDraft[] };
+        const response = await fetch(scoped(endpoint)); const body = await response.json() as { accountScope?:string; drafts?: CharacterDraft[] };
+        if(!response.ok)return;capture(body.accountScope);
         const saved = body.drafts?.find(item => item.id === current.current?.id);
         if (response.ok && saved?.pendingGeneration && current.current) show({ ...current.current, version: saved.version, pendingGeneration: saved.pendingGeneration });
       } catch { /* Keep the original input; explicit reload can recover account state. */ }
@@ -134,10 +144,10 @@ export default function CharacterDraftEditor() {
   const canSwitch = !templatePending && !saving && !generating && !forming && !dirty && !saveFailed;
   return <section className="panel space-y-4 p-6" aria-label="建角文字草稿">
     <h2>製作人物卡</h2>
-    {modelPanel && <ModelSettingsPanel onClose={() => setModelPanel(false)} />}
+    {modelPanel && <ModelSettingsPanel originalAccountScope={accountScope} onClose={() => setModelPanel(false)} />}
     <p className="hint">先寫人物概念，或全部手填。此處保存帳號建角草稿，尚不是可選入世界的完成人物卡。起始位置在開局配置安排。</p>
     <div className="flex flex-wrap gap-2">
-      <Button type="button" disabled={loading || !canSwitch} onClick={() => edit(newCharacterDraft())}>新建建角草稿</Button>
+      <Button type="button" disabled={loading || !accountScope || !canSwitch} onClick={() => edit({...newCharacterDraft(),accountScope})}>新建建角草稿</Button>
       <Button type="button" variant="outline" disabled={!canSwitch} onClick={() => void load()}>重新讀取建角草稿</Button>
       {drafts.map(item => <Button key={item.id} type="button" variant="outline" disabled={!canSwitch} onClick={() => edit(item)}>{item.fields.name || item.concept.slice(0, 20) || '未命名草稿'}{item.completedCard?'（完成卡）':item.formation?'（已形成）':''}</Button>)}
     </div>
@@ -163,7 +173,7 @@ export default function CharacterDraftEditor() {
       {!!missing.length && <p role="status">待完成：{missing.join('、')}</p>}
       {memoryError && <p role="alert" className="error">{memoryError}</p>}
       <Button type="button" disabled={saving || generating || forming || !!draft.formation || !!draft.pendingFormation || !!memoryError || !!draft.pendingGeneration} onClick={() => void save()}>{saveFailed ? '恢復草稿保存' : '保存建角草稿'}</Button>
-      <CharacterFormationControls key={draft.id} draft={draft} disabled={saving||generating||loading||saveFailed} onBusy={setForming} onModels={() => setModelPanel(true)} onSaved={value => { show(value); record(value); setDirty(false); setStatus('已保存至帳號'); }} onPrepare={async () => { if (!current.current) return; if (dirty || !current.current.version) return save(current.current); return current.current; }} />
+      <CharacterFormationControls key={draft.id} draft={draft} disabled={saving||generating||loading||saveFailed} onBusy={setForming} onModels={() => setModelPanel(true)} onSaved={value => { if(!alive.current)return;capture(value.accountScope);show(value); record(value); setDirty(false); setStatus('已保存至帳號'); }} onPrepare={async () => { if (!current.current) return; if (dirty || !current.current.version) return save(current.current); return current.current; }} />
       {conflict && <p className="hint">本頁文字仍保留。請另開人物頁核對帳號已保存版本，再決定如何處理變更；不會自動覆寫或另建副本。</p>}
     </div>}
     <p role="status" aria-live="polite">{status}</p>

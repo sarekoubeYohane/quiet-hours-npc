@@ -26,7 +26,8 @@ export function prepareCityAccess(
   const visible: EntryPreview[] = [];
   for (const place of preview.places) {
     const locationId = cityLocationId(place.id);
-    const source = scenes.find(scene => scene.id === configuration.sceneSources?.[locationId]?.id);
+    const reference=configuration.sceneSources?.[locationId];
+    const source = scenes.find(scene => scene.id === reference?.id && scene.version === reference.version);
     const building = source?.access?.building ?? 'public';
 
     function assignment(scope: Scope, key: string, rule: EntryRule, inherited = false) {

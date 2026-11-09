@@ -1,3 +1,4 @@
+import {boundPageURL} from './bound-page-url.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -17,10 +18,10 @@ const page = await context.newPage();
 const evidence=[];
 try {
   await page.goto(app.url);
-  await page.getByText('尚無世界存檔。你可以先準備人物與場景。',{exact:true}).waitFor();
+  await page.getByText('尚無世界存檔。從「＋新開存檔」開始建立第一份世界。',{exact:true}).waitFor();
   assert.deepEqual(await page.evaluate(async () => (await (await fetch('/api/saves')).json()).saves), []);
   await page.getByRole('link',{name:'人物',exact:true}).click();
-  await page.waitForURL(app.url+'/character-templates');
+  await page.waitForURL(boundPageURL(app.url,'t3-account-a','/character-templates'));
   assert.equal(new URL(page.url()).pathname,'/character-templates');
   await page.getByRole('button',{name:'新建建角草稿',exact:true}).click();
   await page.locator('[name="draftConcept"]').fill('安靜的河畔修鐘人');
@@ -65,7 +66,7 @@ try {
   const implicitWorld = await page.evaluate(async () => { const r = await fetch('/api/world'); return r.status; });
   assert.equal(implicitWorld,409); // Authoring never creates a legacy playable world.
   await page.getByRole('navigation',{name:'共同導覽'}).getByRole('link',{name:'存檔',exact:true}).click();
-  await page.getByText('尚無世界存檔。你可以先準備人物與場景。',{exact:true}).waitFor();
+  await page.getByText('尚無世界存檔。從「＋新開存檔」開始建立第一份世界。',{exact:true}).waitFor();
   const privateContext=await browser.newContext();await privateContext.addCookies([{name:'qh_local_owner',value:'t3-account-b',url:app.url}]);const otherPage=await privateContext.newPage();await otherPage.goto(app.url+'/character-templates');
   assert.equal(await otherPage.getByRole('button',{name:'孟澄',exact:true}).count(),0);
   await privateContext.close();

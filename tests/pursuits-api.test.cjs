@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
@@ -11,7 +13,7 @@ const {candidate:fixtureCandidate}=require('./pursuit-selection-fixture.cjs');
 // Invalid contract samples below are returned as written, without transport repair.
 function declareFixtureCandidates(value,data){for(const update of value.pursuitUpdates.filter(u=>u.operation==='upsert'&&u.version===0)){const proposal=fixtureCandidate(data.self.id,'form-'+value.pursuitCandidates.length,update.node.content,update.node.scope);value.pursuitCandidates.push(proposal);value.pursuitSelection.adoptions.push({candidateId:proposal.id,pursuitId:update.id});}}
 function selectFixtureFocus(value,id,version=0){const adoption=value.pursuitSelection.adoptions.find(a=>a.pursuitId===id);value.pursuitSelection.focus=adoption?{kind:'candidate',id:adoption.candidateId,version:0}:{kind:'existing',id,version};}
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...body}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 const decision=data=>({contractVersion:'npc-decision.v3',pursuitContext:data.pursuitContext,focusIntentId:null,pursuitCandidates:[],pursuitSelection:{adoptions:[],declinedCandidateIds:[],focus:null,reason:''},pursuitUpdates:[],action:{type:'rest',target:'',content:'休息一會兒',purpose:''},mood:'平靜',durationMinutes:15,timeIntent:{kind:'open-ended',maxMinutes:null},methodAssessment:{purpose:'',knownResults:[],choice:'new',method:'',change:{kind:'not-applicable',detail:''},reason:'',selectedAction:{type:'rest',target:''},intentIds:[]},reconfirmBodyConsequences:false,attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:'',preferenceUpdates:[],habitCandidates:[],arrangementUpdates:[]});
 const node=(id,parents=[])=>({id,content:'先確認自己想做什麼',intensity:'medium',importance:'medium',urgency:'low',context:'',kind:'intent',scope:'只先安靜想一會兒',satisfaction:null,parents});
@@ -42,13 +44,13 @@ test('current direction evolves explicitly and omitted directions survive withou
  }return value;},async()=>{for(round=0;round<3;round++)assert.equal((await advance()).status,200);const saved=await read();assert.equal(saved.characters[0].personality,initial.characters[0].personality);assert.equal(saved.characters[0].intents[0].version,3);assert.equal(saved.characters[0].goal,initial.characters[0].goal);});
 });
 
-test('old world remains readable and advance stops before dispatch until explicit reset, preserving usage',async()=>{
+test('old world remains readable and retired reset preserves unsupported history and original usage',async()=>{
  const old=await setup();delete old.pursuitVersion;delete old.pursuitContext;old.characters[0].intents=[];old.aiUsage={windowStartedAt:Date.now(),calls:7,inputTokens:70,outputTokens:30,unknownCalls:0,totalCalls:9,totalInputTokens:90,totalOutputTokens:50,totalUnknownCalls:0,savedDecisions:4};store.install(old);
  let calls=0;await transport(data=>{calls++;return decision(data);},async()=>{
   const loaded=await read();assert.deepEqual(loaded.characters[0].intents,[]);assert.equal(loaded.pursuitVersion,undefined);
   const blocked=await advance();assert.equal(blocked.status,409);assert.equal((await blocked.json()).worldResetRequired,true);assert.equal(calls,0);
   assert.deepEqual((await read()).aiUsage,old.aiUsage);assert.equal((await read()).turn,0);
-  assert.equal((await POST(request({operation:'reset'}))).status,200);const fresh=await read();assert.equal(fresh.pursuitVersion,1);assert.ok(fresh.pursuitContext);assert.equal(fresh.characters[0].intents[0].kind,'direction');assert.equal(fresh.aiUsage.totalCalls,9);assert.equal(fresh.aiUsage.savedDecisions,0);assert.equal(calls,0);
+  const before=await read();assert.equal((await POST(request({operation:'reset'}))).status,409);const unchanged=await read();assert.deepEqual(unchanged,before);assert.equal(unchanged.pursuitVersion,undefined);assert.deepEqual(unchanged.characters[0].intents,[]);assert.equal(unchanged.aiUsage.totalCalls,9);assert.equal(unchanged.aiUsage.savedDecisions,4);assert.equal(calls,0);
  });
 });
 
