@@ -35,9 +35,9 @@
 ## 本機證據
 
 - `node --test tests/model-settings.test.mjs tests/character-drafts.test.mjs`：**20/20**。涵蓋空帳號、設定提交前失敗／提交後回覆遺失、版本及帳號衝突、原小時、跨檔、另存／刪來源、新檔、並行保留、同 ID 回放、known／unknown 失敗、已知用量恢復及無派送不造局部費用。
-- `tooling/verification/browser-review-account-281.mjs`：真 App Router 設定、空狀態、兩世界、受控呼叫、另存未受理→重載→409→名稱保留→重新確認、刪來源、SQLite 真正關閉重開通過；受控 transport 1 次、實付 0。固定提交版本覆驗及資產連結待補。
+- `tooling/verification/browser-review-account-281.mjs`：真 App Router 設定、空狀態、兩世界、受控呼叫、另存未受理→重載→409→名稱保留→重新確認、刪來源、SQLite 真正關閉重開通過；受控 transport 1 次、實付 0。固定 runtime `a84ff96` 覆驗通過：[機器紀錄](assets/player-account-review-281/evidence.json)、[帳號權威](assets/player-account-review-281/account-authority.png)、[衝突後名稱保留](assets/player-account-review-281/copy-conflict-input-retained.png)。
 - 新舊成本及恢復窄覆核 **4/4**，舊完整回合／預算／正式啟用／SQLite 窄覆核 **4/4**；兩條既有 UI 回歸修正後 **2/2**，派送保存點覆核 **1/1**。完整 suite 的先前候選發現這些回歸，已保留原失敗 log 並停止過時執行，不把中途結果列為全套通過。
-- typecheck 通過；完整 lint 與隔離 D1 migration 已執行，最終固定版本結果待補。必要命令與 log 保存於 `/tmp/quiet-hours-context/review-*`。
+- typecheck 通過；lint 0 errors／4 既有 warnings；獨立本機 D1 路徑 `/tmp/quiet-hours-review-migration-281-final` 的全部 migration（含 0018）成功。完整回歸仍待收尾。必要命令與 log 保存於 `/tmp/quiet-hours-context/review-*`。
 
 ## 遷移與回退
 
