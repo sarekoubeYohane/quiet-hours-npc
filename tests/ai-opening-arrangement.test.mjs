@@ -7,8 +7,11 @@ import {join} from 'node:path';
 import {startApp} from '../tooling/verification/real-route-runtime.mjs';
 import {formCharacterCard} from '../tooling/verification/opening-journey.mjs';
 const operationId=()=>Date.now()+':'+crypto.randomUUID();
+function requester(app,owner='a'){
+ return async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});const text=await response.text();let value;try{value=JSON.parse(text);}catch{value={error:text.slice(0,200)}}return {status:response.status,body:value};};
+}
 async function journey(app,owner='a'){
- const request=async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});const text=await response.text();let value;try{value=JSON.parse(text);}catch{value={error:text.slice(0,200)}}return {status:response.status,body:value};};
+ const request=requester(app,owner);
  const ok=async(path,body)=>{const result=await request(path,body);assert.ok(result.status>=200&&result.status<300,JSON.stringify(result));return result.body;};
  const accountScope='account-operations:'+owner;
  await ok('/api/model-settings',{accountScope,version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}});
@@ -127,4 +130,38 @@ test('a later failed request keeps the prior saved proposal accessible, and step
   const stepped=await j.ok('/api/opening-drafts',{operationScope:'a',id:j.draft.id,version:j.draft.version,body:{...j.draft.body,name:'改名保留建議',step:4}});
   const adopted=await j.ok('/api/opening-drafts/arrange',{operationScope:'a',id:j.draft.id,version:stepped.draft.version,operationId:firstOp,proposalVersion:first.arrangement.version,action:'adopt',city:first.arrangement.city});assert.equal(adopted.draft.body.name,'改名保留建議');assert.equal(adopted.world.objects.some(object=>object.label==='木桌'),true);assert.equal(app.modelRequests.length,3);
  }finally{await app.close();}
+});
+
+
+test('adoption receipt failure rolls back the draft, then the original operation recovers across disk reopen without another model or die',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'adoption-atomic-')),databasePath=join(directory,'acceptance.sqlite');
+ let app=await startApp({databasePath,diceFaces:Array(20).fill(4),modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task==='character-card-assessment-v1'?{bonuses:[]}:proposal(input);}}),db;
+ try{
+  const j=await journey(app),base={operationScope:'a',id:j.draft.id,version:j.draft.version,operationId:operationId()},suggested=await j.ok('/api/opening-drafts/arrange',{...base,worldContext:j.scope.world.contextId});
+  const input={...base,action:'adopt',proposalVersion:suggested.arrangement.version,city:suggested.arrangement.city};
+  db=new DatabaseSync(databasePath);const draftBefore=db.prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id),proposalBefore=db.prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=?').get('a',j.draft.id);
+  db.exec("CREATE TRIGGER controlled_receipt_failure BEFORE UPDATE ON opening_arrangements WHEN NEW.state='adopted' BEGIN SELECT RAISE(ABORT,'controlled second write failure'); END");
+  const failed=await j.request('/api/opening-drafts/arrange',input);assert.equal(failed.status,503);assert.equal(failed.body.operationUncertain,true);
+  assert.deepEqual(db.prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id),draftBefore);assert.deepEqual(db.prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=?').get('a',j.draft.id),proposalBefore);assert.equal(app.modelRequests.length,2);
+  db.exec('DROP TRIGGER controlled_receipt_failure');db.close();db=undefined;await app.close();
+  app=await startApp({databasePath,diceFaces:[],modelResponder:()=>{throw Error('adoption recovery must not dispatch');}});const request=requester(app);
+  const retried=await request('/api/opening-drafts/arrange',input);assert.equal(retried.status,200,JSON.stringify(retried.body));assert.equal(retried.body.draft.version,base.version+1);assert.equal(retried.body.arrangement.state,'adopted');assert.deepEqual(retried.body.draft.body.city,input.city);
+  // Close/reopen after a committed adoption, then recover exactly that receipt.
+  // The browser journey separately aborts a real committed HTTP response.
+  await app.close();app=await startApp({databasePath,diceFaces:[],modelResponder:()=>{throw Error('committed replay must not dispatch');}});
+  const replay=await requester(app)('/api/opening-drafts/arrange',input);assert.equal(replay.status,200,JSON.stringify(replay.body));assert.deepEqual(replay.body.draft,retried.body.draft);assert.deepEqual(replay.body.arrangement,retried.body.arrangement);assert.equal(app.modelRequests.length,0);
+  db=new DatabaseSync(databasePath);assert.equal(db.prepare('SELECT version FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id).version,base.version+1);assert.equal(db.prepare('SELECT state FROM opening_arrangements WHERE owner=? AND draft_id=?').get('a',j.draft.id).state,'adopted');
+ }finally{db?.close();await app.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('adoption uses the saved proposal revision and duplicate concurrent requests commit one draft revision',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task==='character-card-assessment-v1'?{bonuses:[]}:proposal(input);}});let db;
+ try{
+  const j=await journey(app),base={operationScope:'a',id:j.draft.id,version:j.draft.version,operationId:operationId()},result=await j.ok('/api/opening-drafts/arrange',{...base,worldContext:j.scope.world.contextId});
+  const old={...base,action:'adopt',proposalVersion:result.arrangement.version,city:result.arrangement.city},city=structuredClone(result.arrangement.city);city.finalization.spaces[0].objects[0].name='原使用者核對的圓桌';
+  const edited=await j.ok('/api/opening-drafts/arrange',{...base,action:'edit',proposalVersion:result.arrangement.version,city});db=new DatabaseSync(app.sqlitePath);const draftBefore=db.prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id),proposalBefore=db.prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=?').get('a',j.draft.id);
+  assert.equal((await j.request('/api/opening-drafts/arrange',old)).status,409);assert.deepEqual(db.prepare('SELECT * FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id),draftBefore);assert.deepEqual(db.prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=?').get('a',j.draft.id),proposalBefore);
+  const input={...base,action:'adopt',proposalVersion:edited.arrangement.version,city};const replies=await Promise.all([j.request('/api/opening-drafts/arrange',input),j.request('/api/opening-drafts/arrange',input)]);for(const response of replies){assert.equal(response.status,200,JSON.stringify(response.body));assert.equal(response.body.draft.version,base.version+1);assert.equal(response.body.arrangement.state,'adopted');}
+  assert.equal(db.prepare('SELECT version FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id).version,base.version+1);assert.equal(app.modelRequests.length,2);
+ }finally{db?.close();await app.close();}
 });

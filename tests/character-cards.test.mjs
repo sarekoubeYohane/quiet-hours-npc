@@ -94,7 +94,7 @@ test('numeric game-stat requests and incomplete text stop before models or dice 
  globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
  try{
   await configure(f);
-  for(const abilities of ['力量至少18','精神容量65–90','耐力比18歲時更好且力量18','strength:18','容量80','力量十八','力量：一','耐力為十二','精神容量八十至九十','外觀10–18','dexterity is 18','strength must be 18','endurance between 8 and 18','strength should be 18','dexterity set to 18','mental capacity from 65 to 90','appearance >= 18']){const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities}})).body.draft;assert.equal((await f.form(await operation(f,draft))).status,400);}
+  for(const abilities of ['力量至少18','力量高於18','力量>=-1','力量不等於十二','耐力大於一點五','strength lower-than 18','力量大於18','耐力低於8','外觀小於18','精神容量不得超過90','strength greater than 18','endurance lower than 8','appearance no higher than 18','mental capacity not smaller than 65','精神容量65–90','耐力比18歲時更好且力量18','strength:18','容量80','力量十八','力量：一','耐力為十二','精神容量八十至九十','外觀10–18','dexterity is 18','strength must be 18','endurance between 8 and 18','strength should be 18','dexterity set to 18','mental capacity from 65 to 90','appearance >= 18']){const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities}})).body.draft;assert.equal((await f.form(await operation(f,draft))).status,400);}
   const missing=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,beliefs:''}})).body.draft;assert.equal((await f.form(await operation(f,missing))).status,400);assert.equal(calls,0);assert.equal(f.context.dice,0);
   const legal=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'35歲，身高175公分，做力量訓練3年',fields})).body.draft;assert.equal((await f.form(await operation(f,legal))).status,200);assert.equal(calls,1);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
@@ -178,4 +178,16 @@ test('ordinary Chinese ability prose forms through the real API and persists wit
   const formed=await f.form(await operation(f,draft));assert.equal(formed.status,200,JSON.stringify(formed.body));
   const saved=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);assert.equal(saved.fields.abilities,description);assert.ok(saved.formation);
  }assert.equal(calls,4);}finally{globalThis.fetch=old;f.db.close();}
+});
+
+test('hyphenated age and physical units remain background and their saved formation replays without another model or die',async()=>{
+ const f=await fixture(),old=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
+ try{
+  await configure(f);for(const description of ['strength greater than 18-year-olds','strength greater than 18-year-old','appearance higher than 175-cm','strength more than 80-kg','strength greater than 18‑year‑olds']){
+   const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities:description}})).body.draft,input=await operation(f,draft);
+   const formed=await f.form(input);assert.equal(formed.status,200,JSON.stringify(formed.body));const count=calls,dice=f.context.dice;
+   assert.deepEqual((await f.form(input)).body.draft,formed.body.draft);assert.equal(calls,count);assert.equal(f.context.dice,dice);
+   const stored=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);assert.equal(stored.fields.abilities,description);assert.deepEqual(stored.formation,formed.body.draft.formation);
+  }assert.equal(calls,5);
+ }finally{globalThis.fetch=old;f.db.close();}
 });

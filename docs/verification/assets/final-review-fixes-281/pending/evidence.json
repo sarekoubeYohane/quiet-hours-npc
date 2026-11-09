@@ -1,0 +1,12 @@
+{
+  "origin": "http://127.0.0.1:39891",
+  "commit": "1861ffd",
+  "draftId": "150a10bc-5905-424d-83dc-28a8240eadc0",
+  "pendingReloadLocked": true,
+  "explicitOriginalRecovery": true,
+  "knownFailureCanFinishManually": true,
+  "priorSavedProposalRestoredWithoutModel": true,
+  "missingKeyCancelCanFinishManually": true,
+  "modelCalls": 3,
+  "paidCalls": 0
+}
