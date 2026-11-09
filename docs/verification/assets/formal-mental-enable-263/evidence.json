@@ -34,27 +34,27 @@
         "text": "我是街角咖啡館的店主。這是獨立的測試角色，不屬於小說正史。"
       },
       {
-        "id": "abd6c95e-43e1-4049-a461-116e1a20f1e6",
+        "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
         "time": 1265,
-        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:36137fec-4ebc-4adc-9835-add226d2996a]：{\"condition\":\"sound\"}。"
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。"
       },
       {
-        "id": "c0028386-98b2-41f9-ad06-b2b371dfa55a",
+        "id": "65535b05-593e-4e03-a495-e69d4cc7097b",
         "time": 1280,
-        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:36137fec-4ebc-4adc-9835-add226d2996a]：{\"condition\":\"sound\"}。"
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。"
       },
       {
-        "id": "5688ceff-8ce9-4bc0-ab18-4270483c8951",
+        "id": "5b19711a-de92-4684-a407-016497193880",
         "time": 1285,
         "text": "店主 開始進行已選活動，完整結果尚未發生。"
       },
       {
-        "id": "254c8ca7-2a68-4b2e-a66c-be6a48988fc9",
+        "id": "143c7db1-efab-4652-abc3-7913596f234c",
         "time": 1290,
         "text": "店主 開始進行已選活動，完整結果尚未發生。"
       },
       {
-        "id": "69bc948c-ac1b-4ca6-8165-72b69de7a177",
+        "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
         "time": 1295,
         "text": "觀察者對 店主 說：「接管期間，我仍在這裡陪你。」"
       }
@@ -97,12 +97,12 @@
       "mode": "taken-over",
       "experiences": [
         {
-          "id": "254c8ca7-2a68-4b2e-a66c-be6a48988fc9",
+          "id": "143c7db1-efab-4652-abc3-7913596f234c",
           "time": 1290,
           "text": "店主 開始進行已選活動，完整結果尚未發生。"
         },
         {
-          "id": "69bc948c-ac1b-4ca6-8165-72b69de7a177",
+          "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
           "time": 1295,
           "text": "觀察者對 店主 說：「接管期間，我仍在這裡陪你。」"
         }
@@ -125,33 +125,33 @@
         }
       },
       {
-        "id": "abd6c95e-43e1-4049-a461-116e1a20f1e6",
+        "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
         "characterId": "owner",
         "version": 1,
         "time": 1265,
-        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:36137fec-4ebc-4adc-9835-add226d2996a]：{\"condition\":\"sound\"}。",
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；世界時間 1265）：開始進行這項活動；活動尚未完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"raw\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。",
         "source": {
           "kind": "experience",
           "person": "owner",
           "region": "cafe-front"
         },
-        "eventId": "62cabf25-a84f-4390-86ef-cd7683b139da"
+        "eventId": "33f72c21-de90-4914-a4fa-de024f6634b2"
       },
       {
-        "id": "c0028386-98b2-41f9-ad06-b2b371dfa55a",
+        "id": "65535b05-593e-4e03-a495-e69d4cc7097b",
         "characterId": "owner",
         "version": 1,
         "time": 1280,
-        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:36137fec-4ebc-4adc-9835-add226d2996a]：{\"condition\":\"sound\"}。",
+        "text": "店主 行動回饋（原提案，非已發生成果：propose workpiece 加工這件作品；活動始於 1265；世界時間 1280）：練習作品：progress=complete；活動已完成。 依本次已知物件：練習作品 [workpiece]：{\"progress\":\"complete\"}；店主 的手機 [phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333]：{\"condition\":\"sound\"}。",
         "source": {
           "kind": "experience",
           "person": "owner",
           "region": "cafe-front"
         },
-        "eventId": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+        "eventId": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
         "feelingOrigins": [
           {
-            "id": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+            "id": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
             "actorId": "owner",
             "version": 1,
             "at": 1280,
@@ -160,7 +160,7 @@
         ]
       },
       {
-        "id": "5688ceff-8ce9-4bc0-ab18-4270483c8951",
+        "id": "5b19711a-de92-4684-a407-016497193880",
         "characterId": "owner",
         "version": 1,
         "time": 1285,
@@ -170,10 +170,10 @@
           "person": "owner",
           "region": "cafe-front"
         },
-        "eventId": "bc22a5ae-982c-4b9d-8ce1-aa84301b29ca"
+        "eventId": "8f50902a-2bab-4d36-a158-fb45df05a025"
       },
       {
-        "id": "254c8ca7-2a68-4b2e-a66c-be6a48988fc9",
+        "id": "143c7db1-efab-4652-abc3-7913596f234c",
         "characterId": "owner",
         "version": 1,
         "time": 1290,
@@ -183,11 +183,11 @@
           "person": "owner",
           "region": "cafe-front"
         },
-        "eventId": "f5745f19-89f0-4534-9922-0faa185ff78a",
+        "eventId": "1972d504-3b49-4eff-886e-0a8a07bb1d6a",
         "controlled": true
       },
       {
-        "id": "69bc948c-ac1b-4ca6-8165-72b69de7a177",
+        "id": "0a60cb63-1b9c-4e22-adf6-7a8d276cdf0b",
         "characterId": "owner",
         "version": 1,
         "time": 1295,
@@ -197,11 +197,11 @@
           "person": "observer",
           "region": "cafe-front"
         },
-        "eventId": "01df820f-5cdf-4a18-b90e-feed897ab704",
+        "eventId": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
         "controlled": true,
         "feelingOrigins": [
           {
-            "id": "01df820f-5cdf-4a18-b90e-feed897ab704",
+            "id": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
             "actorId": "owner",
             "version": 1,
             "at": 1295,
@@ -223,7 +223,7 @@
         "regulationCost": 5,
         "lowAt": 13,
         "process": {
-          "seed": 3881429717,
+          "seed": 216479089,
           "slotMinutes": 5,
           "levels": [
             0,
@@ -244,7 +244,7 @@
           ]
         }
       },
-      "value": 21,
+      "value": 14,
       "activatedAt": 1260,
       "updatedAt": 1300,
       "history": [
@@ -254,9 +254,9 @@
           "minute": 1265,
           "reason": "正式五分鐘時間來源共同結算",
           "before": 3,
-          "after": 3,
+          "after": 2,
           "awakeMinutes": 5,
-          "naturalDelta": 0,
+          "naturalDelta": -1,
           "processDelta": 0,
           "processMinutes": 0,
           "processSlots": [],
@@ -266,8 +266,8 @@
               "slot": 252,
               "source": "natural",
               "die": 6,
-              "face": 4,
-              "rawDelta": 0
+              "face": 1,
+              "rawDelta": -1
             }
           ]
         },
@@ -276,15 +276,15 @@
           "from": 1265,
           "minute": 1270,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 3,
-          "after": 4,
+          "before": 2,
+          "after": 3,
           "awakeMinutes": 5,
           "naturalDelta": -1,
           "processDelta": 2,
           "processMinutes": 5,
           "processSlots": [
             {
-              "id": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
               "slot": 253,
               "draw": 1
             }
@@ -304,7 +304,7 @@
               "reason": "享受真正創作的過程",
               "revision": 1,
               "slot": 253,
-              "source": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
               "die": 3,
               "face": 1,
               "rawDelta": 2
@@ -316,17 +316,17 @@
           "from": 1270,
           "minute": 1275,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 4,
-          "after": 7,
+          "before": 3,
+          "after": 5,
           "awakeMinutes": 5,
           "naturalDelta": 0,
-          "processDelta": 3,
+          "processDelta": 2,
           "processMinutes": 5,
           "processSlots": [
             {
-              "id": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
               "slot": 254,
-              "draw": 2
+              "draw": 1
             }
           ],
           "sleepDelta": 0,
@@ -335,7 +335,7 @@
               "slot": 254,
               "source": "natural",
               "die": 6,
-              "face": 3,
+              "face": 4,
               "rawDelta": 0
             },
             {
@@ -344,10 +344,10 @@
               "reason": "享受真正創作的過程",
               "revision": 1,
               "slot": 254,
-              "source": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
               "die": 3,
-              "face": 2,
-              "rawDelta": 3
+              "face": 1,
+              "rawDelta": 2
             }
           ]
         },
@@ -356,15 +356,15 @@
           "from": 1275,
           "minute": 1280,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 7,
-          "after": 10,
+          "before": 5,
+          "after": 8,
           "awakeMinutes": 5,
           "naturalDelta": 0,
           "processDelta": 3,
           "processMinutes": 5,
           "processSlots": [
             {
-              "id": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "id": "325aa644-c8bb-405f-9899-136e737a6739",
               "slot": 255,
               "draw": 2
             }
@@ -375,7 +375,7 @@
               "slot": 255,
               "source": "natural",
               "die": 6,
-              "face": 2,
+              "face": 4,
               "rawDelta": 0
             },
             {
@@ -384,7 +384,7 @@
               "reason": "享受真正創作的過程",
               "revision": 1,
               "slot": 255,
-              "source": "e30f9528-4b6a-46aa-aed5-ff828afc95d2",
+              "source": "325aa644-c8bb-405f-9899-136e737a6739",
               "die": 3,
               "face": 2,
               "rawDelta": 3
@@ -396,8 +396,8 @@
           "from": 1280,
           "minute": 1285,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 10,
-          "after": 10,
+          "before": 8,
+          "after": 8,
           "awakeMinutes": 5,
           "naturalDelta": 0,
           "processDelta": 0,
@@ -409,7 +409,7 @@
               "slot": 256,
               "source": "natural",
               "die": 6,
-              "face": 3,
+              "face": 4,
               "rawDelta": 0
             }
           ]
@@ -419,21 +419,21 @@
           "from": 1285,
           "minute": 1285,
           "reason": "真實成果帶來獨立成就感",
-          "before": 10,
-          "after": 16,
+          "before": 8,
+          "after": 13,
           "awakeMinutes": 0,
-          "source": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+          "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
           "moodBefore": "低落",
           "moodAfter": "有成就感",
           "draws": [
             {
-              "source": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+              "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
               "die": 4,
-              "face": 2,
-              "rawDelta": 6
+              "face": 1,
+              "rawDelta": 5
             }
           ],
-          "rawDelta": 6,
+          "rawDelta": 5,
           "groupId": "experience:1285:1280"
         },
         {
@@ -442,8 +442,8 @@
           "minute": 1285,
           "reason": "有餘裕讓自己能承受",
           "effort": "慢慢呼吸整理想法",
-          "before": 16,
-          "after": 11,
+          "before": 13,
+          "after": 8,
           "awakeMinutes": 0,
           "moodBefore": "有成就感",
           "moodAfter": "稍微穩住"
@@ -453,8 +453,8 @@
           "from": 1285,
           "minute": 1290,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 11,
-          "after": 11,
+          "before": 8,
+          "after": 8,
           "awakeMinutes": 5,
           "naturalDelta": 0,
           "processDelta": 0,
@@ -466,7 +466,7 @@
               "slot": 257,
               "source": "natural",
               "die": 6,
-              "face": 4,
+              "face": 5,
               "rawDelta": 0
             }
           ]
@@ -476,15 +476,15 @@
           "from": 1290,
           "minute": 1295,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 11,
-          "after": 12,
+          "before": 8,
+          "after": 9,
           "awakeMinutes": 5,
           "naturalDelta": 0,
           "processDelta": 1,
           "processMinutes": 5,
           "processSlots": [
             {
-              "id": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
+              "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
               "slot": 258,
               "draw": 1
             }
@@ -495,7 +495,7 @@
               "slot": 258,
               "source": "natural",
               "die": 6,
-              "face": 6,
+              "face": 2,
               "rawDelta": 0
             },
             {
@@ -504,7 +504,7 @@
               "reason": "本人覺得這段受控休息放鬆",
               "revision": 1,
               "slot": 258,
-              "source": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
+              "source": "523549ad-9d39-4534-bc3b-2dc4f939b820",
               "die": 3,
               "face": 1,
               "rawDelta": 1
@@ -516,17 +516,17 @@
           "from": 1295,
           "minute": 1300,
           "reason": "正式五分鐘時間來源共同結算",
-          "before": 12,
-          "after": 15,
+          "before": 9,
+          "after": 11,
           "awakeMinutes": 5,
           "naturalDelta": 0,
-          "processDelta": 3,
+          "processDelta": 2,
           "processMinutes": 5,
           "processSlots": [
             {
-              "id": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
+              "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
               "slot": 259,
-              "draw": 3
+              "draw": 2
             }
           ],
           "sleepDelta": 0,
@@ -535,7 +535,7 @@
               "slot": 259,
               "source": "natural",
               "die": 6,
-              "face": 6,
+              "face": 4,
               "rawDelta": 0
             },
             {
@@ -544,10 +544,10 @@
               "reason": "本人覺得這段受控休息放鬆",
               "revision": 1,
               "slot": 259,
-              "source": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
+              "source": "523549ad-9d39-4534-bc3b-2dc4f939b820",
               "die": 3,
-              "face": 3,
-              "rawDelta": 3
+              "face": 2,
+              "rawDelta": 2
             }
           ]
         },
@@ -556,21 +556,21 @@
           "from": 1300,
           "minute": 1300,
           "reason": "真正新陪伴帶來獨立支持",
-          "before": 15,
-          "after": 21,
+          "before": 11,
+          "after": 14,
           "awakeMinutes": 0,
-          "source": "01df820f-5cdf-4a18-b90e-feed897ab704",
+          "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
           "moodBefore": "稍微穩住",
           "moodAfter": "有人陪伴而安心",
           "draws": [
             {
-              "source": "01df820f-5cdf-4a18-b90e-feed897ab704",
+              "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
               "die": 4,
-              "face": 4,
-              "rawDelta": 6
+              "face": 1,
+              "rawDelta": 3
             }
           ],
-          "rawDelta": 6,
+          "rawDelta": 3,
           "groupId": "experience:1300:1295"
         }
       ],
@@ -582,7 +582,7 @@
       "experiences": {
         "receipts": [
           {
-            "source": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+            "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
             "direction": "positive",
             "level": 3,
             "reason": "真實成果帶來獨立成就感",
@@ -590,21 +590,21 @@
             "originKind": "result",
             "at": 1285,
             "expiresAt": 11360,
-            "before": 10,
-            "after": 16,
+            "before": 8,
+            "after": 13,
             "moodBefore": "低落",
             "moodAfter": "有成就感",
             "draw": {
-              "source": "9db29dc5-adb8-4fc8-b392-b2732b4498d5",
+              "source": "970c5bcf-bf52-4a4c-9ba1-dc67bce23ff9",
               "die": 4,
-              "face": 2,
-              "rawDelta": 6
+              "face": 1,
+              "rawDelta": 5
             },
-            "rawDelta": 6,
+            "rawDelta": 5,
             "groupId": "experience:1285:1280"
           },
           {
-            "source": "01df820f-5cdf-4a18-b90e-feed897ab704",
+            "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
             "direction": "positive",
             "level": 2,
             "reason": "真正新陪伴帶來獨立支持",
@@ -612,17 +612,17 @@
             "originKind": "experience",
             "at": 1300,
             "expiresAt": 11375,
-            "before": 15,
-            "after": 21,
+            "before": 11,
+            "after": 14,
             "moodBefore": "稍微穩住",
             "moodAfter": "有人陪伴而安心",
             "draw": {
-              "source": "01df820f-5cdf-4a18-b90e-feed897ab704",
+              "source": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
               "die": 4,
-              "face": 4,
-              "rawDelta": 6
+              "face": 1,
+              "rawDelta": 3
             },
-            "rawDelta": 6,
+            "rawDelta": 3,
             "groupId": "experience:1300:1295"
           }
         ],
@@ -632,13 +632,13 @@
       "controlAssessments": {
         "sources": [
           {
-            "id": "01df820f-5cdf-4a18-b90e-feed897ab704",
+            "id": "32cbc7be-d98b-4973-b880-6cbc4f8e547c",
             "at": 1295
           }
         ],
         "activities": [
           {
-            "id": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
+            "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
             "at": 1290
           }
         ],
@@ -817,30 +817,30 @@
     "habitEvidenceDropped": 0,
     "habitEvidence": [
       {
-        "id": "62cabf25-a84f-4390-86ef-cd7683b139da",
+        "id": "33f72c21-de90-4914-a4fa-de024f6634b2",
         "version": 1,
         "time": 1265,
         "location": "cafe",
         "activityKey": "unclassified",
         "activityLabel": "完成作品",
         "semanticGap": true,
-        "eventId": "62cabf25-a84f-4390-86ef-cd7683b139da",
+        "eventId": "33f72c21-de90-4914-a4fa-de024f6634b2",
         "memory": {
-          "id": "abd6c95e-43e1-4049-a461-116e1a20f1e6",
+          "id": "3688125a-5bfc-4d90-a253-10a1f2c4cc64",
           "version": 1
         },
         "started": true
       },
       {
-        "id": "bc22a5ae-982c-4b9d-8ce1-aa84301b29ca",
+        "id": "8f50902a-2bab-4d36-a158-fb45df05a025",
         "version": 1,
         "time": 1285,
         "location": "cafe",
         "activityKey": "rest:",
         "activityLabel": "休息",
-        "eventId": "bc22a5ae-982c-4b9d-8ce1-aa84301b29ca",
+        "eventId": "8f50902a-2bab-4d36-a158-fb45df05a025",
         "memory": {
-          "id": "5688ceff-8ce9-4bc0-ab18-4270483c8951",
+          "id": "5b19711a-de92-4684-a407-016497193880",
           "version": 1
         },
         "started": true
@@ -851,7 +851,7 @@
         "activityKey": "rest:",
         "activityLabel": "休息",
         "evidenceIds": [
-          "bc22a5ae-982c-4b9d-8ce1-aa84301b29ca"
+          "8f50902a-2bab-4d36-a158-fb45df05a025"
         ],
         "key": "activity.v1:3:cafe:rest:",
         "type": "rest",
@@ -866,6 +866,7 @@
     ],
     "plan": {
       "deferredAction": true,
+      "checkSystem": "d20-v1",
       "action": {
         "type": "rest"
       },
@@ -885,8 +886,8 @@
       },
       "mentalProcess": {
         "version": 1,
-        "id": "2a845ad0-0a45-409c-95e1-7c73d931a2c2",
-        "randomState": 1182811145,
+        "id": "523549ad-9d39-4534-bc3b-2dc4f939b820",
+        "randomState": 693145709,
         "draws": 2,
         "effectiveAt": 1300,
         "updatedAt": 1300,
@@ -928,7 +929,7 @@
       }
     },
     {
-      "id": "phone:owner:36137fec-4ebc-4adc-9835-add226d2996a",
+      "id": "phone:owner:332d2dd7-3fa6-45da-b6e3-9944254df333",
       "source": "phone-baseline-v1",
       "label": "店主 的手機",
       "kind": "phone",
