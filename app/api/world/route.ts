@@ -4,7 +4,7 @@ import { saveCardAssessment } from '@/lib/character-card-store';
 import { loadCharacterDraft } from '@/lib/character-draft-store';
 import { readEffectiveModels, modelSettingsView } from '@/lib/model-settings-store';
 import { bindWorldSave, ensureAccountOperationLedger, SaveAccessError } from '@/lib/world-saves';
-import { adoptFormalMentalEnergy, validateMentalAdoption, formFormalMentalEnergy } from '@/lib/formal-mental-enablement';
+import { adoptFormalMentalEnergy, validateMentalAdoption } from '@/lib/formal-mental-enablement';
 import { enablePersonalNeeds, validateBodyNeedsSetup } from '@/lib/body-needs-policy';
 import { characterSetupSchema, formCharacterAttributes } from '@/lib/character-attributes';
 import { requestControlledFeelings } from '@/lib/controlled-feelings';
@@ -19,7 +19,7 @@ import { recoverPaidUsage, paidDelta, emptyUsageReceipt, recoveryStatus, boundUs
 import { confirmsBodyConsequences } from '@/lib/needs';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, timePolicyHeader, deadlineSignal, awaitSignal, checkSignal } from '@/lib/round-time-policy';
 import { createDecisionTrace, traceActorSnapshot } from '@/lib/decision-trace-capture';
-import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, clearDecisionTraces, type DecisionTrace, omitDecisionTraceContent } from '@/lib/decision-traces';
+import { readDecisionTrace, listDecisionTraces, saveDecisionTrace, type DecisionTrace, omitDecisionTraceContent } from '@/lib/decision-traces';
 import { cancelActivity } from '@/lib/activity-lifecycle';
 import { createOperationEvidence, type OperationEvidence } from '@/lib/operation-evidence';
 import { currentEnvironment } from '@/lib/environment';
@@ -34,7 +34,7 @@ import { reserveRecallDispatch, recallBudgetLimits, recallUsage, recallBudgetDat
 import { MemoryValidationError } from '@/lib/memory';
 import { getGitHubUser } from '@/lib/auth';
 import { loadWorld, database } from '@/lib/store';
-import { record, normalizeWorld, resetWorld, resolve, type Action, type AIUsage, type World } from '@/lib/world';
+import { record, normalizeWorld, resolve, type Action, type AIUsage, type World } from '@/lib/world';
 import { aiDecision, directModels } from '@/lib/models';
 import { accountUsage, advanceActivities, BudgetExceeded, currentUsage, validBudgetLimits, budgetReached, type BudgetLimits } from '@/lib/activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable, ModelKeyError } from '@/lib/model-keys';
@@ -338,14 +338,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       if (updatingSenseLimits && characterSetup.success && (characterSetup.data.blockedSenses === undefined || Object.keys(characterSetup.data).some(key=>key!=='blockedSenses'))) return reply({error:'此處只更新明示感官硬限制，不改寫人物數值。'},400);
       if (!actor || (adoptingAttributes ? !!actor.attributes : !actor.attributes) || world.acceptance) return reply({error:'此人物無法再次導入基本屬性。'},400);
     }
-    let startedCity: World | undefined;
-    if (b.operation === 'start-city' && city?.success) {
-      if (b.expectedVersion !== version) return reply({error:'原世界已變更，請重新預覽後開始。',operationSettled:true}, 409);
-      if (world.configuration || world.acceptance) return reply({error:'目前世界無法另建城市。'}, 400);
-      const candidate = await prepareCity(accountId, city.data, world);
-      if (!candidate.world) return reply({error:candidate.preview.issues.join(' '), preview:candidate.preview}, 400);
-      startedCity = candidate.world;
-    }
+
 
     if (isOperationExpired(issuedAt, journal.floor)) return reply({ error: '操作識別碼已超過保留範圍；請重新讀取世界後再決定是否建立新操作。', operationExpired: true }, 410);
     // An archive can outlive a lost journal receipt. It proves prior acceptance,
@@ -515,15 +508,6 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
         world = await (b.operation === 'enter-acceptance' ? enterAcceptanceScene(world) : exitAcceptanceScene(world));
         journal.floor = Math.max(journal.floor, issuedAt - 1);
       } catch (error) { failure = error instanceof Error ? error : new Error('無法切換驗收場景。'); }
-    } else if (startedCity) {
-      world = startedCity;
-      world.timeContract='five-minute-v1';
-      for (const actor of world.characters) {
-        const selected = city?.success && city.data.characters.find(item=>item.templateId===actor.profileSource?.id);
-        if(!actor.attributes)formCharacterAttributes(actor,selected ? selected.characterSetup ?? {} : {},world.minute);
-        formFormalMentalEnergy(actor,world.minute,selected?.mentalOpening??{});
-      }
-      journal.floor = Math.max(journal.floor, issuedAt - 1);
     } else if (b.operation === 'enable-mental-energy') {
       adoptFormalMentalEnergy(world,validateMentalAdoption(world,b.mentalOpenings));
     } else if (b.operation === 'enable-body-needs') {
@@ -552,15 +536,6 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       c.activity = '已交還控制權，等待下一次自主選擇。';
     } else if (b.operation === 'direct') {
       world.characters.find(c => c.id === 'owner')!.control!.pending = b.action!;
-    } else if (b.operation === 'reset') {
-      // Same lease, version check and journal as every other mutation: a round another page is
-      // committing either finishes first or makes this save fail, never a half-reset world.
-      world = resetWorld(world);
-      // Operations issued before the reset belong to the old story. Raising the floor makes a
-      // later retry of such an ID answer 410, so the page re-reads the fresh world instead of
-      // applying an old intention to it. Settled results stay replayable; IDs from the same
-      // millisecond as the reset are not treated as older.
-      journal.floor = Math.max(journal.floor, issuedAt - 1);
     } else if (b.operation === 'intervene') {
       const targets = b.target === 'all' ? world.characters.map(c => c.id) : [b.target!];
       const name = world.characters.find(c => c.id === b.target)?.name;
@@ -710,7 +685,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     trimJournal(journal, 8, operationId);
     paidAfter=world.aiUsage&&structuredClone(world.aiUsage);
     traceWorld(trace, 'commit-start');
-    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ?${startedCity&&!failure?', city_started = 1':''} WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
+    const saved = await finishWait(db.prepare(`UPDATE worlds SET state = ?, version = version + 1, locked_until = 0, operations = ? WHERE owner = ? AND version = ? AND locked_until = ? AND locked_until > max(?, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) AND ? > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) AND operations = ?`).bind(JSON.stringify(world), JSON.stringify(journal), id, version, lease, Date.now(), Math.min(lease,receivedAt+roundClientMs), pendingJournal).run());
     if (!saved.meta.changes) {
       commitRejected=true;decisionTrace?.step('commit-conflict',undefined,{worldCommitted:false});await finishTrace('not-committed');
       traceWorld(trace, 'commit-conflict', { outcome: 'not-committed' });
@@ -718,7 +693,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       paidRetained=true;
       throw Error('儲存衝突，請重新載入再試。');
     }
-    if(b.operation==='reset'){const cleared=await clearDecisionTraces(db,id);traceSaved=false;if(cleared.status==='clear-failed')decisionTrace?.step('trace-lifecycle-gap',undefined,{gap:'trace-clear-failed'});}
+
     decisionTrace?.step('world-commit-confirmed',undefined,{version:version+1,outcome:failure?'rolled-back':'committed',committedEvidence:result.body.operationEvidence});
     if(decisionTrace){result.body.decisionTraceStatus=await finishTrace(failure?'rolled-back':'committed',world,version+1);
       // Link only a bounded status receipt. Failure here cannot undo the already

@@ -28,7 +28,7 @@ export const cityDraftSchema = z.object({
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
-    mentalOpening: z.union([mentalOpeningSchema,cardMentalOpeningSchema]).optional(), openingNeeds:openingNeedsSchema.optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
+    mentalOpening: z.union([mentalOpeningSchema,cardMentalOpeningSchema]).optional(), openingNeeds:openingNeedsSchema.optional(), openingFeelings:z.object({hunger:z.number().int().min(0).max(3).optional(),thirst:z.number().int().min(0).max(3).optional(),fatigue:z.number().int().min(0).max(3).optional(),sleep:z.number().int().min(0).max(3).optional()}).strict().optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     homeDescription: z.string().trim().max(300).optional(), workDescription: z.string().trim().max(300).optional(),
@@ -241,7 +241,7 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
     aiUsage:previous.aiUsage && { ...structuredClone(previous.aiUsage), savedDecisions:0 },
     adjudication:previous.adjudication, modelPrices:previous.modelPrices, playerBudget:previous.playerBudget,
   });
-  for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
+  for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds,selection.openingFeelings);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
   if(preview.issues.length)return {preview};
   return { preview, world };
 }
