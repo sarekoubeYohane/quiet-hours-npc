@@ -64,3 +64,30 @@
 - [新城市開局設定](assets/formal-mental-enable-263/new-city/character-263-city-opening.png)
 - [新城市人物與首次推進](assets/formal-mental-enable-263/new-city/character-275-city.png)
 - [完整結果JSON](assets/formal-mental-enable-263/new-city/character-275-browser.json)
+
+## 審查後原規格邊界補證
+
+在 runtime 已通過兩軸審查的 integration `dfdd426` 上，補兩項真正 API／provider transport／SQLite 重讀的表驅動驗證；這是既定 Testing Decisions 的集中證據，沒有 runtime 修改，也不宣稱修復前 RED。
+
+第一項使用真正 `enable-mental-energy` 明示容量10及目前0至10，逐列捕獲正常 NPC 模型請求：
+
+| 目前／容量 | 本人階段 | 可選調節 |
+| --- | --- | --- |
+| 0／10、1／10 | 見底 | 否 |
+| 2／10、3／10 | 吃緊 | 否 |
+| 4／10 | 尚可 | 否 |
+| 5／10 | 尚可 | 是 |
+| 6／10、7／10 | 有餘 | 是 |
+| 8／10、9／10、10／10 | 充沛 | 是 |
+
+因此涵蓋0／20／40／60／80／100%與各界線前後的合法整數。實際 `self.mentalEnergy` 僅等於 `{feeling,canRegulate}`，無精確電量、容量、政策或骰源。`Math.random=0` 只控制建立邊界，讓正式啟用保存seed0；未在公用payload傳seed，沒有呼叫私人helper取預期。第一格真正保存的自然收支證據為d6=2、無自然損耗，各列目前值保持，避免門檻期望被先發生的自然耗電混淆。
+
+第二項逐列驗目前5／4各自選或不選調節：恰5支付一次至0並改成所選心情；4選擇支付則整候選拒絕、原人物／時間保持、無免費改心情且已知派送用量保留；兩者不選均保留電量與原心情。成功及失敗均以原操作ID重播，實際provider只呼叫一次、不再扣費，SQLite人物重讀一致。
+
+```sh
+node --import ./tooling/verification/no-network.mjs tests/run-activities.mjs tests/formal-mental-enable-api.test.cjs tests/formal-mental-policy-api.test.cjs
+npm run typecheck
+git diff --check
+```
+
+本地 **34/34 PASS**（含新增2項及原有正式政策／啟用案例）、0 fail／skip；typecheck、diff check通過。命令輸出：`/private/tmp/npc-handoff-20261109/formal-boundaries-evidence.log`、`formal-boundaries-typecheck.log`。未以補證重跑結果覆寫原完整整合測試的SHA與數字；全套執行與發佈狀態仍依整合紀錄。
