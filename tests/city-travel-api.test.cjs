@@ -56,7 +56,7 @@ async function mountScene() {
   };
 }
 
-test('a saved journey occupies world time, survives replay and arrives with the same carried phone', async () => {
+test('historical city compatibility: a saved journey occupies world time, survives replay and arrives with the same carried phone', async () => {
   const legacy=seedWorld();
   legacy.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(legacy);

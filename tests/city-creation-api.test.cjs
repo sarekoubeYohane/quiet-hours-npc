@@ -66,7 +66,7 @@ test('a historical manual city retains closed and blocked connections and does n
   } finally { global.fetch = transport; }
 });
 
-test('city setup reserves capacity for the phones needed by the first round', async () => {
+test('historical city setup retains capacity for the phones needed by the first round', async () => {
   store.install(seedWorld());
   const original = await read();
   const templates = [];
@@ -252,7 +252,7 @@ test('observation no longer exposes the retired in-place city editor', async () 
   try{await React.act(async()=>root.render(React.createElement(WorldApp,{signInPath:'/login',displayName:'fixture',saveId:'legacy',accountScope:'test-owner',environment:{caption:'fixture',builtAtLabel:'unknown'}})));assert.equal([...document.querySelectorAll('button')].some(button=>button.textContent==='建立城市'),false);assert.ok([...document.querySelectorAll('a')].some(link=>link.getAttribute('href')==='/new'));}finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;await window.happyDOM.close();}
 });
 
-test('opening associations separate home, ownership, work, an explicit start and private directed relationships', async () => {
+test('historical opening associations separate home, ownership, work, an explicit start and private directed relationships', async () => {
   const initial = seedWorld();
   initial.adjudication = { provider: 'openai', model: 'gpt-6.1-sol' };
   store.install(initial);
@@ -403,7 +403,7 @@ test('metered opening suggestions bind only evidenced associations to selected i
   }
 });
 
-test('paid city initialization scopes NPC drafts, preserves explicit facts, and saves the editable final arrangement without a round', async () => {
+test('legacy city initialization scopes NPC drafts and preserves a historical finalized arrangement without a round', async () => {
   const initial = seedWorld();
   initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
   store.install(initial);
@@ -531,7 +531,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
   }
 });
 
-test('opening familiarity is built from the edited final city and remains actor-private in the next actual model calls', async () => {
+test('historical opening familiarity is built from the edited final city and remains actor-private in the next actual model calls', async () => {
   const initial = seedWorld();
   initial.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(initial);

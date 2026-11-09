@@ -22,7 +22,7 @@ const response = async (result, status) => {
   return body;
 };
 
-test('entry permission uses the actual place and the room override and is recorded independently of physical movement', async () => {
+test('historical city compatibility: entry permission uses the actual place and the room override and is recorded independently of physical movement', async () => {
   const legacy = seedWorld();
   legacy.adjudication = { provider: 'openai', model: 'gpt-6.1-sol' };
   store.install(legacy);
