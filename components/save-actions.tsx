@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
+import {useCallback,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {useRouter} from 'next/navigation';
 import type {WorldSave} from '@/lib/world-saves';
 import type {SaveManagementInput,SaveOperationResult} from '@/lib/save-management';
@@ -10,8 +10,8 @@ const changed='quiet-hours:save-operation';
 const copyNameKey=(accountScope:string,saveId:string)=>'quiet-hours:saves:name:'+JSON.stringify([accountScope,saveId]);
 function useSaveOperation(accountScope:string,onBefore?:()=>void) {
   const storageKey='quiet-hours:saves:pending:'+accountScope;
-  const router=useRouter(),busyRef=useRef(false),alive=useRef(true),owner=useRef(accountScope);owner.current=accountScope;
-  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[accountScope]);
+  const router=useRouter(),busyRef=useRef(false),alive=useRef(true),owner=useRef(accountScope);
+  useLayoutEffect(()=>{owner.current=accountScope;alive.current=true;return()=>{alive.current=false;};},[accountScope]);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const subscribe=useCallback((listener:()=>void)=>{window.addEventListener(changed,listener);return()=>window.removeEventListener(changed,listener);},[]);
   const raw=useSyncExternalStore(subscribe,()=>sessionStorage.getItem(storageKey),()=>null);
