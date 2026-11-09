@@ -68,7 +68,7 @@ test('a historical manual city retains closed and blocked connections and does n
 
 test('city setup reserves capacity for the phones needed by the first round', async () => {
   store.install(seedWorld());
-  await read();
+  const original = await read();
   const templates = [];
   for (const name of ['丁楊','翁柳']) {
     templates.push((await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name}}),200)).template);
