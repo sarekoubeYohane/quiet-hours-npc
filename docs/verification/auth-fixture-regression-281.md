@@ -17,3 +17,11 @@ root 固定 `c2a38a3` 的完整 `pnpm test` 已完成 core **1264/1264**，後�
 | `git diff --check` | 通過 |
 
 窄 red／診斷／green／Workers／typecheck log 位於 `/tmp/quiet-hours-context/review-auth-fixture-*`。沒有重新跑已固定全綠的 core；最後整份 integration suite 仍由整合者於後續固定來源執行。沒有新 migration、正式操作、付費模型或部署。
+
+## 人物文字範本的獨立 D1 fixture
+
+root 固定 `1b09069` 補跑 assets／templates／scenes／drafts／cards／models／migration／versioned 組，原始 **43/44** 結果保留於 `/tmp/quiet-hours-context/integration-1b09069-assets.log`；人物編輯器案例尚未開始操作就因 `scope.world.contextId` 中斷。唯一修復者在最新 `1b09069` 上，先讓既有 helper 明確斷言帳號 GET 狀態，確認實際為 503；再以同 fixture 的原子批次契約反例確認 `d1.batch is not a function`。原 generic 安全錯誤與後續讀 undefined 不是產品建角失敗的證據。
+
+`tests/character-templates.test.mjs` 原本已有 first/all/run 與每次 bind 獨立 closure，僅補 execute 及同步 SQLite batch。原 RETURNING 的 `writeFault=before/after` 分支完全保留，既有故障、去重、版本衝突與全部產品斷言未放寬。新增契約驗證獨立重綁值、失敗 batch 對普通並行 read 的原子可見性、完整 rollback 及後續可繼續寫入；此測試表只是 hosting 接點驗證，不代替使用者建立人物旅程。
+
+`node --test tests/character-templates.test.mjs` 修正後 **3/3**（原 2＋接點 1），包含原完整編輯／保存／重開旅程、提交前後故障與來源隔離；typecheck、該檔 ESLint、diff check 通過。窄 red、契約 red、完整 green 及檢查 log 位於 `/tmp/quiet-hours-context/review-character-fixture-*`。沒有重跑其他已通過 43 項或 core，也未改 root 的隔離驗證工作樹、產品、seed、migration 或正式資料。
