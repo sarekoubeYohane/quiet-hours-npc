@@ -41,11 +41,8 @@ test('an empty account sees no saves and cannot install a seed by reading observ
 });
 
 async function create(name) {
-  const person=(await body(await people.POST(req({id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name:name+'的人'}})))).template;
   const scene=(await body(await scenes.POST(req({id:crypto.randomUUID(),version:0,name:name+'的場景',note:'',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})),201)).template;
-  const request={id:crypto.randomUUID(),name,city:{places:[{id:'home',templateId:scene.id,version:scene.version,name:name+'的家'}],characters:[{templateId:person.id,version:person.version,placeId:'home',roomId:'front'}]}};
-  const saved=await body(await saves.POST(req(request)),201);
-  return {request,saved};
+  const {input,saved,draft}=await require('./create-world-via-opening.cjs')({load,name,scene});return {request:input,saved,draft};
 }
 
 test('two worlds created through real templates and the product API resume independently and recover one creation', async()=>{
@@ -82,7 +79,7 @@ test('foreign accounts and stale source scopes cannot read, recover or mutate an
   await body(await world.POST(req(attempt,a.saved.save.id)),404);
   auth.setUserId('test-owner');
   assert.equal((await read(a.saved.save.id)).world.turn,0);
-  const changed={...a.request,name:'不該覆寫的名稱'};
+  const changed={...a.request,draftVersion:a.request.draftVersion+1};
   await body(await saves.POST(req(changed)),409);
   assert.equal((await body(await saves.GET())).saves.find(s=>s.id===a.saved.save.id).name,'甲');
 });
@@ -139,15 +136,16 @@ test('save installation is atomic, and a committed save whose response was lost 
   store.install(seedWorld());auth.setUserId('test-owner');
   const initial=await create('保存來源');
   const before=(await body(await saves.GET())).saves.length;
-  const pending={...initial.request,id:crypto.randomUUID(),name:'交易失敗'};
-  store.onStorage(sql=>{if(sql.startsWith('INSERT OR IGNORE INTO world_saves (owner,id,storage_owner,name,created_at,creation_request'))throw Error('controlled failure before registration');});
+  const opening=await body(await load('opening-drafts-route').POST(req({id:crypto.randomUUID(),version:0,operationScope:'test-owner',body:initial.draft.body})));
+  const pending={id:crypto.randomUUID(),draftId:opening.draft.id,draftVersion:opening.draft.version,operationScope:'test-owner'};
+  store.onStorage(sql=>{if(/^INSERT OR IGNORE INTO world_saves\s*\(owner,id,storage_owner,name,created_at,creation_request/.test(sql))throw Error('controlled failure before registration');});
   await body(await saves.POST(req(pending)),503);
   store.onStorage(undefined);
   assert.equal((await body(await saves.GET())).saves.length,before);
   await body(await world.GET(new Request(origin+'/api/world?save='+pending.id)),404);
   let reads=0;
   store.onStorage(sql=>{if(sql.startsWith('SELECT s.name,s.created_at')&&++reads===2)throw Error('controlled response loss after commit');});
-  const lost={...pending,id:crypto.randomUUID(),name:'回覆遺失'};
+  const lost={...pending,id:crypto.randomUUID()};
   await body(await saves.POST(req(lost)),503);
   store.onStorage(undefined);
   const committed=await read(lost.id);

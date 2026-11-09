@@ -1,3 +1,4 @@
+import { saveUuidPattern } from './save-identities';
 import { database } from './store';
 import type { World } from './world';
 
@@ -6,7 +7,6 @@ export type SaveBinding = { accountOwner:string; storageOwner:string; saveId:str
 export class SaveAccessError extends Error {
   constructor(message:string,readonly status:number){super(message);}
 }
-const validId = /^(legacy|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
 
 /** Reconcile only an existing legacy row. Reading never installs a seed world. */
 async function retainLegacySave(owner:string) {
@@ -32,7 +32,7 @@ export async function bindWorldSave(accountOwner:string,request?:Request):Promis
   }
   if(url&&(url.searchParams.getAll('save').length>1||url.searchParams.getAll('workspace').length>1))throw new SaveAccessError('請只指定一份存檔。',400);
   const supplied=url?.searchParams.get('save');
-  if(supplied!==null&&supplied!==undefined&&!validId.test(supplied))throw new SaveAccessError('存檔識別碼無效。',400);
+  if(supplied!==null&&supplied!==undefined&&supplied!=='legacy'&&!saveUuidPattern.test(supplied))throw new SaveAccessError('存檔識別碼無效。',400);
   if(supplied) {
     await retainLegacySave(accountOwner);
     const save=await database().prepare('SELECT storage_owner FROM world_saves WHERE owner = ? AND id = ?').bind(accountOwner,supplied).first<{storage_owner:string}>();
@@ -64,7 +64,7 @@ export async function readSaveCreation(owner:string,id:string,creationRequest:st
 
 /** A single database transaction installs both story and owner-scoped identity. */
 export async function createWorldSave(owner:string,input:{id:string;name:string;creationRequest:string;world:World;originalOpening?:unknown}):Promise<SavedWorld> {
-  if(!validId.test(input.id)||input.id==='legacy')throw new SaveAccessError('建立操作識別碼無效。',400);
+  if(!saveUuidPattern.test(input.id))throw new SaveAccessError('建立操作識別碼無效。',400);
   const db=database(),storageOwner='save:'+owner+':'+input.id;
   await db.batch([
     db.prepare('INSERT OR IGNORE INTO worlds (owner,state,version,locked_until,city_started) SELECT ?,?,0,0,1 WHERE NOT EXISTS (SELECT 1 FROM save_tombstones WHERE owner=? AND id=?)').bind(storageOwner,JSON.stringify(input.world),owner,input.id),
