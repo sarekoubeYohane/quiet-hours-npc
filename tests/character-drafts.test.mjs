@@ -23,7 +23,7 @@ async function fixture() {
   async function request(body, origin = 'https://test.invalid') { const response = body === undefined ? await api.GET() : await api.POST(new Request('https://test.invalid/api/character-drafts', { method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(body) })); return { status:response.status,body:await response.json() }; }
   async function post(route,payload,path) {const r=await route.POST(new Request('https://test.invalid'+path,{method:'POST',headers:{Origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload)}));return {status:r.status,body:await r.json()};}
   const generate=payload=>post(generation,payload,'/api/character-drafts/generate');
-  const worldRequest=payload=>payload===undefined ? world.GET(new Request('https://test.invalid/api/world?workspace=account')).then(async r=>({status:r.status,body:await r.json()})) : post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...payload},'/api/world?workspace=account');
+  const worldRequest=async payload=>{const r=await world.GET(new Request('https://test.invalid/api/world?workspace=account')); const scope=await r.json(); return payload===undefined ? {status:r.status,body:scope} : post(world,{operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...payload},'/api/world?workspace=account');};
   return { db, context, request, generate, worldRequest };
 }
 const fields = {name:'',appearance:'',personality:'',abilities:'',background:'',initialMemories:'',beliefs:'',preferences:'',directions:'',startLocation:''};
