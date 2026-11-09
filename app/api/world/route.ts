@@ -110,6 +110,7 @@ async function readWorld(request: Request | undefined, trace: WorldTrace) {
   let binding:Awaited<ReturnType<typeof bindWorldSave>>;
   try { binding=await bindWorldSave(accountId,request); } catch(error) { return reply({error:error instanceof Error?error.message:'無法讀取存檔。'},error instanceof SaveAccessError?error.status:503); }
   const id=binding.storageOwner;
+  const readScope=request&&new URL(request.url).searchParams.get('operationScope');if(readScope!==undefined&&readScope!==null&&readScope!==id)return reply({error:'原世界或帳號已變更，請回原帳號恢復。',scopeMismatch:true},409);
   try {
     const operationId = request && new URL(request.url).searchParams.get('operationId');
     if (operationId && !operationIdPattern.test(operationId)) return reply({ error: '操作識別碼無效。' }, 400);
@@ -223,6 +224,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     let b: { mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
+    if(b.operationScope!==id)return reply({error:'登入帳號已變更或缺少原世界識別，請回到原帳號核對。',scopeMismatch:true},409);
     if(binding.accountWorkspace&&!['generate-character-template','assess-character-card','set-model-key','clear-model-key','set-adjudication','set-budget','set-price'].includes(b.operation||''))return reply({error:'帳號製作操作空間不能推進或操作世界。'},400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
     const initializingCity = b.operation === 'initialize-city';
@@ -233,9 +235,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
       if (b.operation === 'set-model-key') await saveModelKey(accountId, provider, b.key);
       else await clearModelKey(accountId, provider);
-      return reply({ modelKeys: await modelKeyStatus(accountId), modelKeyStorageAvailable: modelKeyStorageAvailable() });
+      return reply({operationScope:id,modelKeys:await modelKeyStatus(accountId),modelKeyStorageAvailable:modelKeyStorageAvailable()});
     }
-    if ((binding.saveId&&new URL(request.url).searchParams.has('save')&&b.operationScope!==id) || (b.operationScope !== undefined && b.operationScope !== id)) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
     if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'assess-character-card', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
