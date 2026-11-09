@@ -1,3 +1,4 @@
+import { enablePersonalNeeds, validateBodyNeedsSetup } from '@/lib/body-needs-policy';
 import { requestControlledFeelings } from '@/lib/controlled-feelings';
 import { readMentalEnergyTestPolicy } from '@/lib/mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from '@/lib/character-templates';
@@ -198,7 +199,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
-    let b: { city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
+    let b: { bodyNeeds?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     const suggestingOpening = b.operation === 'suggest-opening-relationships';
@@ -214,7 +215,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operationScope !== undefined && b.operationScope !== id) return reply({ error: '登入帳號已變更，請重新讀取世界。', scopeMismatch: true }, 409);
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'suggest-opening-relationships', 'initialize-city'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -339,6 +340,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     if (!generatingSetup) normalizeWorld(world);
     const initialUsage = world.aiUsage && structuredClone(world.aiUsage);
     paidBefore=initialUsage;
+    if(b.operation==='enable-body-needs'){try{validateBodyNeedsSetup(world,b.bodyNeeds);}catch(e){return reply({error:(e as Error).message},400);}}
     if (b.operation === 'intervene' && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 500 || (!world.characters.some(c => c.id === b.target) && b.target !== 'all'))) return reply({ error: '請填入 1–500 字的事件，並選擇對象。' }, 400);
     if (world.configuration && ['direct', 'takeover', 'return-control'].includes(b.operation || '')) return reply({ error: '此世界沒有可直接控制的預設店主。' }, 400);
     if (b.operation === 'direct') {
@@ -454,6 +456,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     } else if (startedCity) {
       world = startedCity;
       journal.floor = Math.max(journal.floor, issuedAt - 1);
+    } else if (b.operation === 'enable-body-needs') {
+      enablePersonalNeeds(world,validateBodyNeedsSetup(world,b.bodyNeeds));
     } else if (b.operation === 'set-price') {
       savePrice(world,b.price!);
     } else if (b.operation === 'set-adjudication') {
