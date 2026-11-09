@@ -10,6 +10,7 @@ const store = load('store');
 const { blankCharacterTemplateFields } = load('character-templates');
 const { seedWorld } = load('world');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
   method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
@@ -72,7 +73,7 @@ test('entry permission uses the actual place and the room override and is record
   edited.accessGrants[1].roomId = 'not-in-this-home';
   const invalid = (await response(await send(route, {...scope, operation:'preview-city', mode:'demo', city:edited}), 200)).preview;
   assert.match(invalid.issues.join(''), /授權/);
-  const started = await response(await send(route, { ...scope, operation:'start-city', operationId:operationId(), mode:'demo', city }), 200);
+  const started = await installHistoricalCity(city);
   const {world} = await response(await route.GET(), 200);
   assert.equal(world.configuration.residences[world.characters[0].id], undefined);
   assert.deepEqual(world.configuration.access, started.world.configuration.access);

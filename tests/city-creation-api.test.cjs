@@ -12,6 +12,7 @@ const { blankCharacterTemplateFields } = load('character-templates');
 const { seedWorld } = load('world');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
 
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
   method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === places ? {id:crypto.randomUUID(),version:0,...body} : body),
@@ -24,7 +25,7 @@ const response = async (result, status) => {
 };
 const read = async () => response(await route.GET(), 200);
 
-test('a new manual city saves closed and blocked connections and does not invent an instant route', async () => {
+test('a historical manual city retains closed and blocked connections and does not invent an instant route', async () => {
   const initial = seedWorld();
   initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
   store.install(initial);
@@ -42,7 +43,7 @@ test('a new manual city saves closed and blocked connections and does not invent
   const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
   const preview = (await response(await send(route,{...scope,operation:'preview-city',mode:'demo',city}),200)).preview;
   assert.deepEqual(preview.places[0].connections.map(connection=>connection.state),['closed','blocked']);
-  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  const {world} = await installHistoricalCity(city);
   const stored = (await read()).world;
   assert.deepEqual(stored.configuration.walks,[]);
   assert.equal(stored.scene.doors['place:one:door:private-door'],'closed');
@@ -84,21 +85,21 @@ test('city setup reserves capacity for the phones needed by the first round', as
   const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
   const preview = async () => (await response(await send(route,{...scope,operation:'preview-city',mode:'demo',city}),200)).preview;
   assert.match((await preview()).issues.join(' '),/容量/);
-  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),400);
+  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),409);
   city.places.at(-1).templateId = smaller.id;
   assert.deepEqual((await preview()).issues,[]);
-  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  const {world} = await installHistoricalCity(city);
   const round = await response(await send(route,{operation:'advance',operationId:id(),worldContext:world.contextId,mode:'demo',minutes:5,timeContract:'five-minute-v1'}),200);
   assert.equal(round.world.turn,1);
   assert.equal(round.world.objects.length,512);
   assert.equal(round.world.objects.filter(object=>object.kind==='phone').length,2);
 });
 
-test('opening an unidentified door keeps its private name out of the actor and witness decision payloads', async () => {
+test('in a historical city, opening an unidentified door keeps its private name out of the actor and witness decision payloads', async () => {
   const initial = seedWorld();
   initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
   store.install(initial);
-  const original = await read();
+  await read();
   const templates = [];
   for (const name of ['岑一','岑二','岑三']) {
     templates.push((await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name}}),200)).template);
@@ -110,8 +111,7 @@ test('opening an unidentified door keeps its private name out of the actor and w
   }),201)).template;
   const city = {places:[{id:'house',templateId:scene.id,version:1,name:'會客處'}],
     characters:templates.map((person,index)=>({templateId:person.id,version:1,placeId:'house',roomId:index===2?'private':'front'}))};
-  const scope = {operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version};
-  const {world} = await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  const {world} = await installHistoricalCity(city);
   await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled'}),200);
   const transport = global.fetch;
   let opening = true;
@@ -139,7 +139,7 @@ test('opening an unidentified door keeps its private name out of the actor and w
   } finally { global.fetch = transport; }
 });
 
-test('the saved city preview starts one isolated world with two new people and distinct copies of a scene', async () => {
+test('retired start-city preserves the old world; a historical city fixture retains life with two new people and distinct copies of a scene', async () => {
   const legacy = seedWorld();
   legacy.aiUsage = {windowStartedAt:Date.now(),calls:2,inputTokens:60,outputTokens:15,unknownCalls:0,totalCalls:2,totalInputTokens:60,totalOutputTokens:15,totalUnknownCalls:0,savedDecisions:1};
   legacy.adjudication = { provider: 'openai', model: 'gpt-6.1-sol' };
@@ -169,7 +169,7 @@ test('the saved city preview starts one isolated world with two new people and d
   invalid.characters[1].roomId = '';
   const incomplete = await response(await send(route, { ...scope, operation:'preview-city', mode:'demo', city:invalid }), 200);
   assert.match(incomplete.preview.issues.join(' '), /杉.*起始/);
-  await response(await send(route, { ...scope, operation:'start-city', operationId:id(), mode:'demo', city:invalid }), 400);
+  await response(await send(route, { ...scope, operation:'start-city', operationId:id(), mode:'demo', city:invalid }), 409);
   const previewed = await response(await send(route, { ...scope, operation:'preview-city', mode:'demo', city }), 200);
   assert.deepEqual(previewed.preview.issues, []);
   assert.deepEqual(previewed.preview.places.map(place=>place.name), ['北屋','南屋']);
@@ -179,11 +179,9 @@ test('the saved city preview starts one isolated world with two new people and d
   await response(await send(route, { ...scope, expectedVersion:99, operation:'start-city', operationId:id(), mode:'demo', city }), 409);
 
   const start = { ...scope, operation:'start-city', operationId:id(), mode:'demo', city };
-  store.throwAfterNextSave();
-  const started = await response(await send(route, start), 200);
-  const replayed = await response(await send(route, start), 200);
-  assert.equal(replayed.version, started.version);
-  assert.equal(replayed.world.contextId, started.world.contextId);
+  await response(await send(route,start),409);
+  // The remaining assertions exercise an already saved pre-#281 city, not a new opening.
+  await installHistoricalCity(city);
   const { world } = await read();
   assert.deepEqual(world.characters.map(actor=>actor.name), ['澄','杉']);
   assert.equal(world.characters[0].personality, '安靜');
@@ -194,7 +192,7 @@ test('the saved city preview starts one isolated world with two new people and d
   assert.equal(new Set(world.objects.map(object=>object.id)).size, 2);
   assert.equal(world.aiUsage.totalCalls, 2);
   assert.doesNotMatch(JSON.stringify(world), /舊世界獨有歷史/);
-  assert.match(store.archivedWorld(), /舊世界獨有歷史/);
+  assert.equal(store.archivedWorld(),undefined); // No new overwrite/backup operation ran.
   await response(await send(route, {operation:'set-model-key',mode:'openai',key:'controlled'}), 200);
 
   const transport = global.fetch;
@@ -234,18 +232,12 @@ test('the saved city preview starts one isolated world with two new people and d
     auth.setUserId('test-owner');
   }
 });
-test('the actual app previews and confirms editable opening associations with two custom people', async () => {
-  const initial = seedWorld();
-  initial.adjudication = {provider:'openai',model:'gpt-6.1-sol'};
-  store.install(initial);
-  await response(await send(route,{operation:'set-model-key',mode:'openai',key:'controlled-ui-association'}),200);
-  for (const name of ['澄', '杉']) {
-    await response(await send(people,{id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name,personality:'安靜',startLocation:name==='澄'?'自己的臥室':''}}), 200);
-  }
+test('observation no longer exposes the retired in-place city editor', async () => {
+  store.install(seedWorld());
   const { Window } = await import('happy-dom');
   const window = new Window({ url:origin });
   for (const name of [...Object.getOwnPropertyNames(window).filter(name=>/^(HTML|SVG|Event|CustomEvent|ShadowRoot)/.test(name)),
-    'window','document','navigator','HTMLElement','Element','Node','DocumentFragment','MutationObserver','ResizeObserver','getComputedStyle','sessionStorage','requestAnimationFrame','cancelAnimationFrame']) {
+    'window','document','navigator','self','HTMLElement','Element','Node','DocumentFragment','MutationObserver','ResizeObserver','getComputedStyle','sessionStorage','requestAnimationFrame','cancelAnimationFrame']) {
     Object.defineProperty(globalThis,name,{configurable:true,value:typeof window[name]==='function'&&['getComputedStyle','requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
   }
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -256,121 +248,8 @@ test('the actual app previews and confirms editable opening associations with tw
   const compiled = {exports:{}};
   new Function('require','module','exports',outputFiles[0].text)(require,compiled,compiled.exports);
   const WorldApp = compiled.exports.default;
-  const nativeFetch = global.fetch;
-  global.fetch = (url, options) => {
-    if (String(url).startsWith('https://api.openai.com/')) {
-      const input = JSON.parse(JSON.parse(options.body).messages[1].content);
-      if (input.stage==='npc-city-description' || input.stage==='heavenly-city-finalization') {
-        const north = input.places.find(place=>place.name==='河畔北屋');
-        const south = input.places.find(place=>place.name==='河畔南屋');
-        const reply = input.stage==='npc-city-description'
-          ? {rooms:north?[{placeId:north.id,id:'own',name:'臥室',private:true}]:[],objects:north?[{placeId:north.id,roomId:'living-room',name:'生成水杯',state:[]}]:[]}
-          : {spaces:[],walks:[{places:[north.id,south.id],minutes:20}]};
-        return Promise.resolve(Response.json({usage:{prompt_tokens:4,completion_tokens:2},choices:[{message:{content:JSON.stringify(reply)}}]}));
-      }
-      const actor = input.people.find(item=>item.name==='杉');
-      const [north,south] = input.places;
-      return Promise.resolve(Response.json({usage:{prompt_tokens:4,completion_tokens:2},choices:[{message:{content:JSON.stringify({
-        updates:[
-          {kind:'owned',from:actor.id,to:south.id,room:'',quote:'杉擁有河畔南屋'},
-          {kind:'work',from:actor.id,to:north.id,room:'',quote:'杉在河畔北屋工作'},
-        ],
-      })}}]}));
-    }
-    const handler = {'/api/world':route,'/api/character-templates':people,'/api/scene-templates':places}[new URL(url,origin).pathname];
-    assert.ok(handler, url);
-    if (options?.method==='POST') return handler.POST(new Request(origin + url,{...options,headers:{...options.headers,origin}}));
-    return handler.GET(new Request(origin + url, options));
-  };
-  const root = createRoot(document.body.appendChild(document.createElement('div')));
-  const button = text => [...document.querySelectorAll('button')].find(item=>item.textContent.trim()===text);
-  const click = async text => {
-    assert.ok(button(text), text);
-    await React.act(async()=>button(text).click());
-  };
-  const fill = async (label,value) => {
-    const element = document.querySelector('[aria-label="'+label+'"]');
-    assert.ok(element, label);
-    const select = element instanceof window.HTMLSelectElement;
-    const proto = select?window.HTMLSelectElement.prototype:element instanceof window.HTMLTextAreaElement?window.HTMLTextAreaElement.prototype:window.HTMLInputElement.prototype;
-    await React.act(async()=>{
-      Object.getOwnPropertyDescriptor(proto,'value').set.call(element,value);
-      element.dispatchEvent(new window.Event(select?'change':'input',{bubbles:true}));
-    });
-  };
-  try {
-    await React.act(async()=>root.render(React.createElement(WorldApp,{signInPath:'/login',displayName:'fixture',environment:{caption:'fixture',builtAtLabel:'unknown'}})));
-    await click('建立城市');
-    await fill('住宅數量','2');
-    await fill('場所 1 名稱','河畔北屋');
-    await fill('場所 2 名稱','河畔南屋');
-    for(const name of ['澄','杉']){
-      const checkbox=document.querySelector('[aria-label="選用'+name+'"]');
-      assert.ok(checkbox);
-      await React.act(async()=>checkbox.click());
-    }
-    const home=document.querySelector('[aria-label="澄的住處"]');
-    await fill('澄的住處',home.options[1].value);
-    await fill('杉的住處',home.options[1].value);
-    const location=document.querySelector('[aria-label="杉的起始場所"]');
-    await fill('杉的起始場所',location.options[1].value);
-    const room=document.querySelector('[aria-label="杉的起始房間"]');
-    await fill('杉的起始房間',room.options[2].value);
-    await fill('自然語言開局關聯','杉擁有河畔南屋，杉在河畔北屋工作。');
-    await click('用 AI 整理開局關聯');
-    assert.equal(document.querySelector('[aria-label="杉擁有河畔南屋"]').checked,true);
-    assert.equal(document.querySelector('[aria-label="杉工作於河畔北屋"]').checked,true);
-    await click('新增背景人物');
-    await fill('背景人物 1 姓名','老師');
-    await click('新增人物關聯');
-    const from = document.querySelector('[aria-label="關聯 1 人物"]');
-    const to = document.querySelector('[aria-label="關聯 1 對象"]');
-    await fill('關聯 1 人物',from.options[1].value);
-    await fill('關聯 1 對象',to.options[to.options.length-1].value);
-    await fill('關聯 1 描述','教我修鐘');
-    await click('初始化場所');
-    const generatedRooms = document.querySelector('[aria-label="城市預覽"]');
-    assert.match(generatedRooms.textContent,/澄的臥室.*杉的臥室/);
-    assert.ok([...generatedRooms.querySelectorAll('[aria-label="有效進出權限"] li')].some(row=>/澄的臥室.*沿用建築/.test(row.textContent)));
-    await fill('河畔北屋物件 1 名稱','確認的水杯');
-    const grantPerson=document.querySelector('[aria-label="授權人物"]');
-    const grantPlace=document.querySelector('[aria-label="授權場所"]');
-    assert.ok(grantPerson && grantPlace, 'the app exposes individual entry grants');
-    await fill('授權人物',grantPerson.options[1].value);
-    await fill('授權場所',grantPlace.options[2].value);
-    await click('新增個別授權');
-    await click('預覽城市');
-    assert.equal(button('開始世界').disabled,false);
-    assert.match(document.querySelector('[aria-label="城市預覽"]').textContent,/河畔北屋.*河畔南屋/);
-    assert.match(document.querySelector('[aria-label="有效進出權限"]').textContent,/河畔南屋.*澄/);
-    assert.match(document.querySelector('[aria-label="澄的初始認知"]').textContent,/確認的水杯/);
-    assert.match(document.querySelector('[aria-label="杉的初始認知"]').textContent,/確認的水杯/);
-    assert.equal((await read()).world.turn,0);
-    await fill('場所 2 名稱','林間南屋');
-    await fill('澄的住處',home.options[2].value);
-    assert.equal(button('開始世界').disabled,true);
-    await click('預覽城市');
-    assert.equal(button('開始世界').disabled,false,document.querySelector('[role="alert"]')?.textContent);
-    assert.doesNotMatch(document.querySelector('[aria-label="澄的初始認知"]').textContent,/確認的水杯/);
-    assert.match(document.querySelector('[aria-label="杉的初始認知"]').textContent,/確認的水杯/);
-    await click('開始世界');
-    const { world } = await read();
-    assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
-    assert.deepEqual(world.configuration.locations.map(place=>place.name),['河畔北屋','林間南屋']);
-    assert.equal(world.characters[0].location,world.configuration.locations[1].id);
-    assert.equal(world.characters[1].location,world.configuration.locations[0].id);
-    assert.deepEqual(world.configuration.ownerships[world.characters[1].id],[world.configuration.locations[1].id]);
-    assert.deepEqual(world.configuration.workplaces[world.characters[1].id],[world.configuration.locations[0].id]);
-    assert.equal(world.configuration.backgroundPeople[0].name,'老師');
-    assert.equal(world.objects.filter(item=>item.label==='確認的水杯').length,1);
-    assert.equal(world.configuration.walks[0].minutes,20);
-    assert.deepEqual(new Set(Object.values(world.configuration.privateRooms)),new Set(world.characters.map(actor=>actor.id)));
-    assert.match(document.querySelector('[aria-label="世界像素地圖"]').textContent,/台燈.*關閉/);
-  } finally {
-    await React.act(async()=>root.unmount());
-    global.fetch=nativeFetch;
-    await window.happyDOM.close();
-  }
+  const originalFetch=global.fetch;global.fetch=()=>route.GET();const root=createRoot(document.body.appendChild(document.createElement('div')));
+  try{await React.act(async()=>root.render(React.createElement(WorldApp,{signInPath:'/login',displayName:'fixture',saveId:'legacy',accountScope:'test-owner',environment:{caption:'fixture',builtAtLabel:'unknown'}})));assert.equal([...document.querySelectorAll('button')].some(button=>button.textContent==='建立城市'),false);assert.ok([...document.querySelectorAll('a')].some(link=>link.getAttribute('href')==='/new'));}finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;await window.happyDOM.close();}
 });
 
 test('opening associations separate home, ownership, work, an explicit start and private directed relationships', async () => {
@@ -410,7 +289,7 @@ test('opening associations separate home, ownership, work, an explicit start and
   const invalid = structuredClone(city);
   delete invalid.characters[0].homeId;
   assert.match((await preview(invalid)).issues.join(' '),/澄.*起始/);
-  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city:invalid}),400);
+  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city:invalid}),409);
   const before = await preview(city);
   assert.deepEqual(before.issues,[]);
   assert.deepEqual(before.characters.map(actor=>[actor.place,actor.room]),[['北屋','臥室'],['公園','前台'],['隱密書店','前台']]);
@@ -420,7 +299,7 @@ test('opening associations separate home, ownership, work, an explicit start and
   assert.deepEqual(after.characters.map(actor=>[actor.place,actor.room]),[['南屋','臥室'],['公園','前台'],['隱密書店','前台']]);
   assert.equal((await read()).world.minute, original.world.minute);
 
-  await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',city}),200);
+  await installHistoricalCity(city);
   const {world} = await read();
   const [cheng,shan,shu] = world.characters;
   assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉','樹']);
@@ -626,8 +505,7 @@ test('paid city initialization scopes NPC drafts, preserves explicit facts, and 
     const previewed = await response(await send(route,{...operation,operation:'preview-city',city:approved,expectedVersion:latest.version}),200);
     assert.deepEqual(previewed.preview.issues,[]);
     assert.match(JSON.stringify(previewed.preview),/最後確認的小桌/);
-    const start = { ...operation,operation:'start-city',operationId:id(),city:approved,expectedVersion:latest.version };
-    await response(await send(route,start),200);
+    await installHistoricalCity(approved);
     const {world} = await read();
     assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
     assert.notEqual(world.characters[0].region,world.characters[1].region);
@@ -734,7 +612,7 @@ test('opening familiarity is built from the edited final city and remains actor-
     assert.deepEqual(edited.characters[1].openingKnowledge,old.characters[1].openingKnowledge);
     assert.equal(requests.length,3);
 
-    await response(await send(route,{...scope,operation:'start-city',operationId:id(),mode:'demo',expectedVersion:generated.version,city:draft}),200);
+    await installHistoricalCity(draft);
     const {world} = await read();
     const [first,second] = world.characters;
     assert.deepEqual(world.characters.map(actor=>actor.name),['澄','杉']);
@@ -760,4 +638,12 @@ test('opening familiarity is built from the edited final city and remains actor-
   } finally {
     global.fetch = originalFetch;
   }
+});
+test('a historical settled start-city receipt replays before the retired-operation guard without rewriting the current world',async()=>{
+ store.install(seedWorld());const original=await read(),operationId=id(),payload={operation:'start-city',operationId,operationScope:original.operationScope,worldContext:original.world.contextId,expectedVersion:original.version,mode:'demo',city:{places:[],characters:[]}};
+ const receipt={status:200,body:{world:original.world,version:original.version,compatibilityReceipt:'historical-start'}};
+ // Explicit pre-upgrade receipt fixture, never a new city installation.
+ await store.database().prepare('UPDATE worlds SET operations=? WHERE owner=?').bind(JSON.stringify({floor:0,results:{[operationId]:receipt}}),'test-owner').run();
+ const before=store.snapshot(),replayed=await response(await send(route,payload),200);assert.equal(replayed.compatibilityReceipt,'historical-start');assert.equal(replayed.operationSettled,true);assert.deepEqual(store.snapshot(),before);assert.equal((await read()).version,original.version);
+ await response(await send(route,{...payload,operationId:id()}),409);assert.deepEqual(store.snapshot(),before);
 });
