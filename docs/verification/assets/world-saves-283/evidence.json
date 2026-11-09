@@ -1,0 +1,86 @@
+{
+  "identity": "local cookie identity boundary; no real OAuth",
+  "production": false,
+  "routes": [
+    {
+      "label": "empty home",
+      "url": "http://127.0.0.1:46407/",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "世界存檔"
+      ]
+    },
+    {
+      "label": "selected first",
+      "url": "http://127.0.0.1:46407/observe?save=8e0b989b-fee0-46cb-8cde-4ddfc2b88a0c",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    },
+    {
+      "label": "selected second",
+      "url": "http://127.0.0.1:46407/observe?save=ae9aac1a-843a-4a1e-b041-e417f9140561",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    },
+    {
+      "label": "reload second",
+      "url": "http://127.0.0.1:46407/observe?save=ae9aac1a-843a-4a1e-b041-e417f9140561",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    },
+    {
+      "label": "foreign isolation",
+      "url": "http://127.0.0.1:46407/",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "世界存檔"
+      ]
+    },
+    {
+      "label": "sqlite process reload",
+      "url": "http://127.0.0.1:45475/observe?save=8e0b989b-fee0-46cb-8cde-4ddfc2b88a0c",
+      "title": "Quiet Hours · NPC 觀察室",
+      "headings": [
+        "此刻的世界"
+      ]
+    }
+  ],
+  "api": [
+    {
+      "path": "/api/character-templates",
+      "status": 200
+    },
+    {
+      "path": "/api/scene-templates",
+      "status": 201
+    },
+    {
+      "path": "/api/saves",
+      "status": 201
+    },
+    {
+      "path": "/api/saves",
+      "status": 201
+    },
+    {
+      "path": "/api/saves",
+      "status": 200
+    }
+  ],
+  "autoStoppedOnSwitch": true,
+  "commit": "7345944",
+  "origin": "http://127.0.0.1:45475",
+  "modelCalls": 0,
+  "pageErrors": [],
+  "savedIds": [
+    "8e0b989b-fee0-46cb-8cde-4ddfc2b88a0c",
+    "ae9aac1a-843a-4a1e-b041-e417f9140561"
+  ],
+  "result": "passed"
+}

@@ -157,3 +157,28 @@ test('save installation is atomic, and a committed save whose response was lost 
   assert.deepEqual(recovered.world.characters[0].mentalEnergy,committed.world.characters[0].mentalEnergy);
   assert.equal((await body(await saves.GET())).saves.length,before+1);
 });
+
+test('model keys and actual dispatch usage stay account-scoped while journals and reservation identities stay save-scoped', async()=>{
+  store.install(seedWorld());auth.setUserId('test-owner');
+  const a=await create('帳號用量甲'),b=await create('帳號用量乙');
+  const {env}=load('cloudflare-workers');
+  const {fixtureDecision}=require('./pursuit-fixture.cjs');
+  const fetcher=global.fetch;let calls=0;
+  env.RECALL_ENABLED='true';env.RECALL_USAGE_DB=store.database();
+  global.fetch=async(_url,request)=>{calls++;const input=JSON.parse(JSON.parse(request.body).messages[1].content);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:''}))}}]});};
+  try {
+    await body(await world.POST(req({operation:'set-model-key',mode:'openai',key:'same-account-key'},a.saved.save.id)));
+    const sameId=operationId();
+    for(const saved of [a,b]) {
+      const current=await read(saved.saved.save.id);
+      await body(await world.POST(req({operation:'set-adjudication',mode:'demo',adjudication:{provider:'openai',model:'gpt-6.1-sol'},operationScope:current.operationScope,worldContext:current.world.contextId,operationId:operationId()},saved.saved.save.id)));
+      const request=req({operation:'advance',mode:'openai',model:'gpt-6.1-sol',operationId:sameId,operationScope:current.operationScope,worldContext:current.world.contextId,minutes:5,timeContract:'five-minute-v1'},saved.saved.save.id);
+      request.headers.set('X-World-Time-Policy','round-v1');await body(await world.POST(request));
+    }
+    assert.equal(calls,2);
+    assert.equal((await read(a.saved.save.id)).recallUsage.playerPaidChatCalls,2);
+    assert.equal((await read(b.saved.save.id)).recallUsage.playerPaidChatCalls,2);
+    assert.equal((await read(a.saved.save.id)).world.aiUsage.totalCalls,1);
+    assert.equal((await read(b.saved.save.id)).world.aiUsage.totalCalls,1);
+  }finally{global.fetch=fetcher;delete env.RECALL_ENABLED;delete env.RECALL_USAGE_DB;}
+});
