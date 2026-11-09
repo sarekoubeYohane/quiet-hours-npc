@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import ModelSettingsPanel from '@/components/model-settings-panel';
+import { modelRoleReady, type ModelSettingsView } from '@/lib/model-settings';
 import { Button } from '@/components/ui/button';
 import { initialMemoryCapacityError, blankCharacterTemplateFields, characterDescriptionMaxLength, characterTemplateFieldNames, characterTemplateFields, readCharacterTemplateFields, type CharacterTemplate, type CharacterTemplateField } from '@/lib/character-templates';
 
@@ -18,6 +20,7 @@ function newDraft(fields = blankCharacterTemplateFields()): CharacterTemplate {
 export default function CharacterTemplateEditor() {
   const [library, setLibrary] = useState<Library>({ presets: [], templates: [] });
   const [draft, setDraft] = useState<CharacterTemplate>();
+  const [modelPanel, setModelPanel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -70,6 +73,10 @@ export default function CharacterTemplateEditor() {
     setError('');
     setFeedback('');
     try {
+      const availabilityResponse = await fetch('/api/model-settings');
+      const availability = await availabilityResponse.json() as ModelSettingsView;
+      if (!availabilityResponse.ok) throw Error('暫時無法讀取模型設定。');
+      if (!modelRoleReady(availability, 'adjudication')) { setModelPanel(true); return; }
       const characterGeneration = { description, fields: draft.fields };
       const input = JSON.stringify(characterGeneration);
       if (pendingGeneration.current?.input !== input) {
@@ -138,6 +145,7 @@ export default function CharacterTemplateEditor() {
 
   return (
     <div className="space-y-6 pb-10">
+      {modelPanel && <ModelSettingsPanel onClose={() => setModelPanel(false)} />}
       <section className="panel space-y-4 p-6" aria-label="人物範本清單">
         <div className="flex flex-wrap gap-2">
           <Button type="button" disabled={busy} onClick={() => edit(newDraft())}>新建人物</Button>

@@ -45,3 +45,8 @@ export const worldSaves = sqliteTable('world_saves', {
   name:text('name').notNull(),createdAt:integer('created_at').notNull(),creationRequest:text('creation_request'),
   originalOpening:text('original_opening'),savedFrom:text('saved_from'),
 },table=>[primaryKey({columns:[table.owner,table.id]})]);
+
+export const modelPreferences = sqliteTable('model_preferences', {
+  owner: text('owner').notNull(), target: text('target').notNull(),
+  version: integer('version').notNull(), body: text('body').notNull(),
+}, table => [primaryKey({ columns: [table.owner, table.target] })]);
