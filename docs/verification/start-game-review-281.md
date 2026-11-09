@@ -93,3 +93,26 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 - **Spec**：T9 原帳號 `11f782f`、假同步／卸載慢導航 `28b9edd`，以及 `7aa2346` Key／四 surface／世界原 owner 均各自獨立清零。最後兩項新 P2：已 commit 回覆遇 cookie 換帳號導入同 UUID 他人世界、混合場景版本誤用第一版 public，在 `5face37` 各 remaining 0。原帳號世界正確已存、他人世界不變；v1 public／v2 private 的預覽、保存及 GET 一致。
 
 詳 [原帳號介面證據](account-origin-surfaces-281.md)、[最後兩項紅綠與獨立覆核](opening-bound-review-288.md)及 [T7 逐 AC](opening-wizard-288.md)。所有受控模型付費 0。root 原 `5bdc6db` full core1265/1267、補組 Workers14/15 的 exit1 原樣保留；修後針對性綠不拼成全套綠。T8 完成後仍須 `249f20c...完整 integration` 的兩軸審查與固定版本全套。
+
+## 最終完整審查：固定 6ddae5b（進行中）
+
+基準 `249f20c3723d46f1ad7ce3d5ace11be6d575697e`，完整 HEAD `6ddae5b2f11f04138eb46250d0a7a8a0d08d9d65`；基準存在且三點 diff 非空，360 檔 10162 增／807 刪。兩個獨立 detached worktree 分別審 Standards 與 Spec，含全部交付及既有責任，不只新 T8。
+
+- **Standards 新 P2（硬性）**：`app/api/opening-drafts/arrange/route.ts` 分開提交草稿及採納收據，違反故障後原操作恢復的原子性契約。真 SQLite adopted UPDATE ABORT 後 draft.version2／city已改、proposal complete；移除故障重送同 request 409。反例 `/tmp/standards-adoption-receipt-6dd.mjs`，log `/tmp/quiet-hours-context/standards-adoption-receipt-6dd.log`。
+- **Spec 同一 P2 獨立確認**：引用 #281「回覆遺失／結果可能已保存先恢復原操作」及 #289「失敗保留原輸入與已存安排」。真卡／整理 API、磁碟 SQLite 複現相同中間故障，原 request 無法恢復。反例 `/tmp/quiet-hours-final-adoption-atomic-spec.mjs`／`.log`。
+
+兩軸各 controlled 2／paid 0，沒有把既有 47/47 或採納前故障通過當作本例已修。#289 已重新 open，全部 review finding 仍由同一修復者處理。兩軸其他完整審查尚未結束；原始 `6ddae5b` full 正在另一隔離樹執行，此 finding 不因舊全套通過而消失。
+
+### Standards 最終原報告
+
+硬性 **1 項 P2**、判斷性 smell **0**。採納草稿與收據分開提交，第二次寫入故障後原 ID 無法恢復，違反 ADR0004 原子提交／同 ID 語義與採納恢復契約。實際 503→draft.version2／city已改→proposal complete→原 request409；既有 T8 9/9 並未覆蓋此窗口。其餘全產品 since249 與 12 項 baseline 掃描未提出新增問題。
+
+### Spec 最終原報告
+
+已重現 **3 項 P2**，scope creep **0**：
+
+1. **採納部分提交後不能原請求恢復**，與 Standards 同一問題，引用 #281 原操作恢復要求。
+2. **人物重選靜默刪相依資料**：`components/opening-wizard.tsx:60` 暫取消卡時 filter relationships／accessGrants，真頁再選回同卡、兩次 autosave200，DB selected1 但兩陣列空。違反 #281「修改人物選擇…重新核對，不默默刪除相依資料」。反例 `/tmp/quiet-hours-final-selection-dependencies-spec.mjs/.log`，controlled1／paid0。#288 已重新 open。
+3. **直接數字不等式未阻擋**：`lib/character-formation.ts:13` 白名單漏「高於」「大於」「greater than」；三筆真 scope API200 並形成鎖字、受控力量12。違反 #281／#286 的數字／範圍禁令，不表示模型改骰。反例 `/tmp/quiet-hours-final-numeric-inequality-spec.mjs/.log`。#286 已重新 open。
+
+窄組 47/47、49/49、6/6 及兩條 T8 真頁通過，仍不否定這三個新 RED。沒有改產品、沒有付費／正式操作；正式站及真人語義未驗，已知 #282 外部阻擋不列新產品 finding。全部交唯一修復者處理；後續每項固定覆驗才記 remaining0，尚未清零。
