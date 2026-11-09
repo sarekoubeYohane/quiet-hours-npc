@@ -8,7 +8,7 @@ const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import
 for (const args of [
   ['tests/run-activities.mjs'],
   ['tests/run-auth.mjs'],
-  ['--test', 'tests/character-templates.test.mjs', 'tests/scene-templates.test.mjs', 'tests/character-drafts.test.mjs', 'tests/character-cards.test.mjs', 'tests/model-settings.test.mjs', 'tests/world-saves-migration.test.mjs', 'tests/versioned-d100.test.mjs'],
+  ['--test', 'tests/character-templates.test.mjs', 'tests/scene-templates.test.mjs', 'tests/character-drafts.test.mjs', 'tests/character-cards.test.mjs', 'tests/model-settings.test.mjs', 'tests/world-saves-migration.test.mjs', 'tests/versioned-d100.test.mjs', 'tests/opening-wizard.test.mjs'],
   ['--test', 'tests/auth-workerd.test.mjs', 'tests/model-keys-workerd.test.mjs', 'tests/migration-gate.test.mjs', 'tooling/experiments/check-autonomous-demand-211.test.mjs'],
   // Source-pin counterexamples deliberately alter and restore local sources.
   // Finish every Worker/migration reader before this isolated test process.
