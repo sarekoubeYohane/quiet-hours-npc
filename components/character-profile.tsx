@@ -1,4 +1,6 @@
 'use client';
+import CharacterAttributes from './character-attributes';
+import type { CharacterSetup } from '@/lib/character-attributes';
 import PursuitsAnalysis from './pursuits-analysis';
 import PhoneMapReads from './phone-map-reads';
 import { useState } from 'react';
@@ -8,7 +10,7 @@ import type { Character, World } from '@/lib/world';
 import { worldLocations, worldRegions } from '@/lib/world-configuration';
 import { regionOf } from '@/lib/perception';
 
-export default function CharacterProfile({world,character,onBack,onInteract,onAnalysis}:{world:World;character:Character;onBack:()=>void;onInteract:()=>void;onAnalysis:()=>void}) {
+export default function CharacterProfile({world,character,onBack,onInteract,onAnalysis,onAdoptAttributes,disabled}:{onAdoptAttributes?:(setup:CharacterSetup)=>Promise<boolean>;disabled?:boolean;world:World;character:Character;onBack:()=>void;onInteract:()=>void;onAnalysis:()=>void}) {
  const [failed,setFailed]=useState(false);
  const asset=assetsForCharacter(character.id);
  return <section className="character-profile panel" aria-label="人物檔案">
@@ -19,6 +21,7 @@ export default function CharacterProfile({world,character,onBack,onInteract,onAn
   </div><div className="profile-content"><h1 style={{color:character.color}}>{character.name}</h1><h2>簡介</h2><p>{character.personality}</p>
    <h2>當前狀態</h2><p>{character.plan?.journey ? '移動途中' : [worldLocations(world).find(l=>l.id===character.location)?.name||character.location,
      worldRegions(world).find(r=>r.id===regionOf(character))?.name||regionOf(character)].join(' · ')}</p><p>{character.activity}</p><p>心情：{character.mood}</p>{character.physical&&<div aria-label="身體外在狀況"><h3>身體外在狀況</h3>{Object.entries(character.physical.state).map(([key,value])=><p key={key}>{key}：{value}</p>)}</div>}
+   <CharacterAttributes character={character} onAdopt={onAdoptAttributes} disabled={disabled}/>
    <PhoneMapReads world={world} character={character}/>
    <PursuitsAnalysis character={character}/>
    <div className="profile-actions"><Button onClick={onInteract}>互動</Button><Button variant="outline" onClick={onAnalysis}>查看角色分析</Button></div>

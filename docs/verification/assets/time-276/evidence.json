@@ -1,0 +1,137 @@
+{
+  "fixture": true,
+  "realPaidCalls": 0,
+  "checks": {
+    "uiFiveMinuteAdoption": true,
+    "forwardShortAction": true,
+    "threeStepBatch": true,
+    "sixStepBatch": true,
+    "uniqueOperations": true,
+    "sqliteReload": true,
+    "originalIdReplay": true
+  },
+  "requests": [
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080000000:6ea9f5c1-400c-424c-98ba-4fa364faabb3",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080001000:955fbbbf-d632-4bd8-b0dc-19d2ea6c440d",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080002000:29986060-9310-47ae-8e01-1fdcbb4a25b3",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080003000:804b9e6c-c783-4e36-8104-ba311194710e",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080003000:804b9e6c-c783-4e36-8104-ba311194710e",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080000000:f84cb4ab-2bae-473b-854d-a171b436a790",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080005000:ac3cb1c2-3d83-4fb2-86ad-9ab1f4bdd3e1",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080006000:5f441170-a9b5-4f24-ad9c-024708026373",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080007000:0253f618-fb28-42fc-90e6-467050c192bd",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080008000:b2f9a9de-39db-40eb-8285-91f72d082b1b",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    },
+    {
+      "operationScope": "test-owner",
+      "operationId": "1792080009000:575566ad-9758-4146-ba2e-2db11568753f",
+      "worldContext": "browser-time-276",
+      "operation": "advance",
+      "minutes": 5,
+      "timeContract": "five-minute-v1",
+      "mode": "demo",
+      "target": "owner",
+      "text": ""
+    }
+  ],
+  "minute": 1310
+}

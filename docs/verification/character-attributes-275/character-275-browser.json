@@ -1,0 +1,72 @@
+{
+  "status": "passed",
+  "modelCalls": 1,
+  "paidModelCalls": 0,
+  "phases": [
+    "legacy conflict preserves input",
+    "owner-confirmed expertise/sense",
+    "profile SQLite reload",
+    "new-city existing editor and preview",
+    "new-city profile reload",
+    "new-city controlled model advance"
+  ],
+  "legacy": {
+    "version": 1,
+    "activatedAt": 1260,
+    "authority": "owner-confirmed",
+    "values": {
+      "strength": 2,
+      "endurance": 4,
+      "dexterity": 3,
+      "perception": 3
+    },
+    "constraints": {
+      "strength": {
+        "value": 2,
+        "max": 2
+      }
+    },
+    "expertise": [
+      {
+        "scope": "髮飾設計",
+        "modifier": 10
+      }
+    ],
+    "senses": [
+      {
+        "scope": "hearing",
+        "modifier": -10
+      }
+    ]
+  },
+  "city": {
+    "version": 1,
+    "activatedAt": 1260,
+    "authority": "owner-confirmed",
+    "values": {
+      "strength": 2,
+      "endurance": 4,
+      "dexterity": 4,
+      "perception": 3
+    },
+    "constraints": {
+      "strength": {
+        "max": 2
+      },
+      "dexterity": {
+        "value": 4
+      }
+    },
+    "expertise": [],
+    "senses": []
+  },
+  "operations": [
+    "adopt-character-attributes",
+    "adopt-character-attributes",
+    "preview-city",
+    "start-city",
+    "set-model-key",
+    "set-adjudication",
+    "advance"
+  ]
+}

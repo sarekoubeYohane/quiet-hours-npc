@@ -12,7 +12,7 @@ export default function PursuitsAnalysis({character}:{character:Character}){
  };
  return <section className="detail" aria-label="分層追求">
   <h3>分層追求 <span>由角色明示承接與調整</span></h3>
-  <p className="hint">{nodes.some(n=>n.kind)?`當前方向：${currentDirections(character)||'目前沒有保留的持續方向'}`:'舊版平面意圖；需明示重置測試世界才能使用新版推進。'}</p>
+  <p className="hint">{!nodes.length?'目前沒有保留的持續方向；角色可在正常決策自行承接。':nodes.some(n=>n.kind)?`當前方向：${currentDirections(character)||'目前沒有保留的持續方向'}`:'舊版平面意圖；需明示重置測試世界才能使用新版推進。'}</p>
   <p className="hint">{nodes.length}/{pursuitLimits.nodes} 個追求；未提及保持原狀。主觀範圍與滿足標準是角色自述，實際結果沿活動與世界紀錄核對。</p>
   <p className="hint">有效 {nodes.filter(n=>n.status==='active').length} 項 · 已結束可檢視整理 {nodes.filter(n=>n.status!=='active').length} 項。有效追求不按年代或低優先淘汰；滿載仍可保留、明示變更／結束，或歸檔無有效活動的已結束項目。</p>
   <p className="hint">有界歸檔身份 {character.pursuitArchived?.length||0}/{pursuitLimits.archived} · 更早身份缺口 {character.pursuitArchivedDropped||0}。仍被安排或活動來源引用的身份不因淘汰復用；歸檔不刪原活動成果或回填記憶。</p>
