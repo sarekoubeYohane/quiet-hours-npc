@@ -20,9 +20,9 @@
 | #283／T2 選檔 | 無 | 原帳號預算 P1、背景讀取重綁 P2 均修正並獨立覆核，T7 整包 `c0ca009` 已整合，已推送並重新結案。原整合 `0f279ca`，[報告](world-saves-283.md)及[帳號修正](player-account-review-fixes-281.md) |
 | #284／T3 文字草稿 | 無 | Lineage 及普通草稿原 accountScope P2 均修正並獨立覆核，整包 `c0ca009` 已整合，已推送並重新結案。原整合 `5b8abcb`，[報告](character-drafts-284.md) |
 | #285／T4 模型設定 | #283、#284 | 設定／期限矩陣及 Key 原 scope P1、模型預設 P2 均完成修正並獨立覆核，整包 `c0ca009` 已整合，已推送、原生前置實際閉合後結案。原整合 `7634552`／`152c180`，[矩陣](model-settings-285.md) |
-| #286／T5 形成配點 | #285 | 已完成，候選 `5c16667` 及全部 finding 修正合入並推送 `b653e6f`，獨立覆核後 closed；[矩陣](character-cards-286.md) |
+| #286／T5 形成配點 | #285 | 原完整交付及中途修正保留；最終 Spec 新增數值不等式 P2，已重新 open，修正中；[矩陣](character-cards-286.md) |
 | #287／T6 新 d100 | #286 | 完成，整合並推送 `59bb7d9`，舊外觀專長 P2 修正並獨立覆核後 closed；[矩陣](versioned-d100-287.md) |
-| #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步與修正整合 `c0ca009`，[逐項報告](opening-wizard-288.md)，已推送並結案 |
+| #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步整合 `c0ca009`；最終 Spec 新增人物重選靜默刪關係／許可 P2，已重新 open，修正中；[逐項報告](opening-wizard-288.md) |
 | #289／T8 AI 配置 | #288 | 原完整交付整合 `d8b8a2e`；最終兩軸新增採納原子性 P2 已重新 open，修正中；[逐項矩陣](ai-opening-arrangement-289.md) |
 | #290／T9 另存刪除 | #283 | 原交付及帳務／名稱修正保留；跨帳號原操作 P1 已修並獨立覆核，整包 `c0ca009` 已整合，待推送及前置實際閉合後結案；[矩陣](save-management-290.md) |
 
@@ -118,3 +118,5 @@ T8 ready `f34849b`（產品 `2fb450b`）已由 merger 合入 `d8b8a2e`，產品�
 Spec／Standards 在固定 `6ddae5b` 各自獨立確認同一問題：真 API／磁碟 SQLite 對 `opening_arrangements` 的 adopted UPDATE 注入失敗，採納回 503，但前一筆草稿 city／version 已提交、proposal 仍 complete；移除故障後重送完全相同原 request 回 409，無法恢復原採納。這與已通過的「採納前失敗」或「全部成功後回覆遺失」不同。各 controlled 2／paid 0，沒有 fixture 世界捷徑。
 
 #289 已實際重新 open；唯一修復者在全新獨立樹處理草稿 CAS／proposal revision／採納收據的同交易提交，再補中間故障、回覆遺失及原操作恢復。兩軸其餘完整檢查、固定 `6ddae5b` 全套仍繼續。該版 typecheck、lint（0 errors／4 舊 warnings）、build:test／build:production 已各 exit 0，但不能否定此新增反例。未修復、獨立覆核及整合推送前不重新結案。
+
+最終 Spec 另確認兩個 P2，#288／#286 亦已實際重新 open，全部仍交同一修復者：暫取消再選回同卡，關係／許可被 `cardToggle` filter 靜默刪除；「力量高於18」「力量大於18」「strength greater than 18」仍 200 形成鎖字。前者需保留相依輸入並明示重新核對，後者需合理辨識數值比較且保留正常背景；已存值不重新形成。兩軸最終原報告為 Standards hard1／judgment0，Spec P2三項／scope creep0（採納交易為同一問題），distinct 三項待修，不將窄組綠當清零。
