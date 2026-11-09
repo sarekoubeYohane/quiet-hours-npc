@@ -75,3 +75,7 @@
 fixture 修復提交原為 validation branch `5caf6f0`，已 cherry-pick 為本分支 `bf337cd`。原 T9 worktree 的 full run 與先前真頁 pin 在 fixture 修復期間保持 tracked source 不變；source-pin 測試在另一個 validation worktree 執行。full run 結束後才合修復並再次合最新 integration。
 
 本段不把「原失敗組修復通過」改寫成完整 `npm test` 已全綠；整合 P1／後續票完成後仍須在最終 integration 執行全套。
+
+另在最終接合前執行 `node tests/run-auth.mjs` 得 **37/38**；唯一失敗為舊 Key-storage-outage 案例同時缺少裁定設定，T4 現在先回缺模型設定 400，原斷言預期 Key 服務故障 503。僅修正測試前提：先保存合法裁定設定，再移除加密 secret，以隔離原來要測的 Key 服務故障；沒有改產品錯誤優先順序。
+
+`node tests/run-auth.mjs tests/model-keys-api.test.cjs` 修復後 **17/17**，其餘 auth／reset 在先前 37 個通過案例內。新增 fixture 修改亦通過 ESLint；最終完整 auth 與整合全套仍交單一 review 修復分支驗證，未宣稱失敗的原 full invocation 已變成綠色。

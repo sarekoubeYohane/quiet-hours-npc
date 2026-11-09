@@ -141,7 +141,10 @@ test('saving and clearing require an authenticated same-origin request and valid
 });
 
 test('a missing encryption secret disables key saving while the demo remains usable', async () => {
-  reset(); const cookie = await signIn(); delete fixture.env.MODEL_KEY_ENCRYPTION_SECRET;
+  reset(); const cookie = await signIn();
+  // Isolate the Key-storage outage from the separate missing-model-settings gate.
+  assert.equal((await post(cookie, { operation: 'set-adjudication', mode: 'demo', adjudication: { provider: 'openai', model: 'gpt-6-luna' } })).status, 200);
+  delete fixture.env.MODEL_KEY_ENCRYPTION_SECRET;
   assert.equal((await status(cookie)).modelKeyStorageAvailable, false);
   assert.equal((await save(cookie)).status, 503);
   assert.equal((await advance(cookie)).status, 503);
