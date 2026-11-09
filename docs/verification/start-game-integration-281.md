@@ -17,14 +17,14 @@
 | 票 | 原生前置 | 狀態與整合證據 |
 | --- | --- | --- |
 | #282／T1 真導覽 | 無 | 本機有效試次通過；正式 CONNECT 403／CUA／AT-SPI 阻擋，保持 open。整合 `fce8719`，[逐項報告](navigation-282-2026-11-09.md) |
-| #283／T2 選檔 | 無 | 原帳號預算 P1 已修復覆核；背景讀取會重綁新帳號的新 P2 另重新 open，修正中。原整合 `0f279ca`，[報告](world-saves-283.md)及[帳號修正](player-account-review-fixes-281.md) |
-| #284／T3 文字草稿 | 無 | Lineage 已修復並覆核；T7 接合另確認普通草稿保存丟棄原 accountScope，新 P2 重新 open，修正中。原整合 `5b8abcb`，[報告](character-drafts-284.md) |
-| #285／T4 模型設定 | #283、#284 | 原設定／期限矩陣已交付；另確認 Key fast branch 忽略原 scope 的 P1、模型預設晚到寫入 P2，重新 open。原整合 `7634552`／`152c180`，[矩陣](model-settings-285.md) |
+| #283／T2 選檔 | 無 | 原帳號預算 P1、背景讀取重綁 P2 均修正並獨立覆核，T7 整包 `c0ca009` 已整合，待推送後重新結案。原整合 `0f279ca`，[報告](world-saves-283.md)及[帳號修正](player-account-review-fixes-281.md) |
+| #284／T3 文字草稿 | 無 | Lineage 及普通草稿原 accountScope P2 均修正並獨立覆核，整包 `c0ca009` 已整合，待推送後重新結案。原整合 `5b8abcb`，[報告](character-drafts-284.md) |
+| #285／T4 模型設定 | #283、#284 | 設定／期限矩陣及 Key 原 scope P1、模型預設 P2 均完成修正並獨立覆核，整包 `c0ca009` 已整合，待推送及前置實際閉合後結案。原整合 `7634552`／`152c180`，[矩陣](model-settings-285.md) |
 | #286／T5 形成配點 | #285 | 已完成，候選 `5c16667` 及全部 finding 修正合入並推送 `b653e6f`，獨立覆核後 closed；[矩陣](character-cards-286.md) |
 | #287／T6 新 d100 | #286 | 完成，整合並推送 `59bb7d9`，舊外觀專長 P2 修正並獨立覆核後 closed；[矩陣](versioned-d100-287.md) |
-| #288／T7 五步開局 | #287 | 重新讀原生 #287 closed 後才開始，獨立新 worktree 實作中 |
+| #288／T7 五步開局 | #287 | 前置實際 closed 後開始；完整五步與修正整合 `c0ca009`，[逐項報告](opening-wizard-288.md)，待推送後結案 |
 | #289／T8 AI 配置 | #288 | 前置未完成，尚未開始 |
-| #290／T9 另存刪除 | #283 | 原交付及帳務／名稱修正完成後 closed；T7 接合獨立跨帳號原操作反例新增 P1，已重新 open，唯一修復者處理中；[矩陣](save-management-290.md) |
+| #290／T9 另存刪除 | #283 | 原交付及帳務／名稱修正保留；跨帳號原操作 P1 已修並獨立覆核，整包 `c0ca009` 已整合，待推送及前置實際閉合後結案；[矩陣](save-management-290.md) |
 
 T2 暫以既有城市建立契約提供可驗收的獨立保存邊界；T7 必須改接完成卡與最後確認開局，不能把舊尺度城市建立當成本規格的新建角。T3 的文字草稿不當作完成卡選入世界。詞彙表及 ADR0012 的 #281 延伸已合入 `1d02095`，明示新規格與舊版本各自責任。
 
@@ -62,7 +62,7 @@ pnpm build:production
 ## 尚未驗證與完成門檻
 
 - #282 正式站完整唯讀點擊試次仍未完成，須解除連線與真人登入條件；本機 cookie 身分不等同正式 OAuth。
-- T7–T8 尚在依圖交付，不能把專票 API 或受控模型測試當作尚未存在的完整五步開始旅程。
+- T7 已完整整合，T8 仍待原生前置實際結案才開始；不將手動五步通過冒充 AI 配置已交付。
 - 最終整合回歸、固定基準 `249f20c` 的 Standards／Spec 兩軸 code-review 及修復仍待執行。
 - 受控模型只能驗證採納、保存及產品邊界，真實模型語義品質未驗收。
 - 全部完成才可將 PR 標 ready；目前保留 draft，不合併、不部署。
@@ -86,3 +86,17 @@ T6 固定產品 `7e9cfd7`、整合 `59bb7d9`，明示 d100-v2／能力版本 2 �
 同一修復者只補測試 hosting 的 immutable bind、真 `all`、同步 SQLite 原子 batch／rollback，原產品、播種前提及 API 斷言不變。[診斷與紅綠證據](auth-fixture-regression-281.md)。完整 auth **40/40**（原 38 加兩項接點契約）、真 Workers／D1 **2/2** 及 typecheck 通過；合入 `ac3216b` 後再跑 auth 40/40、diffcheck 通過。這不能替代 T7／T8 完成後的最後固定整合全套。
 
 固定 `1b09069` 補跑原先未執行組：Workers／遷移閘門／需求 **15/15**、source-pin **21/21** 通過；資產／草稿／卡／模型／遷移／新 d100 組 **43/44**，唯一失敗為另一個舊人物範本測試的 SQLite 接點缺 `batch`。真正帳號 GET 回 503，舊 helper 直接讀缺失 world 才誤報 contextId。唯一修復者加狀態斷言、保留原故障語義及 API 斷言，補原子 batch 與一項接點契約；該檔 **3/3**（原 2 加 1）及 typecheck／lint 通過，合入 `ae13572` 後再跑 3/3、diffcheck 通過。原 43/44 log 與不同固定版本的結果分開保存，未稱同一整次全綠。
+
+## T7 完整交付與原帳號覆核收斂
+
+T7 ready `7011819` 接合最後修復包 `49cc19a`，產品固定 `5face37`。真正五步、返回修改／資產返回、草稿接續、兩世界各續玩 2／1、磁碟關閉重開、原始開局另建、刪來源副本續玩已通過；所有明示配置與最後確認及保存讀回一致，建立維持 turn 0。來源 v1／v2 可同時選用，各自房間、門、物件與 public／private 規則按精確版本保存。逐 AC、命令與畫面見 [T7 報告](opening-wizard-288.md)及[最後覆核](opening-bound-review-288.md)。
+
+重新開啟的 #283 背景讀取重綁、#284 草稿原帳號、#285 Key／模型偏好、#290 copy／delete 原帳號問題，均由唯一修復者處理並各自獨立覆核為 0；相關 API／UI／receipt reader 及完成導覽使用原帳號前提，query owner 不充當授權。後續同帳 pending／analysis reader、晚到成功回覆與混版場景兩例也已修復並獨立清零。詳 [帳號介面](account-origin-surfaces-281.md)、[T9](save-management-account-review-290.md)與[最後覆核](opening-bound-review-288.md)。此為指定 findings 的結論，尚非全分支最終 review。
+
+固定 `5face37` opening API **16/16**、acceptance **9/9**、真 Workerd／D1 **1/1**；`71888ee` 受影響城市組 **24/24**、typecheck／lint（0 errors、4 既有 warnings）／build 通過。`49f6d85` 真頁從 v1 草稿實際加入更新的 v2、重載、確認與保存，兩版各自規則不變。後續提交僅 driver／報告，產品樹差異為零。
+
+root 隔離樹固定 `5bdc6db` 的完整原執行仍 **exit 1**：core **1265/1267**（兩處舊 reset 預期 400，退役後正確為 409）；補組 auth **40/40**、assets **61/61**、Workers **14/15**（唯一普通 constructor 缺原 scope），source-pin 另跑 **21/21**。原 logs 保留：`/tmp/quiet-hours-context/t7-5bdc6db-{full,remaining,sourcepin}.log`。修後 acceptance 9/9、城市 24/24、Worker 1/1 不合算成一次完整全綠；T8 完成後仍須固定 integration 全套與兩環境 build。
+
+`0019_opening_drafts.sql` 以真正 Wrangler **--local** 演練，獨立 fake DB／state，16 份 SQL 成功；既有 state／D20 journal bytes、version、lease、city_started 及缺原始開局 null 均不變。沒有正式 migration。回退保留新增表／原始開局／卡值／骰果／帳務及收據；舊程式不能安全支援新尺度與新開局，不可 drop、重抽或以原地 reset 取代回退。
+
+合後固定 `c0ca009` opening API **16/16**、`pnpm typecheck` exit 0，產品樹與 `5face37` 相同；來源 diffcheck exit 0。完整 diffcheck exit 2 的六處均為三份原始 Wrangler stdout log 的尾空白，保留證據原樣，未新增忽略規則。

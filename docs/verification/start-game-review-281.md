@@ -84,3 +84,12 @@ UI `cff3707`：Spec 新增兩項真 App Router／Chromium 已重現 P2。保存�
 同一擴充在 `21c0d46` 另確認 **#283 P2**：原 SSR 身分為 A，觀察頁背景重讀卻無條件將 `scopeRef` 改為 B。真形成卡／開局 API 建 A／B 各自同 save UUID，切 cookie B、觸發 visibilitychange 後舊頁顯示 B 人物，再點下一回合送 B scope 並 200，A turn 0／B turn 1。產品自查及 Spec 真 App Router／SQLite／Chromium 各獨立重現，形成呼叫 2、付費 0；這是舊 view 重綁，沒有證明跨帳號查詢漏洞。#283 已實際重新 open（留言 6744813143）。
 
 修復工作中的 Key 與世界讀取反例已紅轉綠：錯帳號 Key 寫入 409 且無 row；原 view 的 GET／下一回合維持 A scope 並 409，A／B turn 均 0。server checkpoint `55ddc00` 有 API 27/27，但 UI 仍在收斂，尚不是完整候選或獨立覆核完成。普通 CJS／auth 與費用 browser 的既有驗證 client setup 分獨立 worktree 遷移協定；所有產品與新反例修正仍由同一實作者負責。不得將舊無 scope payload 在 cookie 切換後補成當下 owner；新 negative 使用 raw Request 避免 helper 遮蔽。
+
+## T7 完整包固定覆核收斂
+
+完整 ready `7011819`（修復包 `49cc19a`，產品 `5face37`）已整合 `c0ca009`。此前各列問題皆保留為當時真實紀錄；目前所有已提出 finding 均有修正與獨立覆核 0，不代表最終完整分支審查完成。
+
+- **Standards**：共用 fixture／v4 身分 P3／P2 已在 `1a3ea10` 清零；帳號 guards、同帳 pending 初讀 `f9d2345`、分析 reader `e6b0e86` 均經真 API／頁面覆驗。最新 `5face37` hard 0、judgment 0，16/16 API、恢復及兩個分析 reader GET200／turn1／新增 POST0。
+- **Spec**：T9 原帳號 `11f782f`、假同步／卸載慢導航 `28b9edd`，以及 `7aa2346` Key／四 surface／世界原 owner 均各自獨立清零。最後兩項新 P2：已 commit 回覆遇 cookie 換帳號導入同 UUID 他人世界、混合場景版本誤用第一版 public，在 `5face37` 各 remaining 0。原帳號世界正確已存、他人世界不變；v1 public／v2 private 的預覽、保存及 GET 一致。
+
+詳 [原帳號介面證據](account-origin-surfaces-281.md)、[最後兩項紅綠與獨立覆核](opening-bound-review-288.md)及 [T7 逐 AC](opening-wizard-288.md)。所有受控模型付費 0。root 原 `5bdc6db` full core1265/1267、補組 Workers14/15 的 exit1 原樣保留；修後針對性綠不拼成全套綠。T8 完成後仍須 `249f20c...完整 integration` 的兩軸審查與固定版本全套。
