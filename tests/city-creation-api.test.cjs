@@ -251,7 +251,7 @@ test('observation no longer exposes the retired in-place city editor', async () 
   new Function('require','module','exports',outputFiles[0].text)(require,compiled,compiled.exports);
   const WorldApp = compiled.exports.default;
   const originalFetch=global.fetch;global.fetch=()=>route.GET();const root=createRoot(document.body.appendChild(document.createElement('div')));
-  try{await React.act(async()=>root.render(React.createElement(WorldApp,{signInPath:'/login',displayName:'fixture',saveId:'legacy',accountScope:'test-owner',environment:{caption:'fixture',builtAtLabel:'unknown'}})));assert.equal([...document.querySelectorAll('button')].some(button=>button.textContent==='建立城市'),false);assert.ok([...document.querySelectorAll('a')].some(link=>link.getAttribute('href')==='/new'));}finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;await window.happyDOM.close();}
+  try{await React.act(async()=>root.render(React.createElement(WorldApp,{signInPath:'/login',displayName:'fixture',saveId:'legacy',accountScope:'test-owner',environment:{caption:'fixture',builtAtLabel:'unknown'}})));assert.equal([...document.querySelectorAll('button')].some(button=>button.textContent==='建立城市'),false);assert.ok([...document.querySelectorAll('a')].some(link=>new URL(link.getAttribute('href'),origin).pathname==='/new'&&new URL(link.getAttribute('href'),origin).searchParams.get('owner')==='test-owner'));}finally{await React.act(async()=>root.unmount());global.fetch=originalFetch;await window.happyDOM.close();}
 });
 
 test('historical opening associations separate home, ownership, work, an explicit start and private directed relationships', async () => {

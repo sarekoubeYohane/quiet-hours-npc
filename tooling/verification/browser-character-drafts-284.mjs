@@ -1,3 +1,4 @@
+import {boundPageURL} from './bound-page-url.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -20,7 +21,7 @@ try {
   await page.getByText('尚無世界存檔。從「＋新開存檔」開始建立第一份世界。',{exact:true}).waitFor();
   assert.deepEqual(await page.evaluate(async () => (await (await fetch('/api/saves')).json()).saves), []);
   await page.getByRole('link',{name:'人物',exact:true}).click();
-  await page.waitForURL(app.url+'/character-templates');
+  await page.waitForURL(boundPageURL(app.url,'t3-account-a','/character-templates'));
   assert.equal(new URL(page.url()).pathname,'/character-templates');
   await page.getByRole('button',{name:'新建建角草稿',exact:true}).click();
   await page.locator('[name="draftConcept"]').fill('安靜的河畔修鐘人');

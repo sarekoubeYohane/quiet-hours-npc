@@ -1,3 +1,4 @@
+import {boundPageURL} from './bound-page-url.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {startApp} from './real-route-runtime.mjs';
@@ -17,7 +18,7 @@ try{
   await region.getByRole('button',{name:operation==='copy'?'另存目前進度':'刪除存檔',exact:true}).click();await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).waitFor();assert.equal(captured.operationScope,'a');assert.equal(captured.saveId,shared);
   await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).click();await region.getByRole('alert').filter({hasText:/原帳號/}).waitFor();assert.equal((await apiA('/api/world?save='+shared)).status,200);assert.equal((await apiB('/api/world?save='+shared)).status,200);assert.equal(okay(await apiB('/api/saves')).saves.length,1);await page.screenshot({path:output+'/'+operation+'-other-account-rejected.png',fullPage:true});
   await context.addCookies([{name:'qh_local_owner',value:'a',url:app.url}]);const restored=page.waitForResponse(response=>response.url()===app.url+'/api/saves'&&response.request().method()==='POST'&&response.request().postDataJSON()?.operation===operation);await region.getByRole('button',{name:'恢復此存檔操作',exact:true}).click();await restored;
-  if(operation==='copy'){copyId=captured.operationId;await page.waitForURL(app.url+'/observe?save='+copyId);assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal(okay(await apiA('/api/saves')).saves.length,2);}else{await page.waitForURL(app.url+'/');assert.equal((await apiA('/api/world?save='+shared)).status,404);assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal((await apiB('/api/world?save='+shared)).status,200);}
+  if(operation==='copy'){copyId=captured.operationId;await page.waitForURL(boundPageURL(app.url,'a','/observe',{save:copyId}));assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal(okay(await apiA('/api/saves')).saves.length,2);}else{await page.waitForURL(app.url+'/');assert.equal((await apiA('/api/world?save='+shared)).status,404);assert.equal((await apiA('/api/world?save='+copyId)).status,200);assert.equal((await apiB('/api/world?save='+shared)).status,200);}
   evidence.push({operation,requestScope:captured.operationScope,sourceSaveId:shared,operationId:captured.operationId,otherAccountUnchanged:true,originalAccountRecovered:true});await page.unroute('**/api/saves',stop);
  }
  assert.equal(app.modelRequests.length,2);await writeFile(output+'/evidence.json',JSON.stringify({commit:app.commit,origin:app.url,status:'passed',controlledCalls:2,paidCalls:0,evidence},null,2));console.log(JSON.stringify({status:'passed',commit:app.commit,evidence}));
