@@ -179,3 +179,15 @@ test('ordinary Chinese ability prose forms through the real API and persists wit
   const saved=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);assert.equal(saved.fields.abilities,description);assert.ok(saved.formation);
  }assert.equal(calls,4);}finally{globalThis.fetch=old;f.db.close();}
 });
+
+test('hyphenated age and physical units remain background and their saved formation replays without another model or die',async()=>{
+ const f=await fixture(),old=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
+ try{
+  await configure(f);for(const description of ['strength greater than 18-year-olds','strength greater than 18-year-old','appearance higher than 175-cm','strength more than 80-kg','strength greater than 18‑year‑olds']){
+   const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields:{...fields,abilities:description}})).body.draft,input=await operation(f,draft);
+   const formed=await f.form(input);assert.equal(formed.status,200,JSON.stringify(formed.body));const count=calls,dice=f.context.dice;
+   assert.deepEqual((await f.form(input)).body.draft,formed.body.draft);assert.equal(calls,count);assert.equal(f.context.dice,dice);
+   const stored=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);assert.equal(stored.fields.abilities,description);assert.deepEqual(stored.formation,formed.body.draft.formation);
+  }assert.equal(calls,5);
+ }finally{globalThis.fetch=old;f.db.close();}
+});

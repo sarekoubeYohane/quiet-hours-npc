@@ -19,7 +19,7 @@ export function characterFormationIssue(draft:CharacterDraft):string|undefined {
  const numeric=new RegExp(String.raw`(?:${statistic})(?:${connector}){0,16}(${number})(?=([^\n，。；,;.]{0,40}))`,'giu');
  for(const match of text.matchAll(numeric)) {
    // Age, height, physical measurements and durations remain background facts.
-   if(/^\s*(?:歲|岁|年|月|天|小時|分鐘|分鍾|公分|厘米|cm\b|公斤|kg\b|公里|毫升|公升|升|ml\b|mah\b|years?\b|months?\b|次|週|周)/i.test(match[2]))continue;
+   if(/^\s*(?:\p{Dash_Punctuation}\s*)?(?:歲|岁|年|月|天|小時|分鐘|分鍾|公分|厘米|cm\b|公斤|kg\b|公里|毫升|公升|升|ml\b|mah\b|years?\b|months?\b|次|週|周)/iu.test(match[2]))continue;
    // A single Chinese numeral embedded in an ordinary word is prose,
    // e.g. 一般／一如往常／十分普通, rather than an assigned statistic.
    const after=match[2].trimStart();
