@@ -124,3 +124,13 @@ export async function exitAcceptanceScene(previous: World): Promise<World> {
 export function worldForClient(world: World): World {
   return world.acceptance ? { ...world, acceptance: { id: world.acceptance.id } } : world;
 }
+
+/** Copy the stored life, including a paused acceptance backup, never its bill. */
+export async function copyWorldWithoutAccounting(world:World):Promise<World> {
+  const copy=structuredClone(world);
+  delete copy.aiUsage;
+  if(copy.acceptance?.original)delete copy.acceptance.original.aiUsage;
+  if(copy.acceptance?.snapshot){const original=await unpackOriginal(copy.acceptance.snapshot);delete original.aiUsage;copy.acceptance.snapshot=await packOriginal(original);}
+  if(copy.acceptance)copy.acceptance.originalSavedDecisions=0;
+  return copy;
+}

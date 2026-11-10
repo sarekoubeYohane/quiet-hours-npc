@@ -3,7 +3,7 @@ const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario,proposal}=require('./routine-program-fixture.cjs');
-const lookup=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json());
+const lookup=async (id,originalScope='test-owner')=>(await(await GET(new Request('https://test.invalid/api/world?operationScope='+encodeURIComponent(originalScope)+'&operationId='+encodeURIComponent(id)))).json());
 const operation=()=>({operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()});
 // Synthetic candidates, not recovered production transcripts.
 for(const [kind,reason] of [['json','json-parse'],['long','memory-selection-reference'],['version','memory-selection-reference'],['foreign','memory-selection-reference'],['format','field-format']])test(`NPC ${kind} failure rereads its safe validation reason without partial commits or replay`,async()=>{
@@ -49,7 +49,7 @@ for(const mode of ['normal','omitted','write-failed'])test(`NPC safe reason ${mo
   assert.ok(!JSON.stringify(logs).includes(privateText));assert.ok(!JSON.stringify(logs).includes(credential));
   assert.ok(!JSON.stringify(trace).includes(credential));
   store.installForOwner('other-owner',load('world').seedWorld());auth.setUserId('other-owner');
-  assert.equal((await lookup(op.operationId)).decisionTrace,null);auth.setUserId('test-owner');
+  assert.equal((await lookup(op.operationId,'other-owner')).decisionTrace,null);auth.setUserId('test-owner');
   assert.deepEqual((await lookup(op.operationId)).decisionTrace,trace);
   await s.post(op);assert.equal(calls,1);
   store.failTraceWrites(false);

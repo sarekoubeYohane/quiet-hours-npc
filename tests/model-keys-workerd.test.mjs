@@ -39,6 +39,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     modules: [{ type: 'ESModule', path: 'worker.js', contents: `
       import { startGitHubLogin, finishGitHubLogin } from './auth.js';
       import { GET, POST } from './world-api.js';
+      import {seedWorld} from './world.js';
       import { fixtureDecision } from './pursuit-fixture.js';
       export default { async fetch(request) {
         globalThis.requestHeaders = request.headers;
@@ -51,6 +52,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
           return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(inputData,{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] })) } }] });
         };
         const path = new URL(request.url).pathname;
+        if(path==='/fixture-existing-world'){const {env}=await import('cloudflare:workers');await env.DB.prepare('INSERT INTO worlds (owner,state,version,locked_until) VALUES (?,?,0,0)').bind('github:123',JSON.stringify(seedWorld())).run();return new Response('existing world installed');}
         if (path === '/api/auth/github') return startGitHubLogin(request);
         if (path === '/api/auth/github/callback') return finishGitHubLogin(request);
         if (path === '/api/world') return request.method === 'POST' ? POST(request) : GET();
@@ -72,8 +74,17 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
       assert.equal(callback.status, 303);
       return callback.headers.getSetCookie().find(value => value.startsWith('qh_session=')).split(';')[0];
     };
+    // Key/backup compatibility is exercised against an explicitly pre-existing world.
+    await mf.dispatchFetch('http://localhost:5173/fixture-existing-world');
     const first = await signIn(), second = await signIn();
-    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body }) });
+    // Capture the actual legacy world's binding once under the original login.
+    // Never derive an account-authoring namespace or refresh it from a later cookie.
+    const initialRead = await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: first } });
+    assert.equal(initialRead.status, 200);
+    const { operationScope } = await initialRead.json();
+    assert.equal(typeof operationScope, 'string');
+    assert.ok(operationScope);
+    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operationScope, ...body }) });
     const fakeKey = 'worker-fixture-key-never-real';
     const saved = await post({ operation: 'set-model-key', mode: 'openai', key: fakeKey });
     assert.equal(saved.status, 200);

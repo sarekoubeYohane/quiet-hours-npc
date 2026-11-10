@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -10,10 +12,11 @@ const characters = load('character-templates-route');
 const scenes = load('scene-templates-route');
 const store = load('store');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api, body) => api.POST(new Request(origin+'/api/world',{
-  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
+  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 const read = async () => (await route.GET()).json();
 async function expect(result, status) {
@@ -55,11 +58,11 @@ async function mountProfile() {
   };
 }
 
-test('an actual city phone read supplies only public map knowledge to the reader and persists on the same device', async () => {
+test('an existing historical city phone read supplies only public map knowledge to the reader and persists on the same device', async () => {
   const legacy=seedWorld();
   legacy.adjudication={provider:'openai',model:'gpt-6.1-sol'};
   store.install(legacy);
-  const opening=await read();
+  await read();
   const create=async name=>(await expect(await post(characters,{
     id:crypto.randomUUID(),version:0,fields:{...blankCharacterTemplateFields(),name},
   }),200)).template;
@@ -84,10 +87,7 @@ test('an actual city phone read supplies only public map knowledge to the reader
       {places:['origin','blocked'],minutes:null},
     ]},
   };
-  const started=await expect(await post(route,{
-    operation:'start-city',operationId:operationId(),operationScope:opening.operationScope,
-    worldContext:opening.world.contextId,expectedVersion:opening.version,mode:'demo',city,
-  }),200);
+  const started=await installHistoricalCity(city);
   const context=started.world.contextId;
   await expect(await post(route,{operation:'set-model-key',mode:'openai',key:'controlled-map'}),200);
   await expect(await post(route,{operation:'set-budget',operationId:operationId(),worldContext:context,mode:'demo',limits:{calls:40,tokens:10000}}),200);

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { createRuntime } from './pursuit-runtime-228.mjs';
 import { digest } from './pursuit-runner-228.mjs';
 const directory = await mkdtemp(join(tmpdir(), 'pursuit-export-'));
-const runtime = await createRuntime({ databasePath:join(directory,'offline.sqlite') });
+const runtime = await createRuntime({ databasePath:join(directory,'offline.sqlite'),legacySeed:true });
 try {
   const require=createRequire(import.meta.url), fixture=require('../../tests/fixtures/demand-integration-loop.cjs');
   const service=fixture.initialWorld(runtime.load('world').seedWorld);

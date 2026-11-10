@@ -1,4 +1,4 @@
-import { resolveActionCheck, senseAvailable, d100Parameters } from './action-checks';
+import { resolveActionCheck, senseAvailable, d100Parameters, newCheckSystem } from './action-checks';
 import { canIdentifyOpeningDestination } from './opening-knowledge';
 import { isSleeping, isSleepStimulus } from './needs';
 import { knownExternalState, type PhysicalState } from './world-state';
@@ -169,12 +169,12 @@ export function resolvePerception(world: World, character: Character, eventId: s
     const routes=[...new Set(candidates.map(candidate=>candidate.sense))].sort().map(route=>{
       const clues=candidates.filter(candidate=>candidate.sense===route);
       const difficulty=clues.reduce<Difficulty>((best,candidate)=>Math.min(best,perceptionRules.difficulty[candidate.interference||'weak']) as Difficulty,16);
-      const check={system:'d100-v1' as const,difficulty,ability:route,attribute:'perception' as const,sense:route};
+      const check={system:newCheckSystem(character) as 'd100-v1'|'d100-v2',difficulty,ability:route,attribute:'perception' as const,sense:route};
       return {route,clues,difficulty,threshold:d100Parameters(character,check,attention>0?10:attention<0?-10:0).threshold};
     }).sort((a,b)=>b.threshold-a.threshold||(a.route<b.route?-1:1));
     relevant=routes[0].clues;checkDifficulty=routes[0].difficulty;sense=routes[0].route;
   }
-  const resolution = resolveActionCheck(character,{difficulty:checkDifficulty,ability:sense,...(character.attributes?{system:'d100-v1' as const,attribute:'perception' as const,sense}:{})},modifier,attention>0?10:attention<0?-10:0);
+  const resolution = resolveActionCheck(character,{difficulty:checkDifficulty,ability:sense,...(character.attributes?{system:newCheckSystem(character) as 'd100-v1'|'d100-v2',attribute:'perception' as const,sense}:{})},modifier,attention>0?10:attention<0?-10:0);
   const falseResult = resolution.outcome === 'critical-failure' ? falsePerception(world, character, relevant) : undefined;
   const selected = ['success', 'critical-success'].includes(resolution.outcome) ? relevant : resolution.outcome === 'mixed' ? relevant.map(candidate => ({ ...candidate, text: candidate.sense === 'hearing' ? '似乎聽見一點模糊的聲響。' : '似乎看見一點模糊的動靜。', clarity: 'vague' as const, source: undefined, objectId: undefined, supplyId: undefined })) : [];
   const trial: PerceptionTrial = { opportunity, resolution, factors: { ability, attention, interference }, candidates: falseResult ? [falseResult.candidate] : selected, ...(falseResult ? { falsePerception: falseResult.diagnostic } : {}) };

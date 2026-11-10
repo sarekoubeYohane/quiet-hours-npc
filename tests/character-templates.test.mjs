@@ -34,10 +34,13 @@ async function fixture({ withWorld = false } = {}) {
   const route = await loadEntry('app/api/character-templates/route.ts', context);
   const db = new DatabaseSync(':memory:');
   const worldRoute = withWorld && await loadEntry('app/api/world/route.ts', context);
+  const settingsRoute = withWorld && await loadEntry('app/api/model-settings/route.ts', context);
   const migrations = withWorld ? (await readdir('drizzle')).filter(name => name.endsWith('.sql')).sort() : ['0006_character_templates.sql'];
   for (const name of migrations) db.exec(await readFile('drizzle/' + name, 'utf8'));
   context.env.DB = {
     prepare(sql) {
+      // Each bind creates an independent closure; subsequent binds cannot
+      // replace values already captured by another statement in a batch.
       return { bind(...values) {
         const statement = db.prepare(sql.replaceAll("CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)", String(Date.now())));
         return {
@@ -50,26 +53,38 @@ async function fixture({ withWorld = false } = {}) {
             if (fault === 'after') throw Error('unavailable after write');
             return result;
           },
-          async run() { return { meta: { changes: Number(statement.run(...values).changes) } }; },
+          execute() { return { meta: { changes: Number(statement.run(...values).changes) } }; },
+          async run() { return this.execute(); },
         };
       } };
+    },
+    async batch(statements) {
+      // Keep the whole SQLite transaction synchronous so ordinary queries
+      // cannot observe or join partially executed writes.
+      db.exec('BEGIN IMMEDIATE');
+      try { const results=statements.map(statement=>statement.execute());db.exec('COMMIT');return results; }
+      catch(error) { db.exec('ROLLBACK');throw error; }
     },
   };
   async function request(payload, origin = 'https://test.invalid') {
     const url = 'https://test.invalid/api/character-templates';
     const response = payload === undefined ? await route.GET() : await route.POST(new Request(url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(payload),
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({accountScope:'account-operations:'+context.owner,...payload}),
     }));
     return { status: response.status, body: await response.json() };
   }
   async function worldRequest(payload) {
-    const url = 'https://test.invalid/api/world';
-    return payload === undefined ? worldRoute.GET(new Request(url)) : worldRoute.POST(new Request(url, {
+    const url = 'https://test.invalid/api/world?workspace=account';
+    const current = await worldRoute.GET(new Request(url));
+    if (payload === undefined) return current;
+    const scope = await current.json();
+    assert.equal(current.status,200,JSON.stringify(scope));
+    return worldRoute.POST(new Request(url, {
       method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
-      body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...payload }),
+      body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', operationScope: scope.operationScope, worldContext: scope.world.contextId, ...payload }),
     }));
   }
-  return { db, context, request, worldRequest };
+  return { db, context, request, worldRequest, settingsRequest:()=>settingsRoute.GET(new Request('https://test.invalid/api/model-settings')) };
 }
 
 test('two new characters persist privately, presets are read-only, and updates cannot erase newer data', async () => {
@@ -126,7 +141,7 @@ test('two new characters persist privately, presets are read-only, and updates c
 });
 
 test('the editor creates, edits, and reopens two custom characters through the real save route', async () => {
-  const { db, request, worldRequest } = await fixture({ withWorld: true });
+  const { db, request, worldRequest, settingsRequest } = await fixture({ withWorld: true });
   const key = 'test-editor-provider-key';
   assert.equal((await worldRequest({ operation: 'set-model-key', mode: 'openai', key })).status, 200);
   assert.equal((await worldRequest({ operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } })).status, 200);
@@ -149,8 +164,9 @@ test('the editor creates, edits, and reopens two custom characters through the r
       paidCalls++;
       return Response.json({ usage: { prompt_tokens: 5, completion_tokens: 3 }, choices: [{ message: { content: candidate } }] });
     }
-    if (url === '/api/world') return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
-    assert.equal(url, '/api/character-templates');
+    if (String(url).split('?')[0] === '/api/model-settings') return settingsRequest();
+    if (String(url).startsWith('/api/world?workspace=account')) return worldRequest(options?.body ? JSON.parse(options.body) : undefined);
+    assert.equal(String(url).split('?')[0], '/api/character-templates');
     const result = await request(options?.body ? JSON.parse(options.body) : undefined);
     return Response.json(result.body, { status: result.status });
   };
@@ -224,4 +240,17 @@ test('the editor creates, edits, and reopens two custom characters through the r
     db.close();
     await window.happyDOM.close();
   }
+});
+
+test('the editor D1 fixture preserves bound values and atomic rollback visibility',async()=>{
+ const {db,context}=await fixture();
+ try{
+  db.exec('CREATE TABLE fixture_atomic (id TEXT PRIMARY KEY,value TEXT NOT NULL)');const d1=context.env.DB;
+  const prepared=d1.prepare('INSERT INTO fixture_atomic(id,value) VALUES (?,?)'),first=prepared.bind('a','first'),second=prepared.bind('b','second');
+  await d1.batch([first,second]);
+  assert.deepEqual((await d1.prepare('SELECT id,value FROM fixture_atomic ORDER BY id').bind().all()).results.map(row=>({...row})),[{id:'a',value:'first'},{id:'b',value:'second'}]);
+  const failed=d1.batch([d1.prepare('UPDATE fixture_atomic SET value=? WHERE id=?').bind('partial','a'),d1.prepare('INSERT INTO fixture_atomic(id,value) VALUES (?,?)').bind('a','duplicate')]);
+  const read=d1.prepare('SELECT value FROM fixture_atomic WHERE id=?').bind('a').first();await assert.rejects(failed,/UNIQUE/);assert.equal((await read).value,'first');
+  await d1.prepare('UPDATE fixture_atomic SET value=? WHERE id=?').bind('after rollback','b').run();assert.equal((await d1.prepare('SELECT value FROM fixture_atomic WHERE id=?').bind('b').first()).value,'after rollback');
+ }finally{db.close();}
 });

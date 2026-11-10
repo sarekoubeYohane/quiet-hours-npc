@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-const post=async body=>{const r=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),mode:'demo',...body})}));const data=await r.json();assert.equal(r.status,200,JSON.stringify(data));return data;};
+const post=async body=>{const r=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),mode:'demo',...body}, 'test-owner'))}));const data=await r.json();assert.equal(r.status,200,JSON.stringify(data));return data;};
 const read=async()=>(await(await GET()).json());
 async function craft(roll,{dexterity=3,expertise=[],tags=[],task='craft-challenge'}={}){
  const w=seedWorld();w.characters.find(c=>c.id==='owner').abilityTags=tags;store.install(w);const original=await read();
@@ -88,7 +90,7 @@ test('new routine confirmation stores its d100 check while an already saved lega
 });
 test('d100 effects, receipts and known paid usage share the existing save-before, lost-response and conflict recovery boundary',async()=>{
  for(const fault of ['throwBeforeNextSave','throwAfterNextSave','conflictOnNextSave']){
- const s=await freeScenario({roll:5});try{store[fault]();const body={operation:'advance',operationId:id(),worldContext:'d100-free',mode:'openai',model:'gpt-6-luna',minutes:15};const request=()=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(body)});const response=await POST(request());assert.equal(response.status,fault==='throwAfterNextSave'?200:502);const w=await s.read();assert.equal(w.objects[0].state.progress,fault==='throwAfterNextSave'?'complete':'raw');assert.equal(!!w.freeTrials,fault==='throwAfterNextSave');assert.equal(w.aiUsage.totalCalls,2);const draws=s.draws();assert.equal((await POST(request())).status,response.status);assert.equal(s.draws(),draws);assert.deepEqual((await s.read()).objects,w.objects);
+ const s=await freeScenario({roll:5});try{store[fault]();const body={operation:'advance',operationId:id(),worldContext:'d100-free',mode:'openai',model:'gpt-6-luna',minutes:15};const request=()=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(body, 'test-owner'))});const response=await POST(request());assert.equal(response.status,fault==='throwAfterNextSave'?200:502);const w=await s.read();assert.equal(w.objects[0].state.progress,fault==='throwAfterNextSave'?'complete':'raw');assert.equal(!!w.freeTrials,fault==='throwAfterNextSave');assert.equal(w.aiUsage.totalCalls,2);const draws=s.draws();assert.equal((await POST(request())).status,response.status);assert.equal(s.draws(),draws);assert.deepEqual((await s.read()).objects,w.objects);
  }finally{s.restore();}}
 });
 test('social expression uses d100 without forcing the listener to agree, while unchanged persuasion reuses its opportunity',async()=>{
@@ -110,7 +112,7 @@ test('passive multi-sensory arrival selects the strongest stable sensory route a
 });
 test('file SQLite close/reopen preserves the d100 receipt and original operation without a second die',async()=>{
  const {mkdtemp,rm}=require('node:fs/promises'),{tmpdir}=require('node:os'),{createRuntime}=await import('../tooling/experiments/pursuit-runtime-228.mjs');const directory=await mkdtemp(path.join(tmpdir(),'checks-277-')),databasePath=path.join(directory,'world.sqlite');let runtime;const random=Math.random;
- try{runtime=await createRuntime({databasePath});const before=await(await runtime.get()).json();const send=async body=>{const response=await runtime.post({operationId:id(),mode:'demo',worldContext:before.world.contextId,...body});assert.equal(response.status,200,await response.clone().text());return response.json();};await send({operation:'adopt-character-attributes',target:'owner',operationScope:before.operationScope,expectedVersion:before.version,characterSetup:{attributes:{strength:{value:3},endurance:{value:3},dexterity:{value:3},perception:{value:3}}}});await send({operation:'direct',action:{type:'work',target:'craft-challenge',content:'蕾絲'}});Math.random=()=>.545;const operationId=id(),result=await send({operation:'advance',operationId,minutes:15}),saved=result.world.events.find(e=>e.actor==='owner'&&e.resolution).resolution;assert.equal(saved.system,'d100-v1');assert.equal(saved.roll,55);await runtime.close();runtime=undefined;runtime=await createRuntime({databasePath});Math.random=()=>{throw Error('reopen must not draw');};const reopened=await(await runtime.get()).json();assert.deepEqual(reopened.world.events.find(e=>e.actor==='owner'&&e.resolution).resolution,saved);const replay=await runtime.post({operationId,mode:'demo',worldContext:before.world.contextId,operation:'advance',minutes:15});assert.equal(replay.status,200);assert.deepEqual((await replay.json()).world.events.find(e=>e.actor==='owner'&&e.resolution).resolution,saved);
+ try{runtime=await createRuntime({databasePath,legacySeed:true});const before=await(await runtime.get()).json();const send=async body=>{const response=await runtime.post({operationId:id(),mode:'demo',worldContext:before.world.contextId,...body});assert.equal(response.status,200,await response.clone().text());return response.json();};await send({operation:'adopt-character-attributes',target:'owner',operationScope:before.operationScope,expectedVersion:before.version,characterSetup:{attributes:{strength:{value:3},endurance:{value:3},dexterity:{value:3},perception:{value:3}}}});await send({operation:'direct',action:{type:'work',target:'craft-challenge',content:'蕾絲'}});Math.random=()=>.545;const operationId=id(),result=await send({operation:'advance',operationId,minutes:15}),saved=result.world.events.find(e=>e.actor==='owner'&&e.resolution).resolution;assert.equal(saved.system,'d100-v1');assert.equal(saved.roll,55);await runtime.close();runtime=undefined;runtime=await createRuntime({databasePath,legacySeed:true});Math.random=()=>{throw Error('reopen must not draw');};const reopened=await(await runtime.get()).json();assert.deepEqual(reopened.world.events.find(e=>e.actor==='owner'&&e.resolution).resolution,saved);const replay=await runtime.post({operationId,mode:'demo',worldContext:before.world.contextId,operation:'advance',minutes:15});assert.equal(replay.status,200);assert.deepEqual((await replay.json()).world.events.find(e=>e.actor==='owner'&&e.resolution).resolution,saved);
  }finally{Math.random=random;await runtime?.close();await rm(directory,{recursive:true,force:true});}
 });
 test('an already started legacy deferred craft keeps D20 when the owner adopts attributes before completion',async()=>{
@@ -118,6 +120,30 @@ test('an already started legacy deferred craft keeps D20 when the owner adopts a
  const random=Math.random;Math.random=()=>.995;try{for(let step=0;step<3;step++)await post({operation:'advance',minutes:5,timeContract:'five-minute-v1'});const saved=(await read()).world.events.find(e=>e.actor==='owner'&&e.resolution);assert.equal(saved.resolution.system,undefined);assert.equal(saved.resolution.roll,20);assert.equal(saved.resolution.outcome,'critical-success');}finally{Math.random=random;}
 });
 test('a newly confirmed absent sense excludes an old successful trial before its cached result could be reused',async()=>{
- const s=await freeScenario({roll:5,check:{difficulty:12,ability:'觀察細節',system:'d100-v1',attribute:'perception',sense:'sight'}});try{const reply=s.current();reply.branches.forEach(branch=>{branch.effects=[];});s.reply(reply);await s.advance();const before=await read();await post({operation:'set-character-sense-limits',target:'owner',operationScope:before.operationScope,expectedVersion:before.version,worldContext:before.world.contextId,characterSetup:{blockedSenses:['sight']}});const current=await s.read(),draws=s.draws();const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operation:'advance',operationId:id(),worldContext:current.contextId,mode:'openai',model:'gpt-6-luna',minutes:15})}));assert.equal(response.status,502);assert.equal(s.draws(),draws);assert.equal((await s.read()).turn,current.turn);assert.deepEqual((await s.read()).freeTrials,current.freeTrials);
+ const s=await freeScenario({roll:5,check:{difficulty:12,ability:'觀察細節',system:'d100-v1',attribute:'perception',sense:'sight'}});try{const reply=s.current();reply.branches.forEach(branch=>{branch.effects=[];});s.reply(reply);await s.advance();const before=await read();await post({operation:'set-character-sense-limits',target:'owner',operationScope:before.operationScope,expectedVersion:before.version,worldContext:before.world.contextId,characterSetup:{blockedSenses:['sight']}});const current=await s.read(),draws=s.draws();const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operation:'advance',operationId:id(),worldContext:current.contextId,mode:'openai',model:'gpt-6-luna',minutes:15}, 'test-owner'))}));assert.equal(response.status,502);assert.equal(s.draws(),draws);assert.equal((await s.read()).turn,current.turn);assert.deepEqual((await s.read()).freeTrials,current.freeTrials);
  }finally{s.restore();}
+});
+
+test('saved v1 appearance-domain expertise keeps its original meaning, threshold and result across reload and replay',async()=>{
+ for(const ability of ['外觀','appearance']){
+  const s=await freeScenario({roll:70,check:{difficulty:12,ability,system:'d100-v1',attribute:null,sense:null},expertise:[{scope:ability,modifier:20}]});
+  try{
+   const operationId=id(),result=await s.advance({operationId});const resolution=Object.values(result.world.freeTrials)[0];
+   assert.equal(resolution.system,'d100-v1');assert.equal(resolution.threshold,75);assert.equal(resolution.factors.expertise,20);assert.equal(resolution.factors.attribute,null);assert.equal(resolution.outcome,'success');assert.equal(s.draws(),1);
+   assert.deepEqual(Object.values((await s.read()).freeTrials)[0],resolution);
+   const calls=s.inputs.length,replayed=await s.advance({operationId});assert.deepEqual(Object.values(replayed.world.freeTrials)[0],resolution);assert.equal(s.inputs.length,calls);assert.equal(s.draws(),1);
+  }finally{s.restore();}
+ }
+});
+
+
+test('v2 continues to exclude appearance aliases from numeric expertise while v1 retains its separate domain',()=>{
+ const {resolveActionCheck}=load('action-checks');
+ for(const ability of ['外觀','appearance']){
+  // Resolver-contract snapshot only; the real formed-card route journey is
+  // covered separately by versioned-d100.test.mjs, not replaced by this object.
+  const actor=seedWorld().characters[0];actor.attributes={version:2,authority:'formed-card',values:{strength:12,endurance:12,dexterity:12,perception:12,appearance:18},expertise:[{scope:ability,modifier:20}],senses:[],blockedSenses:[],activatedAt:0,constraints:{}};
+  let draws=0;const resolution=resolveActionCheck(actor,{difficulty:12,ability,system:'d100-v2',attribute:null,sense:null},0,0,()=>{draws++;return .695;});
+  assert.equal(resolution.system,'d100-v2');assert.equal(resolution.attributeVersion,2);assert.equal(resolution.threshold,55);assert.equal(resolution.factors.expertise,0);assert.equal(resolution.factors.attribute,null);assert.equal(resolution.outcome,'mixed');assert.equal(draws,1);
+ }
 });

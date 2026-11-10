@@ -1,0 +1,26 @@
+{
+  "recordedAt": "2026-11-09T12:39:11Z",
+  "targetOrigin": "https://quiet-hours-npc.houmengkou.workers.dev",
+  "scope": "一次正常雲端 Chrome 唯讀重連；不繞代理或網路政策",
+  "inventory": {
+    "tool": "cua.getState",
+    "browser": { "id": "1", "name": "Chrome", "type": "cdp" },
+    "tabs": [
+      { "id": "2", "title": "New Tab", "url": "chrome://new-tab-page-third-party/" },
+      { "id": "1", "title": "about:blank", "url": "about:blank" }
+    ]
+  },
+  "openAttempt": {
+    "tool": "cua.createBrowserTab",
+    "browser": "cdp",
+    "url": "https://quiet-hours-npc.houmengkou.workers.dev",
+    "result": "Browser Use could not read requirements."
+  },
+  "cuaCompletionSummary": "確認正式導覽仍受阻",
+  "productionPageObserved": false,
+  "productionVersion": null,
+  "productionIdentity": null,
+  "validProductionNavigationTrials": 0,
+  "productFailureReproduced": false,
+  "status": "blocked-by-browser-tool; #282 remains incomplete"
+}

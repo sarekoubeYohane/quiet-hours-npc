@@ -35,7 +35,7 @@ export function prepareControlledFeelings(world:World,actor:Character,modelKey:s
  return {input,schema,messages,sources:offered,...(activityId?{activityId}:{}),...(opportunityId?{opportunityId}:{})};
 }
 export type ControlledFeelingRequest=NonNullable<ReturnType<typeof prepareControlledFeelings>>;
-export async function requestControlledFeelings(actor:Character,minute:number,prepared:ControlledFeelingRequest,service:ModelService,options:{signal:AbortSignal;observer?:ModelObserver;requestId:string;onUsage:(tokens:TokenUsage)=>void;verifyCurrent:()=>Promise<void>}):Promise<ControlledFeelingCandidate>{
+export async function requestControlledFeelings(actor:Character,minute:number,prepared:ControlledFeelingRequest,service:ModelService,options:{signal:AbortSignal;observer?:ModelObserver;requestId:string;fetcher?:typeof fetch;beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch'];onSettled?:()=>Promise<void>;onUsage:(tokens:TokenUsage)=>void|Promise<void>;verifyCurrent:()=>Promise<void>}):Promise<ControlledFeelingCandidate>{
  const raw=await requestModel(service,prepared.messages,prepared.schema,options);await options.verifyCurrent();
  try{
   const value=JSON.parse(raw);

@@ -1,0 +1,20 @@
+{
+  "origin": "http://127.0.0.1:43841",
+  "commit": "2fb450b",
+  "builtAt": "2026-11-09T18:43:28.110Z",
+  "draftId": "5dd66d18-ce46-43bc-8901-6423fda52ec7",
+  "saveId": "5dd66d18-ce46-43bc-8901-6423fda52ec7",
+  "beforeFailed": true,
+  "generationLost": true,
+  "editFailed": true,
+  "adoptionLost": true,
+  "modelCalls": 2,
+  "paidCalls": 0,
+  "auth": "local cookie identity boundary",
+  "database": "disk SQLite full migrations; all assets formed and saved through product APIs; no installed world fixture",
+  "proposalCasConflict": true,
+  "confirmationMatchesSaved": true,
+  "cardStable": true,
+  "sourceSceneUnchanged": true,
+  "ownerBoundUrl": "http://127.0.0.1:43841/observe?save=5dd66d18-ce46-43bc-8901-6423fda52ec7&owner=a"
+}

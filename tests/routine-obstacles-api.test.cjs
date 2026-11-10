@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -9,7 +11,7 @@ const cup=()=>({id:'cup',source:'finite-cups',label:'店內茶杯',region:'cafe-
 async function fixture(modify=()=>{}) {
  const w=seedWorld();w.contextId='obstacle-fixture';w.adjudication={provider:'openai',model:'fixture-adjudicator'};w.characters.forEach(c=>{if(c.id!=='owner')c.control={mode:'taken-over'};});
  w.routineRules=[{id:'tea-rule',version:1,family:'cafe-service',operations:['tea'],origin:'cafe',knownTo:['owner']}];w.objects=[cup()];modify(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body})}));await post({operation:'set-model-key',key:'fixture-key'});
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:w.contextId,mode:'openai',model:'gpt-6.1-sol',...body}, 'test-owner'))}));await post({operation:'set-model-key',key:'fixture-key'});
  const previous=global.fetch,inputs=[];let decision={type:'work',target:'tea',content:'泡茶',mood:'平靜',durationMinutes:30,intents:[]},candidate={status:'unsupported',effects:[],stages:[],check:null};
  global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);inputs.push(input);return completion(input.contractVersion==='world-adjudication.v1'?candidate:decision,JSON.parse(JSON.parse(init.body).messages[1].content));};
  return {post,inputs,decision:v=>{decision=v;},candidate:v=>{candidate=v;},read:async()=>(await(await GET()).json()).world,restore:()=>{global.fetch=previous;}};

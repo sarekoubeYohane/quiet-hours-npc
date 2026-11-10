@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -24,7 +26,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
  const {POST,GET}=build('route'),store=build('store');
  store.install(require('./fixtures/ai-world.cjs')(build('world').seedWorld)());
  const historyTurns=Number(process.env.RECOVERY_HISTORY_TURNS || 0);
- const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})}));
+ const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))}));
  for(let turn=0;turn<historyTurns;turn++){
   if(turn===17)assert.equal((await send({operation:'intervene',target:'all',text:'所有人收到咖啡館通知：下午兩點有自由參加的手作交流，沒有任何人必須出席。'})).status,200);
   assert.equal((await send({operation:'advance',minutes:15})).status,200);

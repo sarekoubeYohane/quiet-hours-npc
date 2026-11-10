@@ -10,6 +10,8 @@ const headers = load('headers');
 const world = load('app/api/world/route');
 function reset() {
   fixture.reset(); fixture.migrate(readFileSync(join(root, 'migrations.sql'), 'utf8'));
+  // These auth/key/reset cases exercise pre-existing legacy worlds, not creation.
+  fixture.installLegacyWorlds(['github:123','github:456']);
   Object.assign(fixture.env, { APP_ENV: 'local', AUTH_ORIGIN: 'http://localhost:5173', GITHUB_CLIENT_ID: 'local-client', GITHUB_CLIENT_SECRET: 'test-only-client-secret', SESSION_SECRET: 'test-only-signing-secret-at-least-32-characters', GITHUB_ALLOWED_IDS: '123' });
   headers.set(new Headers());
 }
@@ -41,7 +43,7 @@ async function signIn(user = { id: 123, login: 'owner' }) {
     return await load('app/api/auth/github/callback/route').GET(authRequest('/api/auth/github/callback?code=test-code&state=' + redirect.searchParams.get('state'), cookies(start)));
   } finally { global.fetch = originalFetch; }
 }
-test('GitHub login grants the invited user a private world and logout revokes the copied cookie', async () => {
+test('GitHub login grants access to an invited user’s existing world and logout revokes the copied cookie', async () => {
   reset();
   const callback = await signIn();
   assert.equal(callback.status, 303);
@@ -76,7 +78,7 @@ test('two invited accounts get separate worlds keyed by stable GitHub id, not lo
   reset(); fixture.env.GITHUB_ALLOWED_IDS = '123,456';
   const first = cookies(await signIn());
   headers.set(new Headers({ cookie: first }));
-  const advanced = await world.POST(authRequest('/api/world', first, { method: 'POST', headers: { origin }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', mode: 'demo', minutes: 15 }) }));
+  const advanced = await world.POST(authRequest('/api/world', first, { method: 'POST', headers: { origin }, body: JSON.stringify({ operationScope:'github:123',operationId: `${Date.now()}:${crypto.randomUUID()}`, operation: 'advance', mode: 'demo', minutes: 15 }) }));
   assert.equal(advanced.status, 200);
   assert.equal((await advanced.json()).world.turn, 1);
   const second = cookies(await signIn({ id: 456, login: 'owner' }));
@@ -189,4 +191,14 @@ test('production login cookies are Secure and no secret is returned to the brows
   assert.ok(!response.headers.get('location').includes(fixture.env.GITHUB_CLIENT_SECRET));
   delete fixture.env.SESSION_SECRET;
   assert.equal((await load('app/api/auth/github/route').GET(new Request('https://test.example.test/api/auth/github'))).status, 503);
+});
+
+test('a newly invited account signs in without implicitly creating a world', async()=>{
+  reset();fixture.env.GITHUB_ALLOWED_IDS='789';
+  const callback=await signIn({id:789,login:'new-owner'});
+  assert.equal(callback.status,303);
+  assert.equal(callback.headers.get('location'),origin+'/');
+  headers.set(new Headers({cookie:cookies(callback)}));
+  assert.equal((await world.GET()).status,409);
+  assert.equal((await world.GET()).status,409);
 });

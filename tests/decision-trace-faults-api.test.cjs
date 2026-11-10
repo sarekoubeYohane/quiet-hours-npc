@@ -3,7 +3,7 @@ const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET}=load('route'),store=load('store'),{scenario,proposal}=require('./routine-program-fixture.cjs');
-const lookup=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json());
+const lookup=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json());
 const operation=()=>({operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()});
 test('accepted and dispatched checkpoints survive while a real provider response is still unavailable',async()=>{
  const s=await scenario();let release,entered;const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
@@ -145,7 +145,7 @@ test('cross-provider secret must be masked in an early checkpoint',async()=>{
  const op={operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()};let running;
  try{
   running=s.post(op);await ready;
-  const data=await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(op.operationId)))).json();
+  const data=await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(op.operationId)))).json();
   assert.ok(data.decisionTrace);assert.ok(!JSON.stringify(data.decisionTrace).includes(otherKey),'unregistered adjudication key leaked into durable NPC input checkpoint');
  }finally{release();await running;s.restore();}
 });

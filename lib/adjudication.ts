@@ -1,3 +1,4 @@
+import {newCheckSystem} from './action-checks';
 import { entryPermission } from './city-access';
 import { worldLocations, worldRegions } from './world-configuration';
 import { regionOf } from './perception';
@@ -11,7 +12,7 @@ export const adjudicationContractVersion = 'world-adjudication.v1';
 export type AdjudicationInput = {
   contractVersion: typeof adjudicationContractVersion;
   action: Pick<Action, 'type' | 'target' | 'content' | 'purpose'>;
-  actor: { id: string; location: string; region?: string; abilityTags: string[]; checkSystem?:'d100-v1'; attributes?:Character['attributes'] };
+  actor: { id: string; location: string; region?: string; abilityTags: string[]; checkSystem?:'d100-v1'|'d100-v2'; attributes?:Character['attributes'] };
   target?: { id: string; location: string; region?: string };
   rules: string[];
   entryPermission?: { regionId: string; allowed: boolean };
@@ -121,12 +122,12 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
     contractVersion: adjudicationContractVersion,
     knownActivityIdentities:[...new Map((actor.habitEvidence||[]).filter(item=>item.confirmedIdentity).map(item=>[item.confirmedIdentity!.key,item.confirmedIdentity!])).values()].slice(-24),
     action: { type: action.type, target: action.target, content: action.content, ...(action.purpose?{purpose:action.purpose}:{}) },
-    actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])], ...(actor.attributes?{checkSystem:'d100-v1' as const,attributes:structuredClone(actor.attributes)}:{}) },
+    actor: { id: actor.id, location: actor.location, region: actor.region, abilityTags: [...(actor.abilityTags || [])], ...(actor.attributes?{checkSystem:newCheckSystem(actor) as 'd100-v1'|'d100-v2',attributes:structuredClone(actor.attributes)}:{}) },
     ...(target ? { target: { id: target.id, location: target.location, region: target.region } } : {}),
     ...(permission ? {entryPermission:permission} : {}),
     rules: [
       ...adjudicationRules(routinePrograms),
-      ...(actor.attributes ? ['本人物的新確認 check 使用 system=d100-v1；attribute 從 strength/endurance/dexterity/perception 或 null 擇與具體方法相關的一項，sense 從 sight/hearing/touch 或 null 擇相關感官；ability 是實際領域。只有 actor.attributes 已確認的專長／感官數字可用，不能從角色名、職業或文字現場賦權。環境噪音只影響 difficulty，同一弱點不重複降低屬性及感官／專長；沒有機會或確定行為用 check=null，不用骰子替人物同意。舊規則保持原版，新確認結果仍使用受限五段分支，不指定骰點、門檻或最終結果。'] : []),
+      ...(actor.attributes ? [`本人物的新確認 check 使用 system=${newCheckSystem(actor)}；attribute 從 strength/endurance/dexterity/perception 或 null 擇與具體方法相關的一項，sense 從 sight/hearing/touch 或 null 擇相關感官；ability 是實際領域。只有 actor.attributes 已確認的專長／感官數字可用，不能從角色名、職業或文字現場賦權。環境噪音只影響 difficulty，同一弱點不重複降低屬性及感官／專長；沒有機會或確定行為用 check=null，不用骰子替人物同意。舊規則保持原版，新確認結果仍使用受限五段分支，不指定骰點、門檻或最終結果。`] : []),
       ...(permission ? ['entryPermission 是此區域的實際進出授權。授權不代表門已開啟或其他人同意協助；未獲授權也不等於物理上無法進入。'] : []),
     ],
   };

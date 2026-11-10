@@ -26,7 +26,7 @@ async function registration(directory,mutate=()=>{}) {
 
 async function existingPayer(directory) {
   await mkdir(join(directory,'account'),{recursive:true});
-  const runtime=await createRuntime({databasePath:join(directory,'account','account.sqlite')});
+  const runtime=await createRuntime({databasePath:join(directory,'account','account.sqlite'),legacySeed:true});
   const before=await(await runtime.get()).json();
   const result=await runtime.post({operation:'set-budget',mode:'openai',worldContext:before.world.contextId,operationId:Date.now()+':'+crypto.randomUUID(),limits:{calls:100,tokens:1000000}});
   assert.equal(result.status,200);await runtime.close();
@@ -88,7 +88,12 @@ test('default 12-call/30000-token payer can forward and stops at its original cu
     const result=await runExperiment({...options,providerFetch:async(_url,init)=>{forwards++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(decision(input,{duration:120}))}}]});}});
     assert.match(result.stopped,/player-limit|technical-error:429|technical-error:502/);assert.ok(forwards>0);assert.equal(result.trials.length,10);assert.ok(result.trials.some(t=>t.rounds>0));
     const view=await readback({runDirectory:directory});assert.equal(view.world.playerBudget,undefined);assert.equal(view.world.aiUsage.totalCalls,12);assert.equal(view.world.aiUsage.calls,12);
-    const first=result.trials.find(t=>t.payerAfter)?.payerAfter.usage;assert.equal(view.world.aiUsage.windowStartedAt,first.windowStartedAt);
+    const active=result.trials.filter(t=>t.payerAfter?.usage.totalCalls>0),first=active[0].payerAfter.usage;
+    // Account and world diagnostics start independently. Assert the account's
+    // original charged window across trials, rather than equating two clocks.
+    for(const trial of active)assert.equal(trial.payerAfter.usage.windowStartedAt,first.windowStartedAt);
+    assert.equal(view.accountPlayer.usage.windowStartedAt,first.windowStartedAt);
+    assert.equal(view.accountPlayer.usage.totalCalls,12);assert.equal(view.accountPlayer.usage.calls,12);
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
@@ -201,7 +206,7 @@ test('runtime helper, SQL and an untracked product module cannot bypass the seal
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('a positive forwarded journey really commits, reopens file SQLite and retains payer usage across story reset', async () => {
+test('a positive forwarded journey really commits, reopens file SQLite and retains central payer usage across isolated historical trial fixtures', async () => {
   const directory = process.env.PURSUIT_EVIDENCE_DIR || await mkdtemp(join(tmpdir(), 'pursuit-positive-'));
   const random=Math.random;Math.random=()=>.675; // Only the approved external perception die seam.
   try {

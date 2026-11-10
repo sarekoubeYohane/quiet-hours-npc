@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public world API, SQLite and external transport fixtures. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store');
-const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...b})});
+const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...b}, 'test-owner'))});
 test('known nonmatch then match between own slots rearms event cue',async()=>{
 const w=seedWorld();const owner=w.characters.find(c=>c.id==='owner'),cass=w.characters.find(c=>c.id==='cass');w.characters=[owner,cass];for(const c of w.characters){c.location='cafe';c.region='cafe-front';}w.adjudication={provider:'openai',model:'fixture'};store.install(w);
 await POST(req({operation:'set-model-key',mode:'openai',key:'test-key'}));await POST(req({operation:'set-budget',limits:{calls:100,tokens:1000000}}));

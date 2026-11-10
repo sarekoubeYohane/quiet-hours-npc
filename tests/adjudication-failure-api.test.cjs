@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -7,8 +9,8 @@ const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, name 
 const { GET, POST } = load('route'), store = load('store');
 const { seedWorld } = load('world');
 const { enterAcceptanceScene } = load('acceptance-scene');
-const read = async operationId => (await (await GET(operationId ? new Request('https://test.invalid/api/world?operationId=' + encodeURIComponent(operationId)) : undefined)).json());
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(body) });
+const read = async operationId => (await (await GET(operationId ? new Request('https://test.invalid/api/world?operationScope=test-owner&operationId=' + encodeURIComponent(operationId)) : undefined)).json());
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(originalWorldInput(body, 'test-owner')) });
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
 const completion = (value,_fixtureInput) => Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: typeof value === 'string' ? value : JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 async function setup(actor = 'cass', modify = () => {}) {

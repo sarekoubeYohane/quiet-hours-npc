@@ -1,0 +1,40 @@
+{
+  "commit": "49f6d85",
+  "origin": "http://127.0.0.1:43191",
+  "versions": [
+    1,
+    2
+  ],
+  "addedVersionViaUI": true,
+  "access": {
+    "place:old": {
+      "rule": "public",
+      "allowedActorIds": [
+        "npc:1"
+      ]
+    },
+    "place:old:room:front": {
+      "rule": "public",
+      "allowedActorIds": [
+        "npc:1"
+      ],
+      "roomOverride": true
+    },
+    "place:place-1": {
+      "rule": "private",
+      "allowedActorIds": []
+    },
+    "place:place-1:room:front": {
+      "rule": "private",
+      "allowedActorIds": [],
+      "roomOverride": true
+    },
+    "place:place-1:room:back": {
+      "rule": "private",
+      "allowedActorIds": []
+    }
+  },
+  "turn": 0,
+  "controlled": 1,
+  "paid": 0
+}

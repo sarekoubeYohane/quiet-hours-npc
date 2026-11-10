@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),mode:'openai',model:'gpt-6-luna',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 const reply=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 function fixture({allowed=true,holder='cass'}={}){
@@ -99,7 +101,7 @@ test('physical receipts retain before-permission and reasons while NPC inputs re
 test('a different account cannot resolve another worlds physical object reference',async()=>{
  const auth=load('auth'),s=await setup(candidate([{kind:'physical',version:1,operation:'take',objectId:'borrowed-cup',expectedRevision:1,reason:'不能跨帳號取得物件。'}]),{allowed:false,holder:'owner'});
  try{
-  const other=fixture({allowed:false,holder:'owner'});other.objects=[];store.installForOwner('other-owner',other);auth.setUserId('other-owner');assert.equal((await POST(request({operation:'set-model-key',key:'fixture-other-key'}))).status,200);const response=await POST(request({operation:'advance',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).objects,[]);auth.setUserId('test-owner');assert.deepEqual((await read()).objects,s.world.objects);
+  const other=fixture({allowed:false,holder:'owner'});other.objects=[];store.installForOwner('other-owner',other);auth.setUserId('other-owner');assert.equal((await POST(request({operationScope:'other-owner',operation:'set-model-key',key:'fixture-other-key'}))).status,200);const response=await POST(request({operationScope:'other-owner',operation:'advance',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).objects,[]);auth.setUserId('test-owner');assert.deepEqual((await read()).objects,s.world.objects);
  }finally{auth.setUserId('test-owner');s.restore();}
 });
 test('a physical candidate containing a credential is safely rejected and its bounded receipt is redacted',async()=>{

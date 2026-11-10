@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const {decision,candidate,adoption,choose}=require('./pursuit-selection-fixture.cjs');
-const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',...body})}));
+const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
 const read=async()=> (await(await GET()).json()).world;
-const trace=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json()).decisionTrace;
+const trace=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json()).decisionTrace;
 async function setup(prepare=()=>{}){const w=seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'gpt-6-luna'};prepare(w);store.install(w);await post({operation:'set-model-key',key:'fixture-key'});return w;}
 async function transport(respond,run){const original=global.fetch;const frames=[];global.fetch=async(url,init)=>{assert.match(String(url),/^https:\/\/api\.openai\.com\//);const request=JSON.parse(init.body),input=JSON.parse(request.messages[1].content);const value=respond(input,request,frames);frames.push({request,input,value});return Response.json({usage:{prompt_tokens:30,completion_tokens:20},choices:[{message:{content:JSON.stringify(value)},finish_reason:'stop'}]});};try{return await run(frames);}finally{global.fetch=original;}}
 

@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- World API fixture. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'), assert=require('node:assert/strict'), path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body})});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
 const read=async()=>(await(await GET()).json()).world;
 const candidate={type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:''};
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);

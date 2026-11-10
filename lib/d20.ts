@@ -6,7 +6,8 @@ export type Outcome = 'critical-success' | 'success' | 'mixed' | 'failure' | 'cr
 export type Advantage = -4 | -2 | 0 | 2 | 4;
 export type Difficulty = 8 | 12 | 16;
 export type Resolution = {
-  system?:'d100-v1';
+  system?:'d100-v1'|'d100-v2';
+  attributeVersion?:1|2;
   threshold?:number;
   factors?:import('./action-checks').CheckFactors;
   roll: number;

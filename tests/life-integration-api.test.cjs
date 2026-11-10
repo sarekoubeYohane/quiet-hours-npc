@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
@@ -9,7 +11,7 @@ const owner=w=>w.characters.find(c=>c.id==='owner');
 async function scenario(secondActor=false,prepare=()=>{}){
  const world=fixture.initialWorld(seedWorld,secondActor);prepare(world);store.install(world);const transport=fixture.model(),old=global.fetch,oldRandom=Math.random;Math.random=()=>0.65;
  global.fetch=async(_url,init)=>transport.respond(JSON.parse(init.body));
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});
  const read=async()=>(await(await GET()).json()).world;
  const advance=async(minutes=15,extra={})=>{const r=await post({operation:'advance',minutes,...extra});assert.equal(r.status,200,await r.clone().text());return read();};

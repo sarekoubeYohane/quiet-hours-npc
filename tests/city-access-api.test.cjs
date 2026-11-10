@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput, originalAccountInput } = require('./original-scope-fixture.cjs');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
@@ -10,9 +12,10 @@ const store = load('store');
 const { blankCharacterTemplateFields } = load('character-templates');
 const { seedWorld } = load('world');
 const { fixtureDecision } = require('./pursuit-fixture.cjs');
+const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const send = (api, body) => api.POST(new Request(origin, {
-  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body),
+  method: 'POST', headers: { origin, 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 const operationId = () => Date.now() + ':' + crypto.randomUUID();
 const response = async (result, status) => {
@@ -21,7 +24,7 @@ const response = async (result, status) => {
   return body;
 };
 
-test('entry permission uses the actual place and the room override and is recorded independently of physical movement', async () => {
+test('historical city compatibility: entry permission uses the actual place and the room override and is recorded independently of physical movement', async () => {
   const legacy = seedWorld();
   legacy.adjudication = { provider: 'openai', model: 'gpt-6.1-sol' };
   store.install(legacy);
@@ -72,7 +75,7 @@ test('entry permission uses the actual place and the room override and is record
   edited.accessGrants[1].roomId = 'not-in-this-home';
   const invalid = (await response(await send(route, {...scope, operation:'preview-city', mode:'demo', city:edited}), 200)).preview;
   assert.match(invalid.issues.join(''), /授權/);
-  const started = await response(await send(route, { ...scope, operation:'start-city', operationId:operationId(), mode:'demo', city }), 200);
+  const started = await installHistoricalCity(city);
   const {world} = await response(await route.GET(), 200);
   assert.equal(world.configuration.residences[world.characters[0].id], undefined);
   assert.deepEqual(world.configuration.access, started.world.configuration.access);

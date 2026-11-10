@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Public API, provider transport, elapsed clock and real SQLite. */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{env}=load('cloudflare-workers');
 const {scenario,proposal}=require('./routine-program-fixture.cjs');
-const query=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationId='+encodeURIComponent(id)))).json());
+const query=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json());
 const op=()=>({operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()});
 function clock(){
  const now=Date.now,timeout=AbortSignal.timeout;let instant=now(),queue=[];
@@ -68,13 +70,13 @@ for(const stage of ['no-headers','body','response-save','prepared-save'])test(st
   global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;if(stage==='no-headers'){await c.sleep(26000);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(26000);controller.enqueue(new TextEncoder().encode(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content))));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,stage==='prepared-save'?0:1);
   store.onStorage(undefined);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,before.turn);assert.deepEqual(saved.world.events,before.events);
-  assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'?0:1);
+  assert.equal(saved.world.aiUsage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.accountPlayer.usage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'||stage==='prepared-save'?0:1);
  }finally{store.onStorage(undefined);s?.restore();c.restore();}
 });
 
 test('legacy 125s client is rejected before acceptance; original settled IDs still replay without opt-in',async()=>{
  const s=await scenario(),operation=op();let sent=0;const old=global.fetch;global.fetch=async(...args)=>{sent++;return old(...args);};
- const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({mode:'openai',model:'gpt-6-luna',worldContext:'program-fixture',...body})});
+ const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify(originalWorldInput({mode:'openai',model:'gpt-6-luna',worldContext:'program-fixture',...body}, 'test-owner'))});
  try{
   const response=await POST(req(operation));assert.equal(response.status,426);assert.equal((await response.json()).clientUpdateRequired,true);assert.equal(sent,0);assert.equal((await query(operation.operationId)).operation.state,'unknown');
   const successful=await s.post(operation),body=await successful.json();const calls=sent;const replayed=await POST(req(operation));assert.equal(replayed.status,successful.status);assert.deepEqual(await replayed.json(),body);assert.equal(sent,calls);
@@ -124,7 +126,7 @@ for(const kind of ['recall','request-disconnect'])test(kind+' stops before any c
   if(kind==='recall'){env.RECALL_ENABLED='true';env.RECALL_USAGE_DB=store.database();env.OWNER_EMBEDDING_KEY='synthetic-owner-key';env.MEMORY_VECTOR_INDEX={query:async()=>({matches:[]})};}
   global.fetch=async(url,_fixtureInit)=>{if(String(url).includes('embeddings')){await c.sleep(11000);return Response.json({usage:{total_tokens:7},data:[{index:0,embedding:Array(1536).fill(.1)}]});}sent++;if(kind==='request-disconnect'){controller.abort();await c.sleep(1000);}return new Response(envelope(kind==='recall'?{type:'recall',questions:['Earlier?']}:proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),payload={worldContext:'program-fixture',mode:'openai',model:'gpt-6-luna',...operation};
-  const response=await c.run(POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(payload),signal:controller.signal}))),body=await response.json();
+  const response=await c.run(POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(payload, 'test-owner')),signal:controller.signal}))),body=await response.json();
   assert.equal(response.status,502);assert.equal(sent,1);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);
  }finally{s?.restore();c.restore();for(const key of ['RECALL_ENABLED','RECALL_USAGE_DB','OWNER_EMBEDDING_KEY','MEMORY_VECTOR_INDEX'])delete env[key];}
 });

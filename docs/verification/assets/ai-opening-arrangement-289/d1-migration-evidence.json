@@ -1,0 +1,52 @@
+{
+  "localOnly": true,
+  "fresh": {
+    "sqlite": "/tmp/quiet-hours-t8-d1/fresh-state/v3/d1/miniflare-D1DatabaseObject/1d86945724128759ebd10400e22d0254fbaa8faa130296b866e732c3fac26237.sqlite",
+    "migrations": 17,
+    "arrangementRows": 0,
+    "columns": [
+      "owner",
+      "draft_id",
+      "operation_id",
+      "input_version",
+      "revision",
+      "request",
+      "snapshot",
+      "state",
+      "result",
+      "error",
+      "adoption_request"
+    ],
+    "pendingUniqueIndex": "CREATE UNIQUE INDEX opening_arrangement_pending ON opening_arrangements(owner,draft_id) WHERE state='pending'"
+  },
+  "upgrade": {
+    "sqlite": "/tmp/quiet-hours-t8-d1/upgrade-state/v3/d1/miniflare-D1DatabaseObject/1d86945724128759ebd10400e22d0254fbaa8faa130296b866e732c3fac26237.sqlite",
+    "migrations": 17,
+    "arrangementRows": 0,
+    "columns": [
+      "owner",
+      "draft_id",
+      "operation_id",
+      "input_version",
+      "revision",
+      "request",
+      "snapshot",
+      "state",
+      "result",
+      "error",
+      "adoption_request"
+    ],
+    "pendingUniqueIndex": "CREATE UNIQUE INDEX opening_arrangement_pending ON opening_arrangements(owner,draft_id) WHERE state='pending'",
+    "beforeSha256": "a781915bc7a24e1844cbbb4f34a3cbf94c83ba5915881127dedd931f1ac8fb54",
+    "afterSha256": "a781915bc7a24e1844cbbb4f34a3cbf94c83ba5915881127dedd931f1ac8fb54",
+    "unchanged": true,
+    "version": 42,
+    "lease": 1700000430000,
+    "legacyOriginalOpening": null
+  },
+  "commands": [
+    "CI=true WRANGLER_SEND_METRICS=false pnpm exec wrangler d1 migrations apply DB --local --config /tmp/quiet-hours-t8-d1/fresh.json --persist-to /tmp/quiet-hours-t8-d1/fresh-state",
+    "CI=true WRANGLER_SEND_METRICS=false pnpm exec wrangler d1 migrations apply DB --local --config /tmp/quiet-hours-t8-d1/upgrade.json --persist-to /tmp/quiet-hours-t8-d1/upgrade-state (first migrations_dir=pre20, then full drizzle)",
+    "CI=true WRANGLER_SEND_METRICS=false pnpm exec wrangler d1 execute DB --local --config /tmp/quiet-hours-t8-d1/upgrade.json --persist-to /tmp/quiet-hours-t8-d1/upgrade-state --file /tmp/quiet-hours-t8-d1/legacy.sql"
+  ]
+}

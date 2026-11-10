@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { originalWorldInput } = require('./original-scope-fixture.cjs');
+
 const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {nonPhoneObjects}=require('./fixtures/non-phone-objects.cjs');
@@ -7,7 +9,7 @@ const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const opid=()=>Date.now()+':'+crypto.randomUUID();
 async function scenario(prepare=()=>{}) {
  const w=seedWorld();w.contextId='life-needs';w.adjudication={provider:'openai',model:'fixture-judge'};w.characters=w.characters.filter(c=>c.id==='owner');prepare(w);store.install(w);
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:w.contextId,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});let npc=0,inputs=[];const old=global.fetch;
  global.fetch=async(_url,init)=>{npc++;inputs.push(JSON.parse(JSON.parse(init.body).messages[1].content));return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),{type:npc===1?'reflect':'continue',target:'',content:'先留在這裡',mood:'平靜',durationMinutes:90,intents:[],timeIntent:{kind:'open-ended',maxMinutes:null}}))}}]});};
  return {post,read:async()=>(await(await GET()).json()).world,inputs,calls:()=>npc,restore:()=>{global.fetch=old;}};

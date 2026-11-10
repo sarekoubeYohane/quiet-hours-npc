@@ -1,0 +1,48 @@
+{
+  "commit": "5bdc6db",
+  "engine": "Wrangler local D1 / SQLite",
+  "config": "/tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json",
+  "persistTo": "/tmp/quiet-hours-t7-d1-5bdc6db/state",
+  "database": "/tmp/quiet-hours-t7-d1-5bdc6db/state/v3/d1/miniflare-D1DatabaseObject/8ff8456c43659294a6630105c1efa7099eb83aa27b57881a033ca5d8dfda5374.sqlite",
+  "migrations": [
+    "0000_bizarre_inhumans.sql",
+    "0001_hard_cargill.sql",
+    "0002_account_model_keys.sql",
+    "0003_world_operations.sql",
+    "0004_recall_usage.sql",
+    "0005_decision_traces.sql",
+    "0006_character_templates.sql",
+    "0007_scene_templates.sql",
+    "0008_world_before_city.sql",
+    "0013_character_drafts.sql",
+    "0014_world_saves.sql",
+    "0015_save_management.sql",
+    "0016_model_preferences.sql",
+    "0017_character_cards.sql",
+    "0018_player_account_budget.sql",
+    "0019_opening_drafts.sql"
+  ],
+  "migrationCount": 16,
+  "oldRows": "explicit historical migration fixture only, not a user creation journey",
+  "unchanged": [
+    "state exact UTF-8 bytes",
+    "operation journal exact bytes with old d20 result",
+    "version 42",
+    "lease 9876543210000",
+    "city_started",
+    "world_saves original null"
+  ],
+  "openingDraftRows": 0,
+  "legacyBytes": {
+    "stateSha256": "301a564a040b889d2eeb9a261639db1a7dc8bcd0611b22b22c6319cd1a826775",
+    "journalSha256": "4ed8d91f77a99700d827f977f6f3ec2e194315de08c5efdaed9ebeb144f337d8",
+    "stateUtf8Bytes": 186,
+    "journalUtf8Bytes": 89
+  },
+  "productionOrRemote": false,
+  "commands": [
+    "npx wrangler d1 migrations apply DB --local --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state",
+    "npx wrangler d1 execute DB --local --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state --file /tmp/quiet-hours-t7-d1-5bdc6db/legacy-fixture.sql",
+    "npm run db:migrate:local -- --config /tmp/quiet-hours-t7-d1-5bdc6db/wrangler.json --persist-to /tmp/quiet-hours-t7-d1-5bdc6db/state"
+  ]
+}
