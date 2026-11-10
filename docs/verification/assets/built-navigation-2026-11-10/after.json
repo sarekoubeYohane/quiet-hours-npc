@@ -1,0 +1,15 @@
+{
+  "production": false,
+  "bundleEnvironment": "production",
+  "identity": "isolated local session/D1 fixture",
+  "routes": [
+    "/",
+    "/new?draft=ec121810-309e-41af-a5fb-7781f25bbf9e&owner=github%3A123",
+    "/character-templates?returnTo=%2Fnew%3Fdraft%3Dec121810-309e-41af-a5fb-7781f25bbf9e%26owner%3Dgithub%253A123&owner=github%3A123",
+    "/settings?owner=github%3A123",
+    "/"
+  ],
+  "errors": [],
+  "external": [],
+  "savedDrafts": 1
+}

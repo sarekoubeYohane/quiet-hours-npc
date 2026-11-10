@@ -30,4 +30,8 @@ jobs:
         run: |
           pnpm build:production
           node --input-type=module -e 'import fs from "node:fs"; import assert from "node:assert/strict"; const config = JSON.parse(fs.readFileSync("dist/server/wrangler.json", "utf8")); assert.equal(config.name, "quiet-hours-npc"); assert.equal(config.vars.APP_ENV, "production");'
+      - name: Install browser for production bundle regression
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify production bundle navigation with isolated local D1
+        run: pnpm test:built-navigation
 

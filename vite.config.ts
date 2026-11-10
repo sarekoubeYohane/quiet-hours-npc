@@ -25,6 +25,10 @@ export default defineConfig(async () => {
     define: { __GIT_COMMIT__: JSON.stringify(gitCommit()), __BUILT_AT__: JSON.stringify(new Date().toISOString()) },
     // Only server environments emit maps; keep them out of public client assets.
     environments: {
+      // Vite defaults to dropping entry signatures. With vinext's shared browser
+      // entry, that also drops the namespace Link loads dynamically for prefetch
+      // and navigation. Keep it intact in production builds (dev is unaffected).
+      client: { build: { rolldownOptions: { preserveEntrySignatures: "strict" as const } } },
       rsc: { build: { sourcemap: true } },
       ssr: { build: { sourcemap: true } },
     },
