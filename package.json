@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit --incremental false",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local"
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "test:built-navigation": "node tooling/verification/browser-built-navigation.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -56,6 +57,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
     "happy-dom": "^20.14.5",
+    "playwright": "1.64.0",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "tw-animate-css": "^1.4.0",

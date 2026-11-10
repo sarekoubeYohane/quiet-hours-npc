@@ -1,0 +1,18 @@
+{
+  "production": false,
+  "bundleEnvironment": "production",
+  "identity": "isolated local session/D1 fixture",
+  "routes": [
+    "/"
+  ],
+  "errors": [
+    "[vinext] RSC prefetch setup error: TypeError: d is not a function\n    at http://127.0.0.1:36135/_next/static/chunks/link-BoEaVDPo.js:2:4492",
+    "[vinext] RSC prefetch setup error: TypeError: d is not a function\n    at http://127.0.0.1:36135/_next/static/chunks/link-BoEaVDPo.js:2:4492",
+    "[vinext] RSC prefetch setup error: TypeError: d is not a function\n    at http://127.0.0.1:36135/_next/static/chunks/link-BoEaVDPo.js:2:4492",
+    "[vinext] RSC prefetch setup error: TypeError: d is not a function\n    at http://127.0.0.1:36135/_next/static/chunks/link-BoEaVDPo.js:2:4492",
+    "[vinext] RSC prefetch setup error: TypeError: d is not a function\n    at http://127.0.0.1:36135/_next/static/chunks/link-BoEaVDPo.js:2:4492",
+    "e is not a function"
+  ],
+  "external": [],
+  "failure": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: '新開世界', exact: true }) to be visible\u001b[22m\n"
+}
