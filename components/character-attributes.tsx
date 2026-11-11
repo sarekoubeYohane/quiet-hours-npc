@@ -8,8 +8,8 @@ export default function CharacterAttributes({character,disabled,onAdopt}:{charac
  const [editing,setEditing]=useState(false),[setup,setSetup]=useState<CharacterSetup>({});
  const data=character.attributes;
  return <section aria-label="人物基本屬性"><h2>基本屬性</h2>{data?<>
-  <dl>{attributeNames.map(name=><div key={name}><dt>{attributeLabels[name]}</dt><dd>{data.values[name]}／{data.version===2?18:5}{data.constraints[name]&&`（確認背景：${data.constraints[name]?.min??1}–${data.constraints[name]?.max??5}${data.constraints[name]?.value!==undefined?'，指定'+data.constraints[name]?.value:''}）`}</dd></div>)}</dl>
-  {data.version===2&&<p>外觀：{data.values.appearance}／18（不參與檢定） · 完成人物卡能力版本 2</p>}
+  <dl>{attributeNames.map(name=><div key={name}><dt>{attributeLabels[name]}</dt><dd><span className="attribute-bar" aria-hidden="true"><span style={{width:`${Math.min(100,data.values[name]/(data.version===2?18:5)*100)}%`}}/></span><b>{data.values[name]}</b>／{data.version===2?18:5}{data.constraints[name]&&<small>可調範圍 {data.constraints[name]?.min??1}–{data.constraints[name]?.max??5}{data.constraints[name]?.value!==undefined?'，指定 '+data.constraints[name]?.value:''}</small>}</dd></div>)}</dl>
+  {data.version===2&&<p>外觀：{data.values.appearance}／18（只供展示，不參與檢定）</p>}
   <h3>專長與感官特性</h3><p>{data.expertise.map(item=>`${item.scope} ${item.modifier>0?'+':''}${item.modifier}`).join('、')||'未確認專長數值'}</p><p>{data.senses.map(item=>`${({sight:'視覺',hearing:'聽覺',touch:'觸覺'})[item.scope]} ${item.modifier>0?'+':''}${item.modifier}`).join('、')||'未確認感官修正'}</p>
   <p className="hint">背景限制與領域熟練分開保留。這些是穩定人物資料；新確認行動與新感知機會採 d100；舊規則與既存結果保持原版，並非當前需求、喜好或必須採取的行動。</p>
   <p>感官硬限制：{(data.blockedSenses??[]).map(sense=>({sight:'視覺',hearing:'聽覺',touch:'觸覺'})[sense]).join('、')||'未設定'}</p>

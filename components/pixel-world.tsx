@@ -7,11 +7,12 @@ import { worldDoors, worldLocations, worldRegions } from '@/lib/world-configurat
 import { assetsForCharacter } from '@/lib/character-assets';
 import { bubbleText, characterRegion, position, walkRoute, type Point } from '@/lib/pixel-scene';
 
-export function PixelSprite({ id, className = '' }: { id: string; className?: string }) {
+export function PixelSprite({ id, className = '', name, sourceId }: { id: string; className?: string; name?: string; sourceId?: string }) {
   const [failedSrc, setFailedSrc] = useState('');
-  const src = assetsForCharacter(id)?.pixel;
+  // World IDs come first; a card ID lets artwork made for a character card show up in every world that uses it.
+  const src = (assetsForCharacter(id) ?? (sourceId ? assetsForCharacter(sourceId) : undefined))?.pixel;
   return <span className={`pixel-sprite ${className}`} aria-hidden="true" data-asset-character={id} data-asset-use="pixel">
-    {!src || failedSrc === src ? <span className="pixel-sprite-fallback">{id.slice(0, 1).toUpperCase()}</span> : <img src={src} alt="" draggable={false} onError={() => setFailedSrc(src)}/>}
+    {!src || failedSrc === src ? <span className={`pixel-sprite-fallback ${name ? 'is-initial' : ''}`}>{[...(name || id)][0]?.toUpperCase()}</span> : <img src={src} alt="" draggable={false} onError={() => setFailedSrc(src)}/>}
   </span>;
 }
 
@@ -40,8 +41,8 @@ function ConfiguredScene({world,selected,onSelect}:{world:World;selected:string;
           return <section className="pixel-location" key={room.id} aria-label={room.name}>
             <h3>{room.name}</h3>
             <div>{occupants.map(person=><button key={person.id} type="button" onClick={()=>onSelect(person.id)}
-              aria-pressed={selected===person.id} className={selected===person.id?'active':''}>
-              <PixelSprite id={person.id}/><strong>{person.name}</strong>
+              aria-pressed={selected===person.id} className={selected===person.id?'active':''} style={{'--character-color':person.color} as CSSProperties}>
+              <PixelSprite id={person.id} name={person.name} sourceId={person.profileSource?.id}/><strong>{person.name}</strong>
               <small>{room.name} · {person.activity || '活動內容未記錄'}</small>
             </button>)}
               {!occupants.length&&<span className="empty-place">此刻沒有人</span>}
@@ -132,7 +133,7 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
   const regions = worldRegions(world);
   const doors = worldDoors(world);
   return <section role="region" aria-label="世界像素地圖" data-period={period}>
-    <div className="map-time">第 {Math.floor(world.minute / 1440) + 1} 天 · {timeLabel(world.minute)} · {period === 'day' ? '白天' : '夜晚'}</div>
+    {!world.configuration && <div className="map-time">第 {Math.floor(world.minute / 1440) + 1} 天 · {timeLabel(world.minute)} · {period === 'day' ? '白天' : '夜晚'}</div>}
     {!world.configuration && <div className={`pixel-scene period-${period}`} data-period={period}>
       <img className="pixel-map" src="/pixel/night-map.png" alt="像素場景底圖；時間、分區與門狀態以覆蓋標示及下方文字為準。" onError={() => setArtFailed(true)} draggable={false}/>
       {artFailed && <div className="map-error">地圖載入失敗，請重新整理。下方仍可點選角色。</div>}
@@ -157,6 +158,6 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
       <div className="map-door-status">{doors.map(door => <span key={door.id}>{door.name}：{world.scene?.doors[door.id] === 'closed' ? '關閉' : '開啟'}（{door.regions.map(id => regions.find(region => region.id === id)?.name || id).join(' ↔ ')}）</span>)}<span>分區邊界為示意；角色位置與門狀態來自世界。</span></div>
       <div className="pixel-locations">{places.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}><span style={{background:c.color}}/><strong>{c.name}</strong><small>{regions.find(region => region.id === characterRegion(c))?.name || c.location} · {c.activity || '活動內容未記錄'}</small></button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
     </>}
-    <div className="scene-caption" aria-live="polite">{active ? `已提交行動回放 · ${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨回合行動。延續活動不重新詢問 AI；當面對話顯示在地圖上。`}</div>
+    {(!world.configuration || active) && <div className="scene-caption" aria-live="polite">{active ? `已提交行動回放 · ${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨回合行動。延續活動不重新詢問 AI；當面對話顯示在地圖上。`}</div>}
   </section>;
 }

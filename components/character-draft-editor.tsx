@@ -181,26 +181,7 @@ export default function CharacterDraftEditor({originalAccountScope,returnTo}:{or
   const missing = draft ? missingCharacterText(draft.fields) : [];
   const locked = modelPanel || generating || forming || !!draft?.pendingGeneration || !!draft?.formation || !!draft?.pendingFormation;
   const canSwitch = !modelPanel && !templatePending && !saving && !generating && !forming && !dirty && !saveFailed;
-  return <section className="panel character-authoring space-y-4 p-6" aria-label="建角文字草稿">
-    <header className="journey-panel-heading"><div><span className="eyebrow">人物準備</span><h2>製作人物卡</h2></div><p role="status" className="opening-status">{status}</p></header>
-    <aside className="journey-note"><strong>{modelReady?'模型已就緒，可以製作人物':'形成數值前，需要模型與 API Key'}</strong><p>先寫設定 → 確認文字並形成數值 → 配點與完成。全部手填仍需要模型判讀背景；可先存草稿。</p><Button variant="outline" disabled={forming||generating} onClick={()=>{setResumeModel(undefined);setModelPanel(true);}}>設定模型與 Key</Button></aside>
-    {modelPanel && <ModelSettingsPanel originalAccountScope={accountScope} onClose={() => {setModelPanel(false);setResumeModel(undefined);}} onSaved={settings=>setModelReady(modelRoleReady(settings,'adjudication'))} continuation={resumeModel?{label:'保存並繼續這次操作',run:async()=>{setModelPanel(false);setResumeModel(undefined);await resumeModel();}}:undefined} />}
-    <p className="hint">先寫人物概念，或全部手填。此處保存帳號建角草稿，尚不是可選入世界的完成人物卡。起始位置在開局配置安排。</p>
-    <div className="flex flex-wrap gap-2">
-      <Button type="button" disabled={loading || !accountScope || !canSwitch} onClick={() => edit({...newCharacterDraft(),accountScope})}>建立新人物</Button>
-      <Button type="button" variant="outline" disabled={!canSwitch} onClick={() => void load()}>重新讀取建角草稿</Button>
-      {drafts.map(item => <Button key={item.id} type="button" variant="outline" disabled={!canSwitch} onClick={() => edit(item)}>{item.fields.name || item.concept.slice(0, 20) || '未命名草稿'}{item.completedCard?'（完成卡）':item.formation?'（已形成）':''}</Button>)}
-    </div>
-    {templatePending&&<Button type="button" disabled={saving} onClick={()=>void fromTemplate()}>恢復原範本建角</Button>}
-    <details><summary>從文字範本明示建角</summary><p className="hint">沿用來源文字建立新草稿；舊範本未記錄的文字來源不視為使用者親寫。數值須另行確認形成，來源更新不改這份草稿。</p>{sources.map(source=><Button key={source.id} type="button" variant="outline" disabled={!canSwitch} onClick={()=>void fromTemplate(source)}>以 {source.fields.name} 建角</Button>)}</details>
-    {draft && <div className="space-y-4" aria-label="建角編輯器">
-      <div className="authoring-progress" aria-label="人物製作進度"><span aria-current={!draft.formation?"step":undefined}>1 撰寫設定</span><span aria-current={draft.formation&&!draft.completedCard?"step":undefined}>2 確認數值</span><span aria-current={draft.completedCard?"step":undefined}>3 完成人物卡</span></div><label>人物概念（選填，可請 AI 補完）<textarea name="draftConcept" maxLength={2400} rows={3} value={draft.concept} disabled={locked} onChange={event => update('concept', event.target.value)} /></label>
-      <p className="hint">AI 只補空白，已填內容（包含「沒有」）原樣保留。使用帳號現有天上意志模型設定；不會自動重試付費請求。</p>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={modelPanel || saving || generating || forming || !!draft.formation || !!draft.pendingFormation || saveFailed || !!memoryError || (!draft.pendingGeneration && !draft.concept.trim() && !characterDraftFieldNames.some(field => draft.fields[field].trim())) || (!draft.pendingGeneration && !missing.length)} onClick={() => void generate()}>{generating ? '正在補完…' : draft.pendingGeneration ? '恢復原 AI 補完操作' : '用 AI 補完空白文字'}</Button>
-        {draft.pendingGeneration && <Button type="button" variant="outline" disabled={saving || generating} onClick={() => void generate(true)}>放棄套用原 AI 結果</Button>}
-      </div>
-      {characterTextGroups.map(group => <details key={group.title} open={!draft.formation} className="space-y-2">
+  const textGroups = draft ? characterTextGroups.map(group => <details key={group.title} open={!draft.formation} className="space-y-2">
         <summary>{group.title}：{group.fields.map(field => draft.fields[field].trim() ? draft.fields[field].slice(0, 24) : `${characterTemplateFields[field].label}未填`).join('／')}</summary>
         <fieldset disabled={locked} className="grid gap-3 md:grid-cols-2">
           {group.fields.map(field => <label key={field}>{characterTemplateFields[field].label}
@@ -208,16 +189,37 @@ export default function CharacterDraftEditor({originalAccountScope,returnTo}:{or
             <span className="hint">{draft.provenance[field]?.kind === 'ai' ? (draft.provenance[field].materiallyEdited ? 'AI 補完，使用者已有實質修改' : 'AI 補完') : draft.provenance[field]?.kind==='unknown' ? (draft.provenance[field].materiallyEdited?'範本文字，使用者已有實質修改':'來源範本文字（來源未記錄）') : draft.fields[field].trim() ? '使用者文字' : '留白'}</span>
           </label>)}
         </fieldset>
-      </details>)}
+      </details>) : null;
+  return <section className="panel character-authoring space-y-4 p-6" aria-label="建角文字草稿">
+    <header className="journey-panel-heading"><div><span className="eyebrow">人物準備</span><h2>製作人物卡</h2></div><p role="status" aria-live="polite" className="opening-status">{status}</p></header>
+    {modelReady?<p className="model-ready-line"><span>模型已就緒</span><Button variant="ghost" disabled={forming||generating} onClick={()=>{setResumeModel(undefined);setModelPanel(true);}}>調整模型與 Key</Button></p>:<aside className="journey-note"><strong>產生數值前，需要先設定模型與 API Key</strong><p>文字可以先寫、先存草稿；即使全部手填，產生數值時仍需要模型判讀背景。</p><Button variant="outline" disabled={forming||generating} onClick={()=>{setResumeModel(undefined);setModelPanel(true);}}>設定模型與 Key</Button></aside>}
+    {modelPanel && <ModelSettingsPanel originalAccountScope={accountScope} closeOnSaved onClose={() => {setModelPanel(false);setResumeModel(undefined);}} onSaved={settings=>{const ready=modelRoleReady(settings,'adjudication');setModelReady(ready);if(ready)setStatus('模型與 Key 已保存');}} continuation={resumeModel?{label:'保存並繼續這次操作',run:async()=>{setModelPanel(false);setResumeModel(undefined);await resumeModel();}}:undefined} />}
+    <p className="hint">三步完成一張人物卡：寫設定 → 產生數值 → 完成。草稿會自動保存，完成後才能選進世界；起始位置之後在開局時安排。</p>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" disabled={loading || !accountScope || !canSwitch} onClick={() => edit({...newCharacterDraft(),accountScope})}>＋ 從空白開始</Button>
+      <Button type="button" variant="ghost" disabled={!canSwitch} onClick={() => void load()}>重新讀取</Button>
+    </div>
+    {!!drafts.length&&<div className="draft-list" role="group" aria-label="我的草稿與人物卡"><span className="eyebrow">我的草稿與人物卡</span>
+      {drafts.map(item => <button key={item.id} type="button" disabled={!canSwitch} aria-pressed={draft?.id===item.id} onClick={() => edit(item)}><strong>{item.fields.name || item.concept.slice(0, 20) || '未命名草稿'}</strong><small className={item.completedCard?'is-card':''}>{item.completedCard?'人物卡':item.formation?'草稿 · 已有數值':'草稿 · 撰寫中'}</small></button>)}
+    </div>}
+    {templatePending&&<Button type="button" disabled={saving} onClick={()=>void fromTemplate()}>恢復原範本建角</Button>}
+    <details><summary>或從範本開始</summary><p className="hint">複製範本的文字成為一份新草稿，之後修改不影響範本；數值仍要自己產生。</p><div className="flex flex-wrap gap-2">{sources.map(source=><Button key={source.id} type="button" variant="outline" disabled={!canSwitch} onClick={()=>void fromTemplate(source)}>用 {source.fields.name} 的設定開始</Button>)}</div></details>
+    {draft && <div className="space-y-4" aria-label="建角編輯器">
+      <div className="authoring-progress" aria-label="人物製作進度"><span aria-current={!draft.formation?"step":undefined}>1 寫設定</span><span aria-current={draft.formation&&!draft.completedCard?"step":undefined}>2 產生數值與配點</span><span aria-current={draft.completedCard?"step":undefined}>3 完成人物卡</span></div>{draft.formation?<details className="locked-text"><summary>人物設定（已鎖定，展開查看）</summary>{textGroups}</details>:<><label>人物概念（選填，可請 AI 補完）<textarea name="draftConcept" maxLength={2400} rows={3} value={draft.concept} disabled={locked} onChange={event => update('concept', event.target.value)} /></label>
+      <p className="hint">AI 只補空白，已填內容（包含「沒有」）原樣保留。使用帳號現有天上意志模型設定；不會自動重試付費請求。</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" disabled={modelPanel || saving || generating || forming || !!draft.formation || !!draft.pendingFormation || saveFailed || !!memoryError || (!draft.pendingGeneration && !draft.concept.trim() && !characterDraftFieldNames.some(field => draft.fields[field].trim())) || (!draft.pendingGeneration && !missing.length)} onClick={() => void generate()}>{generating ? '正在補完…' : draft.pendingGeneration ? '恢復原 AI 補完操作' : '用 AI 補完空白文字'}</Button>
+        {draft.pendingGeneration && <Button type="button" variant="outline" disabled={saving || generating} onClick={() => void generate(true)}>放棄套用原 AI 結果</Button>}
+      </div>
+      {textGroups}
       <p className="hint">形成數值前須完成九項文字；適用時可如實填寫「沒有特殊設定」。形成後所有文字都會鎖定，請先核對姓名及錯字。</p>
       {!!missing.length && <p role="status">待完成：{missing.join('、')}</p>}
       {memoryError && <p role="alert" className="error">{memoryError}</p>}
-      <Button type="button" disabled={modelPanel || saving || generating || forming || !!draft.formation || !!draft.pendingFormation || !!memoryError || !!draft.pendingGeneration} onClick={() => void save()}>{saveFailed ? '恢復草稿保存' : '保存建角草稿'}</Button>
+      <Button type="button" disabled={modelPanel || saving || generating || forming || !!draft.formation || !!draft.pendingFormation || !!memoryError || !!draft.pendingGeneration} onClick={() => void save()}>{saveFailed ? '恢復草稿保存' : '立即保存草稿'}</Button></>}
       <CharacterFormationControls key={draft.id} draft={draft} disabled={modelPanel||saving||generating||loading||saveFailed} onBusy={setForming} onModels={openModels} completeLabel={returnTo?'保存人物卡並帶回開局':undefined} onCompleted={returnTo?bringBack:undefined} onSaved={value => { if(!alive.current)return;capture(value.accountScope);show(value); record(value); setDirty(false); setStatus('已保存至帳號'); }} onPrepare={async () => { if (!current.current) return; if (dirty || !current.current.version) return save(current.current); return current.current; }} />
       {returnTo&&draft.completedCard&&<Button disabled={returning} onClick={()=>void bringBack(draft)}>{returning?'正在選入開局…':'帶回本次開局'}</Button>}
       {conflict && <p className="hint">本頁文字仍保留。請另開人物頁核對帳號已保存版本，再決定如何處理變更；不會自動覆寫或另建副本。</p>}
     </div>}
-    <p role="status" aria-live="polite">{status}</p>
     {error && <p role="alert" className="error">{error}</p>}
   </section>;
 }

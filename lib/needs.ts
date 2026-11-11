@@ -9,7 +9,7 @@ export const needLabels:Record<Need,string> = {hunger:'飢餓',thirst:'口渴',f
 const initial:NeedValues={hunger:20,thirst:20,fatigue:15,sleep:20};
 const hourly:NeedValues={hunger:3,thirst:6,fatigue:1,sleep:4};
 const stage=(value:number)=>value<40?0:value<65?1:value<85?2:3;
-const needStage=(actor:Character,key:Need)=>stage(actor.needs!.personal?.status==='active'?actor.needs!.personal!.units[key]/60000000:actor.needs!.values[key]);
+export const needStage=(actor:Character,key:Need)=>stage(actor.needs!.personal?.status==='active'?actor.needs!.personal!.units[key]/60000000:actor.needs!.values[key]);
 const clamp=(value:number)=>Math.round(Math.max(0,Math.min(100,value))*100)/100;
 export function activateBodyNeeds(world:World):void {
  for(const actor of world.characters)if(!actor.needs)actor.needs={version:1,activatedAt:world.minute,updatedAt:world.minute,values:{...initial},assessed:{hunger:0,thirst:0,fatigue:0,sleep:0},history:[],dropped:0};
