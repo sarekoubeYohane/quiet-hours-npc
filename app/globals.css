@@ -492,3 +492,5 @@ label:has(>input[type=checkbox]),.check-label{flex-direction:row;align-items:cen
 .attribute-bar>span{display:block;height:100%;background:#7fa7c9;border-radius:999px}
 [aria-label="人物基本屬性"] dd small{color:var(--muted-foreground);margin-left:10px;font-size:.8rem}
 .analysis-needs .need-meters{margin:10px 0 12px}
+.draft-list button[data-note]{font-weight:600}
+.draft-list button[data-note]::after{content:attr(data-note);font-size:.75rem;font-weight:400;color:var(--muted-foreground)}

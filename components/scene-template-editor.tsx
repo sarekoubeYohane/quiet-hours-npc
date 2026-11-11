@@ -152,8 +152,8 @@ export default function SceneTemplateEditor({originalAccountScope,returnTo}:{ori
       <button type="button" disabled={busy} onClick={() => void reload()}>重新讀取場景範本</button>
     </div>
     {!!templates.length && <div className="draft-list" role="group" aria-label="可用的場景"><span className="eyebrow">可用的場景</span>
-      {templates.map(template => <button type="button" key={template.id} disabled={busy} onClick={() => open(editTemplate(template))}>
-        <strong>{template.name}</strong><small>{template.shared ? '內建範本 · 會複製成你的副本' : '我的場景'}</small>
+      {templates.map(template => <button type="button" key={template.id} disabled={busy} data-note={template.shared ? '內建範本 · 編輯時會複製成你的副本' : '我的場景'} onClick={() => open(editTemplate(template))}>
+        {template.shared ? template.name + '（複製共用範本）' : template.name}
       </button>)}
     </div>}
     {message && <p role="status">{message}</p>}
