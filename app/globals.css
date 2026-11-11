@@ -494,3 +494,4 @@ label:has(>input[type=checkbox]),.check-label{flex-direction:row;align-items:cen
 .analysis-needs .need-meters{margin:10px 0 12px}
 .draft-list button[data-note]{font-weight:600}
 .draft-list button[data-note]::after{content:attr(data-note);font-size:.75rem;font-weight:400;color:var(--muted-foreground)}
+.analysis-needs .meter-mental{margin:10px 0 12px}
