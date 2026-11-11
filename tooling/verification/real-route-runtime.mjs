@@ -12,7 +12,7 @@ import {createHash} from 'node:crypto';
 import './no-network.mjs';
 import http from 'node:http';
 
-export async function startApp({root=process.cwd(), port=0, databasePath, modelResponder, diceFaces, checkRolls}={}) {
+export async function startApp({root=process.cwd(), port=0, databasePath, modelResponder, diceFaces, checkRolls, onRequest}={}) {
   root=resolve(root);
   if(!port){const probe=http.createServer();await new Promise(done=>probe.listen(0,'127.0.0.1',done));port=probe.address().port;await new Promise(done=>probe.close(done));}
   const require=createRequire(join(root,'package.json'));
@@ -84,7 +84,7 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
       if(!source.includes(expected))throw Error('Model boundary changed: update the acceptance harness before testing');
       return source.replace(expected,`((_url, init) => (options.fetcher || fetch)(${JSON.stringify(modelUrl)}, {...init, headers:{'Content-Type':'application/json'}}))`);
     },
-    configureServer(server){server.middlewares.use((req,_res,next)=>{requests.push({method:req.method,url:req.url});next();});},
+    configureServer(server){server.middlewares.use((req,_res,next)=>{requests.push({method:req.method,url:req.url});if(onRequest?.(req,_res))return;next();});},
   };
   let server;
   try {

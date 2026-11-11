@@ -2,18 +2,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import { Button } from '@/components/ui/button';
-import { modelSourceLabel, type ModelChoice, type ModelRoles, type ModelSettingsView } from '@/lib/model-settings';
+import { modelRoleReady, modelSourceLabel, type ModelChoice, type ModelRoles, type ModelSettingsView } from '@/lib/model-settings';
 const blank: Required<ModelRoles> = { npc: { provider: 'openai', model: 'gpt-6-luna' }, adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } };
-export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalAccountScope }: { originalAccountScope?: string; saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void }) {
+const providerNames = { openai: 'OpenAI', openrouter: 'OpenRouter' };
+type Provider = ModelChoice['provider'];
+type Props = { originalAccountScope?: string; saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void; continuation?: { label: string; run: () => Promise<void> } };
+export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalAccountScope, continuation }: Props) {
   const { capture, scoped } = useOriginalAccountScope(originalAccountScope);
-  const alive = useRef(true);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const alive = useRef(true), heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { alive.current = true; heading.current?.focus(); return () => { alive.current = false; }; }, []);
   const [scope, setScope] = useState<'account' | 'save'>(saveId ? 'save' : 'account');
   const [view, setView] = useState<ModelSettingsView>();
   const [models, setModels] = useState<Required<ModelRoles>>(blank);
   const [inherit, setInherit] = useState(false);
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false);
-  const [provider, setProvider] = useState<ModelChoice['provider']>('openai'), [key, setKey] = useState('');
+  const [keys, setKeys] = useState<Record<Provider, string>>({ openai: '', openrouter: '' });
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
   const endpoint = '/api/model-settings' + (scope === 'save' && saveId ? '?save=' + encodeURIComponent(saveId) : '');
   const reload = useCallback(async (signal: AbortSignal) => {
@@ -22,61 +25,79 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
       const body = await response.json() as ModelSettingsView & { error?: string };
       if (!response.ok) throw Error(body.error || '無法讀取模型設定。');
       if (signal.aborted) return;
-      capture(body.accountScope);
-      setView(body); setModels({ npc: body.effective.npc ?? blank.npc, adjudication: body.effective.adjudication ?? blank.adjudication });
+      capture(body.accountScope); setView(body);
+      setModels({ npc: body.effective.npc ?? blank.npc, adjudication: body.effective.adjudication ?? blank.adjudication });
       setInherit(scope === 'save' && body.preference.mode === 'inherit'); setError('');
     } catch (cause) { if (!signal.aborted) setError(cause instanceof Error ? cause.message : '無法讀取模型設定。'); }
     finally { if (!signal.aborted) setLoading(false); }
   }, [endpoint, scope, capture, scoped]);
-  useEffect(() => { const controller = new AbortController(); queueMicrotask(() => { if (!controller.signal.aborted) void reload(controller.signal); }); return () => controller.abort(); }, [reload]);
-  async function save() {
+  useEffect(() => { const controller = new AbortController(); void reload(controller.signal); return () => controller.abort(); }, [reload]);
+  async function writeKey(provider: Provider, clear: boolean, settings: ModelSettingsView) {
+    const response = await fetch('/api/world?workspace=account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operationScope: settings.accountScope, operation: clear ? 'clear-model-key' : 'set-model-key', mode: provider === 'openai' ? 'openai' : 'ai', ...(clear ? {} : { key: keys[provider] }) }) });
+    const body = await response.json() as Pick<ModelSettingsView, 'modelKeys' | 'modelKeyStorageAvailable'> & { operationScope?: string; error?: string };
+    if (!response.ok) throw Error(body.error || providerNames[provider] + ' Key 未確認保存，輸入已保留。');
+    capture(body.operationScope);
+    const next = { ...settings, modelKeys: body.modelKeys, modelKeyStorageAvailable: body.modelKeyStorageAvailable };
+    if (alive.current) { setView(next); setKeys(previous => ({ ...previous, [provider]: '' })); }
+    return next;
+  }
+  async function save(continueAfter = false) {
     if (!view || saving) return;
     setSaving(true); setError(''); setNotice('');
+    let savedModels = false;
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountScope: view.accountScope, version: view.version, ...(scope === 'save' && inherit ? { mode: 'inherit' } : { mode: 'custom', models }) }) });
-      const body = await response.json() as ModelSettingsView & { error?: string };
-      if (!response.ok) throw Error(body.error || '未同步：保存模型設定失敗，原輸入已保留。');
+      const preference = scope === 'save' && inherit ? { mode: 'inherit' } : { mode: 'custom', models };
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountScope: view.accountScope, version: view.version, ...preference }) });
+      let next = await response.json() as ModelSettingsView & { error?: string };
+      if (!response.ok) throw Error(next.error || '模型設定未同步，原輸入已保留。');
+      capture(next.accountScope); if (!alive.current) return;
+      savedModels = true; setView(next);
+      for (const provider of ['openai', 'openrouter'] as const) {
+        if (keys[provider].trim()) next = await writeKey(provider, false, next);
+      }
       if (!alive.current) return;
-      capture(body.accountScope);
-      setView(body); setNotice('模型設定已保存；僅供後續新操作使用。尚未呼叫模型或推進世界。');
-      onSaved?.(body);
-    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : '未同步：保存結果尚未確認，請保留輸入並恢復保存。'); }
+      setNotice('模型與已填的 Key 已保存。Key 加密保存 14 天；設定只影響後續新操作。');
+      onSaved?.(next);
+      if (continueAfter && continuation) {
+        if (!modelRoleReady(next, 'adjudication')) throw Error('設定已保存；請補上天上意志服務的有效 API Key，再繼續。');
+        await continuation.run();
+      }
+    } catch (cause) { if (alive.current) setError((savedModels ? '模型已保存；' : '') + (cause instanceof Error ? cause.message : '保存結果尚未確認，請重試。')); }
     finally { if (alive.current) setSaving(false); }
   }
-  async function manageKey(clear = false) {
-    if (!view || saving || (!clear && !key.trim())) return;
+  async function clearKey(provider: Provider) {
+    if (!view || saving) return;
     setSaving(true); setError('');
-    try {
-      const response = await fetch('/api/world?workspace=account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operationScope: view.accountScope, operation: clear ? 'clear-model-key' : 'set-model-key', mode: provider === 'openai' ? 'openai' : 'ai', ...(clear ? {} : { key }) }) });
-      const body = await response.json() as Pick<ModelSettingsView, 'modelKeys' | 'modelKeyStorageAvailable'> & { operationScope?: string; error?: string };
-      if (!response.ok) throw Error(body.error || 'Key 保存失敗，輸入仍保留。');
-      if (!alive.current) return;
-      capture(body.operationScope);
-      setView(previous => previous && { ...previous, ...body }); setKey(''); setNotice(clear ? '此帳號的服務 Key 已清除。' : '服務 Key 已加密保存；固定 14 天，不會因讀取、使用或重新登入延長。');
-    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Key 保存失敗，輸入仍保留。'); }
+    try { const next = await writeKey(provider, true, view); setNotice(providerNames[provider] + ' Key 已清除，這個帳號的所有瀏覽器都無法再用它發出新請求。'); onSaved?.(next); }
+    catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Key 清除結果尚未確認。'); }
     finally { if (alive.current) setSaving(false); }
   }
-  return <section className="panel space-y-4 p-6" role={onClose ? 'dialog' : undefined} aria-modal={onClose ? true : undefined} aria-label="模型設定面板">
-    <h2>模型設定</h2>
-    <p>NPC 自主決策與天上意志分開設定。建角與世界配置使用天上意志；規則推進不需要模型。保存不會重送進行中的請求，也不會自動呼叫模型。</p>
+  const effective = scope === 'save' && inherit ? view?.accountModels : models;
+  const requiredProviders = [...new Set([...Object.values(effective ?? {}).map(choice => choice.provider), ...(['openai', 'openrouter'] as const).filter(provider => keys[provider].trim())])];
+  return <section className="panel model-setup" aria-label="模型設定面板">
+    <header className="journey-panel-heading"><div><span className="eyebrow">模型與連線</span><h2 ref={heading} tabIndex={-1}>準備這次需要的模型</h2></div>{onClose && <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>取消，返回原流程</Button>}</header>
+    <p className="hint">人物補完與數值形成使用「天上意志」。模型與 Key 可一起保存；只有明確選擇繼續操作才會發出模型請求。</p>
     {saveId && <label>設定範圍<select aria-label="設定範圍" value={scope} disabled={saving} onChange={event => { setScope(event.target.value as 'account' | 'save'); setLoading(true); setNotice(''); }}><option value="save">這份存檔</option><option value="account">帳號預設</option></select></label>}
     {loading ? <p role="status">正在讀取設定…</p> : <>
-      <p role="status">生效來源：{view ? modelSourceLabel[view.source] : '尚未讀取'}</p>
-      <p>目前已保存：NPC {view?.effective.npc?.model || '尚未設定'}；天上意志 {view?.effective.adjudication?.model || '尚未設定'}。以下欄位需按保存才生效。</p>
-      {scope === 'save' && <label><input type="checkbox" checked={inherit} disabled={saving} onChange={event => setInherit(event.target.checked)} />沿用帳號預設</label>}
-      {(['npc', 'adjudication'] as const).map(role => <fieldset key={role} disabled={saving || (scope === 'save' && inherit)} className="space-y-2"><legend>{role === 'npc' ? 'NPC 自主決策' : '天上意志／建角與世界配置'}</legend>
-        <label>{role === 'npc' ? 'NPC 服務' : '天上意志服務'}<select aria-label={role === 'npc' ? 'NPC 服務' : '天上意志服務'} value={models[role].provider} onChange={event => setModels(previous => ({ ...previous, [role]: { ...previous[role], provider: event.target.value as ModelChoice['provider'] } }))}><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option></select></label>
+      <p className="hint">生效來源：{view ? modelSourceLabel[view.source] : '尚未讀取'}</p>
+      {scope === 'save' && <label className="check-label"><input type="checkbox" checked={inherit} disabled={saving} onChange={event => setInherit(event.target.checked)} />沿用帳號預設</label>}
+      <div className="model-role-grid">{(['adjudication', 'npc'] as const).map(role => <fieldset key={role} disabled={saving || (scope === 'save' && inherit)}><legend>{role === 'npc' ? 'NPC 自主決策' : '天上意志 · 人物與世界製作'}</legend>
+        <label>{role === 'npc' ? 'NPC 服務' : '天上意志服務'}<select aria-label={role === 'npc' ? 'NPC 服務' : '天上意志服務'} value={models[role].provider} onChange={event => setModels(previous => ({ ...previous, [role]: { ...previous[role], provider: event.target.value as Provider } }))}><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option></select></label>
         <label>{role === 'npc' ? 'NPC 模型' : '天上意志模型'}<input aria-label={role === 'npc' ? 'NPC 模型' : '天上意志模型'} maxLength={120} value={models[role].model} onChange={event => setModels(previous => ({ ...previous, [role]: { ...previous[role], model: event.target.value } }))} /></label>
+      </fieldset>)}</div>
+      {requiredProviders.map(provider => <fieldset key={provider} disabled={saving || !view?.modelKeyStorageAvailable}>
+        <legend>{providerNames[provider]} API Key</legend>
+        <p className="hint">{view?.modelKeys[provider]?.configured ? '已有有效 Key，可留空沿用。填入新 Key 才會替換。' : '尚未設定。請貼上此服務的 Key，與模型一起保存。'}</p>
+        <label>{providerNames[provider]} 服務 API Key<input aria-label={providerNames[provider] + ' 服務 API Key'} type="password" value={keys[provider]} autoComplete="off" maxLength={4096} onChange={event => setKeys(previous => ({ ...previous, [provider]: event.target.value }))} /></label>
       </fieldset>)}
-      <Button type="button" disabled={saving || !view} onClick={() => void save()}>{saving ? '正在保存…' : error ? '恢復保存模型設定' : '保存模型設定'}</Button>
-      <fieldset disabled={saving || !view?.modelKeyStorageAvailable} className="space-y-2"><legend>帳號共用服務 Key</legend><p className="hint">Key 按本站、帳號與供應商加密保存，最長 14 天；不存入人物、世界、草稿或另存副本。</p>
-        <label>Key 服務<select aria-label="Key 服務" value={provider} onChange={event => { setProvider(event.target.value as ModelChoice['provider']); setKey(''); }}><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option></select></label>
-        <label>服務 API Key<input aria-label="服務 API Key" type="password" value={key} autoComplete="off" maxLength={4096} onChange={event => setKey(event.target.value)} /></label>
-        <p role="status">{view?.modelKeys[provider]?.configured ? '此服務已有有效 Key' : '此服務尚無有效 Key'}</p>
-        <Button type="button" disabled={!key.trim()} onClick={() => void manageKey()}>保存服務 Key</Button><Button type="button" variant="outline" disabled={!view?.modelKeys[provider]?.expiresAt} onClick={() => void manageKey(true)}>清除此服務 Key</Button>
-      </fieldset>
+      {view && !view.modelKeyStorageAvailable && <p role="alert">本站的 Key 保存服務尚未就緒。可先保存人物文字，待服務恢復再形成數值。</p>}
+      <p className="hint">Key 只在本站同帳號、同服務共用，不放進人物卡、世界或草稿。規則模式推進世界不需要 Key。</p>
+      <div className="opening-actions"><Button type="button" variant={continuation ? 'outline' : 'default'} disabled={saving || !view} onClick={() => void save()}>{saving ? '保存中…' : '保存模型與 Key'}</Button>
+        {continuation && <Button type="button" disabled={saving || !view} onClick={() => void save(true)}>{continuation.label}</Button>}
+      </div>
+      <details><summary>管理已保存的服務 Key</summary><p className="hint">清除會停止同帳號所有瀏覽器後續的新請求；不撤銷已送出的請求。</p>{(['openai', 'openrouter'] as const).map(provider => <Button key={provider} type="button" variant="outline" disabled={saving || !view?.modelKeys[provider]?.expiresAt} onClick={() => void clearKey(provider)}>清除 {providerNames[provider]} Key</Button>)}</details>
     </>}
     {notice && <p role="status">{notice}</p>}{error && <p role="alert" className="error">{error}</p>}
-    {onClose && <Button type="button" variant="outline" disabled={saving} onClick={onClose}>返回原流程</Button>}
+    {!loading && !view && <Button onClick={() => { setLoading(true); void reload(new AbortController().signal); }}>重試讀取設定</Button>}
   </section>;
 }

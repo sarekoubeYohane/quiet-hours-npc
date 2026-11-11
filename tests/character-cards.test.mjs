@@ -191,3 +191,49 @@ test('hyphenated age and physical units remain background and their saved format
   }assert.equal(calls,5);
  }finally{globalThis.fetch=old;f.db.close();}
 });
+
+test('explicit reroll replaces unfinished values using the same assessed background without another model call',async()=>{
+ const f=await fixture(),oldFetch=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:JSON.stringify({bonuses:[{target:'strength',source:'concept',quote:'擅長搬重物',substantive:true},{target:'capacity',source:'concept',quote:'處變不驚',substantive:true}]})}}]});};
+ try{
+  await configure(f);const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'擅長搬重物，處變不驚',fields})).body.draft;
+  const formed=(await f.form(await operation(f,draft))).body.draft;
+  f.context.random=()=>{f.context.dice++;return 0;};
+  const input={action:'reroll',id:draft.id,version:formed.version,operationId:Date.now()+':'+crypto.randomUUID()};
+  const rerolled=await f.form(input);assert.equal(rerolled.status,200,JSON.stringify(rerolled.body));
+  assert.deepEqual(rerolled.body.draft.formation.values,{strength:8,endurance:3,dexterity:3,perception:3,appearance:3});
+  assert.equal(rerolled.body.draft.formation.initialTotal,20);assert.equal(rerolled.body.draft.formation.capacity,65);assert.deepEqual(rerolled.body.draft.formation.needTraits,{hunger:.8,thirst:.8,sleep:.8});
+  assert.deepEqual(rerolled.body.draft.fields,formed.fields);assert.deepEqual(rerolled.body.draft.provenance,formed.provenance);assert.equal(calls,1);
+  const used=f.context.dice;assert.deepEqual((await f.form(input)).body,rerolled.body);assert.equal(f.context.dice,used);
+  assert.deepEqual((await f.readDrafts()).body.drafts.find(item=>item.id===draft.id),rerolled.body.draft);
+  assert.equal((await f.saveDraft({...rerolled.body.draft,fields:{...fields,name:'改名'}})).status,409);
+  const card=(await f.complete({id:draft.id,version:rerolled.body.draft.version})).body.card;
+  assert.deepEqual(card.values,rerolled.body.draft.formation.values);
+  const completed=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);
+  assert.equal((await f.form({...input,version:completed.version,operationId:Date.now()+':'+crypto.randomUUID()})).status,409);
+  assert.deepEqual((await f.cards()).body.cards[0],card);assert.equal(f.context.dice,used);assert.equal(calls,1);
+ }finally{globalThis.fetch=oldFetch;f.db.close();}
+});
+
+test('reroll retries, stale tabs and foreign accounts cannot replace a committed result or trigger another assessment',async()=>{
+ for(const fault of ['before','after']){
+  const f=await fixture(),oldFetch=globalThis.fetch;let calls=0;
+  globalThis.fetch=async()=>{calls++;return Response.json({usage:{prompt_tokens:1,completion_tokens:1},choices:[{message:{content:'{"bonuses":[]}'}}]});};
+  try{
+   await configure(f);const draft=(await f.saveDraft({id:crypto.randomUUID(),version:0,concept:'修鐘人',fields})).body.draft;
+   const formed=(await f.form(await operation(f,draft))).body.draft;
+   const input={action:'reroll',id:draft.id,version:formed.version,operationId:Date.now()+':'+crypto.randomUUID()};
+   f.context.random=()=>{f.context.dice++;return .999;};f.context.formFault=fault;
+   assert.equal((await f.form(input)).status,503);const used=f.context.dice;
+   const stored=(await f.readDrafts()).body.drafts.find(value=>value.id===draft.id);assert.equal(!!stored.lastReroll,fault==='after');
+   const replay=await f.form(input);assert.equal(replay.status,200);assert.equal(replay.body.draft.lastReroll.count,1);assert.equal(replay.body.draft.formation.initialTotal,90);assert.equal(calls,1);
+   if(fault==='after')assert.equal(f.context.dice,used);
+   const settled=f.context.dice;
+   assert.equal((await f.form({...input,operationId:Date.now()+':'+crypto.randomUUID()})).status,409);assert.equal(f.context.dice,settled);
+   f.context.owner='foreign';assert.equal((await f.form({...input,operationScope:'account-operations:a'})).status,409);assert.equal((await f.form(input)).status,404);assert.equal(f.context.dice,settled);
+   f.context.owner='a';const next=await f.form({...input,version:replay.body.draft.version,operationId:Date.now()+':'+crypto.randomUUID()});assert.equal(next.status,200);assert.equal(next.body.draft.lastReroll.count,2);
+   const afterNext=f.context.dice;assert.equal((await f.form(input)).status,409);assert.equal(f.context.dice,afterNext);assert.equal(calls,1);
+   assert.deepEqual((await f.readDrafts()).body.drafts.find(value=>value.id===draft.id),next.body.draft);
+  }finally{globalThis.fetch=oldFetch;f.db.close();}
+ }
+});

@@ -52,7 +52,7 @@ try{
   record();
   await page.getByRole('link',{name:'＋新開存檔',exact:true}).hover();
   await page.getByRole('link',{name:'＋新開存檔',exact:true}).click();
-  await page.getByRole('heading',{name:'新開世界',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'建立你的世界',exact:true}).waitFor();
   await page.getByRole('button',{name:'建立人物卡並返回',exact:true}).waitFor();record();
   assert.equal(new URL(page.url()).searchParams.get('owner'),'github:123');
   // This button flushes the draft via the real API and calls router.push.

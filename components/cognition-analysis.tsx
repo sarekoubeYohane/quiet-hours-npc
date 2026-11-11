@@ -2,6 +2,7 @@
 import ArrangementsAnalysis from './arrangements-analysis';
 import type { Character, World } from '@/lib/world';
 import { timeLabel } from '@/lib/world';
+import {worldLocations,worldRegions} from '@/lib/world-configuration';
 import { cognitiveProjection, type CognitiveReference } from '@/lib/cognition';
 import { recallableMemoryProjection, type MemorySource } from '@/lib/memory';
 
@@ -15,7 +16,8 @@ export default function CognitionAnalysis({ character, world }: { character: Cha
   const long = recallableMemoryProjection(character);
   const short = (character.shortTerm || []).filter(item => item.characterId === character.id);
   const person = (id: string) => world.characters.find(c => c.id === id)?.name || (id === 'observer' ? '觀察者' : id);
-  const source = (value: MemorySource) => [value.kind === 'legacy-unclassified' ? '舊版來源未分類' : value.kind === 'observation' ? '主觀觀察' : '主觀經歷', value.person ? `記得的人物：${person(value.person)}` : '', value.region ? `記得的區域：${value.region}` : '', value.sense === 'sight' ? '視覺' : value.sense === 'hearing' ? '聽覺' : value.sense === 'touch' ? '身體感知' : '', value.clarity === 'vague' ? '模糊線索' : value.clarity === 'clear' ? '清楚線索' : ''].filter(Boolean).join(' · ');
+  const place=(id:string)=>{const region=worldRegions(world).find(r=>r.id===id);return region?[worldLocations(world).find(l=>l.id===region.location)?.name,region.name].filter(Boolean).join(' · '):worldLocations(world).find(l=>l.id===id)?.name||id;};
+  const source = (value: MemorySource) => [value.kind === 'legacy-unclassified' ? '舊版來源未分類' : value.kind === 'observation' ? '主觀觀察' : '主觀經歷', value.person ? `記得的人物：${person(value.person)}` : '', value.region ? `記得的區域：${place(value.region)}` : '', value.sense === 'sight' ? '視覺' : value.sense === 'hearing' ? '聽覺' : value.sense === 'touch' ? '身體感知' : '', value.clarity === 'vague' ? '模糊線索' : value.clarity === 'clear' ? '清楚線索' : ''].filter(Boolean).join(' · ');
   function reference(ref: CognitiveReference, index: number) {
     const list = ref.kind === 'short' ? short : ref.kind === 'long' ? long : ref.kind === 'belief' ? cognition.beliefs.filter(item => item.characterId === character.id) : cognition.relationshipTags.filter(item => item.characterId === character.id);
     const exact = list.find(item => item.id === ref.id && item.version === ref.version);
