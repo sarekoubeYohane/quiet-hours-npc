@@ -6,8 +6,8 @@ import { modelRoleReady, modelSourceLabel, type ModelChoice, type ModelRoles, ty
 const blank: Required<ModelRoles> = { npc: { provider: 'openai', model: 'gpt-6-luna' }, adjudication: { provider: 'openai', model: 'gpt-6.1-sol' } };
 const providerNames = { openai: 'OpenAI', openrouter: 'OpenRouter' };
 type Provider = ModelChoice['provider'];
-type Props = { originalAccountScope?: string; saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void; continuation?: { label: string; run: () => Promise<void> } };
-export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalAccountScope, continuation }: Props) {
+type Props = { originalAccountScope?: string; saveId?: string; onClose?: () => void; onSaved?: (settings: ModelSettingsView) => void; continuation?: { label: string; run: () => Promise<void> }; closeOnSaved?: boolean };
+export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalAccountScope, continuation, closeOnSaved }: Props) {
   const { capture, scoped } = useOriginalAccountScope(originalAccountScope);
   const alive = useRef(true), heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { alive.current = true; heading.current?.focus(); return () => { alive.current = false; }; }, []);
@@ -58,6 +58,8 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
       if (!alive.current) return;
       setNotice('模型與已填的 Key 已保存。Key 加密保存 14 天；設定只影響後續新操作。');
       onSaved?.(next);
+      // A caller that shows its own confirmation can ask the panel to get out of the way once the model is usable.
+      if (closeOnSaved && onClose && !continueAfter && modelRoleReady(next, 'adjudication')) { onClose(); return; }
       if (continueAfter && continuation) {
         if (!modelRoleReady(next, 'adjudication')) throw Error('設定已保存；請補上天上意志服務的有效 API Key，再繼續。');
         await continuation.run();
@@ -75,7 +77,7 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
   const effective = scope === 'save' && inherit ? view?.accountModels : models;
   const requiredProviders = [...new Set([...Object.values(effective ?? {}).map(choice => choice.provider), ...(['openai', 'openrouter'] as const).filter(provider => keys[provider].trim())])];
   return <section className="panel model-setup" aria-label="模型設定面板">
-    <header className="journey-panel-heading"><div><span className="eyebrow">模型與連線</span><h2 ref={heading} tabIndex={-1}>準備這次需要的模型</h2></div>{onClose && <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>取消，返回原流程</Button>}</header>
+    <header className="journey-panel-heading"><div><span className="eyebrow">模型與連線</span><h2 ref={heading} tabIndex={-1}>準備這次需要的模型</h2></div>{onClose && <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>{notice ? '完成，關閉設定' : '關閉設定'}</Button>}</header>
     <p className="hint">人物補完與數值形成使用「天上意志」。模型與 Key 可一起保存；只有明確選擇繼續操作才會發出模型請求。</p>
     {saveId && <label>設定範圍<select aria-label="設定範圍" value={scope} disabled={saving} onChange={event => { setScope(event.target.value as 'account' | 'save'); setLoading(true); setNotice(''); }}><option value="save">這份存檔</option><option value="account">帳號預設</option></select></label>}
     {loading ? <p role="status">正在讀取設定…</p> : <>
