@@ -69,7 +69,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 登入 | `lib/auth.ts` |
 | 回合時間預算（400／430／445 秒） | `lib/round-time-policy.ts` |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
-| 觀察頁介面 | `components/world-app.tsx` |
+| 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
 | 開局精靈介面 | `components/opening-wizard.tsx` |
 | 樣式 | `app/globals.css`，以手寫語意 class 為主（`.panel`、`.opening-*`、`.analysis-*`） |
 | 新增資料表或欄位 | `db/schema.ts`、`drizzle/`，並依 [docs/testing.md](docs/testing.md) 手動登記到測試 |
@@ -137,6 +137,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `decision-trace-capture.ts` | 記憶體內的 trace builder |
 | `operation-evidence.ts` | 給觀察者的操作證據，64 KiB allowlist |
 | `diagnostic-redaction.ts` | 診斷文字中的秘密遮罩 |
+| `observation-log.ts` | 觀察頁回合紀錄的純投影：把事件、檢定與感知擲骰、精神電量與需求歷史整理成依時間分組的紀錄；只讀，不進 NPC 輸入 |
 
 ### 感知
 
@@ -225,7 +226,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `character-cards.ts` | 完成人物卡型別（v2 五屬性）與配點驗證 |
 | `character-card-world.ts` | 把人物卡套到世界的 `Character` |
 | `character-attributes.ts` | 舊制四屬性（v1，1 到 5 級） |
-| `character-assets.ts` | 角色素材路徑，來源是 `public/characters/manifest.json` |
+| `character-assets.ts` | 角色素材路徑，來源是 `public/characters/manifest.json`。`PixelSprite` 先用世界角色 ID 查，再用人物卡 ID（`profileSource.id`）查；都沒有就顯示人物顏色與名字首字 |
 | `scene-templates.ts` | 場景範本 schema 與內建範本 |
 | `city-draft.ts` | 開局配置的純型別（`CityDraft`、`CityPreview`）與上限 |
 | `city-creation.ts` | `prepareCity`：把開局配置與來源轉成預覽與世界 |
@@ -347,7 +348,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 
 `components/world-app.tsx` 以 `page` 狀態切換觀察、分析、設定、人物檔案，面板大多用 `hidden` 屬性切換而不卸載，切頁不會重新載入世界。
 
-- **觀察**：`PixelWorld`，以及寫在 `world-app.tsx` 內的生活紀錄、角色近況、介入。
+- **觀察**：`PixelWorld`（場所畫面）、`CharacterStatusBoard`（全員的心情、精神電量、四項需求）、`RoundLog`（誰做了什麼、擲骰與數值變化），以及寫在 `world-app.tsx` 內的角色近況與介入。時間列固定在頁面頂部。
 - **分析**：`CharacterAnalysis`（需求、追求、習慣、認知、關注）、`WorldAnalysis`（日常、檢定、感知）、用量與 `CostPanel`、`ForecastPanel`、`OperationEvidenceDetails`、`DecisionTraces`。
 - **設定**：`AcceptanceSceneControls`、運行設定、`BudgetControls`。
 - **人物檔案**：`CharacterProfile`。
