@@ -19,9 +19,27 @@ export async function POST(request:Request){
   if(typeof input.id!=='string'||!Number.isSafeInteger(input.version)||input.version!<0)return reply({error:'草稿身分或版本無效。'},400);
   if(input.operationScope!=='account-operations:'+user.userId)return reply({error:'原帳號已變更，原輸入未同步。',scopeMismatch:true},409);
   let draft=await loadCharacterDraft(user.userId,input.id);if(!draft)return reply({error:'找不到本帳號的建角草稿。'},404);
+  if(input.action==='reroll'){
+   if(Object.keys(input).sort().join(',')!=='action,id,operationId,operationScope,version'||typeof input.operationId!=='string'||!/^\d{13}:[0-9a-f-]{36}$/.test(input.operationId))return reply({error:'重骰操作身分無效。'},400);
+   if(draft.lastReroll?.operationId===input.operationId){
+    if(draft.lastReroll.inputVersion!==input.version)return reply({error:'重骰操作版本不符，請核對原操作。'},409);
+    return reply({draft:characterDraftForClient(draft,user.userId)});
+   }
+   if(draft.completedCard)return reply({error:'完成人物卡已固定，不能重骰；既有世界不會變更。'},409);
+   if(!draft.formation||draft.pendingFormation||draft.pendingGeneration)return reply({error:'請先完成原人物形成操作，再決定是否重骰。'},409);
+   if(draft.version!==input.version)return reply({error:'另一頁已修改人物，請重新核對；尚未重骰。'},409);
+   const assessment=draft.formation.operationId&&await readCardAssessment(user.userId,draft.id,draft.formation.operationId);
+   if(!assessment)return reply({error:'原背景判讀暫時無法取得；原數值保留，尚未重骰。'},409);
+   const formation={...formCardValues(assessment),operationId:draft.formation.operationId,inputVersion:draft.formation.inputVersion};
+   const saved=await writeCharacterDraft(user.userId,{...draft,formation,lastReroll:{operationId:input.operationId,inputVersion:input.version!,count:(draft.lastReroll?.count??0)+1}});
+   if(saved)return reply({draft:characterDraftForClient(saved,user.userId)});
+   const current=await loadCharacterDraft(user.userId,draft.id);
+   if(current?.lastReroll?.operationId===input.operationId&&current.lastReroll.inputVersion===input.version)return reply({draft:characterDraftForClient(current,user.userId)});
+   return reply({error:'重骰版本衝突，原資料未覆寫；請重新核對。'},409);
+  }
   if(input.action==='allocate'){
    if(input.operationScope!=='account-operations:'+user.userId)return reply({error:'原帳號已變更，請回原帳號恢復配點。'},409);
-   if(Object.keys(input).sort().join(',')!=='action,id,operationScope,values,version'||!draft.formation||!validCardAllocation(input.values,draft.formation))return reply({error:'五項總分必須保持初次總分，且各項在合法上下限內；容量不可交換。'},400);
+   if(Object.keys(input).sort().join(',')!=='action,id,operationScope,values,version'||!draft.formation||!validCardAllocation(input.values,draft.formation))return reply({error:'五項總分必須保持本次已保存總分，且各項在合法上下限內；容量不可交換。'},400);
    if(draft.completedCard)return reply({error:'完成人物卡不可修改，請另建人物。'},409);
    if((draft.version===input.version||draft.version===input.version!+1)&&JSON.stringify(draft.formation.values)===JSON.stringify(input.values))return reply({draft:characterDraftForClient(draft,user.userId)});
    if(draft.version!==input.version)return reply({error:'另一頁已修改配點，原輸入已保留，請重新核對。'},409);

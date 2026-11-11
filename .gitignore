@@ -49,3 +49,6 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+# Local verification logs, previews, and before-change backups.
+# Curated review screenshots belong under docs/verification/assets/.
+/artifacts/

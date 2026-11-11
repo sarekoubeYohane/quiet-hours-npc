@@ -1,5 +1,7 @@
 'use client';
 
+import {useRouter} from 'next/navigation';
+import {returnOpeningAsset} from '@/lib/opening-authoring';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOriginalAccountScope } from '@/components/use-original-account-scope';
 import type { FormEvent } from 'react';
@@ -45,7 +47,11 @@ function RoomSelect({ label, value, rooms, onChange }: {
   </select>;
 }
 
-export default function SceneTemplateEditor({originalAccountScope}:{originalAccountScope?:string}) {
+export default function SceneTemplateEditor({originalAccountScope,returnTo}:{originalAccountScope?:string;returnTo?:string}) {
+  const router=useRouter();
+  const [localStatus,setLocalStatus]=useState('');
+  const [savedContent,setSavedContent]=useState('');
+  const [returnPending,setReturnPending]=useState<SceneTemplate>();
   const {accountScope,capture,scoped}=useOriginalAccountScope(originalAccountScope);
   const alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -65,7 +71,9 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
       if (!response.ok || !body.templates) throw Error(body.error ?? '場景範本讀取失敗。');
       if(!alive.current)return;capture(body.accountScope);
       setTemplates(body.templates);
-      setDraft(undefined);
+      const cached=sessionStorage.getItem('quiet-hours:scene-draft:'+body.accountScope);
+      if(cached){try{const restored=JSON.parse(cached) as Draft;if(restored.id&&Array.isArray(restored.rooms)&&Array.isArray(restored.objects)&&Array.isArray(restored.connections)){setDraft(restored);const stored=body.templates.find(item=>item.id===restored.id&&item.version===restored.version);if(stored){const normalized=editTemplate(stored);const semantic=(value:Draft)=>JSON.stringify({...value,objects:value.objects.map(object=>({...object,state:object.state.map(({key,value})=>({key,value}))}))});if(semantic(normalized)===semantic(restored))setSavedContent(JSON.stringify(restored));}setLocalStatus('已恢復本分頁的場景草稿；保存後才會同步至帳號。');}}catch{/* Malformed local drafts never replace server templates. */}}
+      else setDraft(undefined);
     } catch (failure) {
       if (!signal?.aborted) setError(failure instanceof Error ? failure.message : '場景範本讀取失敗。');
     } finally {
@@ -79,13 +87,20 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
     return () => controller.abort();
   }, [reload]);
 
+  useEffect(()=>{
+    if(!draft||!accountScope)return;
+    try{sessionStorage.setItem('quiet-hours:scene-draft:'+accountScope,JSON.stringify(draft));setLocalStatus(JSON.stringify(draft)===savedContent?'已保存至帳號':'草稿已保存在本分頁；按保存才會同步至帳號。');}
+    catch{setLocalStatus('本機草稿未保存；離開前請先按保存場景。');}
+  },[draft,accountScope,savedContent]);
   function open(next: Draft) {
+    if(draft&&JSON.stringify(draft)!==savedContent&&!window.confirm('切換會取代目前場景草稿。確定要切換嗎？'))return;
+    setSavedContent(next.version?JSON.stringify(next):'');setReturnPending(undefined);
     setDraft(next);
     setMessage('');
     setError('');
   }
 
-  async function save(event: FormEvent) {
+  async function save(event: FormEvent, bringBack=false) {
     event.preventDefault();
     if (!draft || busy) return;
     setMessage('');
@@ -111,8 +126,9 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
       const saved = body.template;
       if(!alive.current)return;capture(body.accountScope);
       setTemplates(previous => [...previous.filter(template => template.id !== saved.id), saved]);
-      setDraft(editTemplate(saved));
+      const completed=editTemplate(saved);setDraft(completed);setSavedContent(JSON.stringify(completed));
       setMessage('場景範本已保存。');
+      if(bringBack&&returnTo&&accountScope){setReturnPending(saved);const path=await returnOpeningAsset(returnTo,accountScope,{kind:'scene',scene:saved});setReturnPending(undefined);router.push(path);}
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '場景範本保存失敗。');
     } finally {
@@ -129,8 +145,8 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
   }
 
   return <section className="panel scene-template-editor" aria-label="場景範本編輯器">
-    <h1>場景範本</h1>
-    <p>每份範本描述一處場所。可複製共用範本成為自己的版本。</p>
+    <header className="journey-panel-heading"><div><span className="eyebrow">場景準備</span><h1>建立生活的地方</h1></div><p role="status" className="opening-status">{localStatus}</p></header>
+    <p className="hint">先命名場所與房間，就能保存使用。房間連接、物件與權限可以按需要補充；同一場景能在開局加入多次。</p>
     <div className="scene-template-controls">
       <button type="button" disabled={busy} onClick={() => open(emptyDraft())}>新增場景範本</button>
       <button type="button" disabled={busy} onClick={() => void reload()}>重新讀取場景範本</button>
@@ -139,8 +155,9 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
       </button>)}
     </div>
     {message && <p role="status">{message}</p>}
-    {error && <p role="alert">{error}</p>}
-    {draft && <form onSubmit={save}>
+    {error && <p role="alert" className="error">{error}</p>}
+    {returnPending&&returnTo&&<button disabled={busy} onClick={async()=>{setBusy(true);try{const path=await returnOpeningAsset(returnTo,accountScope!,{kind:'scene',scene:returnPending});router.push(path);}catch(cause){setError(cause instanceof Error?cause.message:'尚未帶回開局');}finally{setBusy(false);}}}>重試帶回已保存的場景</button>}
+    {draft && <form onSubmit={event=>void save(event,!!returnTo)}>
       <fieldset disabled={busy}>
         <legend>{draft.version ? '編輯場景範本' : '新場景範本'}</legend>
         <label>場所名稱<input aria-label="場所名稱" required maxLength={80} value={draft.name}
@@ -178,7 +195,7 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
         </div>)}
         <button type="button" disabled={draft.rooms.length >= 20}
           onClick={() => setDraft({ ...draft, rooms: [...draft.rooms, newRoom()] })}>新增房間</button>
-        <h2>房間連接</h2>
+        <details><summary>房間連接與門（選填）</summary><p className="hint">至少有兩個房間才能新增連接。</p>
         {draft.connections.map((connection, index) => <div className="scene-template-controls" key={connection.id}>
           <label>連接 {index + 1} 名稱<input aria-label={'連接 ' + (index + 1) + ' 名稱'} required maxLength={80} value={connection.name}
             onChange={event => updateConnection(connection.id, { name: event.target.value })}/></label>
@@ -198,7 +215,7 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
           onClick={() => setDraft({ ...draft, connections: [...draft.connections, {
             id: crypto.randomUUID(), name: '', rooms: [draft.rooms[0].id, draft.rooms[1].id],
           }] })}>新增連接</button>
-        <h2>文字物件</h2>
+        </details><details><summary>物件與初始狀態（選填）</summary>
         {draft.objects.map((object, index) => <fieldset key={object.id}>
           <legend>物件 {index + 1}</legend>
           <div className="scene-template-controls">
@@ -229,7 +246,7 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
           onClick={() => setDraft({ ...draft, objects: [...draft.objects, {
             id: crypto.randomUUID(), name: '', roomId: draft.rooms[0].id, state: [],
           }] })}>新增文字物件</button>
-        <section className="scene-template-preview" aria-label="預設場景美術">
+        </details><section className="scene-template-preview" aria-label="預設場景美術">
           <h2>{draft.name || '場所預覽'}</h2>
           {draft.rooms.map(room => <div key={room.id}>
             <h3>{room.name || '未命名房間'}</h3>
@@ -238,7 +255,7 @@ export default function SceneTemplateEditor({originalAccountScope}:{originalAcco
                 <span key={id}> · {key} {value}</span>)}</li>)}</ul>
           </div>)}
         </section>
-        <button type="submit">保存場景範本</button>
+        <div className="opening-actions">{returnTo&&<button type="button" onClick={event=>void save(event)}>只保存場景</button>}<button className="opening-primary" type="submit">{returnTo?'保存場景並帶回開局':'保存場景範本'}</button></div>
       </fieldset>
     </form>}
   </section>;

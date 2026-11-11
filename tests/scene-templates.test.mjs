@@ -39,6 +39,8 @@ async function load(entry, external = []) {
     entryPoints: [entry], bundle: true, write: false, platform: 'node', format: 'cjs', logLevel: 'silent',
     jsx: 'automatic', alias: { '@': process.cwd() }, external,
     plugins: [{ name: 'sqlite-and-auth', setup(builder) {
+      builder.onResolve({filter:/^next\/navigation$/},()=>({path:'navigation',namespace:'test-host'}));
+      builder.onLoad({filter:/.*/,namespace:'test-host'},()=>({contents:'export function useRouter(){return {push(){throw Error("unexpected navigation")}}}',loader:'js'}));
       builder.onResolve({ filter: /^@\/lib\/(auth|store)$/ }, ({ path }) => ({ path, external: true }));
     } }],
   });
@@ -100,7 +102,7 @@ test('scene templates save rooms, connections and every explicitly listed object
 
 test('the actual editor saves, reopens and changes a multi-room scene template', async () => {
   const window = new Window({ url: origin });
-  for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Event', 'MouseEvent', 'Node']) {
+  for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Event', 'MouseEvent', 'Node', 'sessionStorage']) {
     Object.defineProperty(globalThis, name, { configurable: true, value: window[name] });
   }
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;

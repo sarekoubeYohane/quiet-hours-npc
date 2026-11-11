@@ -14,14 +14,14 @@ export default async function CharacterTemplatesPage({ searchParams }: { searchP
   if (!user) redirect('/');
   const params=await searchParams;requireNavigationOwner(user.userId,params.owner,'/character-templates',{save:params.save,returnTo:params.returnTo});const returnTo=openingReturnPath(params.returnTo,user.userId);
   return (
-    <main>
+    <main className="authoring-page">
       <header className="topbar">
-        <h1>人物範本</h1>
+        <h1>人物庫</h1>
         <Link className="auth-retry" href="/">返回觀察室</Link>
       </header>
       <SaveNavigation owner={user.userId} saveId={(await searchParams).save} />
       {returnTo&&<Link href={returnTo}>返回本次開局（保留已選內容）</Link>}
-      <div className="pt-6"><CharacterDraftEditor key={'drafts:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/><details className="mt-6"><summary>文字範本來源庫（與建角草稿分開）</summary><CharacterTemplateEditor key={'templates:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/></details></div>
+      <div className="pt-6"><CharacterDraftEditor returnTo={returnTo} key={'drafts:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/><details className="mt-6"><summary>文字範本來源庫（與建角草稿分開）</summary><CharacterTemplateEditor key={'templates:'+user.userId} originalAccountScope={'account-operations:'+user.userId}/></details></div>
     </main>
   );
 }

@@ -12,6 +12,7 @@ export type CharacterDraft = {
   formation?:import('./character-cards').CardFormation;
   pendingFormation?:{operationId:string;operationScope:string;worldContext?:string;inputVersion:number};
   completedCard?:{id:string;version:number};
+  lastReroll?:{operationId:string;inputVersion:number;count:number};
   completedGeneration?: { operationId: string; inputVersion: number };
   pendingGeneration?: { operationId: string; operationScope: string; worldContext?: string; baseVersion: number; concept: string; fields: CharacterTemplateFields };
 };
