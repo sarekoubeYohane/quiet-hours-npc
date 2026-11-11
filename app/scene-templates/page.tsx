@@ -2,6 +2,8 @@ import {openingReturnPath} from '@/lib/bound-navigation';
 import {requireNavigationOwner} from '@/lib/bound-navigation-server';
 import Link from 'next/link';
 import SaveNavigation from '@/components/save-navigation';
+import SiteHeader from '@/components/site-header';
+import { currentEnvironment } from '@/lib/environment';
 import { redirect } from 'next/navigation';
 import { getGitHubUser } from '@/lib/auth';
 import SceneTemplateEditor from '@/components/scene-template-editor';
@@ -12,7 +14,9 @@ export default async function SceneTemplatesPage({searchParams}:{searchParams:Pr
   const user=await getGitHubUser();if (!user) redirect('/');
   const params=await searchParams;requireNavigationOwner(user.userId,params.owner,'/scene-templates',{save:params.save,returnTo:params.returnTo});const save=params.save;const returnTo=openingReturnPath(params.returnTo,user.userId);
   return <main className="authoring-page">
+    <SiteHeader environment={currentEnvironment()} displayName={user.displayName}/>
     <SaveNavigation owner={user.userId} saveId={typeof save==='string'?save:undefined}/>
+    <h1 className="page-title">場景</h1>
     {returnTo&&<Link href={returnTo}>返回本次開局（保留已選內容）</Link>}
     <SceneTemplateEditor returnTo={returnTo} key={user.userId} originalAccountScope={'account-operations:'+user.userId}/>
   </main>;

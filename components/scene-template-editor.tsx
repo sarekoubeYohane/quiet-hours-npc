@@ -148,12 +148,14 @@ export default function SceneTemplateEditor({originalAccountScope,returnTo}:{ori
     <header className="journey-panel-heading"><div><span className="eyebrow">場景準備</span><h1>建立生活的地方</h1></div><p role="status" className="opening-status">{localStatus}</p></header>
     <p className="hint">先命名場所與房間，就能保存使用。房間連接、物件與權限可以按需要補充；同一場景能在開局加入多次。</p>
     <div className="scene-template-controls">
-      <button type="button" disabled={busy} onClick={() => open(emptyDraft())}>新增場景範本</button>
+      <button type="button" className="opening-primary" disabled={busy} onClick={() => open(emptyDraft())}>新增場景範本</button>
       <button type="button" disabled={busy} onClick={() => void reload()}>重新讀取場景範本</button>
-      {templates.map(template => <button type="button" key={template.id} disabled={busy} onClick={() => open(editTemplate(template))}>
-        {template.shared ? template.name + '（複製共用範本）' : template.name}
-      </button>)}
     </div>
+    {!!templates.length && <div className="draft-list" role="group" aria-label="可用的場景"><span className="eyebrow">可用的場景</span>
+      {templates.map(template => <button type="button" key={template.id} disabled={busy} onClick={() => open(editTemplate(template))}>
+        <strong>{template.name}</strong><small>{template.shared ? '內建範本 · 會複製成你的副本' : '我的場景'}</small>
+      </button>)}
+    </div>}
     {message && <p role="status">{message}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {returnPending&&returnTo&&<button disabled={busy} onClick={async()=>{setBusy(true);try{const path=await returnOpeningAsset(returnTo,accountScope!,{kind:'scene',scene:returnPending});router.push(path);}catch(cause){setError(cause instanceof Error?cause.message:'尚未帶回開局');}finally{setBusy(false);}}}>重試帶回已保存的場景</button>}

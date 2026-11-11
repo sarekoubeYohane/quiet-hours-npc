@@ -5,6 +5,7 @@ import {useRouter} from 'next/navigation';
 import type {WorldSave} from '@/lib/world-saves';
 import type {SaveManagementInput,SaveOperationResult} from '@/lib/save-management';
 import {Button} from './ui/button';
+import {worldClock} from '@/lib/world-clock';
 
 type Source=Pick<WorldSave,'id'|'name'|'version'|'turn'|'minute'>;
 const changed='quiet-hours:save-operation';
@@ -65,7 +66,7 @@ export default function SaveActions({save,accountScope,disabled=false,onBeforeAc
   return <section aria-label={save.name+'的存檔管理'} style={{display:'grid',gap:12,padding:'16px 0'}}>
     <label>另存名稱<input aria-label={save.name+'的另存名稱'} maxLength={80} value={ownPending?.operation==='copy'?ownPending.name:name} disabled={locked} onChange={event=>setName(event.target.value)}/></label>
     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}><Button variant="outline" disabled={locked||!name.trim()} onClick={()=>void submit({operationScope:accountScope,operation:'copy',operationId:crypto.randomUUID(),saveId:save.id,expectedVersion:save.version,name:name.trim()})}>另存目前進度</Button>
-    <Button variant="destructive" disabled={locked} onClick={()=>{onBeforeAction?.();if(window.confirm(`永久刪除「${save.name}」？\n已走過 ${save.turn} 個回合，世界時間 ${save.minute} 分鐘。\n這份世界將永久刪除，無法復原；其他存檔、人物與場景保留。`))void submit({operationScope:accountScope,operation:'delete',operationId:crypto.randomUUID(),saveId:save.id,expectedVersion:save.version});}}>刪除存檔</Button>
+    <Button variant="destructive" disabled={locked} onClick={()=>{onBeforeAction?.();if(window.confirm(`永久刪除「${save.name}」？\n已走過 ${save.turn} 個回合，${worldClock(save.minute)}。\n這份世界將永久刪除，無法復原；其他存檔、人物與場景保留。`))void submit({operationScope:accountScope,operation:'delete',operationId:crypto.randomUUID(),saveId:save.id,expectedVersion:save.version});}}>刪除存檔</Button>
     {ownPending&&<Button disabled={busy} onClick={()=>void submit(ownPending,true)}>恢復此存檔操作</Button>}</div>{error&&<p role="alert">{error} 請重新讀取存檔進度後核對；未保存的名稱仍保留。</p>}
   </section>;
 }

@@ -3,7 +3,7 @@ import {fillUniqueStarts} from '@/lib/opening-authoring';
 import {useDraftNavigation} from './use-draft-navigation';
 import {boundPath} from '@/lib/bound-navigation';
 import {saveUuidPattern} from '@/lib/save-identities';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import SaveNavigation from './save-navigation';
@@ -35,7 +35,7 @@ function unselectedCharacterReferences(city:OpeningCity){
 function placeHasConfiguration(city:OpeningCity,id:string){
  return city.characters.some(actor=>actor.placeId===id||actor.homeId===id||actor.ownedPlaceIds?.includes(id)||actor.workplaceIds?.includes(id))||city.accessGrants?.some(grant=>grant.placeId===id)||city.finalization?.walks.some(walk=>walk.places.includes(id))||city.finalization?.spaces.some(space=>space.placeId===id&&(space.rooms.length||space.objects.length||space.connections.length));
 }
-export default function OpeningWizard({draftId,restartSaveId,owner}:{draftId?:string;restartSaveId?:string;owner:string}){
+export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draftId?:string;restartSaveId?:string;owner:string;header?:ReactNode}){
  const router=useRouter();
  const [creating,setCreating]=useState(false);
  const [arrangement,setArrangement]=useState<ArrangementView>(),[previousArrangement,setPreviousArrangement]=useState<ArrangementView>();
@@ -77,7 +77,7 @@ export default function OpeningWizard({draftId,restartSaveId,owner}:{draftId?:st
  const removePlace=(placeId:string)=>{if(placeHasConfiguration(body.city,placeId)){setSelectionNotice('此場所仍有已填起點、住處、所有權、工作、許可或空間／道路配置；尚未移除。請先返回世界配置明示核對或解除引用。');return;}updateCity({...body.city,places:body.city.places.filter(place=>place.id!==placeId),...(body.city.finalization?{finalization:{...body.city.finalization,spaces:body.city.finalization.spaces.filter(space=>space.placeId!==placeId)}}:{})});};
  const placeOptions=body.city.places.map((place,index)=><option key={place.id} value={place.id}>{place.name}{body.city.places.some(other=>other.id!==place.id&&other.name===place.name)?`（場所 ${index+1}）`:''}</option>);
  const refresh=async()=>{try{await loadLibrary();}catch(cause){setError(cause instanceof Error?cause.message:'來源未更新。');}};
- if(loading)return <main><SaveNavigation owner={owner}/><p role="status">正在讀取開局草稿…</p></main>;
+ if(loading)return <main className="opening-wizard">{header}<SaveNavigation owner={owner}/><p role="status">正在讀取開局草稿…</p></main>;
  const missingStart=stage===2?body.city.characters.find(actor=>!actor.placeId||!actor.roomId):undefined;
  const missingStartLabel=missingStart?`${sourceName(missingStart.templateId)} 還沒選${missingStart.placeId?'起始房間':'起始場所'}`:'';
  const goToMissingStart=()=>{if(!missingStart)return;const field=document.querySelector(`select[aria-label="${CSS.escape(sourceName(missingStart.templateId)+(missingStart.placeId?'起始房間':'起始場所'))}"]`) as HTMLElement|null;field?.scrollIntoView({block:'center'});field?.focus();};
@@ -89,7 +89,7 @@ export default function OpeningWizard({draftId,restartSaveId,owner}:{draftId?:st
   missingStart?missingStartLabel+'。':
   body.step>=4&&preview?.issues.length?'請修正上方列出的開局問題。':
   body.step>=4&&!candidate?'正在等待開局確認結果。':'';
- return <main className="opening-wizard"><header className="topbar"><div><span className="eyebrow">QUIET HOURS · NPC 觀察室</span><h1>建立你的世界</h1></div><Link href="/">返回選檔</Link></header><SaveNavigation owner={owner}/>
+ return <main className="opening-wizard">{header}<SaveNavigation owner={owner}/><h1 className="page-title">建立你的世界</h1>
   <div className="journey-heading"><p>先準備人物，再安排他們生活的地方。隨時可離開，從存檔頁接續。</p><p role="status" aria-live="polite" className="opening-status">{status}</p></div>{error&&<p role="alert">{error}</p>}{selectionNotice&&<p role="alert">{selectionNotice}</p>}{unselectedCharacterReferences(body.city)&&<section role="alert" aria-label="人物選擇變更需核對"><p>已保留原關係與許可，其中仍引用未選人物。請重新選取原人物，或明示移除這些引用；未核對完成不能建立世界。</p><button disabled={busy||conflict||creating||arrangement?.state==='pending'||!!finalized} onClick={clearUnselectedReferences}>明示移除未選人物的關係與許可</button></section>}
   {failed&&<button onClick={()=>{setFailed(false);void save();}} disabled={busy||conflict}>恢復草稿保存</button>}
   {conflict&&<button onClick={()=>window.location.reload()}>重新載入伺服器版本（捨棄本頁未同步修改）</button>}

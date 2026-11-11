@@ -260,7 +260,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `bound-navigation.ts`、`bound-navigation-server.ts` | 帶 `?owner=` 的 URL helper；後者在伺服器端 redirect |
 | `world-response.ts` | 瀏覽器端的回應檢查 |
 
-其他：`text-equivalence.ts`（文字正規化比較）、`utils.ts`（shadcn 的 `cn()`，只被 `components/ui/` 使用）。
+其他：`world-clock.ts`（把世界分鐘數顯示成「第 N 天 HH:MM」，給存檔清單用）、`text-equivalence.ts`（文字正規化比較）、`utils.ts`（shadcn 的 `cn()`，只被 `components/ui/` 使用）。
 
 ## 建立世界的流程與詞彙
 
@@ -342,15 +342,15 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | `/character-templates` | `CharacterDraftEditor`、`CharacterTemplateEditor` | `CharacterFormationControls`、`ModelSettingsPanel` |
 | `/scene-templates` | `SceneTemplateEditor` | |
 | `/observe?save=&view=` | `WorldApp` | 見下 |
-| `/settings` | `ModelSettingsPanel`、`PlayerAccountSettings` | `BudgetControls`、`CostPanel` |
+| `/settings?save=`（帳號設定） | `ModelSettingsPanel`、`PlayerAccountSettings` | `BudgetControls`、`CostPanel` |
 
-所有頁面都在伺服器端先驗證登入與 URL 的 `owner` 參數。
+所有頁面都在伺服器端先驗證登入與 URL 的 `owner` 參數。觀察頁以外的頁面共用 `components/site-header.tsx`；導覽列是 `components/save-navigation.tsx`，其中的「帳號設定」一律連到 `/settings`（模型、Key、預算、單價只在那裡改）。
 
 `components/world-app.tsx` 以 `page` 狀態切換觀察、分析、設定、人物檔案，面板大多用 `hidden` 屬性切換而不卸載，切頁不會重新載入世界。
 
 - **觀察**：`PixelWorld`（場所畫面）、`CharacterStatusBoard`（全員的心情、精神電量、四項需求）、`RoundLog`（誰做了什麼、擲骰與數值變化），以及寫在 `world-app.tsx` 內的角色近況與介入。時間列固定在頁面頂部。
 - **分析**：`CharacterAnalysis`（需求、追求、習慣、認知、關注）、`WorldAnalysis`（日常、檢定、感知）、用量與 `CostPanel`、`ForecastPanel`、`OperationEvidenceDetails`、`DecisionTraces`。
-- **設定**：`AcceptanceSceneControls`、運行設定、`BudgetControls`。
+- **設定**（`view=settings`）：有存檔的世界已不從導覽列進入，運行設定改由時間列的「運行設定」開啟，`AcceptanceSceneControls` 收在其中的「進階：驗收場景」；預算與單價連到帳號設定。沒有 `saveId` 的舊入口仍保留完整的設定分頁與 `BudgetControls`。
 - **人物檔案**：`CharacterProfile`。
 
 瀏覽器端的暫存只用 sessionStorage 與 URL 參數，沒有用 localStorage：
