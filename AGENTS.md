@@ -21,6 +21,7 @@
 ### Issue tracker
 
 工作事項與規格使用 sarekoubeYohane/quiet-hours-npc 的 GitHub Issues。見 `docs/agents/issue-tracker.md`。
+開 issue 時盡量附 Gherkin 驗收條件；預期行為未定的部分列為待釐清，不自行編造。
 
 ### Domain docs
 
