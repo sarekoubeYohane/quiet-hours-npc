@@ -19,6 +19,21 @@ CLI 操作加上 `-R sarekoubeYohane/quiet-hours-npc`。
 技能要求「publish to the issue tracker」時建立 GitHub issue；要求「fetch the relevant ticket」時讀取對應 issue。
 Issue 與 PR 共用編號，先確認類型。
 
+## 驗收條件用 Gherkin
+
+建立或補寫 issue（bug、工作票、規格的子票）時，盡量附上 Gherkin 格式的驗收條件，放在 `## 驗收條件` 標題下的 ```` ```gherkin ```` 區塊。`to-spec`、`to-tickets` 產出的票也適用；技能原文要求的其他欄位照舊保留。
+
+- 關鍵字用英文（`Feature`、`Scenario`、`Scenario Outline`、`Given`、`When`、`Then`、`And`、`Examples`），敘述用繁體中文與 `GLOSSARY.md` 的正式用語。
+- 每個 `Scenario` 寫一個從外部看得到的行為：畫面顯示、API 回應、保存後重讀的結果。不寫實作步驟、函式名或資料表欄位。
+- 修 bug 的票至少有一個重現原問題的情境，以及一個確認既有合法行為沒被改壞的情境。
+- 門檻數字（秒數、次數、成功率）要有來源；是暫定值就在區塊外註明是誰提的、還沒確認。
+
+**預期行為還沒決定時，不要自己編 AC。** 需要先釐清設計才寫得出來的部分（例如該接受還是拒絕、算不算刻意的設計），在 issue 裡列成 `## 待釐清`，寫清楚卡在哪個決定，等 grilling 或使用者確認後再補 Gherkin。只有部分行為已確定時，確定的寫成 Gherkin，其餘留在待釐清。
+
+有待釐清段落的 issue 貼上 `needs-grill` 標籤。釐清完、補上 Gherkin 後移除標籤；`needs-grill` 與 `ready-for-agent` 不同時存在。
+
+純紀錄、Idea、Backlog 盤點這類沒有可驗收行為的 issue 不需要 Gherkin。
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.**
