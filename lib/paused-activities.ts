@@ -3,6 +3,7 @@ import { regionOf } from './perception';
 import { worldTargetSnapshot } from './world-state';
 import { cancelActivity, progressActivity } from './activity-lifecycle';
 import { recordActionResult, effectReferenceIds, remainingActivityConditionsHold, type Effect } from './world-effects';
+import { activityForPlan, newActivitySnapshot, newObservedActivity, observeActivity } from './observed-activity';
 
 export type PausedActivity = {
  version:1;id:string;plan:ActivityPlan;pausedAt:number;elapsedMinutes:number;remainingMinutes:number;region:string;
@@ -67,27 +68,47 @@ export function managePausedActivity(world:World,character:Character,type:'pause
   // Even a rejected pause cannot freeze work whose time has already elapsed.
   // Settle through the shared executor before deciding whether to save a pause.
   progressActivity(world,character,'automatic');
-  if(!canPause){recordActionResult(world,character,undefined,'目前活動未確認可暫停，或已保留另一項暫停進度。','blocked');return;}
+  if(!canPause){
+   const reason='目前活動未確認可暫停，或已保留另一項暫停進度。';
+   observeActivity(recordActionResult(world,character,undefined,reason,'blocked'),newObservedActivity(world,{type}),'not-started',reason);
+   return;
+  }
   const plan=character.plan;if(!plan)return;
+  const activity=activityForPlan(world,character,plan);
   const elapsedMinutes=Math.min(plan.until-plan.startedAt,Math.max(0,world.minute-plan.startedAt));
-  character.pausedActivity={version:1,id:`${character.id}:${plan.startedAt}`,plan:structuredClone(plan),pausedAt:world.minute,elapsedMinutes,remainingMinutes:Math.max(0,plan.until-world.minute),region:regionOf(character),references:referencedFacts(world,plan)};
+  character.pausedActivity={version:1,id:`${character.id}:${plan.startedAt}`,plan:{...structuredClone(plan),observedActivity:activity},pausedAt:world.minute,elapsedMinutes,remainingMinutes:Math.max(0,plan.until-world.minute),region:regionOf(character),references:referencedFacts(world,plan)};
   delete character.plan;if(character.control)delete character.control.active;
-  recordActionResult(world,character,undefined,`暫停原活動，已投入 ${elapsedMinutes} 分鐘；尚餘 ${character.pausedActivity.remainingMinutes} 分鐘，是否復工由自己決定。`,'pause');return;
+  const event=recordActionResult(world,character,undefined,`暫停原活動，已投入 ${elapsedMinutes} 分鐘；尚餘 ${character.pausedActivity.remainingMinutes} 分鐘，是否復工由自己決定。`,'pause');
+  observeActivity(event,activity,'paused',`已投入 ${elapsedMinutes} 分鐘，尚餘 ${character.pausedActivity.remainingMinutes} 分鐘。`);
+  return;
  }
  const paused=character.pausedActivity;
- if(!paused||target!==paused.id){recordActionResult(world,character,undefined,'沒有這項可處理的暫停活動。','blocked');return;}
+ if(!paused||target!==paused.id){
+  const reason='沒有這項可處理的暫停活動。';
+  observeActivity(recordActionResult(world,character,undefined,reason,'blocked'),newObservedActivity(world,{type}),'not-started',reason);
+  return;
+ }
  if(type==='abandon'){
   const active=character.plan,controlled=character.control?.active;character.plan=paused.plan;cancelActivity(world,character);character.plan=active;if(controlled&&character.control)character.control.active=controlled;delete character.pausedActivity;
-  recordActionResult(world,character,undefined,'已放棄暫停活動的未完成安排；先前已發生的成果仍保留。','abandon');return;
+  const reason='已放棄暫停活動的未完成安排；先前已發生的成果仍保留。';
+  observeActivity(recordActionResult(world,character,undefined,reason,'abandon'),activityForPlan(world,character,paused.plan),'stopped',reason);
+  return;
  }
  const plan=structuredClone(paused.plan);
+ plan.observedActivity=activityForPlan(world,character,paused.plan);
  // The resume choice occupies this round. Productive progress restarts at this
  // committed boundary, so pause duration never becomes retroactive work.
  plan.startedAt=world.minute-paused.elapsedMinutes;plan.until=world.minute+paused.remainingMinutes;
- if(regionOf(character)!==paused.region||paused.references.some(ref=>ref.snapshot!==snapshot(world,ref))||!remainingActivityConditionsHold(world,character,plan)){recordActionResult(world,character,undefined,'原活動目前的必要條件已改變，尚未恢復；可以重新確認方法或放棄原安排。','blocked');return;}
- cancelActivity(world,character);
+ if(regionOf(character)!==paused.region||paused.references.some(ref=>ref.snapshot!==snapshot(world,ref))||!remainingActivityConditionsHold(world,character,plan)){
+  const reason='原活動目前的必要條件已改變，尚未恢復；可以重新確認方法或放棄原安排。';
+  const activity=newActivitySnapshot(`恢復：${activityForPlan(world,character,plan).label}`);
+  observeActivity(recordActionResult(world,character,undefined,reason,'blocked'),activity,'not-started',reason);
+  return;
+ }
+ cancelActivity(world,character,'stop');
  plan.modelKey=modelKey;plan.attention=attention;
 
  character.plan=plan;delete character.pausedActivity;
- recordActionResult(world,character,undefined,`自行恢復原活動，保留已投入 ${paused.elapsedMinutes} 分鐘的進度，尚餘 ${paused.remainingMinutes} 分鐘。`,'resume');
+ const event=recordActionResult(world,character,undefined,`自行恢復原活動，保留已投入 ${paused.elapsedMinutes} 分鐘的進度，尚餘 ${paused.remainingMinutes} 分鐘。`,'resume');
+ observeActivity(event,activityForPlan(world,character,plan),'resumed',`尚餘 ${paused.remainingMinutes} 分鐘。`);
 }

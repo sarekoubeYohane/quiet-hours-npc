@@ -1,3 +1,4 @@
+import { activityObservationText, observedEventText } from './observed-activity';
 /**
  * Observer-only projection of a saved world into one readable round log.
  * Pure: it reads events and the bounded per-character histories, and never
@@ -53,8 +54,38 @@ function eventEntry(world: World, event: WorldEvent): LogEntry {
   return {
     id: 'event:' + event.id, time: event.time, actor: event.actor, color: actor?.color,
     actorName: actor?.name ?? (event.actor === 'observer' ? '觀察者' : '世界'),
-    source: 'event', kind: eventKindLabel(event), text: event.text, rolls, event,
+    source: 'event', kind: eventKindLabel(event),
+    text: observedEventText(event, actor), rolls, event,
   };
+}
+
+function eventEntries(world: World, event: WorldEvent): LogEntry[] {
+  const observation = event.activityObservation;
+  if (observation?.state === 'continuing') return [];
+  const entry = eventEntry(world, event);
+  if (observation?.state !== 'started' || !observation.detail) return [entry];
+  return [entry, {
+    ...entry, id: entry.id + ':progress', kind: '活動進展', rolls: [], event: undefined,
+    text: activityObservationText({ ...observation, state: 'progress' }),
+  }];
+}
+
+function activityEntries(world: World): LogEntry[] {
+  const eventIds = new Set(world.events.map(event => event.id));
+  const anchored = new Map<string, LogEntry[]>();
+  const unanchored: LogEntry[] = [];
+  for (const transition of world.activityTransitions ?? []) {
+    const actor = world.characters.find(character => character.id === transition.actor);
+    const entry: LogEntry = { id: `activity:${transition.activity.id}:${transition.state}`, time: transition.time,
+      actor: transition.actor, actorName: actor?.name ?? '世界', color: actor?.color, source: 'event',
+      kind: '活動狀態', text: activityObservationText(transition), rolls: [] };
+    if (transition.afterEventId && eventIds.has(transition.afterEventId)) {
+      anchored.set(transition.afterEventId, [...(anchored.get(transition.afterEventId) ?? []), entry]);
+    } else unanchored.push(entry);
+  }
+  return [...unanchored, ...world.events.flatMap(event => [
+    ...eventEntries(world, event), ...(anchored.get(event.id) ?? []),
+  ])];
 }
 
 function mentalEntries(character: Character): LogEntry[] {
@@ -106,7 +137,7 @@ function needEntries(character: Character): LogEntry[] {
 /** All entries, oldest first within a round; rounds are returned newest first. */
 export function observationLog(world: World): LogRound[] {
   const entries = [
-    ...world.events.map(event => eventEntry(world, event)),
+    ...activityEntries(world),
     ...world.characters.flatMap(mentalEntries),
     ...world.characters.flatMap(needEntries),
   ];

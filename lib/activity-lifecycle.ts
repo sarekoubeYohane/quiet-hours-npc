@@ -10,6 +10,7 @@ import { requiresWorldEffects, recordActionResult, commitFreeAction, commitActiv
 import { completeMovement, moveHeldObjects, movementTarget, record, resolve, type Character, type World } from './world';
 import { regionOf, transitRegion, PerceptionCapacityError } from './perception';
 import type { ActivityDecision } from './activities';
+import { activityEndState, activityForPlan, newObservedActivity, observeActivity, saveActivityTransition } from './observed-activity';
 
 // This module mutates only the current round candidate. Model dispatch, NPC
 // choices, usage accounting and the whole-round persistence remain outside.
@@ -25,15 +26,21 @@ export function canResumeActivity(world: World, character: Character, modelKey: 
 
 function expireOpenPeriod(world:World,character:Character):boolean {
  if(character.plan?.timeIntent?.kind!=='open-ended'||world.minute<character.plan.until)return false;
+ const activity=activityForPlan(world,character,character.plan);
  character.activity='自己選定的活動時段已到期，接下來可重新安排。';
- record(world,character.id,`${character.name} ${character.activity}`,'continue',[character.id]);
+ observeActivity(record(world,character.id,`${character.name} ${character.activity}`,'continue',[character.id]),activity,'period-ended');
  cancelActivity(world,character);
  return true;
 }
 
 // Only unexecuted prepared servings belong to the cancelled future. Concrete
 // objects and earlier committed phases remain facts of the world.
-export function cancelActivity(w:World,c:Character):void {
+export function cancelActivity(w:World,c:Character,stop?:'stop'):void {
+ const plan=c.plan;
+ if(stop&&plan){
+  const expired=!plan.deferredAction&&!plan.phases&&!plan.journey&&w.minute>=plan.until;
+  saveActivityTransition(w,c,{activity:activityForPlan(w,c,plan),state:expired?finishedState(plan):'stopped'});
+ }
  const phases=c.plan?.phases;
  if(phases&&w.supplies){
   const pending=new Set(phases.stages.slice(phases.cursor).flatMap(stage=>stage.effects).flatMap(effectSupplyReferenceIds));
@@ -46,6 +53,7 @@ export function cancelActivity(w:World,c:Character):void {
 function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
  const plan=c.plan,phases=plan?.phases;
  if(!plan||!phases)return;
+ const activity=activityForPlan(w,c,plan);
  const previousCursor=phases.cursor;
  const periodEnded='自己選定的活動時段已到期，接下來可重新安排。';
  while(phases.cursor<phases.stages.length&&phases.stages[phases.cursor].afterMinutes<=throughMinute-plan.startedAt){
@@ -53,20 +61,30 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
   let committed:ReturnType<typeof commitActivityPhase>;
   try{committed=commitActivityPhase(w,c,phase,phases.cursor);}catch(error){
    if(error instanceof PerceptionCapacityError)throw error;
-   recordActionResult(w,c,plan.action,'原活動的條件已改變，尚未完成。','blocked');cancelActivity(w,c);return;
+   const reason='原活動的條件已改變，尚未完成。';
+   observeActivity(recordActionResult(w,c,plan.action,reason,'blocked'),activity,'failed',reason);cancelActivity(w,c);return;
   }
   const {results,feelingSourceId}=committed;
   phases.cursor++;
   const finished=phases.cursor===phases.stages.length&&throughMinute>=plan.until;
   const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
-  recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution,phase.effects.some(effect=>effect.kind!=='schedule-natural')||finished&&plan.selectedResult&&!phases.stages.some(stage=>stage.effects.some(effect=>effect.kind!=='schedule-natural'))?'result':undefined,feelingSourceId);
+  const event=recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution,phase.effects.some(effect=>effect.kind!=='schedule-natural')||finished&&plan.selectedResult&&!phases.stages.some(stage=>stage.effects.some(effect=>effect.kind!=='schedule-natural'))?'result':undefined,feelingSourceId);
+  observeActivity(event,activity,finished?finishedState(plan):phase.effects.length?'progress':'continuing',results.join('，'));
  }
  if(phases.cursor===phases.stages.length&&throughMinute>=plan.until){
   // A stored plan may finish its final effect before its chosen period ends.
   // Expiry is still a new knowable result, even when no phase runs this time.
-  if(phases.cursor===previousCursor)recordActionResult(w,c,plan.action,plan.timeIntent?.kind==='open-ended'?periodEnded:'這次嘗試已結束，沒有新增可知成果。','work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
+  if(phases.cursor===previousCursor){
+   const event=recordActionResult(w,c,plan.action,plan.timeIntent?.kind==='open-ended'?periodEnded:'這次嘗試已結束，沒有新增可知成果。','work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)});
+   observeActivity(event,activity,finishedState(plan));
+  }
   cancelActivity(w,c);
  }
+}
+
+function finishedState(plan: NonNullable<Character['plan']>, event?: World['events'][number]) {
+ const ending=plan.timeIntent?.kind==='open-ended'?'period-ended':event?.kind==='continue'?'attempt-ended':'completed';
+ return activityEndState(event?.resolution?.outcome??plan.selectedResult?.outcome,ending);
 }
 
 // A control transition, an autonomous continuation and an explicit NPC continue
@@ -74,14 +92,30 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
 export function progressActivity(world:World,character:Character,kind:'controlled'|'automatic'|'chosen'):void {
  if(character.plan?.deferredAction){
   if(world.minute<character.plan.until)return;
-  const action=character.plan.action,checkSystem=character.plan.checkSystem??'d20-v1';
+  const plan=character.plan,activity=activityForPlan(world,character,plan);
+  const action=plan.action,checkSystem=plan.checkSystem??'d20-v1';
   try{const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;resolve(validation,actor,action,{dryRun:true});}
-  catch(error){if(error instanceof MemoryValidationError||error instanceof PerceptionCapacityError)throw error;cancelActivity(world,character);recordActionResult(world,character,action,'原活動的條件已改變，尚未完成。','blocked');return;}
+  catch(error){
+   if(error instanceof MemoryValidationError||error instanceof PerceptionCapacityError)throw error;
+   cancelActivity(world,character);
+   const reason='原活動的條件已改變，尚未完成。';
+   observeActivity(recordActionResult(world,character,action,reason,'blocked'),activity,'failed',reason);
+   return;
+  }
   cancelActivity(world,character);
-  resolve(world,character,action,{checkSystem});invalidateNaturalChanges(world);return;
+  const previous=world.events.at(-1);
+  resolve(world,character,action,{checkSystem});invalidateNaturalChanges(world);
+  const result=world.events.at(-1);
+  if(result!==previous&&result?.actor===character.id){
+   observeActivity(result,activity,finishedState(plan,result),result.text);
+  }
+  return;
  }
  if(character.plan?.phases){
-  if(kind==='chosen')record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from:character.location,to:character.location});
+  if(kind==='chosen'){
+   const event=record(world,character.id,`${character.name} 決定繼續原本的活動。`,'continue',[character.id],{from:character.location,to:character.location});
+   observeActivity(event,activityForPlan(world,character,character.plan),'continuing');
+  }
   advancePhases(world,character);return;
  }
  if(expireOpenPeriod(world,character))return;
@@ -89,7 +123,8 @@ export function progressActivity(world:World,character:Character,kind:'controlle
  const left=Math.max(0,character.plan.until-world.minute);
  const message=kind==='chosen'?`決定繼續原本的活動，還有約 ${left} 分鐘。`:
   `${kind==='controlled'?'繼續指定活動':'繼續原本的活動'}${left?`，還有約 ${left} 分鐘`:'，這段活動已完成'}。`;
- record(world,character.id,`${character.name} ${message}`,'continue',[character.id],{from:character.location,to:character.location});
+ const event=record(world,character.id,`${character.name} ${message}`,'continue',[character.id],{from:character.location,to:character.location});
+ observeActivity(event,activityForPlan(world,character,character.plan),kind==='controlled'&&!left?'completed':'continuing');
  if(kind==='controlled'&&!left)cancelActivity(world,character);
 }
 
@@ -103,10 +138,11 @@ export function discardLegacyActivity(world:World,character:Character):void {
 export function finishJourney(world:World,character:Character):void{
  const plan=character.plan;
  if(!plan?.journey||world.minute<plan.until)return;
- const {journey,action}=plan;
+ const {journey,action}=plan,activity=activityForPlan(world,character,plan);
  const name=worldLocations(world).find(location=>location.id===journey.location)!.name;
  cancelActivity(world,character);
  completeMovement(world,character,{...journey,name},action,transitRegion(character));
+ observeActivity(world.events.at(-1),activity,'completed',`抵達${name}`);
  invalidateNaturalChanges(world);
 }
 
@@ -115,26 +151,31 @@ export function startActivity(world:World,character:Character,decision:ActivityD
  // New choices use information available now, never the elapsed interval.
  const minutes=world.timeContract==='five-minute-v1'?0:options.minutes;
  let confirmedProfile:BodyActivity|undefined;
- cancelActivity(world,character);
+ const notStarted=(summary:string,kind:'blocked'|'unsupported')=>{
+  const event=recordActionResult(world,character,decision.action,summary,kind);
+  observeActivity(event,newObservedActivity(world,decision.action),'not-started',summary);
+  return false;
+ };
+ cancelActivity(world,character,'stop');
  if(decision.action.type==='move'&&world.configuration?.walks){
   const destination=movementTarget(world,character,decision.action.target);
   const duration=destination.walkMinutes;
   if(duration!==undefined){
    if(decision.timeIntent?.kind==='completion'&&decision.timeIntent.maxMinutes!==null&&duration>decision.timeIntent.maxMinutes){
-    recordActionResult(world,character,decision.action,`這段步行需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未出發。`,'blocked');
-    return false;
+    return notStarted(`這段步行需要 ${duration} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未出發。`,'blocked');
    }
    if(duration<=minutes)completeMovement(world,character,destination,decision.action);
    else{
     const fromRegion=regionOf(character),from=character.location;
-    character.plan={action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,
+    character.plan={observedActivity:newObservedActivity(world,decision.action),action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,
       journey:{location:destination.location,region:destination.region}};
     character.activity=`正在前往${destination.name}。`;
     applyLegacyMood(character,decision.action.mood);
     const road=transitRegion(character);
     moveHeldObjects(world,character,road);
-    record(world,character.id,`${character.name} 開始步行前往${destination.name}。`,'depart',[character.id],
+    const event=record(world,character.id,`${character.name} 開始步行前往${destination.name}。`,'depart',[character.id],
       {from,to:from,fromRegion,toRegion:road});
+    observeActivity(event,character.plan.observedActivity,'started');
    }
    invalidateNaturalChanges(world);
    return true;
@@ -143,8 +184,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   if(requiresWorldEffects(decision.action)){
     if(!decision.freeCandidate){
       if(ai)throw Error('物件行動缺少裁定。');
-      recordActionResult(world,character,decision.action,'泡茶尚未完成：目前規則模式不支援這項物件活動。','unsupported');
-      return false;
+      return notStarted('泡茶尚未完成：目前規則模式不支援這項物件活動。','unsupported');
     }
     let candidate=decision.freeCandidate;
     if(candidate.status==='accepted'&&candidate.bodyActivity?.kind==='sleep'){
@@ -180,23 +220,22 @@ export function startActivity(world:World,character:Character,decision:ActivityD
     const duration=candidate.bodyActivity?.kind==='sleep'?adjudicationLimits.maxMinutes:candidate.confirmedDurationMinutes??decision.durationMinutes;
     if((candidate.stages||[]).some(p=>p.afterMinutes>duration))throw new EffectValidationError('活動階段時點超出本次計畫。',{reason:'phase_duration',durationMinutes:decision.durationMinutes});
     const priorEvents=new Set(world.events.map(event=>event.id));
-    const accepted=commitFreeAction(world,character,candidate,decision.action,{nominalDueAt:world.minute-minutes+(candidate.stages?.length?0:candidate.confirmedDurationMinutes??minutes)});
+    const observedActivity=newObservedActivity(world,decision.action,decision.freeCandidate.activityIdentity?.label);
+    const accepted=commitFreeAction(world,character,candidate,decision.action,{observation:observedActivity,openEnded:decision.timeIntent?.kind==='open-ended',nominalDueAt:world.minute-minutes+(candidate.stages?.length?0:candidate.confirmedDurationMinutes??minutes)});
     if(!accepted)return world.events.some(event=>!priorEvents.has(event.id)&&event.actor===character.id&&event.kind==='attempt');
     const phases=candidate.stages||[];
     if(accepted)confirmedProfile=candidate.bodyActivity;
-    if(accepted&&(phases.length||candidate.bodyActivity)){character.plan={...(candidate.check?{checkSystem:candidate.check.system??'d20-v1',...(character.attributes?{attributeVersion:character.attributes.version}:{})}:{}),...(candidate.resumable?{resumable:true}:{}),action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
+    if(accepted&&(phases.length||candidate.bodyActivity)){character.plan={observedActivity,...(candidate.check?{checkSystem:candidate.check.system??'d20-v1',...(character.attributes?{attributeVersion:character.attributes.version}:{})}:{}),...(candidate.resumable?{resumable:true}:{}),action:decision.action,startedAt:world.minute-minutes,until:world.minute-minutes+duration,attention,modelKey,...(candidate.selectedResult?{selectedResult:candidate.selectedResult}:{}),...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}),phases:{stages:phases,cursor:0,origin:character.region!}};advancePhases(world,character);}
   }
   else {
     if(decision.timeIntent?.kind==='completion'){
       if(decision.action.type==='rest'||decision.action.type==='reflect'){
-        recordActionResult(world,character,decision.action,'目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。','unsupported');
-        return false;
+        return notStarted('目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。','unsupported');
       }
       if(decision.timeIntent.maxMinutes!==null&&decision.timeIntent.maxMinutes<15){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
         resolve(validation,actor,decision.action,{dryRun:true});
-        recordActionResult(world,character,decision.action,`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`,'blocked');
-        return false;
+        return notStarted(`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`,'blocked');
       }
     }
     if(world.timeContract==='five-minute-v1'){
@@ -206,6 +245,8 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       character.plan={deferredAction:true,checkSystem:newCheckSystem(character),...(character.attributes?{attributeVersion:character.attributes.version}:{}),action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
       character.activity='正在進行已選活動，尚未完成。';
       record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
+      character.plan.observedActivity=newObservedActivity(world,decision.action);
+      observeActivity(world.events.at(-1),character.plan.observedActivity,'started');
       if(decision.action.type==='rest')character.plan.bodyActivity={version:1,kind:'rest',fatiguePerHour:-9,sleepPerHour:0};
       if(decision.action.type==='work')character.plan.bodyActivity={version:1,kind:'exertion',fatiguePerHour:3,sleepPerHour:0};
       return true;
@@ -215,7 +256,7 @@ export function startActivity(world:World,character:Character,decision:ActivityD
   }
   const duration = decision.timeIntent?.kind==='completion'?15:activityDurations.includes(decision.durationMinutes) ? decision.durationMinutes : 30;
   if (!requiresWorldEffects(decision.action) && (sustainedActions.has(decision.action.type) || decision.timeIntent?.kind==='open-ended') && duration > minutes) {
-    character.plan = { action: decision.action, startedAt: world.minute - minutes,
+    character.plan = { observedActivity: newObservedActivity(world,decision.action), action: decision.action, startedAt: world.minute - minutes,
       until: world.minute - minutes + duration, attention: attention, modelKey, ...(decision.timeIntent?{timeIntent:decision.timeIntent}:{}) };
     if(decision.timeIntent?.kind==='open-ended')character.activity=`正在進行自己選定的活動時段，約剩 ${duration-minutes} 分鐘。`;
   }else if(decision.timeIntent?.kind==='open-ended'&&!requiresWorldEffects(decision.action)){
@@ -246,13 +287,13 @@ export function wakeSleepingActivity(world:World,character:Character):boolean {
  const naturalAt=character.plan.sleep?.naturalWakeAt,stimulusAt=character.plan.sleep?.stimulusWakeAt;
  const natural=naturalAt!==undefined&&(stimulusAt===undefined||naturalAt<=stimulusAt);
  if(!natural&&character.plan.sleep?.stimulusWakeAt===undefined)return false;
- const action=character.plan.action;
+ const action=character.plan.action,activity=activityForPlan(world,character,character.plan);
  const wakeAt=Math.min(naturalAt??Infinity,stimulusAt??Infinity);
  // Effects are committed now under current conditions, only for work that was
  // already due before actual sleep ended. Later stages remain unexecuted.
  if(character.plan.phases)advancePhases(world,character,Math.min(world.minute,wakeAt));
  cancelActivity(world,character);
  character.activity=natural?'睡眠恢復後自然醒來，接下來可以自行安排。':'受到已察覺的刺激而醒來，接下來可以自行安排。';
- recordActionResult(world,character,action,character.activity,'rest');
+ observeActivity(recordActionResult(world,character,action,character.activity,'rest'),activity,natural?'period-ended':'stopped',character.activity);
  return true;
 }

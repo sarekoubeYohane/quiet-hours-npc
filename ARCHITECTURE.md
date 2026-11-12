@@ -138,6 +138,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `operation-evidence.ts` | 給觀察者的操作證據，64 KiB allowlist |
 | `diagnostic-redaction.ts` | 診斷文字中的秘密遮罩 |
 | `observation-log.ts` | 觀察頁回合紀錄的純投影：把事件、檢定與感知擲骰、精神電量與需求歷史整理成依時間分組的紀錄；只讀，不進 NPC 輸入 |
+| `observed-activity.ts` | 共用活動名稱與狀態呈現。活動計畫及既有事件保存有界的名稱與活動實例；沒有感官事件的停止另存於同一世界 JSON，最多 300 筆。回合紀錄只隱藏明確標記的續做；原事件文字、感知、記憶與決策投影不變 |
 
 ### 感知
 

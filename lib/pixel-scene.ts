@@ -1,3 +1,4 @@
+import { observedEventText } from './observed-activity';
 import type { Character, WorldEvent } from './world';
 import { worldRegions } from './world-configuration';
 
@@ -35,5 +36,6 @@ export function bubbleText(event: WorldEvent, characters: Character[]): string {
   if (event.kind === 'say') return event.scene?.content || event.text.match(/「([\s\S]*)」/)?.[1] || '說了一句話。';
   if (event.kind === 'message') return `傳送私訊給 ${characters.find(c => c.id === event.scene?.target)?.name || '朋友'}`;
   // Committed event prose is the generic activity adapter, including future kinds.
-  return event.text || characters.find(character => character.id === event.actor)?.activity || '活動內容未記錄';
+  const actor = characters.find(character => character.id === event.actor);
+  return observedEventText(event, actor) || actor?.activity || '活動內容未記錄';
 }

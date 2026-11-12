@@ -1,4 +1,5 @@
 'use client';
+import { observedActivityStatus } from '@/lib/observed-activity';
 import type { CSSProperties } from 'react';
 import { timeLabel, type World, type Character } from '@/lib/world';
 import { worldLocations, worldRegions } from '@/lib/world-configuration';
@@ -71,7 +72,7 @@ export default function CharacterStatusBoard({ world, selected, onSelect }: { wo
           <span className="status-name"><strong>{character.name}</strong><small>{whereabouts(world, character)}</small></span>
           <span className="status-mood">{character.mood}</span>
         </button>
-        <p className="status-activity">{character.activity || '活動內容未記錄'}{remaining && <small> · {remaining}</small>}</p>
+        <p className="status-activity">{observedActivityStatus(world, character)}{remaining && <small> · {remaining}</small>}</p>
         <MentalMeter character={character}/>
         <NeedMeters character={character}/>
       </li>;

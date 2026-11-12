@@ -11,7 +11,7 @@ const ts=require('typescript');
 const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));
 const directory=await mkdtemp(join(tmpdir(),'quiet-browser-'));
 const sources=(await readdir('lib')).filter(x=>x.endsWith('.ts')).map(x=>[`lib/${x}`,x.slice(0,-3)]);
-sources.push(['app/api/world/route.ts','route']);
+sources.push(['app/api/world/route.ts','route'], ['app/api/model-settings/route.ts','model-settings-route']);
 const cityEditors = process.env.FIXTURE_CITY_EDITORS === '1';
 if (cityEditors) sources.push(
  ['app/api/character-templates/route.ts','character-templates-route'],
@@ -73,10 +73,11 @@ for (const [source,output] of sources) {
 const load=name=>require(join(directory,`${name}.cjs`));
 const store=load('store'); store.install(load('world').seedWorld());
 const {GET,POST}=load('route');
-const templateRoutes = cityEditors ? new Map([
+const appRoutes = new Map([['/api/model-settings',load('model-settings-route')]]);
+if (cityEditors) for (const [path, name] of [
  ['/api/character-templates',load('character-templates-route')],
  ['/api/scene-templates',load('scene-templates-route')],
-]) : new Map();
+]) appRoutes.set(path,name);
 // Optional read-only view of an already executed private experiment file.
 // This never imports a key, forwards a model request or exposes fixture mutation.
 let experimentReadback;
@@ -103,7 +104,7 @@ const editorImports = cityEditors ? `import People from ${JSON.stringify(join(re
 const worldApp = `<WorldApp signInPath="/login" displayName="browser fixture" environment={{caption:'local fixture',builtAtLabel:'fixed clock'}} ${cityEditors ? 'templateNavigation={<nav><a href="/character-templates">人物範本</a><a href="/scene-templates">場景範本</a></nav>}' : ''}/>`;
 const browserContent = cityEditors ? `location.pathname==='/character-templates'?<People/>:location.pathname==='/scene-templates'?<Places/>:${worldApp}` : worldApp;
 await writeFile(entry,`${rootImports}${editorImports}createRoot(document.getElementById('root')).render(${browserContent});`);
-const bundle=await esbuild.build({entryPoints:[entry],bundle:true,write:false,platform:'browser',format:'esm',jsx:'automatic',alias:{'@':repo},nodePaths:[join(repo,'node_modules')],define:{'process.env.NODE_ENV':'"development"'},loader:{'.png':'dataurl'}});
+const bundle=await esbuild.build({entryPoints:[entry],bundle:true,write:false,platform:'browser',format:'esm',jsx:'automatic',alias:{'@':repo},nodePaths:[join(repo,'node_modules')],define:{'process.env':'{}','process.env.NODE_ENV':'"development"'},loader:{'.png':'dataurl'}});
 const js=bundle.outputFiles[0].text;
 const postcss=require(require.resolve('postcss',{paths:[require.resolve('@tailwindcss/postcss')]}));
 const compiled=await postcss([require('@tailwindcss/postcss')({base:repo})]).process(await readFile(join(repo,'app/globals.css'),'utf8'),{from:join(repo,'app/globals.css')});
@@ -129,8 +130,9 @@ const server=http.createServer(async(req,res)=>{
   const response=await (req.method==='POST'?POST(request):GET(request));
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;
  }
- if(templateRoutes.has(url.pathname)){
-  const handler=templateRoutes.get(url.pathname);
+ if(appRoutes.has(url.pathname)){
+  if(experimentReadback&&req.method!=='GET'){res.writeHead(403);res.end('Readback only');return;}
+  const handler=appRoutes.get(url.pathname);
   const request=new Request(url,{method:req.method,headers:{origin,...req.headers},...(req.method==='POST'?{body}:{})});
   const response=await (req.method==='POST'?handler.POST(request):handler.GET(request));
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;

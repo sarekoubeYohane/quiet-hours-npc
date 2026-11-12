@@ -1,3 +1,4 @@
+import { activityEndState, observeActivity, type ObservedActivity } from './observed-activity';
 import { resolveActionCheck, senseAvailable, type ActionCheck } from './action-checks';
 import { connectingDoor, worldRegions } from './world-configuration';
 import { changeBodyNeeds, type IngestEffect } from './needs';
@@ -276,7 +277,7 @@ function feedbackExcerpt(text:string):string {
 // proposal association in the existing bounded short-term memory/event channel.
 // Only the existing NPC projection is consulted; authority reasons, inventory
 // counters, permission lists and private decision traces are never sources.
-export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution,feelingKind?:import('./world').WorldEvent['feelingKind'],feelingSourceId?:string):void {
+export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution,feelingKind?:import('./world').WorldEvent['feelingKind'],feelingSourceId?:string) {
  const label=action?`${action.type} ${action.target||''} ${action.content||''}`.trim().slice(0,240):'先前活動';
  const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||object.kind==='utensil'&&(action?.type==='work'&&action.target==='tea'||action?.type==='propose'&&(action.target===c.location||action.target===regionOf(c)))).slice(0,4);
  let state='';
@@ -287,9 +288,9 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  const context=relevant.some(object=>object.kind==='utensil'&&object.state.condition==='broken')?' 已知的器具已損壞。':'';
  c.activity=summary+context;
  const text=feedbackExcerpt(`${c.name} 行動回饋（原提案，非已發生成果：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
- record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
+ return record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
 }
-export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean}):boolean{
+export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean;observation?:ObservedActivity;openEnded?:boolean}):boolean{
  if(candidate.check?.sense&&!senseAvailable(c,candidate.check.sense))throw new EffectValidationError('裁定所需的感官目前沒有成立機會。',{reason:'check_sense_unavailable',sense:candidate.check.sense});
  if(context?.validateOnly&&candidate.branches){validateResultBranches(w,c,candidate);return true;}
  if(candidate.branches){
@@ -312,7 +313,9 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   const summary=candidate.knownBlockedReason||(candidate.status==='denied'
    ?'這次方法沒有成功，尚未執行，沒有新增成果。未確認本次受阻的原因；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
    :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
-  recordActionResult(w,c,action,summary,'blocked');return false;
+  const event=recordActionResult(w,c,action,summary,'blocked');
+  observeActivity(event,context?.observation,'not-started',candidate.knownBlockedReason??candidate.blockedReason);
+  return false;
  }
  const method:DiscoveryMethod|undefined=candidate.activityIdentity?{version:1,kind:'activity',key:candidate.activityIdentity.key}:candidate.trialBinding?{version:1,kind:'routine',key:candidate.trialBinding.operation}:undefined;
  for(const phase of candidate.stages||[])if(method&&phase.effects.some(effect=>effect.kind==='discover'))phase.discoveryMethod={...method};
@@ -356,14 +359,25 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   const prior=w.freeTrials?.[key];
   if(!prior&&Object.keys(w.freeTrials||{}).length>=128)throw Error('行動判定保存已達上限，本回合未進行新的判定。');
   resolution=prior||resolveActionCheck(c,candidate.check,abilityAdvantage(c,candidate.check.ability));
-  if(!prior){(w.freeTrials??={})[key]=resolution;record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);w.events.at(-1)!.attemptKey=key;}
-  if(!['success','critical-success'].includes(resolution.outcome)){recordActionResult(w,c,action,'嘗試尚未完成，這次沒有新增成果。','blocked');return false;}
+  if(!prior){
+   (w.freeTrials??={})[key]=resolution;
+   const event=record(w,c.id,`${c.name} 嘗試目前的方法。`,'attempt',[c.id],undefined,resolution);
+   event.attemptKey=key;
+   observeActivity(event,context?.observation,'attempted');
+  }
+  if(!['success','critical-success'].includes(resolution.outcome)){
+   const event=recordActionResult(w,c,action,'嘗試尚未完成，這次沒有新增成果。','blocked');
+   observeActivity(event,context?.observation,'failed');
+   return false;
+  }
  }
  commitWorldChanges(w,clone);
  const feelingSourceId=emitExternalConsequences(w,c.id,candidate.effects,'result');
  const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
  const here=regionOf(c);
- recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId);
+ const event=recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId);
+ const staged=!!candidate.stages?.length||!!candidate.bodyActivity;
+ observeActivity(event,context?.observation,staged?'started':activityEndState(candidate.selectedResult?.outcome,context?.openEnded?'attempt-ended':'completed'),results.join('，'));
  if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
  return true;
 }
