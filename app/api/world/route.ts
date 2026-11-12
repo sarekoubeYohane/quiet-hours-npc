@@ -537,12 +537,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       const c = world.characters.find(c => c.id === 'owner')!;
       c.control!.mode = 'taken-over';
       c.control!.experiences ??= [];
-      if (!c.control!.active) { cancelActivity(world,c); c.activity = '待命，等待下一個指定行動。'; }
+      if (!c.control!.active) { cancelActivity(world,c,'stop'); c.activity = '待命，等待下一個指定行動。'; }
     } else if (b.operation === 'return-control') {
       const c = world.characters.find(c => c.id === 'owner')!;
       const experiences = c.control!.experiences;
       c.control = { mode: 'autonomous', ...(experiences?.length ? { experiences } : {}) };
-      cancelActivity(world,c);
+      cancelActivity(world,c,'stop');
       c.activity = '已交還控制權，等待下一次自主選擇。';
     } else if (b.operation === 'direct') {
       world.characters.find(c => c.id === 'owner')!.control!.pending = b.action!;

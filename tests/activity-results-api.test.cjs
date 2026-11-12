@@ -57,8 +57,10 @@ test('new information can continue the selected branch without reroll, while tak
  }
 });
 test('save conflict or failure rolls back result selection and effects but keeps usage; uncertain successful commit replays once',async()=>{
+ const {observationLog}=load('observation-log');
+ const rows=w=>observationLog(w).flatMap(round=>round.entries.filter(entry=>entry.actor==='owner'&&entry.source==='event'));
  for(const fault of ['conflictOnNextSave','throwBeforeNextSave','throwAfterNextSave']){
-  const s=await scenario({die:20,reply:staged()});try{store[fault]();const op=Date.now()+':'+crypto.randomUUID(),body={operation:'advance',minutes:15,operationId:op};const response=await s.post(body),w=await s.read();assert.equal(response.status,fault==='throwAfterNextSave'?200:502);assert.equal(w.objects[0].state.progress,fault==='throwAfterNextSave'?'partial':'raw');assert.equal(w.aiUsage.totalCalls,2);assert.equal(!!w.characters[0].plan,fault==='throwAfterNextSave');assert.equal(!!w.freeTrials,fault==='throwAfterNextSave');assert.equal((await s.post(body)).status,response.status);assert.deepEqual((await s.read()).objects,w.objects);assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:1});}finally{s.restore();}
+  const s=await scenario({die:20,reply:staged()});try{store[fault]();const op=Date.now()+':'+crypto.randomUUID(),body={operation:'advance',minutes:15,operationId:op};const response=await s.post(body),w=await s.read();assert.equal(response.status,fault==='throwAfterNextSave'?200:502);assert.equal(w.objects[0].state.progress,fault==='throwAfterNextSave'?'partial':'raw');assert.equal(w.aiUsage.totalCalls,2);assert.equal(!!w.characters[0].plan,fault==='throwAfterNextSave');assert.equal(!!w.freeTrials,fault==='throwAfterNextSave');assert.equal(rows(w).some(row=>/開始.*尚未完成/.test(row.text)),fault==='throwAfterNextSave');assert.equal(rows(w).some(row=>/progress=partial/.test(row.text)),fault==='throwAfterNextSave');assert.equal((await s.post(body)).status,response.status);const replayed=await s.read();assert.deepEqual(replayed.objects,w.objects);assert.deepEqual(rows(replayed),rows(w));assert.deepEqual(s.counts(),{npc:1,judgments:1,dice:1});}finally{s.restore();}
  }
 });
 test('transport schema and instructions distinguish result branches from legacy and old legal candidates remain executable',async()=>{

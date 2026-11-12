@@ -1,5 +1,6 @@
 'use client';
 
+import { observedActivityStatus } from '@/lib/observed-activity';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MessageCircle, Pause, Smartphone } from 'lucide-react';
 import { type World, type WorldEvent, timeLabel } from '@/lib/world';
@@ -43,7 +44,7 @@ function ConfiguredScene({world,selected,onSelect}:{world:World;selected:string;
             <div>{occupants.map(person=><button key={person.id} type="button" onClick={()=>onSelect(person.id)}
               aria-pressed={selected===person.id} className={selected===person.id?'active':''} style={{'--character-color':person.color} as CSSProperties}>
               <PixelSprite id={person.id} name={person.name} sourceId={person.profileSource?.id}/><strong>{person.name}</strong>
-              <small>{room.name} · {person.activity || '活動內容未記錄'}</small>
+              <small>{room.name} · {observedActivityStatus(world, person)}</small>
             </button>)}
               {!occupants.length&&<span className="empty-place">此刻沒有人</span>}
             </div>
@@ -146,7 +147,7 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
         const p = points[c.id] || position(c);
         const speaking = active?.actor === c.id;
         return <button key={c.id} type="button" className={`map-character ${p.y > 55 ? 'in-cafe' : ''} ${selected === c.id ? 'selected' : ''} ${walking === c.id ? 'walking' : ''} ${speaking ? 'acting' : ''}`}
-          data-character-id={c.id} data-region={characterRegion(c)} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} aria-label={`${c.name}，${regions.find(region => region.id === characterRegion(c))?.name || c.location}，${c.activity}，點選查看狀態`}
+          data-character-id={c.id} data-region={characterRegion(c)} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} aria-label={`${c.name}，${regions.find(region => region.id === characterRegion(c))?.name || c.location}，${observedActivityStatus(world, c)}，點選查看狀態`}
           style={{ left: `${p.x}%`, top: `${p.y}%`, '--character-color': c.color, '--walk-duration': `${duration}ms`, zIndex: Math.round(p.y) } as CSSProperties}>
           {speaking && <span className={`sprite-bubble ${active.kind === 'say' ? 'speech' : ''}`}>{active.kind === 'message' && <Smartphone size={14}/>}<span>{bubbleText(active, world.characters)}</span></span>}
           <span className="sprite-shadow"/><PixelSprite id={c.id}/><span className="sprite-name">{c.name}</span>
@@ -156,7 +157,7 @@ export default function PixelWorld({ world, selected, onSelect, onPlayingChange 
     </div>}
     {world.configuration ? <ConfiguredScene key={world.contextId} world={world} selected={selected} onSelect={onSelect}/> : <>
       <div className="map-door-status">{doors.map(door => <span key={door.id}>{door.name}：{world.scene?.doors[door.id] === 'closed' ? '關閉' : '開啟'}（{door.regions.map(id => regions.find(region => region.id === id)?.name || id).join(' ↔ ')}）</span>)}<span>分區邊界為示意；角色位置與門狀態來自世界。</span></div>
-      <div className="pixel-locations">{places.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}><span style={{background:c.color}}/><strong>{c.name}</strong><small>{regions.find(region => region.id === characterRegion(c))?.name || c.location} · {c.activity || '活動內容未記錄'}</small></button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
+      <div className="pixel-locations">{places.map(place => <div className="pixel-location" key={place.id}><h2>{place.name}</h2><div>{world.characters.filter(c => c.location === place.id).map(c => <button key={c.id} onClick={() => onSelect(c.id)} aria-pressed={selected === c.id} className={selected === c.id ? 'active' : ''}><span style={{background:c.color}}/><strong>{c.name}</strong><small>{regions.find(region => region.id === characterRegion(c))?.name || c.location} · {observedActivityStatus(world, c)}</small></button>)}{!world.characters.some(c => c.location === place.id) && <span className="empty-place">此刻沒有人</span>}</div></div>)}</div>
     </>}
     {(!world.configuration || active) && <div className="scene-caption" aria-live="polite">{active ? `已提交行動回放 · ${actor?.name} · ${bubbleText(active, world.characters)}` : `角色會隨回合行動。延續活動不重新詢問 AI；當面對話顯示在地圖上。`}</div>}
   </section>;

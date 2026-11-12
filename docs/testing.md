@@ -103,6 +103,8 @@ node --import ./tooling/verification/no-network.mjs --test tests/<name>.test.mjs
 
 `tooling/verification/` 有約 105 個 `browser*.mjs` Playwright runner，用真的 `WorldApp`、API handler 與 SQLite，模型以 fixture 取代。除了 `browser-built-navigation.mjs`（即 `pnpm test:built-navigation`，需先 `pnpm build:production`）之外都是手動執行，不在 CI 內。
 
+活動觀察（#310）：`pnpm test:observed-activities` 使用既有 Chromium fixture。可用 `CHROMIUM_EXECUTABLE` 指定瀏覽器，並設定 `BROWSER_ARTIFACT_DIR` 將畫面寫到已存在的本機目錄。世界 API、SQLite 保存及重讀皆走原路徑；模型使用固定回覆，沒有付費呼叫。
+
 環境變數與個別 runner 的說明見 [tooling/verification/README.md](../tooling/verification/README.md)。截圖與 JSON 預設寫到 `docs/verification/assets/<主題>/`。
 
 ## 資料庫

@@ -1,3 +1,4 @@
+import { newObservedActivity, observeActivity } from './observed-activity';
 import { finishPendingNeeds } from './body-needs-policy';
 import { prepareControlledFeelings, acknowledgeControlledFeelings, type ControlledFeelingRequest, type ControlledFeelingCandidate } from './controlled-feelings';
 import { applyEmotionRegulation, type EmotionRegulation } from './emotion-regulation';
@@ -20,7 +21,7 @@ import { bindRoutine } from './routine-rules';
 import { projectRelationships, type CognitiveState } from './cognition';
 import { MemoryValidationError, validateMemoryState, consumeMemories, type LongMemory, type ShortMemory, type MemoryTrace } from './memory';
 import { pendingObservations, observationAttention, noteAttention, type AttentionCondition } from './attention';
-import { demoDecision, pendingInterventions, record, type Action, type AIUsage, type Character, type Intent, type World } from './world';
+import { ActionRuleError, demoDecision, pendingInterventions, record, type Action, type AIUsage, type Character, type Intent, type World } from './world';
 import { learnHabit } from './habits';
 import { PerceptionCapacityError } from './perception';
 
@@ -147,7 +148,7 @@ export async function advanceActivities(world: World, options: {
     if (control?.pending) {
       const action=control.pending;
       delete control.pending;
-      cancelActivity(world,character);
+      cancelActivity(world,character,'stop');
       const openEnded=['rest','reflect'].includes(action.type);
       controlledDecision={action,durationMinutes:openEnded?60:15,timeIntent:{kind:openEnded?'open-ended':'completion',maxMinutes:null}};
     }
@@ -237,7 +238,8 @@ export async function advanceActivities(world: World, options: {
       if(controlledDecision&&character.plan)control!.active=true;
     } catch (error) {
       if (error instanceof MemoryValidationError || error instanceof PerceptionCapacityError || requiresWorldEffects(decision.action)) throw error;
-      record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
+      const event=record(world, character.id, `${character.name} 的行動未通過規則檢查，這段時間留在原地。`, 'blocked', [character.id]);
+      observeActivity(event,newObservedActivity(world,decision.action),'not-started',error instanceof ActionRuleError?error.message:undefined);
     }
     } finally {applyProcessAssessment(character,processFeeling,world.minute);applyFeelingUpdates(character,feelingUpdates,world.minute);applyEmotionRegulation(character,emotionRegulation,world.minute,`${world.turn}:${world.minute}:${character.id}`);if(world.pursuitVersion===1)validateActivityPursuits(character);try{options.onActor?.(world,character);}catch{/* Observer cannot change execution. */}}
   }

@@ -16,7 +16,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "test:built-navigation": "node tooling/verification/browser-built-navigation.mjs"
+    "test:built-navigation": "node tooling/verification/browser-built-navigation.mjs",
+    "test:observed-activities": "node tooling/verification/browser-observed-activities-310.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
