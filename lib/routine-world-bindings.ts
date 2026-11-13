@@ -1,3 +1,4 @@
+import { routinePlaceFor } from './daily-place-context';
 import { finiteSourceScope, routineFiniteScopeMatches, routineOrdinarySourceMatches, type RoutineSourceQualification } from './routine-materials';
 import { worldTargetSnapshot } from './world-state';
 import { regionOf, canSee } from './perception';
@@ -70,7 +71,7 @@ function routineBackgroundContext(world:World,actor:Character,scope:RoutineSourc
  const reference=scope.refs.find(item=>item.id===id),binding=program?.bindings.find(item=>item.role===reference?.role);
  const source=world.supplies?.find(item=>item.id===id);
  if(!rule||!program||!binding||binding.type!=='supply'||binding.access!=='authorized'||!binding.background||!source?.background||source.region!==regionOf(actor)||!canSee(world,actor,source.region)||
-  !world.routinePlaces?.some(place=>place.location===actor.location&&place.operators.includes(actor.id)))return;
+  !routinePlaceFor(world,actor))return;
  return {rule,binding,source};
 }
 function finiteBackgroundConflict(world:World,actor:Character,binding:RoutineSourceQualification):boolean {

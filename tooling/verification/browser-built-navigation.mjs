@@ -53,13 +53,13 @@ try{
   await page.getByRole('link',{name:'＋新開存檔',exact:true}).hover();
   await page.getByRole('link',{name:'＋新開存檔',exact:true}).click();
   await page.getByRole('heading',{name:'建立你的世界',exact:true}).waitFor();
-  await page.getByRole('button',{name:'建立人物卡並返回',exact:true}).waitFor();record();
+  await page.getByRole('button',{name:'製作第一張人物卡',exact:true}).waitFor();record();
   assert.equal(new URL(page.url()).searchParams.get('owner'),'github:123');
   // This button flushes the draft via the real API and calls router.push.
-  await page.getByRole('button',{name:'建立人物卡並返回',exact:true}).click();
+  await page.getByRole('button',{name:'製作第一張人物卡',exact:true}).click();
   await page.waitForURL(url=>url.pathname==='/character-templates');record();
   assert.equal(new URL(page.url()).searchParams.get('owner'),'github:123');
-  await page.getByRole('navigation',{name:'共同導覽'}).getByRole('link',{name:'設定',exact:true}).click();
+  await page.getByRole('navigation',{name:'共同導覽'}).getByRole('link',{name:'帳號設定',exact:true}).click();
   await page.waitForURL(url=>url.pathname==='/settings');record();
   await page.getByRole('navigation',{name:'共同導覽'}).getByRole('link',{name:'存檔',exact:true}).click();
   await page.waitForURL(origin+'/');record();

@@ -1,3 +1,4 @@
+import { prepareOpeningResources, validateOpeningResourceRequest } from '@/lib/opening-resources';
 import {readArrangement,storeArrangementResult} from '@/lib/opening-arrangement-store';
 import {arrangeOpening} from '@/lib/opening-arrangement-model';
 import type {OpeningDraft} from '@/lib/opening-drafts';
@@ -224,7 +225,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
   try {
     const raw = await request.text();
     if (raw.length > 128000) return reply({ error: '輸入過長。' }, 400);
-    let b: { mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
+    let b: { resourceRequest?:unknown; mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
     try { b = JSON.parse(raw); } catch { return reply({ error: '請傳送有效的 JSON。' }, 400); }
     if (!b || typeof b !== 'object' || Array.isArray(b)) return reply({ error: '請傳送有效的操作。' }, 400);
     if(b.operationScope!==id)return reply({error:'登入帳號已變更或缺少原世界識別，請回到原帳號核對。',scopeMismatch:true},409);
@@ -241,7 +242,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
       return reply({operationScope:id,modelKeys:await modelKeyStatus(accountId),modelKeyStorageAvailable:modelKeyStorageAvailable()});
     }
     if (b.key !== undefined) return reply({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
-    if (!['enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'assess-character-card', 'arrange-opening', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
+    if (!['prepare-opening-resources', 'enable-mental-energy', 'enable-body-needs', 'advance', 'intervene', 'direct', 'takeover', 'return-control', 'reset', 'set-budget', 'set-price', 'set-adjudication', 'enter-acceptance', 'exit-acceptance', 'preview-city', 'start-city', 'generate-character-template', 'assess-character-card', 'arrange-opening', 'suggest-opening-relationships', 'initialize-city', 'adopt-character-attributes', 'set-character-sense-limits'].includes(b.operation || '')) return reply({ error: '無效操作。' }, 400);
     if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return reply({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return reply({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     if (b.operation === 'set-budget' && !validBudgetLimits(b.limits)) return reply({ error: '請提供完整的玩家預算設定。' }, 400);
@@ -259,7 +260,8 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     const assessingDraft = assessingCard && typeof b.target === 'string' ? await loadCharacterDraft(accountId,b.target) : undefined;
     if(assessingCard&&(!binding.accountWorkspace||!assessingDraft?.pendingFormation||assessingDraft.pendingFormation.operationId!==b.operationId||assessingDraft.formation||characterFormationIssue(assessingDraft)))return reply({error:'請從已確認文字的原建角草稿恢復形成。'},400);
     const generatingCharacter = b.operation === 'generate-character-template';
-    const generatingSetup = arrangingOpening || assessingCard || generatingCharacter || suggestingOpening || initializingCity;
+    const preparingResources=b.operation==='prepare-opening-resources';
+    const generatingSetup = preparingResources || arrangingOpening || assessingCard || generatingCharacter || suggestingOpening || initializingCity;
     if (initializingCity && b.operationScope !== id) return reply({ error:'請重新讀取城市後再初始化。' },400);
     const openingDescription = suggestingOpening ? readOpeningDescription(b.openingDescription) : undefined;
     if (suggestingOpening && (openingDescription === undefined || b.operationScope !== id)) {
@@ -362,6 +364,10 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     // normalization; the lease CAS below also protects this exact stored row.
     if(stored!.version!==version||JSON.stringify(JSON.parse(stored!.state))!==JSON.stringify(world))return waiting();
     if(((b.operation==='advance'&&b.mode!=='demo')||generatingSetup)&&request.headers.get(timePolicyHeader)!==roundTimePolicy.version)return reply({error:'回合等待政策已更新，請重新載入觀察室後以原操作識別碼繼續。',clientUpdateRequired:true},426);
+    if(preparingResources){
+      if(b.expectedVersion!==version)return reply({error:'世界已變更，請重新讀取後再準備物資。',operationSettled:true},409);
+      try{validateOpeningResourceRequest(world,b.resourceRequest);}catch(error){return reply({error:(error as Error).message,operationSettled:true},409);}
+    }
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
     if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
     if (b.operation === 'reset' && world.configuration) return reply({error:'自訂城市已開始，請保留目前的世界。'},400);
@@ -487,7 +493,12 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           await verifyLease();
           return result;
         };
-        if(arrangingOpening&&arrangement){
+        if(preparingResources){
+          const prepared=structuredClone(world);
+          await runSetup('opening-resources',(service,options)=>prepareOpeningResources(prepared,b.resourceRequest as string,service,options));
+          world.supplies=prepared.supplies;world.objects=prepared.objects;
+          world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
+        } else if(arrangingOpening&&arrangement){
           const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options));
           await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
         } else if (assessingCard && assessingDraft) {
@@ -511,7 +522,7 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
           }
         }
       } catch (error) {
-        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(assessingCard ? '人物背景未能判讀，尚未形成數值，原文字已保留。' : characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
+        failure = error instanceof BudgetExceeded || error instanceof CharacterTemplateValidationError ? error : Error(preparingResources ? '日常物資未能完整確認，尚未新增物資；原世界與回合已保留。' : assessingCard ? '人物背景未能判讀，尚未形成數值，原文字已保留。' : characterGeneration ? '人物草稿未能生成，原設定已保留。' : initializingCity ? '場所未能定稿，原設定已保留。' : '開局關聯未能整理，原設定已保留。');
       }
     } else if (b.operation === 'enter-acceptance' || b.operation === 'exit-acceptance') {
       try {
