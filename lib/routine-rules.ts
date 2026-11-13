@@ -1,3 +1,4 @@
+import { routinePlaceFor } from './daily-place-context';
 import { confirmNewCheck } from './action-checks';
 import { confirmsBodyConsequences } from './needs';
 import { adjudicationLimits, worldObjectCapacity } from './adjudication-limits';
@@ -30,7 +31,7 @@ const templates:RoutineTemplate[]=[
 export type RoutineRule={confirmedSources?:{operation:string;role:string;type:'object'|'supply'|'body'|'environment';id:string;facts?:string[]}[];confirmedSourcesDropped?:number;confirmedSourceFactsDropped?:number;id:string;version:1|2|3;programs?:(RoutineProgram|RoutineWorldProgram)[];worldTimings?:{operation:string;minutes:number}[];worldSubject?:string|null;finiteSourceBindings?:{operation:string;roles:string[]}[];family:'cafe-service';operations:string[];templates?:RoutineTemplate[];origin:string;knownTo:string[]};
 export type RoutineSelectionObserver=(data:unknown)=>void;
 const observeSelection=(observe:RoutineSelectionObserver|undefined,data:unknown)=>{try{observe?.(data);}catch{/* Private diagnostics cannot alter rule selection. */}};
-export type RoutinePlace={location:string;purpose:'cafe'|'home';operators:string[];confirmedOperations?:RoutineOperation[]};
+export type RoutinePlace={location:string;purpose:'cafe'|'home'|'custom';description?:string;operators:string[];confirmedOperations?:RoutineOperation[]};
 
 // World binding is deliberately separate from pure candidate parsing.
 export function resolveRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15,maxMinutes:number|null=null,observe?:RoutineSelectionObserver,onParsed?:(value:ReturnType<typeof parseAdjudicationCandidate>)=>void):EffectCandidate {
@@ -73,7 +74,7 @@ function requestedDrink(a:Action,t:RoutineTemplate):string|undefined {
  return subject==='咖啡'?'coffee':subject&&/茶/.test(subject)?'tea':undefined;
 }
 export function routineOperation(a:Action,scope:RoutineTemplate[]=templates):RoutineOperation|undefined {return requestTemplate(a,scope)?.operation;}
-function localPlace(w:World,c:Character){return w.routinePlaces?.find(p=>p.location===c.location);}
+function localPlace(w:World,c:Character){return routinePlaceFor(w,c);}
 function capable(w:World,c:Character,op:RoutineOperation){
  // Old café operator configurations remain compatible. Explicit [] means unable.
  return c.routineCapabilities?c.routineCapabilities.includes(op):!!localPlace(w,c)?.operators.includes(c.id);
@@ -100,6 +101,7 @@ export function routineOffer(w:World,c:Character,a:Action){
  const place=localPlace(w,c),scope=w.routineRules?.find(r=>r.family==='cafe-service'&&r.knownTo.includes(c.id))?.templates||templates;
  const op=routineOperation(a,scope);
  if(!place||!place.operators.includes(c.id))return null;
+ if(place.purpose==='custom')return {family:'cafe-service',version:3,genericMethods:{maxPrograms:8},operations:[] as RoutineOperation[],templates:[],background:'Only ordinary materials appropriate to this place purpose and actor role; admission is not goods permission. Explicit finite supplies, private rooms, object facts and current rights take precedence.',place};
  // First interpretation belongs to the existing adjudication slot. Exact
  // wording is needed for free deterministic reuse, not to offer interpretation.
  const selected=(place.purpose==='cafe'?templates:op?templates.filter(t=>t.operation===op):scope).filter(t=>validTemplate(t)&&capable(w,c,t.operation));

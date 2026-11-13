@@ -1,3 +1,4 @@
+import { customRoutinePlaces } from './daily-place-context';
 import { listCharacterCards } from './character-card-store';
 import { applyCharacterCard } from './character-card-world';
 import { mentalOpeningSchema } from './formal-mental-enablement';
@@ -243,5 +244,6 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   });
   for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds,selection.openingFeelings);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
   if(preview.issues.length)return {preview};
+  world.routinePlaces=customRoutinePlaces(world);
   return { preview, world };
 }

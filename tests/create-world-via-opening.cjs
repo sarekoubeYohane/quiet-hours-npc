@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Product API journey for compatibility test hosting only. */
 const assert=require('node:assert/strict');
-module.exports=async function createWorldViaOpening({load,name,scene,placeName=name+'的家',roomId='front',characterName=name+'的人',initialMemories='初到此地'}){
+module.exports=async function createWorldViaOpening({load,name,scene,placeName=name+'的家',roomId='front',characterName=name+'的人',initialMemories='初到此地',characterPlacement={}}){
  const {formCharacterCard,confirmOpening,completeCharacterFields}=await import('../tooling/verification/opening-journey.mjs');
  const owner=(await load('auth').getGitHubUser()).userId;
  const routes={'/api/world':load('route'),'/api/character-drafts':load('character-drafts-route'),'/api/character-drafts/form':load('character-form-route'),'/api/character-cards':load('character-cards-route'),'/api/opening-drafts':load('opening-drafts-route'),'/api/saves':load('saves-route')};
@@ -15,6 +15,6 @@ module.exports=async function createWorldViaOpening({load,name,scene,placeName=n
  Math.random=()=>{draws++;return .5;};
  try{card=await formCharacterCard(request,{fields:{...completeCharacterFields(characterName),initialMemories}});}finally{global.fetch=previousFetch;Math.random=previousRandom;}
  assert.equal(formationCalls,1);assert.equal(draws,20,'five 3d6, one 2d6 capacity and three need-trait dice, once');
- const city={places:[{id:'home',templateId:scene.id,version:scene.version,name:placeName}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId}]};
+ const city={places:[{id:'home',templateId:scene.id,version:scene.version,name:placeName}],characters:[{templateId:card.id,version:card.version,placeId:'home',roomId,...characterPlacement}]};
  const result=await confirmOpening(request,{name,city});assert.equal(result.input.operationScope,owner);return {...result,formationCalls,card};
 };

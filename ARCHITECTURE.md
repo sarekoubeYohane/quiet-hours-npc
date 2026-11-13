@@ -232,6 +232,9 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `city-draft.ts` | 開局配置的純型別（`CityDraft`、`CityPreview`）與上限 |
 | `city-creation.ts` | `prepareCity`：把開局配置與來源轉成預覽與世界 |
 | `city-finalization.ts` | 疊在場景範本上的額外房間、物件、連接與步行時間 |
+| `daily-place-context.ts` | 自訂場所住戶／主人／工作者的日常資格，以及入口到房間的許可與通路 |
+| `opening-resources.ts` | 第 0 回合天上意志備料契約、完整綁定驗證、有限供應與陳設使用權；經 world operation 計費及保存 |
+| `opening-resource-knowledge.ts` | 僅投射本人開局知道的物資位置與許可，不揭露遠端即時庫存 |
 | `city-access.ts` | 進入許可的建立與執行期查詢（`entryPermission`） |
 | `city-initialization.ts` | 用模型產生 finalization |
 | `opening-drafts.ts` | 開局草稿的版本化儲存與 `confirmOpening` |
