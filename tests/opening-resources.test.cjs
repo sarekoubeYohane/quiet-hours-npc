@@ -29,15 +29,21 @@ test('preparation is only available once at turn zero and cannot rewrite a runni
  const w=world();await prepare(w);const before=structuredClone(w);await assert.rejects(prepare(w));assert.deepEqual(w,before);const running=world();running.turn=1;await assert.rejects(prepare(running));
 });
 
-test('API preparation persists in the selected world, recovers the same operation without another call, and preserves other saves',async()=>{
- const {POST,GET}=load('route'),store=load('store'),w=world();w.contextId='resource-fixture';load('world').normalizeWorld(w);store.install(w);const originalWorld={...world(),turn:100,minute:1760};store.installForOwner('untouched-original',originalWorld);
- const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:'test-owner',worldContext:w.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b})}));
- assert.equal((await post({operation:'set-model-key',key:'fixture-key',mode:'openai'})).status,200);
- const current=await(await GET()).json(),before=structuredClone(current.world),operation={operation:'prepare-opening-resources',resourceRequest:'飲水和簡餐',expectedVersion:current.version,operationId:Date.now()+':'+crypto.randomUUID()};
- const prior=global.fetch;let calls=0;global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);assert.equal(input.contractVersion,'opening-resources.v1');return Response.json({usage:{prompt_tokens:20,completion_tokens:10},choices:[{message:{content:JSON.stringify(reply())}}]});};
+test('API preparation persists only in the selected save, replays without another call, and leaves a sibling save unchanged',async()=>{
+ const {POST,GET}=load('route'),store=load('store');store.install(load('world').seedWorld());
+ const sceneResponse=await load('scene-templates-route').POST(new Request('https://test.invalid/api/scene-templates',{method:'POST',headers:{origin:'https://test.invalid'},body:JSON.stringify({accountScope:'account-operations:test-owner',id:crypto.randomUUID(),version:0,name:'住宅',note:'住戶日常起居',rooms:[{id:'front',name:'客廳'}],connections:[],objects:[]})}));
+ assert.equal(sceneResponse.status,201);const scene=(await sceneResponse.json()).template,create=require('./create-world-via-opening.cjs');
+ const original=await create({load,name:'原存檔',scene,characterPlacement:{homeId:'home'}}),target=await create({load,name:'生活測試',scene,characterPlacement:{homeId:'home'}});
+ const url=id=>'https://test.invalid/api/world?save='+id+'&owner=test-owner';
+ const read=async id=>(await(await GET(new Request(url(id)))).json());
+ const untouched=(await read(original.input.id)).world;let current=await read(target.input.id);const before=structuredClone(current.world);
+ const post=b=>POST(new Request(url(target.input.id),{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:current.operationScope,worldContext:before.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b})}));
+ assert.equal((await post({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}})).status,200);current=await read(target.input.id);
+ const operation={operation:'prepare-opening-resources',resourceRequest:'飲水和簡餐',expectedVersion:current.version,operationId:Date.now()+':'+crypto.randomUUID()};
+ const prior=global.fetch;let calls=0;global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);assert.equal(input.contractVersion,'opening-resources.v1');const actor=input.actors[0];const value={supplies:['water','food'].map(kind=>({...provision(kind,actor.region,[actor.id]),responsible:actor.id})),furnishingGrants:[],unavailable:[]};return Response.json({usage:{prompt_tokens:20,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});};
  try{
   let result=await post(operation);assert.equal(result.status,200,await result.clone().text());let state=(await result.json()).world;assert.equal(state.turn,0);assert.equal(state.minute,1260);assert.deepEqual(state.characters,before.characters);assert.deepEqual(state.events,before.events);assert.equal(state.supplies.length,2);
-  result=await post(operation);assert.equal(result.status,200,await result.clone().text());assert.equal(calls,1);assert.deepEqual((await store.loadWorld('untouched-original')).world,originalWorld);
+  result=await post(operation);assert.equal(result.status,200,await result.clone().text());assert.equal(calls,1);const sibling=(await read(original.input.id)).world;delete sibling.aiUsage;delete untouched.aiUsage;assert.deepEqual(sibling,untouched);
   result=await post({...operation,operationId:Date.now()+':'+crypto.randomUUID()});assert.equal(result.status,409);assert.equal(calls,1);
  }finally{global.fetch=prior;}
 });
@@ -73,4 +79,14 @@ test('occlusion and disconnected rooms cannot be approved as immediately usable 
  for(const block of [w=>w.scene.occluded=['loft'],w=>w.configuration.doors=[]]){
   const w=world();block(w);const before=structuredClone(w),r=reply();r.supplies=[provision('water','loft')];await assert.rejects(prepare(w,r));assert.deepEqual(w,before);
  }
+});
+
+test('finite source subjects and assigned bedrooms remain authoritative across generic kinds and shared residences',async()=>{
+ const empty=world();empty.supplies=[{id:'empty-water',region:'loft',kind:'water',finiteScope:{version:1,coverage:'location',subject:'飲水'},owner:'river',remaining:0,initialState:{},knownTo:['river'],allowedTo:['river']}];await assert.rejects(prepare(empty));
+ const shared=world();delete shared.configuration.privateRooms;shared.configuration.bedrooms={river:'loft'};shared.configuration.residences.cedar='studio';shared.configuration.access.loft={rule:'public',allowedActorIds:[]};const r=reply();r.supplies.push(provision('water','loft',['cedar']));await assert.rejects(prepare(shared,r));
+});
+
+test('furnishing rights also require visibility and runtime adjudication receives the responsible actor roles',async()=>{
+ const hidden=world();hidden.scene.occluded=['loft'];const r=reply();r.supplies=[];await assert.rejects(prepare(hidden,r));
+ const w=world();await prepare(w);const offer=routineOffer(w,w.characters[0],{type:'propose',content:'備餐'});assert.deepEqual(offer.place.actorRoles,['resident']);assert.deepEqual(offer.place.responsibleActors[0].roles,['resident']);
 });

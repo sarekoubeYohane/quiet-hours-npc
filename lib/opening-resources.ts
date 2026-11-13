@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { canSee } from './perception';
 import { requestModel, type ModelService } from './model-adapter';
-import { customRoutinePlaces, dailyRoomAccessible, placeRoles } from './daily-place-context';
+import { customRoutinePlaces, dailyRoomAccessible, placeRoles, placeResponsibilities } from './daily-place-context';
+import { finiteSourceScope, routineFiniteScopeMatches } from './routine-materials';
 import { worldRegions } from './world-configuration';
 import type { SceneSupply } from './world-effects';
 import type { World } from './world';
@@ -36,7 +37,7 @@ export function validateOpeningResourceRequest(world:World,request:unknown):asse
 function resourceInput(world:World,request:string){
   return {contractVersion:'opening-resources.v1',request,
     places:world.configuration!.locations.map(place=>({...place,
-      responsibleActors:world.characters.flatMap(actor=>{const roles=placeRoles(world,actor.id,place.id);return roles.length?[{id:actor.id,name:actor.name,roles}]:[];}),
+      responsibleActors:placeResponsibilities(world,place.id),
       rooms:worldRegions(world).filter(room=>room.location===place.id).map(room=>({...room,
         accessibleTo:world.characters.filter(actor=>dailyRoomAccessible(world,actor.id,room.id)).map(actor=>actor.id),
         privateFor:world.configuration!.privateRooms?.[room.id]??null,
@@ -53,24 +54,34 @@ function category(item:{kind:string;consumable?:boolean}):'water'|'food'|undefin
   if(item.kind==='food')return 'food';
 }
 
+function usableAtOpening(world:World,actorId:string,room:{id:string;location:string}):boolean {
+  const actor=world.characters.find(actor=>actor.id===actorId);
+  return !!actor&&dailyRoomAccessible(world,actorId,room.id)&&canSee(world,{...actor,region:room.id,location:room.location},room.id);
+}
+
 // Bind the complete validated authoring result before changing any world facts.
 function bindResources(world:World,reply:z.infer<typeof replySchema>){
   const additions:SceneSupply[]=[],receipts:OpeningResources['supplies']=[],seen=new Set<string>();
   if((world.supplies?.length||0)+reply.supplies.length>128)throw Error('開局供應超出容量。');
   for(const item of reply.supplies){
     const room=worldRegions(world).find(room=>room.id===item.region);
-    if(!room||item.allowedTo.some(id=>!dailyRoomAccessible(world,id,room.id)||!canSee(world,{...world.characters.find(actor=>actor.id===id)!,region:room.id,location:room.location},room.id)))throw Error('物資必須放在使用者可通行的房間。');
+    if(!room||item.allowedTo.some(id=>!usableAtOpening(world,id,room)))throw Error('物資必須放在使用者可通行且可見的房間。');
     if(item.responsible!=='world'&&!placeRoles(world,item.responsible,room.location).length)throw Error('物資負責者必須是場所住戶、工作者、主人，或明示的背景管理者。');
     const key=JSON.stringify([item.region,item.kind]);
     const existing=[...world.supplies||[],...world.objects||[]];
-    if(seen.has(key)||existing.some(source=>category(source)===item.kind&&(source.region===item.region||source.finiteScope?.coverage==='location'&&worldRegions(world).find(region=>region.id===source.region)?.location===room.location)))throw Error('已有同類物資或明確有限來源，不能由開局準備替換或補回。');
+    const subject=item.kind==='water'?'飲水':'即食食物';
+    if(seen.has(key)||existing.some(source=>{
+      const scope=finiteSourceScope(source);
+      const sameCategory=category(source)===item.kind||routineFiniteScopeMatches(source,{sourceRole:'material',sourceSubject:subject,kind:null,background:null});
+      return sameCategory&&(source.region===item.region||scope?.coverage==='location'&&worldRegions(world).find(region=>region.id===source.region)?.location===room.location);
+    }))throw Error('已有同類物資或明確有限來源，不能由開局準備替換或補回。');
     seen.add(key);
     const id='supply:'+crypto.randomUUID();
     additions.push({id,label:item.label,region:item.region,remaining:item.portions,owner:item.responsible,
       knownTo:[...new Set(item.allowedTo)],allowedTo:[...new Set(item.allowedTo)],
       kind:item.kind==='water'?'drink':'food',consumable:true,quantity:{amount:1,unit:'serving'},
       initialState:{ready:'yes',contents:item.kind==='water'?'drinking-water':'ready-to-eat',serving:'可直接取用及攝取，不需要另外的容器'},
-      finiteScope:{version:1,coverage:'region',subject:item.kind==='water'?'飲水':'即食食物'},
+      finiteScope:{version:1,coverage:'region',subject},
     });
     receipts.push({id,label:item.label,region:item.region,location:room.location,allowedTo:[...new Set(item.allowedTo)],responsible:item.responsible,reason:item.reason});
   }
@@ -78,7 +89,7 @@ function bindResources(world:World,reply:z.infer<typeof replySchema>){
   for(const grant of reply.furnishingGrants){
     const item=world.objects?.find(object=>object.id===grant.objectId),room=worldRegions(world).find(room=>room.id===item?.region);
     if(!item||!room||item.kind!=='furnishing'||item.owner!=='world'||item.holder!==null||item.lifecycle!=='active'||item.hiddenAtOpening||granted.has(item.id)||
-      grant.allowedTo.some(id=>!dailyRoomAccessible(world,id,room.id)||!placeRoles(world,id,room.location).length))throw Error('只能確認有場所身分者對可通行、可見、無人持有之公共陳設的日常使用權。');
+      grant.allowedTo.some(id=>!usableAtOpening(world,id,room)||!placeRoles(world,id,room.location).length))throw Error('只能確認有場所身分者對可通行、可見、無人持有之公共陳設的日常使用權。');
     granted.add(item.id);
   }
   return {additions,receipts};

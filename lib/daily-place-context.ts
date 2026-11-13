@@ -11,12 +11,17 @@ export function placeRoles(world:World,actorId:string,location:string):string[] 
     configuration?.workplaces?.[actorId]?.includes(location)?'worker':''].filter(Boolean);
 }
 
+export function placeResponsibilities(world:World,location:string){
+  return world.characters.flatMap(actor=>{const roles=placeRoles(world,actor.id,location);return roles.length?[{id:actor.id,name:actor.name,roles}]:[];});
+}
+
 // Admission, private-room scope and a physical path are separate from goods rights.
 export function dailyRoomAccessible(world:World,actorId:string,regionId:string):boolean {
   const configuration=world.configuration,room=worldRegions(world).find(value=>value.id===regionId);
   if(!configuration||!room||!world.characters.some(actor=>actor.id===actorId))return false;
   const permitted=(id:string)=>entryPermission(world,actorId,room.location,id)?.allowed!==false&&
-    (!configuration.privateRooms?.[id]||configuration.privateRooms[id]===actorId);
+    (!configuration.privateRooms?.[id]||configuration.privateRooms[id]===actorId)&&
+    (!Object.values(configuration.bedrooms||{}).includes(id)||configuration.bedrooms?.[actorId]===id);
   const entrance=defaultRegion(room.location,world);
   if(!permitted(entrance)||!permitted(regionId))return false;
   const visited=new Set([entrance]),queue=[entrance];

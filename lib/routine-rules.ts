@@ -1,4 +1,4 @@
-import { routinePlaceFor } from './daily-place-context';
+import { routinePlaceFor, placeRoles, placeResponsibilities } from './daily-place-context';
 import { confirmNewCheck } from './action-checks';
 import { confirmsBodyConsequences } from './needs';
 import { adjudicationLimits, worldObjectCapacity } from './adjudication-limits';
@@ -101,7 +101,7 @@ export function routineOffer(w:World,c:Character,a:Action){
  const place=localPlace(w,c),scope=w.routineRules?.find(r=>r.family==='cafe-service'&&r.knownTo.includes(c.id))?.templates||templates;
  const op=routineOperation(a,scope);
  if(!place||!place.operators.includes(c.id))return null;
- if(place.purpose==='custom')return {family:'cafe-service',version:3,genericMethods:{maxPrograms:8},operations:[] as RoutineOperation[],templates:[],background:'Only ordinary materials appropriate to this place purpose and actor role; admission is not goods permission. Explicit finite supplies, private rooms, object facts and current rights take precedence.',place};
+ if(place.purpose==='custom')return {family:'cafe-service',version:3,genericMethods:{maxPrograms:8},operations:[] as RoutineOperation[],templates:[],background:'Only ordinary materials appropriate to this place purpose and actor role; admission is not goods permission. Explicit finite supplies, private rooms, object facts and current rights take precedence.',place:{...place,actorRoles:placeRoles(w,c.id,c.location),responsibleActors:placeResponsibilities(w,c.location)}};
  // First interpretation belongs to the existing adjudication slot. Exact
  // wording is needed for free deterministic reuse, not to offer interpretation.
  const selected=(place.purpose==='cafe'?templates:op?templates.filter(t=>t.operation===op):scope).filter(t=>validTemplate(t)&&capable(w,c,t.operation));
