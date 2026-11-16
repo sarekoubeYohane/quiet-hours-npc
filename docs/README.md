@@ -17,7 +17,7 @@
 
 ### `adr/`
 
-11 份，狀態都是 accepted。編號有兩個 `0002`（`activity-rules-and-lifecycle`、`bounded-activity-outcomes`），沒有 0010 與 0011。
+12 份，狀態都是 accepted。編號有兩個 `0002`（`activity-rules-and-lifecycle`、`bounded-activity-outcomes`），沒有 0010、0011 與 0013–0017。0018 修訂了 0005、0007、0009、0012 中針對舊規則世界的相容條款，各份文末有對應的修訂段落。
 
 ### `design/`
 
