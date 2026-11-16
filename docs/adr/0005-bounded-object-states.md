@@ -41,3 +41,7 @@ status: accepted
 
 
 Review 工程補充：有限具體來源與普通背景的取捨以當前已保存物件及有界 server-only 規則角色約束保存。成功綁定有限來源後，不因耗盡、損毀或移走便用背景重生；真正新 active 來源仍能接續。每規則最多 8 operation × 8 role，不補舊歷史或舊證據；observer 可看新操作的約束事實，NPC 不接收內部標記。詳見[工程範圍](../design/world-changes-framework.md)與[review 修復證據](../verification/world-changes-review-fixes-2026-10-21.md)。
+
+## 2026-11-16 修訂（ADR 0018）
+
+上文「新讀取器承接舊世界」的相容原則，其對象是舊規則的固定世界。依 [ADR 0018](0018-single-ruleset-with-example-content.md)，該類世界不再執行、既有存檔於該決定上線時刪除；本 ADR 對世界狀態、所有權與外在後果的決定不受影響。
