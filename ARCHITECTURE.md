@@ -25,7 +25,7 @@ React 介面由 vinext（Vite 上的 Next App Router 相容層）提供，執行
 | `public/characters/`、`public/pixel/` | 角色素材（現行）與舊版像素圖 |
 | `.agents/skills/` | Matt Pocock 工程技能副本，見 `docs/agents/matt-pocock.md` |
 
-Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是本機，另有 `env.test`、`env.production`。秘密的鍵名見 `config/local-auth.example` 與 `cloudflare-env.d.ts`。回想功能需要的 `RECALL_USAGE_DB`、`MEMORY_VECTOR_INDEX` 沒有綁在 `wrangler.jsonc`，所以三個環境預設都是關閉的。
+Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是本機，另有 `env.test`、`env.production`。秘密的鍵名見 `config/local-auth.example` 與 `cloudflare-env.d.ts`。回想功能需要的 `RECALL_USAGE_DB`、`MEMORY_VECTOR_INDEX` 只綁在 `env.test`（共用用量 D1 `quiet-hours-npc-recall-usage`、索引 `quiet-hours-npc-test-memory`）；本機與正式站沒有綁定。有 binding 仍要另設 `RECALL_ENABLED=true` 與 `OWNER_EMBEDDING_KEY` secret 才會啟用。
 
 ## 責任分工
 

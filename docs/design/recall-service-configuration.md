@@ -43,6 +43,17 @@ Embedding 成功回覆的 `usage.total_tokens` 以獨立 nullable `known_input_t
 
 Vectorize binding 沒有 AbortSignal 參數，adapter 會在取消時停止等待；伺服器端的 mutation 可能繼續且計費，因此保留用量。OpenAI fetch 傳入 AbortSignal，取消同樣不能當作未計費證明。所有 transport 仍須由呼叫端在 dispatch 前重驗世界租約、工作期限及預算。
 
+## 測試站資源（2026-11-16）
+
+已建立，正式站與本機尚未建立：
+
+| 資源 | 名稱 | 說明 |
+| --- | --- | --- |
+| Vectorize V2 索引 | `quiet-hours-npc-test-memory` | 1536 維、cosine；metadata index：`owner`、`world`、`npc`、`memoryId`（string）、`version`（number） |
+| 共用用量 D1 | `quiet-hours-npc-recall-usage` | 只以 `wrangler d1 execute --file drizzle/0004_recall_usage.sql` 套用 0004；不設 `migrations_dir`，CI 不對它跑世界 migration |
+
+`wrangler.jsonc` 的 `env.test` 綁定上述兩項，`tooling/check-test-build.mjs` 檢查建置成品只指向這兩個測試站資源。啟用開關不寫在 `wrangler.jsonc`：`RECALL_ENABLED`、`OWNER_EMBEDDING_KEY`、`RECALL_BUDGET_LIMITS` 以 `wrangler secret put <名稱> --env test` 設定，要關閉時刪掉 `RECALL_ENABLED` 即可，不必重新部署。正式站之後另建自己的索引，綁同一個用量 D1。
+
 ## 上線前仍須驗證
 
 1. 各環境資源與 secret 經授權設定，正式 D1 migration 另行執行。`0004_recall_usage.sql` 的 `recall_dispatch_usage` 表與 `recall_usage_month_kind` index 必須另套用至共用 `RECALL_USAGE_DB`；`recall_index_entries` 表及其 index 留在各環境世界 DB。若完整 migration 也套用至共用 DB，多出的空 manifest 表不作權威、不用來讀寫世界資料。
