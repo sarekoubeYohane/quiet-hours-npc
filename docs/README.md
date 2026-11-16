@@ -43,6 +43,7 @@
 | 追求 | `layered-pursuits`、`pursuit-selection`、`pursuit-capacity` |
 | 人物、檢定、精神電量 | `character-attributes`、`d100-checks`、`personal-body-needs`、`formal-mental-energy-policy`、`formal-mental-enablement`、`character-dice-energy-recommendation-2026-11-09`、`character-visual-assets` |
 | 記憶 | `npc-memory-contract` |
+| NPC 決策 prompt | `npc-playbook`（2026-10-08 的版本）、`npc-prompt-rewrite-2026-11-16`（改寫提案與測試證據，尚未實作）、`npc-prompt-rewrite-draft`（草稿全文） |
 
 已知與現行程式不一致的：
 
