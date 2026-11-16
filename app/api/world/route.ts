@@ -370,8 +370,6 @@ async function mutateWorld(request: Request, trace: WorldTrace, services?: World
     }
     if (b.operation === 'enter-acceptance' && world.acceptance) return reply({error:'目前已在驗收場景，請先返回原世界。'},400);
     if (b.operation === 'exit-acceptance' && !world.acceptance?.original && !world.acceptance?.snapshot) return reply({error:'沒有可返回的原世界。'},400);
-    if (b.operation === 'reset' && world.configuration) return reply({error:'自訂城市已開始，請保留目前的世界。'},400);
-    if (b.operation === 'reset' && world.acceptance) return reply({error:'驗收期間請使用「結束驗收並返回原世界」，原世界保持保存。'},400);
     trimJournal(journal, 7);
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return reply({error:'此世界使用舊意圖契約，舊資料仍可讀取；請從新開存檔建立新世界，原存檔與用量保留。',worldResetRequired:true},409);
     const originalAdjudication = world.adjudication && { ...world.adjudication };

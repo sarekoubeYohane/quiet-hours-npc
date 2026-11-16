@@ -17,7 +17,7 @@ React 介面由 vinext（Vite 上的 Next App Router 相容層）提供，執行
 | --- | --- |
 | `app/` | 頁面與 API route。`app/api/world/route.ts` 是所有世界變更的單一入口 |
 | `lib/` | 全部領域邏輯，約 110 個檔，平鋪不分子目錄 |
-| `components/` | 自家 React 元件。`components/ui/` 是 vendored shadcn，自家只用到 `button`、`select`、`alert-dialog` |
+| `components/` | 自家 React 元件。`components/ui/` 是 vendored shadcn，只保留用到的 `button`、`select`、`alert-dialog` |
 | `db/schema.ts`、`drizzle/` | 資料表宣告與 migration SQL |
 | `tests/` | 整合測試與手寫 runner，見 [docs/testing.md](docs/testing.md) |
 | `tooling/` | 部署守門腳本、瀏覽器驗證 runner、診斷與實驗腳本 |
@@ -413,8 +413,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 
 以下在 `main` 上找不到從介面到達的路徑。這裡只記錄現況，是否移除要另外決定，動之前請先搜尋 `tests/` 與 `tooling/` 的引用。
 
-- `components/city-editor.tsx` 沒有任何 importer；`opening-people-editor.tsx`、`city-finalization-editor.tsx` 只被它使用。
-- 因此 `preview-city`、`initialize-city`、`suggest-opening-relationships` 三個 operation，以及 `lib/city-initialization.ts`、`lib/opening-relationship-generation.ts`，目前沒有介面呼叫者。
-- `world-app.tsx` 的 `page === 'city'` 沒有觸發點。
-- `lib/world.ts` 的 `resetWorld`、`lib/world-saves.ts` 的 `createWorldSave` 在 `app/` 與 `lib/` 內沒有呼叫者。
-- `vendor/shadcn-tailwind-4.13.0.css` 沒有被任何檔案引用。
+- `preview-city`、`initialize-city`、`suggest-opening-relationships` 三個 operation，以及 `lib/city-initialization.ts`、`lib/opening-relationship-generation.ts`，沒有介面呼叫者（原本的城市編輯器元件已移除），只剩 `tests/` 與 `tooling/` 在呼叫。
+- `lib/world.ts` 的 `resetWorld` 在 `app/` 與 `lib/` 內沒有呼叫者，只有 `tests/reset-api.test.cjs` 使用。
+- `components/world-app.tsx` 沒有 `saveId` 的分支（舊分頁列與完整設定頁）：`/observe` 一律帶 `saveId`，介面到不了。
+- `public/pixel/` 的舊人物圖與 `public/` 的 starter svg 目前沒有被引用，刻意保留供之後的世界圖像呈現使用。

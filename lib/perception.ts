@@ -290,9 +290,7 @@ export function supplyObservationCandidates(world: World, character: Character, 
 }
 // Call only after the activity's facts commit; information does not transfer
 // possession, rights, quantities or an object's physical revision.
-export function discoverWorldObjects(world: World, character: Character, event: import('./world').WorldEvent, ids: string[]) {
-  return discoverWorldResources(world, character, event, ids, []);
-}
+
 export function discoverWorldResources(world: World, character: Character, event: import('./world').WorldEvent, objectIds: string[], supplyIds: string[], method?:DiscoveryMethod) {
   const candidates = [...objectObservationCandidates(world, character, objectIds), ...supplyObservationCandidates(world, character, supplyIds)];
   return resolveProbe(world, character, event, 'sight', candidates, candidates.map(candidate => candidate.objectId ? 'object:'+candidate.objectId : 'supply:'+candidate.supplyId),method);
