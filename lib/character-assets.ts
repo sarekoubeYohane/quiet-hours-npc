@@ -1,4 +1,5 @@
 import manifest from '@/public/characters/manifest.json';
+import { exampleCardAssetKeys } from './example-content';
 
 /** Approved #88 artwork, keyed by saved-world IDs; manifest is the shared contract. */
 export type CharacterAsset = { pixel: string; portrait: string; avatar: string; master: string; source: string; fallback: 'initial' };
@@ -10,4 +11,8 @@ export const characterAssets: Record<string, CharacterAsset> = Object.fromEntrie
     fallback: 'initial' as const,
   }]),
 );
-export function assetsForCharacter(id: string): CharacterAsset | undefined { return Object.hasOwn(characterAssets,id) ? characterAssets[id] : undefined; }
+const byKey = (key: string | undefined) => key && Object.hasOwn(characterAssets, key) ? characterAssets[key] : undefined;
+/** World character ID first, then the card ID (`profileSource.id`); built-in example cards map back to the original artwork keys. */
+export function assetsForCharacter(id: string, sourceId?: string): CharacterAsset | undefined {
+  return byKey(id) ?? byKey(sourceId) ?? byKey(sourceId && Object.hasOwn(exampleCardAssetKeys, sourceId) ? exampleCardAssetKeys[sourceId] : undefined);
+}

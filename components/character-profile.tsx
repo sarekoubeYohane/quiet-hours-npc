@@ -12,7 +12,7 @@ import { regionOf } from '@/lib/perception';
 
 export default function CharacterProfile({world,character,onBack,onInteract,onAnalysis,onAdoptAttributes,disabled}:{onAdoptAttributes?:(setup:CharacterSetup)=>Promise<boolean>;disabled?:boolean;world:World;character:Character;onBack:()=>void;onInteract:()=>void;onAnalysis:()=>void}) {
  const [failed,setFailed]=useState(false);
- const asset=assetsForCharacter(character.id);
+ const asset=assetsForCharacter(character.id,character.profileSource?.id);
  return <section className="character-profile panel" aria-label="人物檔案">
   <div className="profile-toolbar"><Button variant="outline" onClick={onBack}>返回觀察</Button><span>人物檔案</span></div>
   <div className="profile-layout"><div className="profile-visual" style={{borderColor:character.color}}>

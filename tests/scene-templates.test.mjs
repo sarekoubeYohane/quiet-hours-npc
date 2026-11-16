@@ -198,7 +198,8 @@ test('rejected and failed edits preserve the saved template and its account scop
   try {
     owner = 'another-producer';
     const other = (await (await send('GET')).json()).templates;
-    assert.deepEqual(other, [shared]);
+    assert.deepEqual(other.filter(item => !item.shared), []);
+    assert.deepEqual(other.find(item => item.id === shared.id), shared);
     assert.equal((await send('POST', { ...update, version: 2, name: '跨帳號覆寫' })).status, 409);
     owner = null;
     assert.equal((await send('GET')).status, 401);

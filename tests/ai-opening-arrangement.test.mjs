@@ -33,7 +33,7 @@ test('explicit AI arrangement uses frozen selected sources, stays a proposal, th
   const adopted=await j.ok('/api/opening-drafts/arrange',{operationScope:'a',id:j.draft.id,version:j.draft.version,operationId:op,action:'adopt',proposalVersion:reply.arrangement.version,city:reply.arrangement.city});
   assert.equal(adopted.draft.body.city.characters[0].placeId,'home');assert.equal(adopted.world.objects.find(object=>object.label==='木桌').state.condition,'良好');
   const saved=await j.ok('/api/saves',{operationScope:'a',id:crypto.randomUUID(),draftId:j.draft.id,draftVersion:adopted.draft.version});assert.equal(saved.world.turn,0);assert.deepEqual(saved.world.characters[0].attributes.values,j.card.values);assert.equal(saved.world.objects.find(object=>object.label==='木桌').state.condition,'良好');
-  assert.equal(app.modelRequests.length,2);assert.deepEqual((await j.ok('/api/character-cards?accountScope=account-operations%3Aa')).cards[0],j.card);
+  assert.equal(app.modelRequests.length,2);assert.deepEqual((await j.ok('/api/character-cards?accountScope=account-operations%3Aa')).cards.find(card=>card.id===j.card.id),j.card);
  }finally{await app.close();}
 });
 
