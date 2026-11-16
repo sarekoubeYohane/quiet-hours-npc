@@ -113,12 +113,4 @@ export async function listDecisionTraces(db: TraceDatabase, owner: string, conte
   return { records: rows.results, retention: { scope: 'owner-world' as const, ...totals!, evicted: history?.evicted || 0, limits: decisionTraceLimits } };
 }
 
-export async function clearDecisionTraces(db: TraceDatabase, owner: string): Promise<{ status: 'cleared' | 'clear-failed' }> {
-  try {
-    // Records are removed first. A crash before metadata deletion can only leave
-    // an explicit historical eviction count, never resurrect private contents.
-    await db.prepare('DELETE FROM decision_traces WHERE owner = ?').bind(owner).run();
-    await db.prepare('DELETE FROM decision_trace_retention WHERE owner = ?').bind(owner).run();
-    return { status: 'cleared' };
-  } catch { return { status: 'clear-failed' }; }
-}
+

@@ -62,19 +62,7 @@ export async function readSaveCreation(owner:string,id:string,creationRequest:st
     originalOpeningAvailable:row.original_opening!==null},world,version:row.version};
 }
 
-/** A single database transaction installs both story and owner-scoped identity. */
-export async function createWorldSave(owner:string,input:{id:string;name:string;creationRequest:string;world:World;originalOpening?:unknown}):Promise<SavedWorld> {
-  if(!saveUuidPattern.test(input.id))throw new SaveAccessError('建立操作識別碼無效。',400);
-  const db=database(),storageOwner='save:'+owner+':'+input.id;
-  await db.batch([
-    db.prepare('INSERT OR IGNORE INTO worlds (owner,state,version,locked_until,city_started) SELECT ?,?,0,0,1 WHERE NOT EXISTS (SELECT 1 FROM save_tombstones WHERE owner=? AND id=?)').bind(storageOwner,JSON.stringify(input.world),owner,input.id),
-    db.prepare(`INSERT OR IGNORE INTO world_saves (owner,id,storage_owner,name,created_at,creation_request,original_opening)
-      SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM save_tombstones WHERE owner=? AND id=?)`).bind(owner,input.id,storageOwner,input.name,Date.now(),input.creationRequest,input.originalOpening===undefined?null:JSON.stringify(input.originalOpening),owner,input.id),
-  ]);
-  const saved=await readSaveCreation(owner,input.id,input.creationRequest);
-  if(!saved)throw Error('無法確認存檔保存結果；請以原建立操作重新讀取。');
-  return saved;
-}
+
 
 /** Compatibility ledger for standalone authoring consumers, never a playable world. */
 export async function ensureAccountOperationLedger(binding:SaveBinding) {

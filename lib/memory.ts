@@ -140,11 +140,7 @@ function selectedMemories(c: Character, value: unknown, visibleShort: MemoryRef[
   }
   return result;
 }
-export function selectMemories(c: Character, value: unknown): LongMemory[] {
-  const result = selectedMemories(c, value);
-  if (result.length > 64 || memoryBytes(result) > 64 * 1024) throw new MemoryValidationError('長期記憶已滿，需要明示重新評估，不能自動刪除');
-  return result;
-}
+
 export function consumeMemories(c: Character) {
   for (const item of c.shortTerm || []) { if (item.observation) item.consumed = true; delete item.controlled; }
   projectMemories(c);
