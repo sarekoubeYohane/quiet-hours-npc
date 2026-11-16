@@ -2,15 +2,17 @@ import { database } from './store';
 import { loadCharacterDraft } from './character-draft-store';
 import { publicFormation, validCardAllocation, type CharacterCard } from './character-cards';
 import type { CardAssessment } from './character-formation';
+import { exampleCharacterCards } from './example-content';
 export async function saveCardAssessment(owner:string,draftId:string,operationId:string,value:CardAssessment) {
  await database().prepare('INSERT OR IGNORE INTO character_card_assessments (owner,draft_id,operation_id,body) VALUES (?,?,?,?)').bind(owner,draftId,operationId,JSON.stringify(value)).run();
 }
 export async function readCardAssessment(owner:string,draftId:string,operationId:string):Promise<CardAssessment|undefined> {
  const row=await database().prepare('SELECT body FROM character_card_assessments WHERE owner = ? AND draft_id = ? AND operation_id = ?').bind(owner,draftId,operationId).first<{body:string}>();return row?JSON.parse(row.body):undefined;
 }
+/** Built-in example cards first, then this account's own cards; callers need not tell them apart. */
 export async function listCharacterCards(owner:string):Promise<CharacterCard[]> {
  const {results}=await database().prepare('SELECT id,version,body FROM character_cards WHERE owner = ? ORDER BY id').bind(owner).all<{id:string;version:number;body:string}>();
- return results.map(row=>JSON.parse(row.body) as CharacterCard);
+ return [...exampleCharacterCards,...results.map(row=>JSON.parse(row.body) as CharacterCard)];
 }
 export async function completeCharacterCard(owner:string,draftId:string,version:number):Promise<CharacterCard|undefined> {
  const draft=await loadCharacterDraft(owner,draftId);if(!draft?.formation)return;

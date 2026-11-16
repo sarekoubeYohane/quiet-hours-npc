@@ -38,7 +38,7 @@ try {
   assert.deepEqual((await ok('/api/saves')).saves, []);
   assert.deepEqual((await ok('/api/opening-drafts')).drafts, []);
   assert.deepEqual((await ok('/api/character-drafts')).drafts, []);
-  assert.deepEqual((await ok('/api/character-cards')).cards, []);
+  assert.deepEqual((await ok('/api/character-cards')).cards.filter(card => !card.shared), []);
 
   const { accountScope } = await ok('/api/model-settings');
   await ok('/api/model-settings', {

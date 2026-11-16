@@ -63,6 +63,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 日常規則（泡茶等） | `lib/routine-rules.ts`（入口），見[日常](#日常規則) |
 | 建立新世界 | `lib/city-creation.ts` 的 `prepareCity`、`lib/opening-drafts.ts` 的 `confirmOpening` |
 | 人物卡與數值形成 | `lib/character-formation.ts`、`lib/character-cards.ts` |
+| 內建範例（範例人物卡、範例場景） | `lib/example-content.ts`；經 `listCharacterCards` 與 `sharedSceneTemplates` 出現在人物庫、場景庫與開局 |
 | 存檔的另存與刪除 | `lib/save-management.ts`；存檔身分與綁定在 `lib/world-saves.ts` |
 | 預算、用量、費用 | `lib/player-account-budget.ts`（帳號帳本）、`lib/usage-recovery.ts`、`lib/costs.ts` |
 | 模型 Key 與模型設定 | `lib/model-keys.ts`、`lib/model-settings-store.ts` |
@@ -224,11 +225,12 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `character-drafts.ts` | 建角草稿型別與文字來源追蹤（使用者或 AI） |
 | `character-generation.ts` | 用模型補空白欄位 |
 | `character-formation.ts` | 草稿轉數值：判讀加成、擲骰 |
-| `character-cards.ts` | 完成人物卡型別（v2 五屬性）與配點驗證 |
+| `character-cards.ts` | 完成人物卡型別（v2 五屬性）與配點驗證；`shared: true` 表示內建範例卡 |
+| `example-content.ts` | 內建範例（ADR 0018、#317）：Cass、Vera、Kris、店主四張完成人物卡（#316 定案數值，不擲骰），以及 Kris 的住處、Vera 的房間、街角咖啡館三個場景範本；範例卡 ID 對回角色素材鍵的 `exampleCardAssetKeys`。純資料，不依賴 `seedWorld`，不寫入 D1 |
 | `character-card-world.ts` | 把人物卡套到世界的 `Character` |
 | `character-attributes.ts` | 舊制四屬性（v1，1 到 5 級） |
-| `character-assets.ts` | 角色素材路徑，來源是 `public/characters/manifest.json`。`PixelSprite` 先用世界角色 ID 查，再用人物卡 ID（`profileSource.id`）查；都沒有就顯示人物顏色與名字首字 |
-| `scene-templates.ts` | 場景範本 schema 與內建範本 |
+| `character-assets.ts` | 角色素材路徑，來源是 `public/characters/manifest.json`。`assetsForCharacter(id, sourceId)` 先用世界角色 ID 查，再用人物卡 ID（`profileSource.id`）查，範例卡再經 `exampleCardAssetKeys` 對回 `cass`／`vera`／`kris`／`owner`；`PixelSprite` 與人物檔案都走這裡，都沒有就顯示人物顏色與名字首字 |
+| `scene-templates.ts` | 場景範本 schema 與內建範本（`sharedSceneTemplates`：住宅加上 `example-content.ts` 的三個範例場景） |
 | `city-draft.ts` | 開局配置的純型別（`CityDraft`、`CityPreview`）與上限 |
 | `city-creation.ts` | `prepareCity`：把開局配置與來源轉成預覽與世界 |
 | `city-finalization.ts` | 疊在場景範本上的額外房間、物件、連接與步行時間 |
@@ -326,7 +328,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `model_preferences` | `model-settings-store.ts` |
 | `player_accounts`、`player_usage_origins`、`player_dispatches` | `player-account-budget.ts` |
 | `character_templates`、`character_drafts` | 對應的 `*-store.ts` |
-| `character_cards`、`character_card_assessments` | `character-card-store.ts` |
+| `character_cards`、`character_card_assessments` | `character-card-store.ts`（`listCharacterCards` 另附內建範例卡，範例不在表內） |
 | `scene_templates` | 讀在 `scene-template-store.ts`，寫在 `app/api/scene-templates/route.ts` |
 | `opening_drafts` | `opening-drafts.ts` |
 | `opening_arrangements` | `opening-arrangement-store.ts` |
@@ -343,7 +345,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | --- | --- | --- |
 | `/` | 登入卡或 `SavePicker` | `SaveNavigation`、`SaveActions` |
 | `/new` | `OpeningWizard` | `opening-configuration-controls`、`OpeningArrangementPanel`、`city-access-editor` |
-| `/character-templates` | `CharacterDraftEditor`、`CharacterTemplateEditor` | `CharacterFormationControls`、`ModelSettingsPanel` |
+| `/character-templates` | `CharacterDraftEditor`、`CharacterTemplateEditor`、`ExampleCharacterCards` | `CharacterFormationControls`、`ModelSettingsPanel`；範例人物卡唯讀，沒有修改或刪除操作 |
 | `/scene-templates` | `SceneTemplateEditor` | |
 | `/observe?save=&view=` | `WorldApp` | 見下 |
 | `/settings?save=`（帳號設定） | `ModelSettingsPanel`、`PlayerAccountSettings` | `BudgetControls`、`CostPanel` |

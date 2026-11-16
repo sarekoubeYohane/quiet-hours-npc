@@ -12,7 +12,9 @@ export type CardFormation = {
 };
 export type CharacterCard = {
  id:string;version:1;fields:CharacterTemplateFields;formationVersion:'character-card-v1';attributeVersion:2;
- values:CardValues;initialTotal:number;minimums:CardValues;capacity:number;needTraits:NeedTraits;sourceDraftId:string;
+ values:CardValues;initialTotal:number;minimums:CardValues;capacity:number;needTraits:NeedTraits;
+ /** Account cards record their draft; built-in examples (lib/example-content.ts) have no draft and are marked shared. */
+ sourceDraftId?:string;shared?:true;
 };
 export function publicFormation(value:CardFormation):CardFormation {
  const {version,attributeVersion,values,initialTotal,minimums,capacity,needTraits}=value;

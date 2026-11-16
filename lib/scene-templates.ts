@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { entryRules } from './entry-rules';
 import { assertBoundedState } from './adjudication-contract';
+import { exampleSceneTemplates } from './example-content';
 
 const identifier = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/);
 const name = z.string().trim().min(1).max(80);
@@ -65,4 +66,4 @@ export const sharedSceneTemplates: readonly SceneTemplate[] = [{
     { id: 'table', name: '小桌', roomId: 'living-room', state: {} },
     { id: 'lamp', name: '台燈', roomId: 'living-room', state: { 電源: '關閉' } },
   ],
-}];
+}, ...exampleSceneTemplates];

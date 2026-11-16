@@ -11,7 +11,7 @@ import { bubbleText, characterRegion, position, walkRoute, type Point } from '@/
 export function PixelSprite({ id, className = '', name, sourceId }: { id: string; className?: string; name?: string; sourceId?: string }) {
   const [failedSrc, setFailedSrc] = useState('');
   // World IDs come first; a card ID lets artwork made for a character card show up in every world that uses it.
-  const src = (assetsForCharacter(id) ?? (sourceId ? assetsForCharacter(sourceId) : undefined))?.pixel;
+  const src = assetsForCharacter(id, sourceId)?.pixel;
   return <span className={`pixel-sprite ${className}`} aria-hidden="true" data-asset-character={id} data-asset-use="pixel">
     {!src || failedSrc === src ? <span className={`pixel-sprite-fallback ${name ? 'is-initial' : ''}`}>{[...(name || id)][0]?.toUpperCase()}</span> : <img src={src} alt="" draggable={false} onError={() => setFailedSrc(src)}/>}
   </span>;

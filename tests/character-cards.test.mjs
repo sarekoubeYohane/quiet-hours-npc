@@ -32,13 +32,13 @@ test('forming locks text, rolls once in code, preserves total and capacity, and 
   assert.equal((await f.form({action:'allocate',id:draft.id,version:formed.body.draft.version,values:{...value.values,strength:7,endurance:19}})).status,400);
   assert.equal((await f.form({action:'allocate',id:draft.id,version:formed.body.draft.version,values:{...value.values,capacity:81}})).status,400);
   const allocated=await f.form({action:'allocate',id:draft.id,version:formed.body.draft.version,values:{...value.values,strength:13,dexterity:13}});assert.equal(allocated.status,200);assert.equal(allocated.body.draft.formation.capacity,80);
-  assert.equal((await f.cards()).body.cards.length,0);
+  assert.equal((await f.cards()).body.cards.filter(card=>!card.shared).length,0);
   assert.equal((await f.form({action:'allocate',id:draft.id,version:formed.body.draft.version,values:value.values})).status,409);
   assert.equal((await f.complete({id:draft.id,version:formed.body.draft.version})).status,409);
   const saved=await f.complete({id:draft.id,version:allocated.body.draft.version});assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.card.capacity,80);assert.equal(saved.body.card.values.dexterity,13);
-  assert.equal((await f.cards()).body.cards.length,1);assert.deepEqual((await f.complete({id:draft.id,version:allocated.body.draft.version})).body.card,saved.body.card);assert.equal(f.context.dice,dice);assert.equal(calls,1);
+  assert.equal((await f.cards()).body.cards.filter(card=>!card.shared).length,1);assert.deepEqual((await f.complete({id:draft.id,version:allocated.body.draft.version})).body.card,saved.body.card);assert.equal(f.context.dice,dice);assert.equal(calls,1);
   const read=(await f.readDrafts()).body.drafts[0];assert.equal(read.completedCard.id,saved.body.card.id);assert.equal(read.formation.capacity,80);
-  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.form(input)).status,409);assert.equal((await f.form({...input,operationScope:'account-operations:foreign'})).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
+  f.context.owner='foreign';assert.deepEqual((await f.cards()).body.cards.filter(card=>!card.shared),[]);assert.equal((await f.form(input)).status,409);assert.equal((await f.form({...input,operationScope:'account-operations:foreign'})).status,404);assert.equal((await f.complete({id:draft.id,version:allocated.body.draft.version})).status,409);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
 
@@ -71,8 +71,8 @@ test('formation and completed-card lost replies recover their original stored st
    const stored=(await f.readDrafts()).body.drafts[0];assert.equal(!!stored.formation,fault==='after');assert.equal(calls,1);
    const recovered=await f.form(input);assert.equal(recovered.status,200);assert.equal(calls,1);if(fault==='after')assert.equal(f.context.dice,used);else assert.ok(f.context.dice>used);
    const stable=f.context.dice;assert.equal((await f.form(input)).status,200);assert.equal(f.context.dice,stable);
-   f.context.batchFault=fault;const complete={id:draft.id,version:recovered.body.draft.version};assert.equal((await f.complete(complete)).status,503);assert.equal((await f.cards()).body.cards.length,fault==='after'?1:0);
-   const card=await f.complete(complete);assert.equal(card.status,200);assert.equal((await f.cards()).body.cards.length,1);assert.equal(calls,1);assert.equal(f.context.dice,stable);
+   f.context.batchFault=fault;const complete={id:draft.id,version:recovered.body.draft.version};assert.equal((await f.complete(complete)).status,503);assert.equal((await f.cards()).body.cards.filter(card=>!card.shared).length,fault==='after'?1:0);
+   const card=await f.complete(complete);assert.equal(card.status,200);assert.equal((await f.cards()).body.cards.filter(card=>!card.shared).length,1);assert.equal(calls,1);assert.equal(f.context.dice,stable);
   }finally{globalThis.fetch=oldFetch;f.db.close();}
  }
 });
@@ -113,7 +113,7 @@ test('unknown template text requires explicit creation and real user changes; so
   const edited=(await f.saveDraft({...second,fields:{...second.fields,background:'在港口獨立搬卸大型木箱'}})).body.draft;assert.equal(edited.provenance.background.kind,'unknown');assert.equal(edited.provenance.background.materiallyEdited,true);
   candidates=[{target:'strength',source:'background',quote:'搬卸大型木箱',substantive:true}];assert.equal((await f.form(await operation(f,edited))).body.draft.formation.minimums.strength,8);
   assert.equal((await f.source({...source,fields:{...source.fields,background:'來源改成新的經歷'}})).status,200);
-  assert.equal((await f.importTemplate(importInput)).body.draft.fields.background,'擅長搬重物');assert.equal((await f.cards()).body.cards.find(value=>value.id===card.id).fields.background,'擅長搬重物');
+  assert.equal((await f.importTemplate(importInput)).body.draft.fields.background,'擅長搬重物');assert.equal((await f.cards()).body.cards.filter(card=>!card.shared).find(value=>value.id===card.id).fields.background,'擅長搬重物');
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
 
@@ -165,7 +165,7 @@ test('allocation and completion retain the original account even when two accoun
   assert.equal(formedA.version,formedB.version);
   assert.equal((await f.form({action:'allocate',id,version:formedA.version,operationScope:formedA.accountScope,values:formedA.formation.values})).status,409);
   assert.equal((await f.complete({id,version:formedA.version,operationScope:formedA.accountScope})).status,409);
-  assert.deepEqual((await f.cards()).body.cards,[]);assert.equal((await f.readDrafts()).body.drafts[0].fields.name,'另一帳號人物');
+  assert.deepEqual((await f.cards()).body.cards.filter(card=>!card.shared),[]);assert.equal((await f.readDrafts()).body.drafts[0].fields.name,'另一帳號人物');
   f.context.owner='a';assert.equal((await f.readDrafts()).body.drafts[0].fields.name,'孟澄');assert.equal((await f.readDrafts()).body.drafts[0].completedCard,undefined);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
@@ -211,7 +211,7 @@ test('explicit reroll replaces unfinished values using the same assessed backgro
   assert.deepEqual(card.values,rerolled.body.draft.formation.values);
   const completed=(await f.readDrafts()).body.drafts.find(item=>item.id===draft.id);
   assert.equal((await f.form({...input,version:completed.version,operationId:Date.now()+':'+crypto.randomUUID()})).status,409);
-  assert.deepEqual((await f.cards()).body.cards[0],card);assert.equal(f.context.dice,used);assert.equal(calls,1);
+  assert.deepEqual((await f.cards()).body.cards.filter(card=>!card.shared)[0],card);assert.equal(f.context.dice,used);assert.equal(calls,1);
  }finally{globalThis.fetch=oldFetch;f.db.close();}
 });
 
