@@ -3,9 +3,8 @@ import {getGitHubUser} from '@/lib/auth';
 import {readOpeningDraft,adoptOpeningArrangement} from '@/lib/opening-drafts';
 import {readArrangement,reserveArrangement,settleArrangement,arrangementForClient,editArrangement,actionableArrangement} from '@/lib/opening-arrangement-store';
 import {cityDraftSchema} from '@/lib/city-creation';
-import {SaveAccessError} from '@/lib/world-saves';
-import {POST as worldOperation} from '@/app/api/world/route';
-import {roundTimePolicy,timePolicyHeader} from '@/lib/round-time-policy';
+import { acceptHostOperation } from '@/lib/host-operations';
+import { accountWorkspaceBinding, SaveAccessError } from '@/lib/world-saves';
 import {saveUuidPattern} from '@/lib/save-identities';
 export const dynamic='force-dynamic';
 const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
@@ -43,11 +42,11 @@ export async function POST(request:Request){
    row=await reserveArrangement(owner,input,loaded.draft);
   }
   const original=JSON.parse(row.request) as {worldContext:string};
-  const response=await worldOperation(new Request(origin+'/api/world?workspace=account',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',[timePolicyHeader]:roundTimePolicy.version},body:JSON.stringify({operation:'arrange-opening',mode:'demo',target:input.id,operationId:input.operationId,operationScope:'account-operations:'+owner,worldContext:original.worldContext})}));
-  const result=await response.json() as {error?:string;retryable?:boolean;operationUncertain?:boolean;operationSettled?:boolean;modelSettingsRequired?:boolean;scopeMismatch?:boolean;contextMismatch?:boolean};
+  const response=await acceptHostOperation({accountId:owner,binding:accountWorkspaceBinding(owner),body:{operation:'arrange-opening',mode:'demo',target:input.id,operationId:input.operationId,operationScope:'account-operations:'+owner,worldContext:original.worldContext}});
+  const result=response.body as {error?:string;retryable?:boolean;operationUncertain?:boolean;operationSettled?:boolean;modelSettingsRequired?:boolean;scopeMismatch?:boolean;contextMismatch?:boolean};
   if(response.status===200)await settleArrangement(owner,input.id,input.operationId,'complete');
   else if(!result.retryable&&!result.operationUncertain&&(result.operationSettled||result.scopeMismatch||result.contextMismatch||[400,401,403,404,422,429].includes(response.status)))await settleArrangement(owner,input.id,input.operationId,'failed',result.error||'AI整理未完成，原設定已保留。');
   const stored=(await readArrangement(owner,input.id,input.operationId))!;
-  return reply({...(!response.ok?result:{}),operationScope:owner,...await readOpeningDraft(owner,input.id),arrangement:arrangementForClient(stored)},response.status);
+  return reply({...(response.status<200||response.status>299?result:{}),operationScope:owner,...await readOpeningDraft(owner,input.id),arrangement:arrangementForClient(stored)},response.status);
  }catch(error){return reply({error:error instanceof SaveAccessError?error.message:'整理結果尚未確認，原設定已保留；請恢復原操作，勿另建請求。',...(error instanceof SaveAccessError?{}:{operationUncertain:true})},error instanceof SaveAccessError?error.status:503);}
 }

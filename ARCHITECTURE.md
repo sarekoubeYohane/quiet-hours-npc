@@ -15,7 +15,7 @@ React 介面由 vinext（Vite 上的 Next App Router 相容層）提供，執行
 
 | 路徑 | 內容 |
 | --- | --- |
-| `app/` | 頁面與 API route。`app/api/world/route.ts` 是所有世界變更的單一入口 |
+| `app/` | 頁面與 API route。`app/api/world/route.ts` 是所有世界變更的單一 HTTP 入口，只處理登入、來源與 body；受理、租約與提交在 `lib/host-runtime.ts` |
 | `lib/` | 全部領域邏輯，約 110 個檔，平鋪不分子目錄 |
 | `components/` | 自家 React 元件。`components/ui/` 是 vendored shadcn，只保留用到的 `button`、`select`、`alert-dialog` |
 | `db/schema.ts`、`drizzle/` | 資料表宣告與 migration SQL |
@@ -69,6 +69,9 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 模型 Key 與模型設定 | `lib/model-keys.ts`、`lib/model-settings-store.ts` |
 | 登入 | `lib/auth.ts` |
 | 回合時間預算（400／430／445 秒） | `lib/round-time-policy.ts` |
+| 操作的受理、收據、重送、租約、提交與失敗回復 | `lib/host-runtime.ts` 的 `runOperation`（主持執行層） |
+| 新增或修改一項操作（驗證與執行） | `lib/host-operations.ts` 的 `hostOperations`，每項操作一個 handler |
+| 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
 | 開局精靈介面 | `components/opening-wizard.tsx` |
@@ -77,21 +80,21 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 
 ## 一個回合的請求流程
 
-`POST /api/world`（`operation: "advance"`）在 `app/api/world/route.ts` 的 `mutateWorld` 內依序進行：
+`POST /api/world`（`operation: "advance"`）由 `app/api/world/route.ts` 的 `mutateWorld` 完成第 1、2 步的 HTTP 部分，其餘在 `lib/host-runtime.ts` 的 `runOperation` 內依序進行；各操作自己的檢查與執行由 `lib/host-operations.ts` 的 handler 提供：
 
 1. **驗證**：`lib/auth.ts` 的 `getGitHubUser`，再檢查 Origin。
 2. **綁定存檔**：`lib/world-saves.ts` 的 `bindWorldSave` 取得 `storageOwner`；body 的 `operationScope` 必須與它相符。
-3. **冪等**：`operationId`（格式為 13 位毫秒時間加 UUID）已有收據就回放原結果；仍在處理回 409；租約過期則標為結果不明並回補用量。
+3. **冪等**：`operationId`（格式為 13 位毫秒時間加 UUID）已有收據就回放原結果；仍在處理回 409；租約過期則標為結果不明並回補用量。journal 的格式由 `lib/host-runtime.ts` 解讀。
 4. **解析模型設定**：`lib/model-settings-store.ts` 的 `readEffectiveModels`（存檔 → 帳號 → 舊世界設定）與 `lib/model-keys.ts`。
 5. **取得租約**：對 `worlds` 做一次帶 `version`、`operations`、`state` 條件的 UPDATE，寫入 `locked_until`。
 6. **建立證據與追溯**：`createOperationEvidence`、`createDecisionTrace`。
-7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由 route 以 callback 注入。
+7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由推進的 handler 以 callback 注入，派送接線來自主持執行層的 `dispatchModel`。
 8. **每次派送前檢查預算**：`lib/player-account-budget.ts` 的 `playerBilling`，並重新確認租約。
 9. **失敗**：整個回合回復（`restoreWorld`），已發生的用量保留；回 429（預算）或 502。
 10. **提交**：對 `worlds` 做一次條件 UPDATE，`version + 1`、釋放租約、寫入收據。衝突時只保留已付用量。
 11. **提交後**：完成 decision trace，把狀態補進 journal。
 
-`GET /api/world` 只讀取，不會派送模型。
+`GET /api/world` 只讀取，不會派送模型；操作狀態（已結算、處理中、結果不明、已過期）由 `lib/host-runtime.ts` 的 `journalView` 判讀。
 
 `advanceActivities` 內一位角色的決策：
 
@@ -132,6 +135,8 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `world-formation.ts`、`world-formation-contract.ts` | 執行期物件的切分、轉換、分離效果（與建立世界無關） |
 | `natural-changes.ts` | 延遲後自動發生的狀態變化 |
 | `round-time-policy.ts` | 回合時間預算常數與 AbortSignal 工具 |
+| `host-runtime.ts` | 主持執行層（#338）：`runOperation` 受理一次操作（重送回放、租約、候選世界、條件提交、失敗回復、已付用量保留、操作證據與決策追溯收尾）；`dispatchModel` 是派送模型的共同接線；另有操作 journal 的型別與裁切、`journalView`，以及不經 HTTP 的入口 `acceptOperation`。不知道任何一項操作的內容 |
+| `host-operations.ts` | 各項操作的 handler 表 `hostOperations`：受理前各時點的檢查與取得租約後的 `run`（推進、介入、直接控制、設定類、需要派送模型的準備工作）。`runHostOperation`、`acceptHostOperation` 是帶上這張表的入口 |
 | `acceptance-scene.ts` | 最小驗收場景的進出（原世界 gzip 備份）與給 client 的投影 `worldForClient` |
 | `entry-rules.ts` | 進出規則的型別與常數，沒有邏輯 |
 | `decision-traces.ts` | 私密決策追溯的 D1 存取 |
@@ -312,7 +317,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 - **不需 operationId**：`set-model-key`、`clear-model-key`、`preview-city`。
 - **已退役，一律回 409**：`start-city`、`reset`。
 
-`/api/character-drafts/generate`、`/api/character-drafts/form`、`/api/opening-drafts/arrange` 會在 process 內直接呼叫 world route 匯出的 `POST`（帶 `?workspace=account`）。改 `POST` 的簽名或回應欄位會連帶影響這三條與多個測試。
+`/api/character-drafts/generate`、`/api/character-drafts/form`、`/api/opening-drafts/arrange` 經 `lib/host-operations.ts` 的 `acceptHostOperation` 在帳號工作區受理操作（`accountWorkspaceBinding`），拿到的是 `{ status, body }`，不再呼叫 world route。回應 body 的欄位仍與 `POST /api/world` 相同，改欄位會連帶影響這三條與多個測試。
 
 ## 資料表與負責模組
 
@@ -320,7 +325,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 
 | 資料表 | 負責模組 |
 | --- | --- |
-| `worlds` | 租約與提交在 `app/api/world/route.ts`；新增在 `opening-drafts.ts`、`save-management.ts`、`world-saves.ts`；讀取在 `store.ts` |
+| `worlds` | 租約與提交在 `lib/host-runtime.ts`；新增在 `opening-drafts.ts`、`save-management.ts`、`world-saves.ts`；讀取在 `store.ts` |
 | `world_saves`、`save_tombstones` | `world-saves.ts`、`save-management.ts`、`opening-drafts.ts` |
 | `save_operation_receipts`、`deleted_world_usage` | `save-management.ts` |
 | `auth_sessions`、`oauth_attempts` | `auth.ts` |
@@ -392,6 +397,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 
 ## 檔名陷阱
 
+- **`host-runtime.ts` 與 `host-operations.ts` 的分工**：前者是協定（不認識任何操作），後者是各操作的規則。`OperationHandler` 的檢查時點順序是對外行為（決定先回哪個錯誤），調整前先看該型別的註解。
 - **`lib/models.ts` 不是資料模型**，是 NPC 的 LLM 決策流程。核心型別在 `lib/world.ts`。
 - **沒有 `lib/d100.ts`**。d100 在 `lib/action-checks.ts`；但 d100 結果用的 `Resolution` 型別定義在 `lib/d20.ts`。
 - **`world.ts` 的 `perception()` 與 `lib/perception.ts` 不同**：前者組 NPC 視角，後者是感官引擎。

@@ -22,13 +22,16 @@ export async function listWorldSaves(owner:string):Promise<WorldSave[]> {
     turn:world.turn,minute:world.minute,version:row.version,originalOpeningAvailable:row.original_opening!==null,...(row.saved_from?{savedFrom:JSON.parse(row.saved_from)}:{})};});
 }
 
+/** The account workspace: the operation ledger for paid model work that belongs to no world save. */
+export function accountWorkspaceBinding(accountOwner:string):SaveBinding {
+  return {accountOwner,storageOwner:'account-operations:'+accountOwner,saveId:null,accountWorkspace:true};
+}
 /** Resolve once per HTTP request, before any lease, async work or recovery. */
 export async function bindWorldSave(accountOwner:string,request?:Request):Promise<SaveBinding> {
   const url=request&&new URL(request.url);
   if(url?.searchParams.get('workspace')==='account') {
     if(url.searchParams.has('save'))throw new SaveAccessError('請只指定一份操作來源。',400);
-    const storageOwner='account-operations:'+accountOwner;
-    return {accountOwner,storageOwner,saveId:null,accountWorkspace:true};
+    return accountWorkspaceBinding(accountOwner);
   }
   if(url&&(url.searchParams.getAll('save').length>1||url.searchParams.getAll('workspace').length>1))throw new SaveAccessError('請只指定一份存檔。',400);
   const supplied=url?.searchParams.get('save');
