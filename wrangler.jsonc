@@ -25,7 +25,14 @@
       "name": "quiet-hours-npc-test",
       "vars": { "APP_ENV": "test", "AUTH_ORIGIN": "https://quiet-hours-npc-test.houmengkou.workers.dev", "GITHUB_ALLOWED_IDS": "89203678" },
       "d1_databases": [
-        { "binding": "DB", "database_name": "quiet-hours-npc-test-world", "database_id": "ecfd3c90-db4c-493d-88ad-ac8dca661d7a", "migrations_dir": "drizzle" }
+        { "binding": "DB", "database_name": "quiet-hours-npc-test-world", "database_id": "ecfd3c90-db4c-493d-88ad-ac8dca661d7a", "migrations_dir": "drizzle" },
+        // 站主付費回想的共用用量帳本（#55）；只套用 0004 的用量表，不跑世界 migration。
+        { "binding": "RECALL_USAGE_DB", "database_name": "quiet-hours-npc-recall-usage", "database_id": "e3094fff-7aae-4d9b-aa66-64ca7e196fe7" }
+      ],
+      // 測試站專用的記憶向量索引；1536 維 cosine，metadata index 見 docs/design/recall-service-configuration.md。
+      // 有 binding 不等於啟用：RECALL_ENABLED、OWNER_EMBEDDING_KEY 另以 Worker secret 設定。
+      "vectorize": [
+        { "binding": "MEMORY_VECTOR_INDEX", "index_name": "quiet-hours-npc-test-memory" }
       ]
     },
     "production": {
