@@ -294,6 +294,24 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  const text=feedbackExcerpt(`${c.name} 行動回饋（原提案：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${occurred?'已發生：':''}${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
  return record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
 }
+// #344: what the actor's own committed action used up. It stays on that actor's
+// event and is only read back through an experience the actor still holds.
+function newlyConsumed(w:World,before:Map<string,WorldObject['lifecycle']>):NonNullable<import('./world').WorldEvent['actorConsumed']>{
+ return (w.objects||[]).filter(object=>object.lifecycle==='consumed'&&before.get(object.id)!=='consumed').map(object=>({objectId:object.id,source:object.source,label:object.label.slice(0,80)}));
+}
+// A denial may repeat what the actor already knows from their own retained
+// experience. It never reads stock, grants or the adjudicator's reasons, and it
+// does not claim to be the cause.
+function ownConsumptionNote(w:World,c:Character,action?:Action):string{
+ if(!action?.target)return '';
+ for(let index=w.events.length-1;index>=0;index--){
+  const event=w.events[index];
+  if(event.actor!==c.id)continue;
+  const item=event.actorConsumed?.find(entry=>entry.objectId===action.target||entry.source===action.target);
+  if(item&&c.shortTerm?.some(memory=>memory.eventId===event.id&&memory.source.kind==='experience'))return ` 依自己記得的經歷：世界時間 ${event.time} 自己已食用${item.label}。`;
+ }
+ return '';
+}
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean;observation?:ObservedActivity;openEnded?:boolean}):boolean{
  if(candidate.check?.sense&&!senseAvailable(c,candidate.check.sense))throw new EffectValidationError('裁定所需的感官目前沒有成立機會。',{reason:'check_sense_unavailable',sense:candidate.check.sense});
  if(context?.validateOnly&&candidate.branches){validateResultBranches(w,c,candidate);return true;}
@@ -316,7 +334,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
   // can depend on hidden stock or grants. Only actor-known grounds may leave it.
   const summary=candidate.knownBlockedReason||(candidate.status==='denied'
    ?'這次方法沒有成功，尚未執行，沒有新增成果。未確認本次受阻的原因；方法或已知條件實質改變後可再提出。是否等待、重試或換方法由自己決定。'
-   :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。');
+   :'目前的方法無法落實：這種效果目前無法承接，尚未執行，沒有新增成果。方法或已知條件實質改變後可再提出，僅改措辭不算改變。是否等待、重試或換方法由自己決定。')+ownConsumptionNote(w,c,action);
   const event=recordActionResult(w,c,action,summary,'blocked');
   observeActivity(event,context?.observation,'not-started',candidate.knownBlockedReason??candidate.blockedReason);
   return false;
@@ -380,6 +398,7 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':results.length&&!candidate.selectedResult&&!context?.openEnded?'；這次行動已完成。':'');
  const here=regionOf(c);
  const event=recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId,results.length>0);
+ const consumed=newlyConsumed(w,existingObjects);if(consumed.length)event.actorConsumed=consumed;
  const staged=!!candidate.stages?.length||!!candidate.bodyActivity;
  observeActivity(event,context?.observation,staged?'started':activityEndState(candidate.selectedResult?.outcome,context?.openEnded?'attempt-ended':'completed'),results.join('，'));
  if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
@@ -427,7 +446,8 @@ export function remainingActivityConditionsHold(w:World,c:Character,plan:Activit
 }
 
 // Validate and commit one phase as a batch; lifecycle owns the phase cursor.
-export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):{results:string[];feelingSourceId?:string} {
+export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,index:number,options?:{validateOnly?:boolean}):{results:string[];feelingSourceId?:string;consumed:NonNullable<import('./world').WorldEvent['actorConsumed']>} {
+ const before=new Map((w.objects||[]).map(object=>[object.id,object.lifecycle]));
  const clone=structuredClone(w),actor=clone.characters.find(character=>character.id===c.id)!;
  checkPhase(clone,actor,phase);
  const results=applyEffects(clone,actor,phase.effects,index,c.plan?c.plan.startedAt+phase.afterMinutes:undefined,phase.routineSourceScope);
@@ -435,7 +455,7 @@ export function commitActivityPhase(w:World,c:Character,phase:ActivityPhase,inde
  recordCommittedRoutinePremises(w,c,phase.routineSourceScope);
  const feelingSourceId=emitExternalConsequences(w,c.id,phase.effects,'result');
  if(!options?.validateOnly)commitDiscoveries(w,c,phase.effects,phase.discoveryMethod);
- return {results,feelingSourceId};
+ return {results,feelingSourceId,consumed:newlyConsumed(w,before)};
 }
 
 function commitDiscoveries(w:World,c:Character,effects:Effect[],method?:DiscoveryMethod):void {
