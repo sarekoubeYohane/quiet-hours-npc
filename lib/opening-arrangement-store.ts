@@ -4,7 +4,7 @@ import {prepareCity} from './city-creation';
 import type {OpeningDraft} from './opening-drafts';
 import type {CityDraft,CityPreview} from './city-draft';
 import type {World} from './world';
-export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string};
+export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string;purpose?:'resources';resourceRequest?:string};
 type Result={city:CityDraft;preview:CityPreview;world?:World};
 export type ArrangementRow={owner:string;draft_id:string;operation_id:string;input_version:number;revision:number;request:string;snapshot:string;state:'pending'|'complete'|'failed'|'adopted';result:string|null;error:string|null;adoption_request:string|null};
 export const arrangementForClient=(row:ArrangementRow)=>({operationId:row.operation_id,version:row.revision,inputVersion:row.input_version,state:row.state,...(row.state!=='pending'&&row.result?JSON.parse(row.result) as Result:{}),...(row.error?{error:row.error}:{})});

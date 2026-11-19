@@ -1,3 +1,4 @@
+import { applyOpeningResources,mapResourceActors,resourcePlanSchema } from './opening-resources';
 import { customRoutinePlaces } from './daily-place-context';
 import { listCharacterCards } from './character-card-store';
 import { applyCharacterCard } from './character-card-world';
@@ -43,6 +44,7 @@ export const cityDraftSchema = z.object({
     description: z.string().trim().min(1).max(256).refine(value => new TextEncoder().encode(value).length <= 256),
   }).strict()).max(cityLimits.relationships).optional(),
   finalization: cityFinalizationSchema.optional(),
+  resourcePlan:resourcePlanSchema.optional(),
 }).strict();
 
 const palette = ['#eb9e79', '#a2bdf0', '#d4c485', '#a5c9b3'];
@@ -245,5 +247,14 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds,selection.openingFeelings);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
   if(preview.issues.length)return {preview};
   world.routinePlaces=customRoutinePlaces(world);
+  if(draft.resourcePlan){
+    try {
+      applyOpeningResources(world,mapResourceActors(draft.resourcePlan,id=>{
+        const actor=byTemplate.get(id);
+        if(!actor)throw Error('請重新核對開局物資的負責者與取用人物。');
+        return actor.id;
+      }));
+    } catch(error){preview.issues.push(error instanceof Error?error.message:'請核對開局物資。');return {preview};}
+  }
   return { preview, world };
 }

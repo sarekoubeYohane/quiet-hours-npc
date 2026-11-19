@@ -1,4 +1,4 @@
-import { prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
+import { suggestOpeningResources,mapResourceActors,prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
 import { readArrangement, storeArrangementResult } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
@@ -319,8 +319,26 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
-          const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options));
-          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+          const snapshot=JSON.parse(arrangement.snapshot) as OpeningDraft;
+          const {purpose,resourceRequest}=JSON.parse(arrangement.request) as import('./opening-arrangement-store').ArrangementRequest;
+          let city=snapshot.body.city;
+          if(purpose==='resources'){
+            const {world:candidate}=await prepareCity(accountId,city,world,snapshot.sources);
+            if(!candidate)throw Error('請先完成起點與物資配置。');
+            delete candidate.openingResources;
+            const addition=await runSetup('opening-resources',(service,options)=>suggestOpeningResources(candidate,resourceRequest??'',service,options));
+            const plan=mapResourceActors(addition,id=>{
+              const source=candidate.characters.find(actor=>actor.id===id)?.profileSource?.id;
+              if(!source)throw Error('物資指定了未選人物。');
+              return source;
+            });
+            city={...city,resourcePlan:{supplies:[...city.resourcePlan?.supplies??[],...plan.supplies],
+              furnishingGrants:[...city.resourcePlan?.furnishingGrants??[],...plan.furnishingGrants.filter(row=>!city.resourcePlan?.furnishingGrants.some(old=>old.objectId===row.objectId))],unavailable:plan.unavailable}};
+          }else{
+            city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(snapshot,service,options));
+
+          }
+          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,cityDraftSchema.parse(city)));
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));

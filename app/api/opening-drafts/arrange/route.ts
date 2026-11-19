@@ -9,7 +9,7 @@ import {saveUuidPattern} from '@/lib/save-identities';
 export const dynamic='force-dynamic';
 const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const common={operationScope:z.string().min(1).max(128),id:z.string().regex(saveUuidPattern),version:z.number().int().nonnegative(),operationId:z.string().regex(/^\d{13}:[0-9a-f-]{36}$/)};
-const inputSchema=z.union([z.object({...common,worldContext:z.string().optional()}).strict(),z.object({...common,action:z.enum(['adopt','edit']),proposalVersion:z.number().int().nonnegative(),city:cityDraftSchema}).strict()]);
+const inputSchema=z.union([z.object({...common,worldContext:z.string().optional(),purpose:z.literal('resources').optional(),resourceRequest:z.string().max(1600).optional()}).strict(),z.object({...common,action:z.enum(['adopt','edit']),proposalVersion:z.number().int().nonnegative(),city:cityDraftSchema}).strict()]);
 export async function POST(request:Request){
  const origin=new URL(request.url).origin;if(request.headers.get('origin')!==origin)return reply({error:'請從開局流程操作。'},403);
  try{

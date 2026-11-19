@@ -14,12 +14,12 @@ const provisionSchema=z.object({
   region:identifier,kind:z.enum(['water','food']),label:z.string().trim().min(1).max(80),
   portions:z.number().int().min(1).max(100),responsible:identifier,allowedTo:actors,reason:explanation,
 }).strict();
-const replySchema=z.object({
+export const resourcePlanSchema=z.object({
   supplies:z.array(provisionSchema).max(32),
   furnishingGrants:z.array(z.object({objectId:identifier,allowedTo:actors,reason:explanation}).strict()).max(32),
   unavailable:z.array(explanation).max(24),
 }).strict();
-export type OpeningResources={version:1;minute:number;supplies:{id:string;label:string;region:string;location:string;allowedTo:string[];responsible:string;reason:string}[];furnishingGrants:z.infer<typeof replySchema>['furnishingGrants'];unavailable:string[]};
+export type OpeningResources={version:1;minute:number;supplies:{id:string;label:string;region:string;location:string;allowedTo:string[];responsible:string;reason:string}[];furnishingGrants:z.infer<typeof resourcePlanSchema>['furnishingGrants'];unavailable:string[]};
 const string={type:'string'};
 const object=(properties:Record<string,unknown>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
 const array=(items:unknown)=>({type:'array',items});
@@ -60,7 +60,7 @@ function usableAtOpening(world:World,actorId:string,room:{id:string;location:str
 }
 
 // Bind the complete validated authoring result before changing any world facts.
-function bindResources(world:World,reply:z.infer<typeof replySchema>){
+function bindResources(world:World,reply:z.infer<typeof resourcePlanSchema>){
   const additions:SceneSupply[]=[],receipts:OpeningResources['supplies']=[],seen=new Set<string>();
   if((world.supplies?.length||0)+reply.supplies.length>128)throw Error('開局供應超出容量。');
   for(const item of reply.supplies){
@@ -95,7 +95,7 @@ function bindResources(world:World,reply:z.infer<typeof replySchema>){
   return {additions,receipts};
 }
 
-export async function prepareOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]):Promise<void>{
+export async function suggestOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]){
   validateOpeningResourceRequest(world,request);
   const input=resourceInput(world,request);
   if(new TextEncoder().encode(JSON.stringify(input)).length>96000)throw Error('開局物資依據超出容量，未進行裁定。');
@@ -103,10 +103,24 @@ export async function prepareOpeningResources(world:World,request:string,service
     '你是開局天上意志，確認自訂場所為維持日常生活與工作已備妥的普通物資。這是第 0 回合的世界設定，不是 NPC 行動。依場所用途、住戶、工作者、主人、房間通行權和既有事實判斷；不要推進時間、分配行動或修改身體。只可新增真實的有限即食食物與可直接飲用的水，每處每類至多一個來源、1–100 份，總共至多 32 來源。水必須可直接飲用，不需要找杯子；食物必須即食且可直接取用。label 要清楚說明。allowedTo 是主人明確允許自行取用且知道位置的人；進得了商店不等於有權拿商品。可以確認店主提供的免費試吃或工作餐，不可假定未支援的購買流程。responsible 用場所實際負責者 id；無在場 NPC 主人時可用 world，reason 必須具體說明背景負責者及允許理由。不可新增任何已經有同類物資的房間，不可繞過缺貨、有限來源、隱藏或私人限制。冰箱、飲水機、桌面等陳設名字並非已有食物水的證據。furnishingGrants 只能確認住戶、工作者或主人對 world 擁有、非隱藏、無人持有的既有 furnishings 的使用權，例如自己的床與休息椅，不改物件或房間。supplies 與 grants 可以為空；無法配置的需求必須在 unavailable 列明原因。只輸出契約 JSON。'},
     {role:'user',content:JSON.stringify(input)}],responseSchema,{...options,maxOutputTokens:6000});
   if(new TextEncoder().encode(raw).length>48000)throw Error('開局物資裁定超出容量。');
-  const reply=replySchema.parse(JSON.parse(raw));
+  return resourcePlanSchema.parse(JSON.parse(raw));
+}
+
+export type ResourcePlan=z.infer<typeof resourcePlanSchema>;
+
+export function mapResourceActors(plan:ResourcePlan,resolve:(id:string)=>string):ResourcePlan {
+  return {...plan,supplies:plan.supplies.map(item=>({...item,responsible:item.responsible==='world'?'world':resolve(item.responsible),allowedTo:item.allowedTo.map(resolve)})),
+    furnishingGrants:plan.furnishingGrants.map(grant=>({...grant,allowedTo:grant.allowedTo.map(resolve)}))};
+}
+
+export function applyOpeningResources(world:World,reply:ResourcePlan){
   const {additions,receipts}=bindResources(world,reply);
   world.supplies=[...world.supplies||[],...additions];
   for(const grant of reply.furnishingGrants){const item=world.objects!.find(object=>object.id===grant.objectId)!;item.allowedTo=[...new Set([...item.allowedTo,...grant.allowedTo])];item.knownTo=[...new Set([...item.knownTo,...grant.allowedTo])];}
   world.routinePlaces=[...(world.routinePlaces||[]).filter(place=>place.purpose!=='custom'),...customRoutinePlaces(world).filter(place=>!world.routinePlaces?.some(existing=>existing.location===place.location&&existing.purpose!=='custom'))];
   world.openingResources={version:1,minute:world.minute,supplies:receipts,furnishingGrants:reply.furnishingGrants,unavailable:reply.unavailable};
+}
+
+export async function prepareOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]) {
+  applyOpeningResources(world,await suggestOpeningResources(world,request,service,options));
 }
