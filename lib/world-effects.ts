@@ -277,7 +277,11 @@ function feedbackExcerpt(text:string):string {
 // proposal association in the existing bounded short-term memory/event channel.
 // Only the existing NPC projection is consulted; authority reasons, inventory
 // counters, permission lists and private decision traces are never sources.
-export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution,feelingKind?:import('./world').WorldEvent['feelingKind'],feelingSourceId?:string) {
+// The bracket only quotes what was proposed; whether anything happened is said by
+// the summary. `occurred` marks a summary that lists already committed results
+// (#344): the actor's own experience then leads with 已發生, while the public
+// event text and the shown activity stay as the plain summary.
+export function recordActionResult(w:World,c:Character,action:Action|undefined,summary:string,kind:string,scene?:import('./world').WorldEvent['scene'],resolution?:Resolution,feelingKind?:import('./world').WorldEvent['feelingKind'],feelingSourceId?:string,occurred?:boolean) {
  const label=action?`${action.type} ${action.target||''} ${action.content||''}`.trim().slice(0,240):'先前活動';
  const relevant=knownWorldObjects(w,c).filter(object=>object.id===action?.target||object.holder===c.id||object.kind==='utensil'&&(action?.type==='work'&&action.target==='tea'||action?.type==='propose'&&(action.target===c.location||action.target===regionOf(c)))).slice(0,4);
  let state='';
@@ -287,7 +291,7 @@ export function recordActionResult(w:World,c:Character,action:Action|undefined,s
  }
  const context=relevant.some(object=>object.kind==='utensil'&&object.state.condition==='broken')?' 已知的器具已損壞。':'';
  c.activity=summary+context;
- const text=feedbackExcerpt(`${c.name} 行動回饋（原提案，非已發生成果：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
+ const text=feedbackExcerpt(`${c.name} 行動回饋（原提案：${label}${c.plan?`；活動始於 ${c.plan.startedAt}`:''}；世界時間 ${w.minute}）：${occurred?'已發生：':''}${c.activity}${state?` 依本次已知物件：${state}。`:''}`);
  return record(w,c.id,scene&&kind!=='blocked'?`${c.name} ${summary}`:text,kind,[c.id],scene,resolution,text,feelingKind,feelingSourceId);
 }
 export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,action?:Action,context?:{nominalDueAt?:number;validateOnly?:boolean;observation?:ObservedActivity;openEnded?:boolean}):boolean{
@@ -373,9 +377,9 @@ export function commitFreeAction(w:World,c:Character,candidate:EffectCandidate,a
  }
  commitWorldChanges(w,clone);
  const feelingSourceId=emitExternalConsequences(w,c.id,candidate.effects,'result');
- const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':'');
+ const summary=(results.join('，')||(candidate.stages?.length?'開始進行這項活動':'這次步驟已執行，沒有新增可知成果'))+(candidate.stages?.length?'；活動尚未完成。':results.length&&!candidate.selectedResult&&!context?.openEnded?'；這次行動已完成。':'');
  const here=regionOf(c);
- const event=recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId);
+ const event=recordActionResult(w,c,action,summary,'work',{from:c.location,to:c.location,fromRegion:here,toRegion:here},resolution,candidate.effects.some(effect=>effect.kind!=='schedule-natural')||candidate.selectedResult&&!(candidate.stages?.length)?'result':undefined,feelingSourceId,results.length>0);
  const staged=!!candidate.stages?.length||!!candidate.bodyActivity;
  observeActivity(event,context?.observation,staged?'started':activityEndState(candidate.selectedResult?.outcome,context?.openEnded?'attempt-ended':'completed'),results.join('，'));
  if(!context?.validateOnly)commitDiscoveries(w,c,candidate.effects,method);
