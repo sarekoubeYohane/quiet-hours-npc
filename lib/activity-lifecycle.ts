@@ -64,11 +64,12 @@ function advancePhases(w:World,c:Character,throughMinute=w.minute):void{
    const reason='原活動的條件已改變，尚未完成。';
    observeActivity(recordActionResult(w,c,plan.action,reason,'blocked'),activity,'failed',reason);cancelActivity(w,c);return;
   }
-  const {results,feelingSourceId}=committed;
+  const {results,feelingSourceId,consumed}=committed;
   phases.cursor++;
   const finished=phases.cursor===phases.stages.length&&throughMinute>=plan.until;
   const summary=(results.join('，')||'這個階段沒有新增可知成果')+(finished?(plan.timeIntent?.kind==='open-ended'?`；${periodEnded}`:plan.selectedResult?'；這次嘗試已結束。':'；活動已完成。'):'；這個階段已執行，活動尚未完成。');
   const event=recordActionResult(w,c,plan.action,summary,'work',{from:c.location,to:c.location,fromRegion:regionOf(c),toRegion:regionOf(c)},plan.selectedResult?.resolution,phase.effects.some(effect=>effect.kind!=='schedule-natural')||finished&&plan.selectedResult&&!phases.stages.some(stage=>stage.effects.some(effect=>effect.kind!=='schedule-natural'))?'result':undefined,feelingSourceId,results.length>0);
+  if(consumed.length)event.actorConsumed=consumed;
   observeActivity(event,activity,finished?finishedState(plan):phase.effects.length?'progress':'continuing',results.join('，'));
  }
  if(phases.cursor===phases.stages.length&&throughMinute>=plan.until){

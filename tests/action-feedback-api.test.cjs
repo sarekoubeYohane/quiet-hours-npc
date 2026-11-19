@@ -197,13 +197,14 @@ test('saved phased periods and selected attempts ending after their last effect 
 });
 
 // #344：本人能分辨自己的行動已經發生。經正式 world route，在模型請求邊界檢查 Cass 下一次決策實際收到的輸入。
-async function acceptanceMeal(minutes){
+async function acceptanceMeal(minutes,modify){
  const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
  const world=seedWorld();world.adjudication={provider:'openai',model:'fixture-adjudicator'};world.playerBudget={calls:2000,tokens:50000000};store.install(world);
  const read=async()=>(await (await GET()).json()).world;
  const post=async body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:'test-owner',operationId:Date.now()+':'+crypto.randomUUID(),worldContext:(await read()).contextId,mode:'openai',model:'gpt-6-luna',...body})}));
  assert.equal((await post({operation:'set-model-key',key:'fixture-key'})).status,200);
  assert.equal((await post({operation:'enter-acceptance'})).status,200);
+ if(modify){const entered=await read();modify(entered);store.replaceCommittedWorld(entered);}
  const inputs=[],previous=global.fetch;
  const reply=(value,input)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(input,value))}}]});
  global.fetch=async(_url,init)=>{
@@ -218,7 +219,7 @@ async function acceptanceMeal(minutes){
   inputs.push(input);
   return reply({type:'propose',target:'acceptance-meal',content:'取得並吃掉眼前的驗收餐點',purpose:'吃飯',mood:'平靜',durationMinutes:minutes,timeIntent:{kind:'completion',maxMinutes:null},intents:[]},input);
  };
- return {inputs,read,advance:async()=>{const r=await post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return read();},restore:()=>{global.fetch=previous;}};
+ return {inputs,read,store,advance:async()=>{const r=await post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return read();},restore:()=>{global.fetch=previous;}};
 }
 
 test('#344 an immediately committed meal reaches the next actual request as something that already happened',async()=>{
@@ -258,5 +259,54 @@ test('#344 a proposal that does not hold still reaches the next actual request a
   assert.match(own[1].text,/尚未執行，沒有新增成果/);
   assert.doesNotMatch(own[1].text,/已發生|這次行動已完成|非已發生成果/);
   assert.equal((await s.read()).supplies.find(x=>x.id==='acceptance-meal').remaining,0);
+ }finally{s.restore();}
+});
+
+const ownMeal=/依自己記得的經歷：世界時間 735 自己已食用驗收餐點。/;
+test('#344 a denied repeat of a meal the actor remembers eating says so, without stock or grants',async()=>{
+ const s=await acceptanceMeal(15);
+ try{
+  await s.advance();await s.advance();await s.advance();
+  const input=s.inputs[2],own=feedback(input);assert.equal(own.length,2);
+  assert.match(own[1].text,/尚未執行，沒有新增成果。未確認本次受阻的原因/);
+  assert.match(own[1].text,ownMeal);assert.match(input.self.activity,ownMeal);
+  assert.doesNotMatch(own[0].text,/依自己記得的經歷/);
+  assert.ok(input.supplies.every(supply=>!Object.hasOwn(supply,'remaining')));
+  assert.doesNotMatch(JSON.stringify(input),/allowedTo|adjudicationFailure|operationEvidence/);
+ }finally{s.restore();}
+});
+
+test('#344 a meal eaten by someone else, unseen and unheard, leaves the cause unknown',async()=>{
+ const s=await acceptanceMeal(15,world=>{
+  world.supplies.find(x=>x.id==='acceptance-meal').remaining=0;
+  world.objects.push({id:'acceptance-meal:1',source:'acceptance-meal',label:'驗收餐點',region:'cafe-front',holder:null,owner:'owner',revision:2,state:{},lifecycle:'consumed',kind:'food',knownTo:['kris'],allowedTo:['cass']});
+ });
+ try{
+  await s.advance();await s.advance();
+  const own=feedback(s.inputs[1]);assert.equal(own.length,1);
+  assert.match(own[0].text,/尚未執行，沒有新增成果。未確認本次受阻的原因/);
+  assert.doesNotMatch(JSON.stringify(s.inputs[1]),/依自己記得的經歷|已食用|吃掉了|吃完/);
+ }finally{s.restore();}
+});
+
+test('#344 once the actor no longer holds that experience the denial stays unknown',async()=>{
+ const s=await acceptanceMeal(15);
+ try{
+  await s.advance();
+  const world=await s.read(),cass=world.characters.find(c=>c.id==='cass');
+  cass.shortTerm=cass.shortTerm.filter(m=>!m.text.includes('行動回饋'));cass.memories=cass.memories.filter(m=>!m.text.includes('行動回饋'));
+  s.store.replaceCommittedWorld(world);
+  await s.advance();await s.advance();
+  const own=feedback(s.inputs[2]);assert.equal(own.length,1);
+  assert.match(own[0].text,/未確認本次受阻的原因/);assert.doesNotMatch(JSON.stringify(s.inputs[2]),/依自己記得的經歷/);
+ }finally{s.restore();}
+});
+
+test('#344 a meal eaten at the end of a staged activity is recalled the same way',async()=>{
+ const s=await acceptanceMeal(30);
+ try{
+  await s.advance();await s.advance();await s.advance();await s.advance();
+  const own=feedback(s.inputs.at(-1));assert.equal(s.inputs.length,3);
+  assert.match(own.at(-1).text,/未確認本次受阻的原因.*依自己記得的經歷：世界時間 750 自己已食用驗收餐點。/);
  }finally{s.restore();}
 });
