@@ -5,6 +5,20 @@ const {seedWorld}=load('world'),{aiDecision}=load('models');
 const {decision}=require('./pursuit-selection-fixture.cjs');
 const fixturePath=path.join(__dirname,'fixtures/npc-input-before-235.json.gz');
 
+// Keep the historical captures intact and account for the intentional system prompt addition.
+function expectedTranscripts(file) {
+ const expected=JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(file)));
+ const addition=[
+  '輸出 JSON 時請核對欄位層級。以下是路徑說明，其他欄位照既有契約填寫。',
+  'action 只含 type、target、content、purpose。reconfirmBodyConsequences 填在最外層，與 action 同層，使用布林值。',
+  'methodAssessment.selectedAction 只含 type、target。methodAssessment.intentIds 與 selectedAction 同層，填當次焦點 ID 的陣列，無焦點填 []。',
+].join('\n');
+ for (const {bodies} of Object.values(expected)) {
+  for (const body of bodies) body.messages[0].content += '\n\n' + addition;
+ }
+ return expected;
+}
+
 async function sample(variant,provider='openai'){
  const w=seedWorld();w.pursuitContext='npc-input-equivalence-fixed-context';const c=w.characters.find(c=>c.id==='owner');c.control={mode:'autonomous'};c.memories=[];
  c.shortTerm=Array.from({length:variant.startsWith('escaped')?80:variant==='overflow-recall'?80:3},(_,i)=>({id:`owner:short:${i}`.padEnd(128,'x'),characterId:c.id,version:i+1,time:i,text:variant.startsWith('escaped')?'"\\'.repeat(120):variant==='overflow-recall'?'甲'.repeat(210):`自己的主觀經歷 ${i}`,source:{kind:'experience'}}));
@@ -25,7 +39,7 @@ async function sample(variant,provider='openai'){
 test('fixed decisions preserve the exact pre-refactor provider transcript, schema, receipts and accepted result',async()=>{
  const actual={};for(const variant of ['ordinary','escaped','cues','recall','empty-recall','overlimit'])for(const provider of ['openai','openrouter'])actual[`${variant}:${provider}`]=await sample(variant,provider);
  // Full, lossless pre-refactor output; compression only reduces repository size.
- assert.deepEqual(JSON.parse(JSON.stringify(actual)),JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(fixturePath))));
+ assert.deepEqual(JSON.parse(JSON.stringify(actual)),expectedTranscripts(fixturePath));
 });
 
 test('the complete preparation entry returns the final request and only its actual reference scope without writing the world',()=>{
@@ -46,7 +60,7 @@ test('the complete preparation entry returns the final request and only its actu
 test('recall escape pressure and invalid or mandatory-overflow outcomes preserve the exact pre-236 transcript',async()=>{
  const actual={};for(const variant of ['escaped-recall','invalid-recall','overflow-recall'])for(const provider of ['openai','openrouter'])actual[`${variant}:${provider}`]=await sample(variant,provider);
  const file=path.join(__dirname,'fixtures/npc-input-before-236.json.gz');
- assert.deepEqual(JSON.parse(JSON.stringify(actual)),JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(file))));
+ assert.deepEqual(JSON.parse(JSON.stringify(actual)),expectedTranscripts(file));
 });
 
 test('recall preparation pins a newly remembered source and produces one coherent final request without writing the world',()=>{
