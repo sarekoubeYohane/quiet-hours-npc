@@ -21,10 +21,10 @@ import CognitionAnalysis from './cognition-analysis';
 import AttentionDetails from './attention-details';
 
 const sections=[{id:'state',label:'近況與需求'},{id:'pursuits',label:'追求與生活'},{id:'memory',label:'記憶與信念'}] as const;
-function AnalysisPortrait({src,character}:{src?:string;character:Character}){
+function AnalysisAvatar({src,character}:{src?:string;character:Character}){
  const [failed,setFailed]=useState(false);
  if(!src||failed) return <span className="initial" style={{color:character.color}}>{character.name.slice(0,1)}</span>;
- return <img className="analysis-portrait" src={src} alt={`${character.name} 的人物圖`} onError={()=>setFailed(true)}/>;
+ return <img className="analysis-avatar" src={src} alt={`${character.name} 的頭像`} onError={()=>setFailed(true)}/>;
 }
 
 export default function CharacterAnalysis({world,character,onSelect,onProfile,busy,onEnableMental,onEnableNeeds}:{
@@ -32,13 +32,13 @@ export default function CharacterAnalysis({world,character,onSelect,onProfile,bu
  onEnableMental:(items:MentalAdoption)=>Promise<boolean>;onEnableNeeds:(items:BodyNeedsSetup[])=>Promise<boolean>;
 }){
  const [section,setSection]=useState<typeof sections[number]['id']>('state');
- const portrait=assetsForCharacter(character.id,character.profileSource?.id)?.portrait;
+ const avatar=assetsForCharacter(character.id,character.profileSource?.id)?.avatar;
  const locations=worldLocations(world),regions=worldRegions(world),doors=worldDoors(world);
  const pending=pendingInterventions(world,character),habits=habitViews(world,character).slice(0,5);
  return <section className="character-analysis" aria-label="人物分析">
   <aside className="panel analysis-person">
    <label>正在分析的人物<select value={character.id} onChange={e=>onSelect(e.target.value)}>{world.characters.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-   <div className="identity"><AnalysisPortrait key={character.id+":"+portrait} src={portrait} character={character}/><div><h2>{character.name}</h2><span><MapPin size={14}/>{character.plan?.journey?'移動途中':[locations.find(l=>l.id===character.location)?.name,regions.find(r=>r.id===regionOf(character))?.name].filter(Boolean).join(' · ')}</span></div></div>
+   <div className="identity"><AnalysisAvatar key={character.id+":"+avatar} src={avatar} character={character}/><div><h2>{character.name}</h2><span><MapPin size={14}/>{character.plan?.journey?'移動途中':[locations.find(l=>l.id===character.location)?.name,regions.find(r=>r.id===regionOf(character))?.name].filter(Boolean).join(' · ')}</span></div></div>
    <span className="analysis-mood">{character.mood}</span><p className="analysis-current">{character.activity}</p>
    <Button variant="outline" onClick={onProfile}>人物檔案</Button>
    <details><summary>人物設定摘要</summary><p>{character.personality}</p>{character.abilityTags?.length?<p>能力特質：{character.abilityTags.join('、')}</p>:null}</details>
