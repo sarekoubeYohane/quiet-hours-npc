@@ -195,3 +195,68 @@ test('saved phased periods and selected attempts ending after their last effect 
   }finally{s.restore();}
  }
 });
+
+// #344：本人能分辨自己的行動已經發生。經正式 world route，在模型請求邊界檢查 Cass 下一次決策實際收到的輸入。
+async function acceptanceMeal(minutes){
+ const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
+ const world=seedWorld();world.adjudication={provider:'openai',model:'fixture-adjudicator'};world.playerBudget={calls:2000,tokens:50000000};store.install(world);
+ const read=async()=>(await (await GET()).json()).world;
+ const post=async body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:'test-owner',operationId:Date.now()+':'+crypto.randomUUID(),worldContext:(await read()).contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ assert.equal((await post({operation:'set-model-key',key:'fixture-key'})).status,200);
+ assert.equal((await post({operation:'enter-acceptance'})).status,200);
+ const inputs=[],previous=global.fetch;
+ const reply=(value,input)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(input,value))}}]});
+ global.fetch=async(_url,init)=>{
+  const input=JSON.parse(JSON.parse(init.body).messages[1].content);
+  if(input.contractVersion==='world-adjudication.v1'){
+   const supply=input.supplies?.find(item=>item.id==='acceptance-meal');
+   return reply(input.actor.id==='cass'&&supply?.remaining===1
+    ?{status:'accepted',completionMinutes:minutes,check:null,stages:[],effects:[{kind:'materialize',supplyId:supply.id,expectedRemaining:1},{kind:'consume',objectId:supply.materializedObjectId,expectedRevision:1}]}
+    :{status:'denied',effects:[],stages:[],check:null},input);
+  }
+  if(input.self.id!=='cass')return reply({type:'rest',target:'',content:'安靜休息',mood:'平靜',durationMinutes:15,intents:[]},input);
+  inputs.push(input);
+  return reply({type:'propose',target:'acceptance-meal',content:'取得並吃掉眼前的驗收餐點',purpose:'吃飯',mood:'平靜',durationMinutes:minutes,timeIntent:{kind:'completion',maxMinutes:null},intents:[]},input);
+ };
+ return {inputs,read,advance:async()=>{const r=await post({operation:'advance',minutes:15});assert.equal(r.status,200,await r.clone().text());return read();},restore:()=>{global.fetch=previous;}};
+}
+
+test('#344 an immediately committed meal reaches the next actual request as something that already happened',async()=>{
+ const s=await acceptanceMeal(15);
+ try{
+  const first=await s.advance();assert.equal(first.supplies.find(x=>x.id==='acceptance-meal').remaining,0);
+  await s.advance();const input=s.inputs[1],own=feedback(input);
+  assert.equal(own.length,1);
+  assert.match(own[0].text,/原提案：propose acceptance-meal 取得並吃掉眼前的驗收餐點/);
+  assert.match(own[0].text,/已發生：取得驗收餐點，食用驗收餐點；這次行動已完成。/);
+  assert.match(input.self.activity,/取得驗收餐點，食用驗收餐點；這次行動已完成。/);
+  assert.doesNotMatch(JSON.stringify(input),/非已發生成果/);
+  // 「已發生：」只給本人；旁人感知用的公開事件文字與觀察頁的活動文字不帶這個前綴。
+  assert.doesNotMatch(JSON.stringify({events:first.events.map(event=>event.text),activity:first.characters.find(c=>c.id==='cass').activity}),/已發生：/);
+ }finally{s.restore();}
+});
+
+test('#344 a staged meal says it happened only once its effects are committed',async()=>{
+ const s=await acceptanceMeal(30);
+ try{
+  const started=await s.advance();assert.equal(started.supplies.find(x=>x.id==='acceptance-meal').remaining,1);
+  const finished=await s.advance();assert.equal(finished.supplies.find(x=>x.id==='acceptance-meal').remaining,0);
+  await s.advance();const own=feedback(s.inputs.at(-1));
+  assert.equal(s.inputs.length,2);assert.equal(own.length,2);
+  assert.match(own[0].text,/）：開始進行這項活動；活動尚未完成。/);assert.doesNotMatch(own[0].text,/已發生/);
+  assert.match(own[1].text,/已發生：取得驗收餐點，食用驗收餐點；活動已完成。/);
+  assert.doesNotMatch(JSON.stringify(s.inputs.at(-1)),/非已發生成果/);
+ }finally{s.restore();}
+});
+
+test('#344 a proposal that does not hold still reaches the next actual request as not executed',async()=>{
+ const s=await acceptanceMeal(15);
+ try{
+  await s.advance();await s.advance();await s.advance();
+  const own=feedback(s.inputs[2]);assert.equal(own.length,2);
+  assert.match(own[1].text,/原提案：propose acceptance-meal/);
+  assert.match(own[1].text,/尚未執行，沒有新增成果/);
+  assert.doesNotMatch(own[1].text,/已發生|這次行動已完成|非已發生成果/);
+  assert.equal((await s.read()).supplies.find(x=>x.id==='acceptance-meal').remaining,0);
+ }finally{s.restore();}
+});
