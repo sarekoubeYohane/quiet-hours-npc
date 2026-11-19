@@ -4,8 +4,8 @@ import { getGitHubUser } from '@/lib/auth';
 import { loadCharacterDraft, writeCharacterDraft } from '@/lib/character-draft-store';
 import { characterDraftFieldNames, generatedTextProvenance } from '@/lib/character-drafts';
 import { readCharacterTemplateFields } from '@/lib/character-templates';
-import { POST as worldOperation } from '@/app/api/world/route';
-import { roundTimePolicy, timePolicyHeader } from '@/lib/round-time-policy';
+import { acceptHostOperation } from '@/lib/host-operations';
+import { accountWorkspaceBinding } from '@/lib/world-saves';
 export const dynamic = 'force-dynamic';
 const reply = (body: object, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 export async function POST(request: Request) {
@@ -40,12 +40,10 @@ export async function POST(request: Request) {
     if (draft.version !== pending.baseVersion + 1) return reply({ error: '未同步：原 AI 操作期間草稿已變更，請核對或放棄套用原結果。', draft: characterDraftForClient(draft, user.userId) }, 409);
     // The original accepted request owns the model receipt; never construct a new
     // operation ID after a lost response, reload, or model setting change.
-    const modelResponse = await worldOperation(new Request(origin + '/api/world?workspace=account', {
-      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', [timePolicyHeader]: roundTimePolicy.version },
-      body: JSON.stringify({ operation: 'generate-character-template', mode: 'demo', operationId: pending.operationId, operationScope: pending.operationScope, worldContext: pending.worldContext, characterGeneration: { description: pending.concept, fields: pending.fields, purpose: 'character-card' } }),
-    }));
-    const result = await modelResponse.json() as { generatedCharacter?: unknown; error?: string; retryable?: boolean; operationUncertain?: boolean };
-    if (!modelResponse.ok) {
+    const modelResponse = await acceptHostOperation({ accountId: user.userId, binding: accountWorkspaceBinding(user.userId),
+      body: { operation: 'generate-character-template', mode: 'demo', operationId: pending.operationId, operationScope: pending.operationScope, worldContext: pending.worldContext, characterGeneration: { description: pending.concept, fields: pending.fields, purpose: 'character-card' } } });
+    const result = modelResponse.body as { generatedCharacter?: unknown; error?: string; retryable?: boolean; operationUncertain?: boolean };
+    if (modelResponse.status < 200 || modelResponse.status > 299) {
       if (!result.retryable && !result.operationUncertain) {
         const next = { ...draft }; delete next.pendingGeneration;
         const cleared = await writeCharacterDraft(user.userId, next);

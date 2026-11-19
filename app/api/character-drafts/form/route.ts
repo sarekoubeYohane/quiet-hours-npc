@@ -4,8 +4,8 @@ import { loadCharacterDraft, writeCharacterDraft } from '@/lib/character-draft-s
 import { characterFormationIssue, formCardValues } from '@/lib/character-formation';
 import { readCardAssessment } from '@/lib/character-card-store';
 import { validCardAllocation } from '@/lib/character-cards';
-import { POST as worldOperation } from '@/app/api/world/route';
-import { roundTimePolicy,timePolicyHeader } from '@/lib/round-time-policy';
+import { acceptHostOperation } from '@/lib/host-operations';
+import { accountWorkspaceBinding } from '@/lib/world-saves';
 export const dynamic='force-dynamic';
 const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 export async function POST(request:Request){
@@ -58,9 +58,9 @@ export async function POST(request:Request){
   }
   const pending=draft.pendingFormation!;
   if(pending.operationId!==input.operationId||pending.inputVersion!==input.version)return reply({error:'已有形成操作，請先恢復原操作。',draft:characterDraftForClient(draft,user.userId)},409);
-  const response=await worldOperation(new Request(origin+'/api/world?workspace=account',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',[timePolicyHeader]:roundTimePolicy.version},body:JSON.stringify({operation:'assess-character-card',mode:'demo',operationId:pending.operationId,operationScope:pending.operationScope,worldContext:pending.worldContext,target:draft.id})}));
-  const result=await response.json() as {error?:string;retryable?:boolean;operationUncertain?:boolean;operationSettled?:boolean;modelSettingsRequired?:boolean;scopeMismatch?:boolean;contextMismatch?:boolean};
-  if(!response.ok){
+  const response=await acceptHostOperation({accountId:user.userId,binding:accountWorkspaceBinding(user.userId),body:{operation:'assess-character-card',mode:'demo',operationId:pending.operationId,operationScope:pending.operationScope,worldContext:pending.worldContext,target:draft.id}});
+  const result=response.body as {error?:string;retryable?:boolean;operationUncertain?:boolean;operationSettled?:boolean;modelSettingsRequired?:boolean;scopeMismatch?:boolean;contextMismatch?:boolean};
+  if(response.status<200||response.status>299){
    if(!result.retryable&&!result.operationUncertain&&(result.operationSettled||result.scopeMismatch||result.contextMismatch||[400,401,403,404,422].includes(response.status))){const next={...draft};delete next.pendingFormation;const cleared=await writeCharacterDraft(user.userId,next);return reply({...result,error:result.error||'尚未形成，原文字已保留。',...(cleared?{draft:characterDraftForClient(cleared,user.userId)}:{})},response.status);}
    return reply({...result,error:result.error||'形成結果尚未確認，請恢復原操作。',draft:characterDraftForClient(draft,user.userId)},response.status);
   }
