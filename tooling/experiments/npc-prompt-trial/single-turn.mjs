@@ -37,9 +37,9 @@ const examples = load('./example-content.cjs');
 const { assemble, draftPath } = createRequire(import.meta.url)('./assemble.cjs');
 
 // 單一變因的變體：每個只改草稿的一個地方，用來找行為差異的原因
-let draft = await readFile(draftPath, 'utf8');
+let draft = (await readFile(draftPath, 'utf8')).replace(/\r\n/g, '\n');
 const cut = text => { if (!draft.includes(text)) throw new Error('變體找不到要拿掉的文字，草稿可能已改：' + text.slice(0, 30)); draft = draft.replace(text, ''); };
-if (variant === 'no-goal') cut('這場遊戲沒有主線，你的目標只有一個：**好好過日子**。這包括照顧自己的身體（餓、渴、累、睏）和心（心情與心力），也包括追求你在乎的事。這兩件事是相通的：做自己想做的事、做得開心、得到你在意的結果，都會讓心力恢復。怎麼取捨、先顧哪一樣，由你的性格決定。\n\n');
+if (variant === 'no-goal') cut('這場遊戲沒有主線，你的目標只有一個：**好好過日子**。這包括照顧自己的身體（餓、渴、累、睏）和心（心情與心力），也包括追求你在乎的事。做自己想做的事、享受過程或得到在意的結果，都可能讓心力恢復。怎麼取捨、先顧哪一樣，由你的性格決定。\n\n');
 if (variant === 'no-findit') cut('不確定有什麼時，向場所提出「找找看」。');
 if (variant === 'full-playbook') {
   const start = draft.indexOf('## 怎麼判斷'), end = draft.indexOf('\n# ', start);

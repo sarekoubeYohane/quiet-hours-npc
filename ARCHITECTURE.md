@@ -48,6 +48,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | NPC system prompt | `lib/models.ts` 串接；共用原則在 `lib/playbook.ts`，各子系統的 `*Prompt` 在各自檔案 |
 | NPC 輸出的 JSON schema 與契約版本 | `lib/npc-decision-schema.ts`（`npc-decision.v3`） |
 | NPC 輸出的驗證 | `lib/models.ts` 內部的 `parseDecision`，再委派各子系統的 parser |
+| 測試站的 NPC 自主決策提示 | `vite.config.ts` 將 v0.2.4 Markdown 放進測試站建置；`lib/npc-decision-preparation.ts` 依人物實際輸入呼叫 `lib/npc-prompt-rewrite.ts` 組裝，每次派送與回想續答都以完整 request 計算大小。測試站 `/api/environment` 顯示 `npcDecisionPrompt`。 |
 | 實際打模型 API | `lib/model-adapter.ts` 的 `requestModel`，全專案唯一的 LLM HTTP 出口 |
 | 骰子與檢定（D20 與 d100） | `lib/action-checks.ts` 的 `resolveActionCheck`；`lib/d20.ts` 只有 D20 與共用的 `Resolution` 型別 |
 | 天上意志的裁定 | `lib/adjudication.ts`（呼叫）、`lib/adjudication-contract.ts`（schema 與 parser）、`lib/adjudication-limits.ts`（上限） |

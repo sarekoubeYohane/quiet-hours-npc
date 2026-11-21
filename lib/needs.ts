@@ -6,6 +6,7 @@ export type Need = typeof needKeys[number];
 export type NeedValues = Record<Need, number>;
 export type BodyNeeds = {personal?:import('./body-needs-policy').PersonalNeeds;version:1;activatedAt:number;updatedAt:number;values:NeedValues;assessed:NeedValues;history:{minute:number;reason:string;before:NeedValues;after:NeedValues}[];dropped:number};
 export const needLabels:Record<Need,string> = {hunger:'飢餓',thirst:'口渴',fatigue:'體力疲勞',sleep:'睡眠需求'};
+export const sleepActionPrompt = '依自己的睡意和打算選動作。只想清醒地坐著或躺著歇一會兒，用 rest，這段活動會保持清醒。想睡一覺時，用 propose 向眼前可用的床或已知的合適地點提出睡覺，content 寫具體做法，purpose 寫睡眠目的。例如在自己的床上躺好睡覺，希望睡到自然醒。由世界依當下情況判定是否實際入睡。有睡意時你仍可選擇保持清醒。';
 const initial:NeedValues={hunger:20,thirst:20,fatigue:15,sleep:20};
 const hourly:NeedValues={hunger:3,thirst:6,fatigue:1,sleep:4};
 const stage=(value:number)=>value<40?0:value<65?1:value<85?2:3;

@@ -1,8 +1,9 @@
 # NPC 決策 prompt 改寫提案（2026-11-16）
 
-這是一份提案與證據的快照，尚未實作。現行的 NPC system prompt 仍由 `lib/models.ts` 串接各子系統的 `*Prompt` 而成。
+下文是 11 月 16 日的提案與當時證據。11 月 21 日的測試站建置已接入完整 v0.2.4，依當回合的人物輸入組裝；正式環境沿用 `lib/models.ts` 的提示。測試站的 `/api/environment` 會回報生效的 `npcDecisionPrompt` 版本。
 
-- 草稿全文：[`npc-prompt-rewrite-draft.md`](npc-prompt-rewrite-draft.md)（v0.2.3）
+- [目前的草稿 v0.2.4](npc-prompt-rewrite-draft.md)；[下文 11 月 16 日試驗所用的 v0.2.3](../../tooling/experiments/npc-prompt-trial/v0.2.3.md)。
+- 精簡欄位說明、改寫行動回饋或調整精神與睡眠措辭時，先查[《NPC prompt 修改紀錄》](npc-prompt-change-log.md)的失敗回合與對照結果。
 - 測試工具：[`tooling/experiments/npc-prompt-trial/`](../../tooling/experiments/npc-prompt-trial/README.md)
 - 規格與待釐清：[#341](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/341)
 - 相關：[#340](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/340)（把拒絕原因回饋給模型）、[#85](https://github.com/sarekoubeYohane/quiet-hours-npc/issues/85)（Luna 反覆格式驗證失敗）
