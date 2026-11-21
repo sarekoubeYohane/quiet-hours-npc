@@ -5,6 +5,11 @@ import { env } from 'cloudflare:workers';
 // Node test build.
 declare const __GIT_COMMIT__: string | null | undefined;
 declare const __BUILT_AT__: string | undefined;
+declare const __TEST_NPC_PROMPT__: string | undefined;
+
+export function testSiteNpcPrompt(): string | undefined {
+  if (env.APP_ENV === 'test' && typeof __TEST_NPC_PROMPT__ === 'string') return __TEST_NPC_PROMPT__ || undefined;
+}
 
 export type EnvironmentView = { name: string; label: string; commit: string; builtAt: string; builtAtLabel: string; caption: string };
 

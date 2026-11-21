@@ -8,6 +8,8 @@ import { arrangementCueReceipts } from './arrangement-cues';
 import { knownPeopleForDecision, type CognitiveDecisionContext } from './cognition';
 import { decisionWireSchema } from './npc-decision-schema';
 import { modelRequestBody, type ModelMessage, type ModelService } from './model-adapter';
+import { testSiteNpcPrompt } from './environment';
+import { assembleNpcPrompt } from './npc-prompt-rewrite';
 
 export type NpcDecisionContext=CognitiveDecisionContext & {feelingSources:string[];phoneReferences:ReturnType<typeof phoneForActor>};
 type RecallContinuation={input:ReturnType<typeof normalDecisionInput>;recalled:{id:string;version:number}[]};
@@ -25,12 +27,20 @@ type PreparationOptions=Pick<ModelService,'model'|'provider'> & {
 export function prepareNpcDecision(w:World,c:Character,options:PreparationOptions){
  const {messages,allowedTypes}=options;
  const input=options.continuation?.input??normalDecisionInput(w,c,options.modelKey);
+ const draft=testSiteNpcPrompt();
  const recalled=options.continuation?.recalled||[];
  const pinned=input.self.longTerm.filter(m=>recalled.some(r=>r.id===m.id&&r.version===m.version)).map(({id,version})=>({id,version}));
  let schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined,!!c.mentalEnergy,!!c.mentalEnergy?.policy.process,c.mentalEnergy?.policy.kind==='formal');
  boundDecisionRequest(w,c,input,()=>{
   schema=decisionWireSchema(allowedTypes,input.self.shortTerm,c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):undefined,!!c.mentalEnergy,!!c.mentalEnergy?.policy.process,c.mentalEnergy?.policy.kind==='formal');
-  messages[1].content=JSON.stringify(input);
+  // Bound the exact outgoing transcript. Optional projections may shrink between attempts.
+  if(draft){
+   const {personality,goal,...self}=input.self;
+   messages[0].content=assembleNpcPrompt(input,{name:self.name,personality,goal},{draft,recall:options.allowRecall}).text;
+   messages[1].content=JSON.stringify({...input,self});
+  }else{
+   messages[1].content=JSON.stringify(input);
+  }
   return new TextEncoder().encode(modelRequestBody(options,messages,schema,{allowRecall:options.allowRecall})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};

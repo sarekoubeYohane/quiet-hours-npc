@@ -2,6 +2,7 @@ import { emotionRegulationPrompt, parseEmotionRegulation } from './emotion-regul
 import { processFeelingPromptFor, parseProcessFeeling } from './mental-process';
 import { feelingPromptFor, parseFeelingUpdates } from './mental-experiences';
 import { phoneMapPrompt } from './phone-map';
+import { sleepActionPrompt } from './needs';
 import { pursuitPrompt, updatePursuits } from './pursuits';
 import { pursuitSelectionPrompt, parsePursuitSelection } from './pursuit-selection';
 import { prepareNpcDecision, type NpcDecisionContext } from './npc-decision-preparation';
@@ -112,6 +113,7 @@ if(c.mentalEnergy?.policy.kind==='formal'){
   '留意眼前和誰在一起。即使沒有交談，對方的陪伴也可能讓你安心、感到壓力，或沒有特別感覺。依你對在場者的看法，以及你此刻想不想有人陪，評估這段活動。'
  ].join('\n');
 }
+if(c.needs)messages[0].content += '\n' + sleepActionPrompt;
 if(c.mentalEnergy)messages[0].content+=emotionRegulationPrompt;
 messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;

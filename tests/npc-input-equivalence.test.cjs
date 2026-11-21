@@ -42,6 +42,40 @@ test('fixed decisions preserve the exact pre-refactor provider transcript, schem
  assert.deepEqual(JSON.parse(JSON.stringify(actual)),expectedTranscripts(fixturePath));
 });
 
+test('test-site dispatch uses v0.2.4 for the first decision and recall continuation, scoped to test',async()=>{
+ const {env}=load('cloudflare-workers'), previous=env.APP_ENV;
+ const {assemble,draftPath}=require('../tooling/experiments/npc-prompt-trial/assemble.cjs');
+ const draft=fs.readFileSync(draftPath,'utf8');
+ globalThis.__TEST_NPC_PROMPT__=draft;
+ try {
+  const environment=async()=> (await (await load('environment-route').GET()).json()).npcDecisionPrompt;
+  for(const provider of ['openai','openrouter']){
+   env.APP_ENV='production';
+   assert.equal(await environment(),undefined);
+   const legacy=await sample('recall',provider);
+   env.APP_ENV='test';
+   assert.equal(await environment(),'v0.2.4');
+   const trial=await sample('recall',provider);
+   assert.deepEqual(trial.result,legacy.result);
+   assert.equal(trial.bodies.length,2);
+   for(const [index,body] of trial.bodies.entries()){
+    const source=JSON.parse(legacy.bodies[index].messages[1].content);
+    const {text}=assemble(source,source.self,{draft,recall:index===0});
+    assert.match(text,/^# 你是誰/);
+    assert.ok(text.endsWith('無焦點填 []。'));
+    assert.equal(text.includes('## 回想\n'),index===0);
+    assert.doesNotMatch(legacy.bodies[index].messages[0].content,/^# 你是誰/);
+    delete source.self.personality;
+    delete source.self.goal;
+    const expected=structuredClone(legacy.bodies[index]);
+    expected.messages[0].content=text;
+    expected.messages[1].content=JSON.stringify(source);
+    assert.deepEqual(body,expected);
+   }
+  }
+ } finally { env.APP_ENV=previous; delete globalThis.__TEST_NPC_PROMPT__; }
+});
+
 test('the complete preparation entry returns the final request and only its actual reference scope without writing the world',()=>{
  const {prepareNpcDecision}=load('npc-decision-preparation');const {modelRequestBody}=load('model-adapter');
  const w=seedWorld(),c=w.characters.find(c=>c.id==='owner');w.pursuitContext='preparation-contract';c.control={mode:'autonomous'};
