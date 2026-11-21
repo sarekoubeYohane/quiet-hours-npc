@@ -105,6 +105,13 @@ messages[0].content+=' self.arrangementCues是你實際可知條件下想起既�
 messages[0].content+=' self.lastKnownState 集中呈現本次仍可見的主觀來源、時間及引用；它不是即時世界真相，不把聽聞、推測或錯誤感知改成事實，也不保證受阻原因。supplies 只表示知道該來源，availability=unknown 不表示仍有庫存；指定那份耗盡不代表整個場所有無其他來源，未得知補充保持未知。';
 if(c.mentalEnergy)messages[0].content+='精神電量只呈現本人感受與是否負擔得起一次調節；心力吃緊時可考慮照顧自己，仍可自主續做，不必停工、換活動或放下追求。 '+(c.mentalEnergy.policy.experience?feelingPromptFor(c.mentalEnergy.policy.kind==='formal'):'');
 if(c.mentalEnergy?.policy.process)messages[0].content+=processFeelingPromptFor(c.mentalEnergy.policy.kind==='formal');
+if(c.mentalEnergy?.policy.kind==='formal'){
+ messages[0].content += [
+  '做決定前，分別留意自己的心力、疲勞和睡意。你可以照自己的步調選擇活動；實際睡著也能慢慢恢復心力。',
+  '想想這段活動本身會讓你放鬆、費神，還是沒有明顯感覺。若有具體感受，在 processFeeling 寫出方向、強度與自己的理由；還無法判斷時可留 null。',
+  '留意眼前和誰在一起。即使沒有交談，對方的陪伴也可能讓你安心、感到壓力，或沒有特別感覺。依你對在場者的看法，以及你此刻想不想有人陪，評估這段活動。'
+ ].join('\n');
+}
 if(c.mentalEnergy)messages[0].content+=emotionRegulationPrompt;
 messages[0].content+=pursuitPrompt;
 messages[0].content+=pursuitSelectionPrompt;
