@@ -321,11 +321,16 @@ test('逐房配物以空白描述預覽各房結果，再採納所選三十一�
 });
 
 test('分組採納後接續全部採納，保留手選起點、手動物品與取消項目',async()=>{
- let connected=false;
+ let connected=false,repairRequested=false;
  const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
   const input=JSON.parse(request.messages.at(-1).content);
   if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  if(input.task==='opening-road-repair-v1'){
+   assert.deepEqual(input.groups,[['home'],['cafe']]);
+   return {walks:[{places:['home','cafe'],minutes:14},{places:['cafe','home'],minutes:22}]};
+  }
   const suggestion=proposal(input);
+  if(repairRequested)for(let i=0;i<30;i++)suggestion.finalization.spaces[0].objects.push({id:'item-'+i,roomId:'front',name:'配物'+i,state:[],hidden:false});
   suggestion.checkedRooms=input.city.places.map(place=>({placeId:place.id,roomId:'front'}));
   suggestion.finalization.spaces[0].objects.push({id:'chair',roomId:'front',name:'取消的椅子',state:[],hidden:false});
   suggestion.finalization.walks=connected?[{places:['home','cafe'],minutes:8}]:[];
@@ -333,14 +338,15 @@ test('分組採納後接續全部採納，保留手選起點、手動物品與�
  }});
  try{
   const j=await journey(app);
-  for(const firstGroup of ['adoptItems','adoptRoads']){
-   connected=firstGroup==='adoptRoads';
+  for(const path of ['items-manual','roads','items-repair']){
+   connected=path==='roads';repairRequested=path==='items-repair';
+   const firstGroup=connected?'adoptRoads':'adoptItems';
    const city=structuredClone(j.draft.body.city);
    city.characters[0]={...city.characters[0],placeId:'home',roomId:'front',placeOrigin:'system',roomOrigin:'system'};
    city.places.push({...city.places[0],id:'cafe',name:'街角咖啡館'});
    const write=(version,city,id)=>j.ok('/api/opening-drafts',{operationScope:'a',id,version,body:{...j.draft.body,description:'',city}});
    let {draft}=await write(0,city,crypto.randomUUID());
-   const operation=operationId(),generate={operationScope:'a',id:draft.id,operationId:operation,worldContext:j.scope.world.contextId,version:draft.version,supplyRooms:true,recommendRoads:true};
+   let operation=operationId();const generate={operationScope:'a',id:draft.id,operationId:operation,worldContext:j.scope.world.contextId,version:draft.version,supplyRooms:true,recommendRoads:true};
    let {arrangement}=await j.ok('/api/opening-drafts/arrange',generate);
    const action=(name,extra)=>({operationScope:'a',id:draft.id,operationId:operation,version:draft.version,proposalVersion:arrangement.version,action:name,...extra});
    const excludedItems=['home:chair'];
@@ -363,7 +369,14 @@ test('分組採納後接續全部採納，保留手選起點、手動物品與�
    space.objects.push({id:'vase',name:'手放花瓶',roomId:'front',state:{}});
    if(connected)latest.finalization.walks[0].minutes=15;
    ({draft}=await write(draft.version,latest,draft.id));
-   if(!connected){
+   if(repairRequested){
+    const repairOf={operationId:operation,version:arrangement.version};
+    operation=operationId();
+    ({arrangement}=await j.ok('/api/opening-drafts/arrange',{operationScope:'a',id:draft.id,version:draft.version,worldContext:j.scope.world.contextId,operationId:operation,repairOf}));
+    assert.ok(arrangement.receipts.items);
+    assert.deepEqual(arrangement.roomItems.excludedItems,excludedItems);
+    assert.equal(arrangement.city.finalization.walks.length,1);
+   }else if(!connected){
     const repaired=structuredClone(arrangement.city);repaired.finalization.walks=[{places:['home','cafe'],minutes:14}];
     ({arrangement}=await j.ok('/api/opening-drafts/arrange',action('edit',{city:repaired})));
    }
@@ -374,7 +387,9 @@ test('分組採納後接續全部採納，保留手選起點、手動物品與�
    const saved=(await j.ok('/api/opening-drafts?id='+draft.id+'&operationScope=a')).draft.body.city;
    assert.equal(saved.characters[0].placeId,'cafe');assert.equal(saved.characters[0].roomOrigin,'player');
    assert.deepEqual(saved.finalization.walks,[{places:['home','cafe'],minutes:connected?15:14}]);
-   assert.deepEqual(saved.finalization.spaces[0].objects.map(item=>item.name).sort(),[connected?'木桌':'玩家改名的木桌','手放花瓶'].sort());
+   const expectedNames=[connected?'木桌':'玩家改名的木桌','手放花瓶'];
+   if(repairRequested)for(let i=0;i<30;i++)expectedNames.push('配物'+i);
+   assert.deepEqual(saved.finalization.spaces[0].objects.map(item=>item.name).sort(),expectedNames.sort());
   }
  }finally{await app.close();}
 });

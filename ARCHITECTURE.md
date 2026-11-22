@@ -252,6 +252,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `opening-arrangement-model.ts` | 依玩家勾選的工作整理 AI 開局建議 |
 | `opening-road-repair.ts` | 只向模型傳入當前路網與缺口，接回可編輯的補路建議 |
 | `opening-room-items.ts`、`components/opening-room-item-suggestions.tsx` | 依場所實例及房間核對既有物品、勾選本輪新增物品並單獨採納 |
+| `opening-proposal-adoption.ts` | 採納前核對原草稿、最新手動變更、物品選擇及各組採納收據 |
 | `opening-road-network.ts`、`components/opening-roads.tsx` | 開局步行路段、隔離與分段連通檢查，以及手動／預覽的道路編輯 |
 | `opening-relationship-generation.ts` | 用模型從開局描述抽出住處、工作、關係 |
 | `opening-authoring.ts` | 瀏覽器端 helper：自動預填、把成品帶回開局草稿 |
