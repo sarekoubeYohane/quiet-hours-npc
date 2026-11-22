@@ -318,3 +318,27 @@ test('room list counts the current room and adding both objects focuses their na
     await window.happyDOM.abort();
   }
 });
+
+test('預覽逐房配置時按件勾選會立即更新房間與採納數量',async()=>{
+ const {Component,close}=await component('components/opening-room-item-suggestions.tsx');
+ const rooms=['前台','玄關','廚房','臥室','客廳','書房','儲藏室'];
+ const rows=rooms.map((name,i)=>({placeId:'home',placeName:'住宅',roomId:'r'+i,roomName:name,checked:i!==6,
+  existing:i===1?[{id:'cabinet',name:'鞋櫃'}]:[],suggestedIds:Array.from({length:[7,0,7,6,6,6,0][i]},(_,j)=>i+'-'+j)}));
+ const city={finalization:{spaces:[{placeId:'home',objects:rows.flatMap(room=>room.suggestedIds.map(id=>({id,roomId:room.roomId,name:id==='0-0'?'客用桌椅':id,state:{}})))}]}};
+ const requests=[],root=createRoot(document.body.appendChild(document.createElement('div')));
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{city,review:{rooms:rows,excludedItems:[]},adopted:false,disabled:false,onSubmit:async(action,excluded)=>{requests.push({action,excluded});return true;}})));
+  assert.ok(document.body.textContent.includes('玄關｜沿用 1 件，已齊備，新增 0 件'));
+  assert.ok(document.body.textContent.includes('儲藏室｜沿用 0 件，尚未核對'));
+  const front=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary').textContent.includes('前台'));
+  assert.equal(front.open,false);front.open=true;
+  const box=[...front.querySelectorAll('label')].find(node=>node.textContent==='客用桌椅').querySelector('input');
+  assert.equal(box.checked,true);
+  await React.act(async()=>box.click());
+  assert.ok(front.querySelector('summary').textContent.includes('本輪新增 7 件，選取 6 件'));
+  assert.ok(document.body.textContent.includes('採納所選物品（31 件）'));
+  assert.deepEqual(requests.at(-1),{action:'selectItems',excluded:['home:0-0']});
+  await React.act(async()=>box.click());
+  assert.ok(document.body.textContent.includes('採納所選物品（32 件）'));
+ }finally{await React.act(async()=>root.unmount());await close();await window.happyDOM.abort();}
+});
