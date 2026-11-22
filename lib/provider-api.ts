@@ -36,7 +36,7 @@ export async function listProviderModels(provider: ModelProvider, key: string, s
   const models = new Map<string, CatalogModel>();
   const cursors = new Set<string>();
   for (;;) {
-    const response = await fetch(url, { headers: providerHeaders(provider, key, true), redirect: 'error', signal, cache: 'no-store' });
+    const response = await fetch(url, { headers: providerHeaders(provider, key, true), redirect: 'manual', signal, cache: 'no-store' });
     if (!response.ok) {
       if (provider === 'anthropic' && response.status === 400) throw new CatalogError('Claude 拒絕這次查詢，請確認使用已綁定工作區的 API Key。', 400);
       const denied = response.status === 401 || response.status === 403;

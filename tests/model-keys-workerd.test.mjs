@@ -21,8 +21,9 @@ modules.push({type:'ESModule',path:'pursuit-fixture.js',contents:(await readFile
 // Load the same top-level runtime library modules as the application. Keeping a
 // second hand-written import graph here lets a real runtime dependency go missing.
 const libraryModules = (await readdir('lib')).filter(name => name.endsWith('.ts')).sort().map(name => name.slice(0, -3));
-for (const name of [...libraryModules, 'world-api']) {
-  const source = await readFile(name === 'world-api' ? 'app/api/world/route.ts' : `lib/${name}.ts`, 'utf8');
+const routes = { 'world-api': 'app/api/world/route.ts', 'model-settings-api': 'app/api/model-settings/route.ts' };
+for (const name of [...libraryModules, ...Object.keys(routes)]) {
+  const source = await readFile(routes[name] ?? `lib/${name}.ts`, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
     .replace(/import \{ headers \} from 'next\/headers';/, 'const headers = async () => globalThis.requestHeaders;')
     .replace(/(['"])(?:@\/lib\/|\.\/)([\w-]+)\1/g, "'./$2.js'")
@@ -30,7 +31,7 @@ for (const name of [...libraryModules, 'world-api']) {
   modules.push({ type: 'ESModule', path: name + '.js', contents: code });
 }
 
-test('world API encrypts keys, rejects damaged ciphertext and round-trips large acceptance backups in real Workers/D1', async () => {
+test('model settings list provider models and the world API encrypts keys and restores backups in real Workers/D1', async () => {
   const mf = new Miniflare({
     outboundService: async () => { throw Error('External network blocked by local test fixture'); },
     cf: false, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
@@ -39,6 +40,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     modules: [{ type: 'ESModule', path: 'worker.js', contents: `
       import { startGitHubLogin, finishGitHubLogin } from './auth.js';
       import { GET, POST } from './world-api.js';
+      import { POST as modelSettings } from './model-settings-api.js';
       import {seedWorld} from './world.js';
       import { fixtureDecision } from './pursuit-fixture.js';
       export default { async fetch(request) {
@@ -48,6 +50,10 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
           if (upstream.url.includes('/login/oauth/access_token')) return Response.json({ access_token: 'fake-github-token' });
           if (upstream.url === 'https://api.github.com/user') return Response.json({ id: 123, login: 'fixture-user' });
           if (upstream.redirect !== 'manual') throw Error('Provider redirects must not be followed');
+          if (upstream.url === 'https://api.deepseek.com/models') {
+            if (upstream.headers.get('authorization') !== 'Bearer fixture-catalog-key') return new Response(null, { status: 401 });
+            return Response.json({ data: [{ id: 'fixture-chat' }] });
+          }
           const inputData = JSON.parse(JSON.parse(init.body).messages[1].content);
           return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 5 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(inputData,{ type: 'rest', target: '', content: '', mood: '', durationMinutes: 60, intents: [] })) } }] });
         };
@@ -56,6 +62,7 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
         if (path === '/api/auth/github') return startGitHubLogin(request);
         if (path === '/api/auth/github/callback') return finishGitHubLogin(request);
         if (path === '/api/world') return request.method === 'POST' ? POST(request) : GET();
+        if (path === '/api/model-settings') return modelSettings(request);
         return new Response('Missing', { status: 404 });
       } };
     ` }, ...modules],
@@ -77,6 +84,13 @@ test('world API encrypts keys, rejects damaged ciphertext and round-trips large 
     // Key/backup compatibility is exercised against an explicitly pre-existing world.
     await mf.dispatchFetch('http://localhost:5173/fixture-existing-world');
     const first = await signIn(), second = await signIn();
+    const catalog = await mf.dispatchFetch(origin + '/api/model-settings', {
+      method: 'POST', headers: { origin, cookie: first },
+      body: JSON.stringify({ accountScope: 'account-operations:github:123', operation: 'list-models', provider: 'deepseek', key: 'fixture-catalog-key' }),
+    });
+    const catalogBody = await catalog.json();
+    assert.equal(catalog.status, 200, catalogBody.error);
+    assert.deepEqual(catalogBody.models, [{ id: 'fixture-chat', name: 'fixture-chat' }]);
     // Capture the actual legacy world's binding once under the original login.
     // Never derive an account-authoring namespace or refresh it from a later cookie.
     const initialRead = await mf.dispatchFetch(origin + '/api/world', { headers: { cookie: first } });
