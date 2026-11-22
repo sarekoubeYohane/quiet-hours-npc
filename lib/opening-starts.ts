@@ -3,10 +3,14 @@ import type { CityDraft } from './city-draft';
 type Actor = CityDraft['characters'][number];
 type Start = Pick<Actor, 'placeId' | 'roomId' | 'placeOrigin' | 'roomOrigin'>;
 
-export function protectOpeningStart(current: Start, suggested: Start): Start {
+export function openingStartLocks(current: Start) {
   // A chosen room identifies its place instance, even when another place has the same room ID.
   const keepRoom = !!current.roomId && current.roomOrigin !== 'system';
-  const keepPlace = keepRoom || (!!current.placeId && current.placeOrigin !== 'system');
+  return { keepRoom, keepPlace: keepRoom || (!!current.placeId && current.placeOrigin !== 'system') };
+}
+
+export function protectOpeningStart(current: Start, suggested: Start): Start {
+  const {keepRoom, keepPlace} = openingStartLocks(current);
   const placeId = keepPlace ? current.placeId : suggested.placeId;
   const roomId = !keepRoom && suggested.placeId === placeId ? suggested.roomId : current.roomId;
   return {

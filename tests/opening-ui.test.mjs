@@ -204,6 +204,8 @@ test('the AI road option follows the number of places and its preview names each
   const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
   await settle(()=>adopt());
   assert.equal(adopt().disabled,true);
+  const repair=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='請 AI 補路');
+  assert.ok(repair());
   assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
   for(const place of ['街角咖啡館','Vera 的房間']){
    const check=[...document.querySelectorAll('label')].find(label=>label.textContent==='明示隔離 '+place)?.querySelector('input');
@@ -211,6 +213,7 @@ test('the AI road option follows the number of places and its preview names each
    await React.act(async()=>check.click());
   }
   assert.equal(adopt().disabled,false);
+  assert.equal(repair(),undefined);
  }finally{await React.act(async()=>root.unmount());await close();}
 });
 
@@ -402,4 +405,56 @@ test('review shows shared starts and isolation, edits each exact target and rest
   } finally {
     await React.act(async()=>root.unmount()); globalThis.fetch=originalFetch; await close(); await window.happyDOM.abort();
   }
+});
+
+test('預覽逐房配置時按件勾選會立即更新房間與採納數量',async()=>{
+ const {Component,close}=await component('components/opening-room-item-suggestions.tsx');
+ const rooms=['前台','玄關','廚房','臥室','客廳','書房','儲藏室'];
+ const rows=rooms.map((name,i)=>({placeId:'home',placeName:'住宅',roomId:'r'+i,roomName:name,checked:i!==6,
+  existing:i===1?[{id:'cabinet',name:'鞋櫃'}]:[],suggestedIds:Array.from({length:[7,0,7,6,6,6,0][i]},(_,j)=>i+'-'+j)}));
+ const city={finalization:{spaces:[{placeId:'home',objects:rows.flatMap(room=>room.suggestedIds.map(id=>({id,roomId:room.roomId,name:id==='0-0'?'客用桌椅':id,state:{}})))}]}};
+ const requests=[],root=createRoot(document.body.appendChild(document.createElement('div')));
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{city,review:{rooms:rows,excludedItems:[]},adopted:false,disabled:false,onSubmit:async(action,excluded)=>{requests.push({action,excluded});return true;}})));
+  assert.ok(document.body.textContent.includes('玄關｜沿用 1 件，已齊備，新增 0 件'));
+  assert.ok(document.body.textContent.includes('儲藏室｜沿用 0 件，尚未核對'));
+  const front=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary').textContent.includes('前台'));
+  assert.equal(front.open,false);front.open=true;
+  const box=[...front.querySelectorAll('label')].find(node=>node.textContent==='客用桌椅').querySelector('input');
+  assert.equal(box.checked,true);
+  await React.act(async()=>box.click());
+  assert.ok(front.querySelector('summary').textContent.includes('本輪新增 7 件，選取 6 件'));
+  assert.ok(document.body.textContent.includes('採納所選物品（31 件）'));
+  assert.deepEqual(requests.at(-1),{action:'selectItems',excluded:['home:0-0']});
+  await React.act(async()=>box.click());
+  assert.ok(document.body.textContent.includes('採納所選物品（32 件）'));
+ }finally{await React.act(async()=>root.unmount());await close();await window.happyDOM.abort();}
+});
+
+test('preview start controls show the settings that can actually be adopted for each selected character',async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['left','right'].map((id,i)=>({id,name:['甲住宅','乙住宅'][i],templateId:'house',version:1}));
+ const person=(templateId,placeId,roomId,placeOrigin,roomOrigin)=>({templateId,version:1,placeId,roomId,placeOrigin,roomOrigin});
+ const characters=[person('Cass','left','living','system','system'),person('Vera','left','living','player','system'),
+  person('店主','right','living','system','player'),person('舊卡','right','bedroom')];
+ const city={places,characters};
+ const recommended=characters.map(p=>({...p,placeId:'left',roomId:'bedroom'}));
+ const props={owner:'a',draftId:'draft',cards:characters.map(p=>({id:p.templateId,fields:{name:p.templateId}})),
+  scenes:[{id:'house',version:1,rooms:[{id:'living',name:'客廳'},{id:'bedroom',name:'臥室'}]}],city,
+  arrangement:{state:'complete',version:0,inputVersion:1,operationId:'op',city:{places,characters:recommended},preview:{issues:[]}},
+  onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const control=(name,field)=>document.querySelector('[aria-label="'+name+'建議起始'+field+'"]');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,props)));
+  await settle(()=>control('Cass','場所'));
+  for(const [name,placeDisabled,roomDisabled,place,room] of [
+   ['Cass',false,false,'left','bedroom'],['Vera',true,false,'left','bedroom'],['店主',true,true,'right','living'],['舊卡',true,true,'right','bedroom']
+  ]){
+   assert.deepEqual([control(name,'場所').disabled,control(name,'房間').disabled,control(name,'場所').value,control(name,'房間').value],
+    [placeDisabled,roomDisabled,place,room],name);
+  }
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{places,characters:[{...characters[0],placeId:'right',roomId:'living',roomOrigin:'player'},...characters.slice(1)]}})));
+  assert.deepEqual([control('Cass','場所').disabled,control('Cass','房間').disabled,control('Cass','場所').value,control('Cass','房間').value],[true,true,'right','living']);
+ }finally{await React.act(async()=>root.unmount());await close();}
 });
