@@ -39,13 +39,16 @@ export function reconcileOpeningProposal(original:CityDraft, current:OpeningDraf
   const latest=current.body.city;
   // Item suggestions have their own selection and receipt. Merge everything else before applying them.
   const itemKeys=new Set(groups.roomItems?roomItemKeys(groups.roomItems):[]);
+  const createdRooms=groups.receipts?.items?groups.roomItems?.createdRooms:undefined;
   const spaces:CitySpace[]=latest.places.flatMap(place=>{
     const space=(city:CityDraft)=>city.finalization?.spaces.find(row=>row.placeId===place.id);
     const base=space(original),live=space(latest),next=space(proposal);
     if(!base&&!live&&!next)return [];
     const outsideItemGroup=(item:{id:string})=>!itemKeys.has(itemKey(place.id,item.id));
+    // Rooms created along with selected items now belong to the live draft, including later deletions.
+    const pendingRooms=next?.rooms.filter(room=>!createdRooms?.some(row=>row.placeId===place.id && row.roomId===room.id));
     return [{placeId:place.id,
-      rooms:mergeRows(base?.rooms,live?.rooms,next?.rooms,byId),
+      rooms:mergeRows(base?.rooms,live?.rooms,pendingRooms,byId),
       objects:mergeRows(base?.objects.filter(outsideItemGroup),live?.objects,next?.objects.filter(outsideItemGroup),byId),
       connections:mergeRows(base?.connections,live?.connections,next?.connections,byId),
     }];

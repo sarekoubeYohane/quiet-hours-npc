@@ -15,6 +15,7 @@ export type RoomItemReview = {
   excludedItems:string[];
   candidateKeys?:string[];
   adoptedItemKeys?:string[];
+  createdRooms?:CheckedRoom[];
 };
 export const itemKey = (placeId:string, id:string) => placeId+':'+id;
 
@@ -97,15 +98,19 @@ export function applySelectedRoomItems(draft:OpeningDraft,proposal:CityDraft,rev
   const city=structuredClone(draft.body.city);
   const roomItems=currentRoomItemReview(proposal,review,{city,scenes:draft.sources.scenes});
   const adoptedItemKeys:string[]=[];
+  const createdRooms:CheckedRoom[]=[];
   for(const room of roomItems.rooms){
     const selected=suggestedRoomItems(proposal,room).filter(item=>!roomItems.excludedItems.includes(itemKey(room.placeId,item.id)));
     if(!selected.length)continue;
     const finalization=city.finalization??={spaces:[],walks:[]};
     let space=finalization.spaces.find(value=>value.placeId===room.placeId);
     if(!space){space={placeId:room.placeId,rooms:[],objects:[],connections:[]};finalization.spaces.push(space);}
-    if(room.proposedRoom)space.rooms.push(room.proposedRoom);
+    if(room.proposedRoom){
+      space.rooms.push(room.proposedRoom);
+      createdRooms.push({placeId:room.placeId,roomId:room.roomId});
+    }
     space.objects.push(...selected);
     adoptedItemKeys.push(...selected.map(item=>itemKey(room.placeId,item.id)));
   }
-  return {city,roomItems:{...roomItems,adoptedItemKeys}};
+  return {city,roomItems:{...roomItems,adoptedItemKeys,createdRooms}};
 }

@@ -338,7 +338,7 @@ test('同輪新增房間與物品可預覽、勾選並分次或全部採納',asy
  }});
  try{
   const j=await journey(app);
-  for(const itemsFirst of [false,true]){
+  for(const path of ['all','items-first','delete-after-items']){
    const city={...j.draft.body.city,finalization:{spaces:[{placeId:'home',rooms:[{id:'old',name:'舊房間'}],objects:[],connections:[]}],walks:[]}};
    let {draft}=await j.ok('/api/opening-drafts',{operationScope:'a',id:crypto.randomUUID(),version:0,body:{...j.draft.body,city}});
    const base={operationScope:'a',id:draft.id,operationId:operationId()};
@@ -361,7 +361,7 @@ test('同輪新增房間與物品可預覽、勾選並分次或全部採納',asy
    ({draft}=await j.ok('/api/opening-drafts',{operationScope:'a',id:draft.id,version:draft.version,body:{...j.draft.body,city}}));
    const excludedItems=['home:stool','home:box'];
    ({arrangement}=await action('selectItems',{excludedItems}));
-   if(itemsFirst){
+   if(path!=='all'){
     await action('adoptItems',{excludedItems});
     ({draft,arrangement}=await read());
     const partial=draft.body.city.finalization.spaces[0];
@@ -369,11 +369,17 @@ test('同輪新增房間與物品可預覽、勾選並分次或全部採納',asy
     assert.deepEqual(partial.objects.map(item=>[item.roomId,item.id]),[['studio','easel']]);
     assert.deepEqual(arrangement.roomItems.adoptedItemKeys,['home:easel']);
     assert.deepEqual(draft.body.city.characters,j.draft.body.city.characters);
+    if(path==='delete-after-items'){
+     const manual=structuredClone(draft.body.city);
+     manual.finalization.spaces[0].objects=[];
+     manual.finalization.spaces[0].rooms=[];
+     ({draft}=await j.ok('/api/opening-drafts',{operationScope:'a',id:draft.id,version:draft.version,body:{...draft.body,city:manual}}));
+    }
    }
    await action('adopt',{city:arrangement.city});
    const saved=(await read()).draft.body.city.finalization.spaces[0];
-   assert.deepEqual(saved.rooms.map(room=>room.id),['studio','closet']);
-   assert.deepEqual(saved.objects.map(item=>[item.roomId,item.id]),[['studio','easel']]);
+   assert.deepEqual(saved.rooms.map(room=>room.id),path==='delete-after-items'?['closet']:['studio','closet']);
+   assert.deepEqual(saved.objects.map(item=>[item.roomId,item.id]),path==='delete-after-items'?[]:[['studio','easel']]);
   }
  }finally{await app.close();}
 });
