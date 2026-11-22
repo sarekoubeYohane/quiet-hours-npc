@@ -169,3 +169,21 @@ test('首次設定只需查一個服務，離開查詢失敗的服務後保存�
     assert.deepEqual(calls.filter(call=>call.operation==='set-model-key').map(call=>call.mode),['anthropic']);
   }finally{await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort();}
 });
+test('scene groups take the player directly to the missing starting room',async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(),scene={id:'house',version:1,name:'住宅',rooms:[{id:'lobby',name:'客廳'},{id:'entry',name:'玄關'}],objects:[],connections:[]};
+ const card={id:'card-example-cass',version:1,fields:{name:'Cass'},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50};
+ const draft={id,version:1,body:{name:'回到玄關',description:'',step:3,city:{places:[{id:'home',templateId:scene.id,version:1,name:'住宅'}],characters:[{templateId:card.id,version:1,placeId:'home',roomId:''}]}},sources:{cards:[card],scenes:[scene]}};
+ const originalFetch=globalThis.fetch,root=createRoot(document.body.appendChild(document.createElement('div')));
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:'account-operations:a',cards:[card]}:String(url).includes('scene-templates')?{accountScope:'account-operations:a',templates:[scene]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a'});
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('[name="opening-name"]'));
+  await click('場所與道路');await click('帶我去填');
+  await settle(()=>document.activeElement?.getAttribute('aria-label')==='Cass起始房間');
+  await click('人物關係');await click('新增背景人物');
+  await change(document.querySelector('input[aria-label="背景人物名稱"]'),'阿岑');
+  await click('從阿岑建立關係');
+  assert.equal(document.querySelector('[aria-label="關係 1 對象"]').selectedOptions[0].textContent,'阿岑');
+ }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
