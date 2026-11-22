@@ -1,19 +1,22 @@
 'use client';
 import {useState} from 'react';
 import type {CityDraft} from '@/lib/city-draft';
-import {itemKey, suggestedRoomItems, type RoomItemReview} from '@/lib/opening-room-items';
+import type {SceneTemplate} from '@/lib/scene-templates';
+import {currentRoomItemReview,itemKey, suggestedRoomItems, type RoomItemReview} from '@/lib/opening-room-items';
 
 type Props={
   city:CityDraft;
   review:RoomItemReview;
+  latest?:{city:CityDraft;scenes:SceneTemplate[]};
   adopted:boolean;
   disabled:boolean;
   onSubmit:(action:'selectItems'|'adoptItems',excluded:string[])=>Promise<boolean>;
 };
-export default function OpeningRoomItemSuggestions({city,review,adopted,disabled,onSubmit}:Props){
+export default function OpeningRoomItemSuggestions({city,review,latest,adopted,disabled,onSubmit}:Props){
   const [excluded,setExcluded]=useState(review.excludedItems);
   const [unsaved,setUnsaved]=useState(false);
-  const rows=review.rooms.map(room=>{
+  const visible=adopted?review:currentRoomItemReview(city,review,latest);
+  const rows=visible.rooms.map(room=>{
     const items=suggestedRoomItems(city,room);
     const selected=items.filter(item=>!excluded.includes(itemKey(room.placeId,item.id))).length;
     return {room,items,selected};
@@ -36,7 +39,7 @@ export default function OpeningRoomItemSuggestions({city,review,adopted,disabled
         </label>;
       })}
     </details>)}
-    {adopted?<p role="status">已採納所選物品（{selected} 件）</p>:<>
+    {adopted?<p role="status">已採納所選物品{review.adoptedItemKeys?'（'+review.adoptedItemKeys.length+' 件）':''}</p>:<>
       {unsaved&&<button type="button" disabled={disabled} onClick={()=>void select(excluded)}>重試保存物品選擇</button>}
       <button type="button" disabled={disabled||!selected} onClick={()=>void onSubmit('adoptItems',excluded)}>採納所選物品（{selected} 件）</button>
     </>}

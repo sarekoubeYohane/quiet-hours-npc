@@ -427,3 +427,65 @@ test('分組採納後接續全部採納，保留手選起點、手動物品與�
   }
  }finally{await app.close();}
 });
+
+test('補路以後來手動刪掉的路段和新增場所為準，同一請求可重送',async()=>{
+ let modelInput;
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  if(input.task==='opening-road-repair-v1'){modelInput=input;return {walks:[{places:['b','c'],minutes:8},{places:['c','d'],minutes:10}]};}
+  return proposal(input);
+ }});
+ try{
+  const j=await journey(app),id=j.draft.id;
+  const places=['home','b','c','d'].map(id=>({...j.draft.body.city.places[0],id,name:id}));
+  const ab={places:['home','b'],minutes:5},bc={places:['b','c'],minutes:4};
+  const city={...j.draft.body.city,places:places.slice(0,3),finalization:{spaces:[],walks:[ab,bc]}};
+  const save=(version,city)=>j.ok('/api/opening-drafts',{operationScope:'a',id,version,body:{...j.draft.body,city}});
+  const {draft}=await save(j.draft.version,city);
+  const base={operationScope:'a',id,worldContext:j.scope.world.contextId};
+  const first=await j.ok('/api/opening-drafts/arrange',{...base,operationId:operationId(),version:draft.version,recommendRoads:true});
+  const live=(await save(draft.version,{...city,places,finalization:{spaces:[],walks:[ab]}})).draft;
+  const request={...base,operationId:operationId(),version:live.version,repairOf:{operationId:first.arrangement.operationId,version:first.arrangement.version}};
+  const repair=await j.ok('/api/opening-drafts/arrange',request);
+  assert.deepEqual(modelInput.groups,[['home','b'],['c'],['d']]);assert.deepEqual(modelInput.walks,[ab]);
+  assert.deepEqual(repair.arrangement.originalRoads.walks,[ab]);
+  assert.deepEqual(repair.arrangement.city.places,places);
+  assert.deepEqual(repair.draft.body.city,live.body.city);
+  const requests=app.modelRequests.length;
+  assert.deepEqual((await j.ok('/api/opening-drafts/arrange',request)).arrangement,repair.arrangement);
+  assert.equal(app.modelRequests.length,requests);
+  const {draft:adopted}=await j.ok('/api/opening-drafts/arrange',{operationScope:'a',id,operationId:request.operationId,version:live.version,proposalVersion:repair.arrangement.version,city:repair.arrangement.city,action:'adoptRoads'});
+  assert.deepEqual(adopted.body.city.finalization.walks,[ab,{places:['b','c'],minutes:8},{places:['c','d'],minutes:10}]);
+ }finally{await app.close();}
+});
+
+test('編輯建議物品的房間後保留勾選，採納收據只記錄當時實際增加的物品',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  const res=proposal(input);res.checkedRooms=[{placeId:'home',roomId:'front'},{placeId:'home',roomId:'entry'}];
+  res.finalization.spaces[0].objects.push({id:'chair',name:'椅子',roomId:'front',hidden:false,state:[]},{id:'cup',name:'杯子',roomId:'front',hidden:false,state:[]});return res;
+ }});
+ try{
+  const j=await journey(app),id=j.draft.id,op=operationId();
+  const city={...j.draft.body.city,finalization:{spaces:[{placeId:'home',rooms:[{id:'entry',name:'玄關'}],objects:[],connections:[]}],walks:[]}};
+  const save=(version,city)=>j.ok('/api/opening-drafts',{operationScope:'a',id,version,body:{...j.draft.body,city}});
+  let {draft}=await save(j.draft.version,city);
+  const base={operationScope:'a',id,operationId:op};
+  let {arrangement}=await j.ok('/api/opening-drafts/arrange',{...base,version:draft.version,supplyRooms:true,worldContext:j.scope.world.contextId});
+  const action=(action,input)=>j.ok('/api/opening-drafts/arrange',{...base,version:draft.version,proposalVersion:arrangement.version,action,...input});
+  const excludedItems=['home:chair'];
+  ({arrangement}=await action('selectItems',{excludedItems}));
+  const edited=structuredClone(arrangement.city);
+  for(const object of edited.finalization.spaces[0].objects)object.roomId='entry';
+  ({arrangement}=await action('edit',{city:edited}));
+  assert.deepEqual(arrangement.roomItems.rooms.find(r=>r.roomId==='entry').suggestedIds,['table','chair','cup']);
+  assert.deepEqual(arrangement.roomItems.excludedItems,excludedItems);
+  city.finalization.spaces[0].objects.push({id:'mine',roomId:'entry',name:'木桌',state:{}});
+  ({draft}=await save(draft.version,city));
+  const result=await action('adoptItems',{excludedItems});
+  assert.deepEqual(result.draft.body.city.finalization.spaces[0].objects.map(o=>o.name),['木桌','杯子']);
+  assert.deepEqual(result.arrangement.roomItems.adoptedItemKeys,['home:cup']);
+  assert.deepEqual((await j.ok('/api/opening-drafts?id='+id+'&operationScope=a')).arrangement.roomItems.adoptedItemKeys,['home:cup']);
+ }finally{await app.close();}
+});

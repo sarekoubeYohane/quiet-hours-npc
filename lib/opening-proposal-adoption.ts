@@ -1,7 +1,7 @@
 import type {CityDraft, CitySpace} from './city-draft';
 import type {OpeningDraft} from './opening-drafts';
 import {reconcileOpeningStarts} from './opening-starts';
-import {applySelectedRoomItems, itemKey, type RoomItemReview} from './opening-room-items';
+import {applySelectedRoomItems, itemKey, roomItemKeys, type RoomItemReview} from './opening-room-items';
 import {walkPairKey} from './opening-road-network';
 
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
@@ -35,11 +35,10 @@ export function reconcileOpeningRoads(base:OpeningRoadBaseline, current:CityDraf
 type Groups={roomItems?:RoomItemReview;receipts?:Partial<Record<'items'|'roads',string>>};
 const byId=(value:{id:string})=>value.id;
 
-export function reconcileOpeningProposal(original:CityDraft, current:OpeningDraft, proposal:CityDraft, groups:Groups):CityDraft {
+export function reconcileOpeningProposal(original:CityDraft, current:OpeningDraft, proposal:CityDraft, groups:Groups) {
   const latest=current.body.city;
-  const rows=groups.roomItems?.rooms??[];
   // Item suggestions have their own selection and receipt. Merge everything else before applying them.
-  const itemKeys=new Set(rows.flatMap(room=>room.suggestedIds.map(id=>itemKey(room.placeId,id))));
+  const itemKeys=new Set(groups.roomItems?roomItemKeys(groups.roomItems):[]);
   const spaces:CitySpace[]=latest.places.flatMap(place=>{
     const space=(city:CityDraft)=>city.finalization?.spaces.find(row=>row.placeId===place.id);
     const base=space(original),live=space(latest),next=space(proposal);
@@ -71,5 +70,5 @@ export function reconcileOpeningProposal(original:CityDraft, current:OpeningDraf
     relationships:mergeRows(original.relationships,latest.relationships,proposal.relationships,r=>JSON.stringify([r.from,r.to,r.targetType])),
     accessGrants:mergeRows(original.accessGrants,latest.accessGrants,proposal.accessGrants,r=>JSON.stringify([r.placeId,r.roomId,r.characterTemplateId])),
   },latest);
-  return groups.roomItems&&!groups.receipts?.items?applySelectedRoomItems({...current,body:{...current.body,city}},proposal,groups.roomItems):city;
+  return groups.roomItems&&!groups.receipts?.items?applySelectedRoomItems({...current,body:{...current.body,city}},proposal,groups.roomItems):{city,roomItems:groups.roomItems};
 }

@@ -2,7 +2,9 @@ import {z} from 'zod';
 import {requestModel,type ModelService} from './model-adapter';
 import type {CityDraft} from './city-draft';
 import {cityWalkSchema} from './city-finalization';
-import {openingRoadNetwork,walkPairKey} from './opening-road-network';
+import type {OpeningDraft} from './opening-drafts';
+import {reconcileOpeningRoads,roadBaseline} from './opening-proposal-adoption';
+import {openingRoadNetwork,walkPairKey,withOpeningRoads} from './opening-road-network';
 
 const repairSchema=z.object({walks:z.array(cityWalkSchema).max(28)}).strict();
 const outputSchema={
@@ -13,6 +15,17 @@ const outputSchema={
   }}},
  },
 };
+
+// Freeze the new road baseline while retaining the original baseline for other pending groups.
+export function openingRepairSnapshot(original:OpeningDraft,latest:OpeningDraft):OpeningDraft {
+ const city={...withOpeningRoads(original.body.city,latest.body.city),places:latest.body.city.places};
+ return {...original,version:latest.version,body:{...original.body,city},sources:{...original.sources,scenes:latest.sources.scenes}};
+}
+
+export function openingRepairSource(original:OpeningDraft,latest:OpeningDraft,proposal:CityDraft):CityDraft {
+ const roads=reconcileOpeningRoads(roadBaseline(original.body.city),latest.body.city,proposal);
+ return {...withOpeningRoads(proposal,roads),places:roads.places};
+}
 
 export async function repairOpeningRoads(city:CityDraft,service:ModelService,options:Parameters<typeof requestModel>[3]){
  const {groups}=openingRoadNetwork(city);

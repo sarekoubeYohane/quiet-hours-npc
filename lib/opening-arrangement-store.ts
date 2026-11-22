@@ -1,3 +1,4 @@
+import {currentRoomItemReview} from './opening-room-items';
 import {roadBaseline} from './opening-proposal-adoption';
 import {database} from './store';
 import {SaveAccessError} from './world-saves';
@@ -45,10 +46,11 @@ export async function editArrangement(owner:string,row:ArrangementRow,revision:n
  if(row.state!=='complete')throw new SaveAccessError('這份建議已採納或未完成，請恢復原操作。',409);
  const saved=storedArrangementResult(row);
  const sameCity=JSON.stringify(saved.city)===JSON.stringify(city);
+ const roomItems=metadata.roomItems??(saved.roomItems&&!sameCity&&!saved.receipts?.items?currentRoomItemReview(city,saved.roomItems):saved.roomItems);
  if(row.revision===revision+1&&sameCity&&(!metadata.roomItems||JSON.stringify(saved.roomItems)===JSON.stringify(metadata.roomItems)))return row;
  const draft=JSON.parse(row.snapshot) as OpeningDraft;
  const candidate=sameCity?{preview:saved.preview,world:saved.world}:await prepareCity(owner,city,{minute:1260,turn:0,characters:[],events:[],lastMode:'demo'},draft.sources);if(candidate.world)candidate.world.timeContract='five-minute-v1';
- const changed=await database().prepare("UPDATE opening_arrangements SET result=?,revision=revision+1 WHERE owner=? AND draft_id=? AND operation_id=? AND revision=? AND state='complete' AND EXISTS (SELECT 1 FROM opening_drafts d WHERE d.owner=opening_arrangements.owner AND d.id=opening_arrangements.draft_id AND d.version=? AND d.finalized_save_id IS NULL) AND NOT EXISTS (SELECT 1 FROM opening_arrangements a WHERE a.owner=opening_arrangements.owner AND a.draft_id=opening_arrangements.draft_id AND a.state='pending') RETURNING operation_id").bind(JSON.stringify({...saved,...metadata,world:undefined,city,...candidate}),owner,row.draft_id,row.operation_id,revision,draftVersion).first();
+ const changed=await database().prepare("UPDATE opening_arrangements SET result=?,revision=revision+1 WHERE owner=? AND draft_id=? AND operation_id=? AND revision=? AND state='complete' AND EXISTS (SELECT 1 FROM opening_drafts d WHERE d.owner=opening_arrangements.owner AND d.id=opening_arrangements.draft_id AND d.version=? AND d.finalized_save_id IS NULL) AND NOT EXISTS (SELECT 1 FROM opening_arrangements a WHERE a.owner=opening_arrangements.owner AND a.draft_id=opening_arrangements.draft_id AND a.state='pending') RETURNING operation_id").bind(JSON.stringify({...saved,roomItems,world:undefined,city,...candidate}),owner,row.draft_id,row.operation_id,revision,draftVersion).first();
  if(!changed)throw new SaveAccessError('另一頁已修改建議或開局，原輸入已保留；請核對已存版本。',409);
  return (await readArrangement(owner,row.draft_id,row.operation_id))!;
 }

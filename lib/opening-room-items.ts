@@ -12,6 +12,8 @@ type RoomInventory = CheckedRoom & {
 export type RoomItemReview = {
   rooms:(RoomInventory & {checked:boolean; suggestedIds:string[]})[];
   excludedItems:string[];
+  candidateKeys?:string[];
+  adoptedItemKeys?:string[];
 };
 export const itemKey = (placeId:string, id:string) => placeId+':'+id;
 
@@ -50,28 +52,50 @@ export function reviewRoomItems(draft:OpeningDraft, proposal:CityDraft, checkedR
   return {rooms,excludedItems:[]};
 }
 
-export function suggestedRoomItems(city:CityDraft, room:RoomItemReview['rooms'][number]){
-  return city.finalization?.spaces.find(space=>space.placeId===room.placeId)?.objects
-    .filter(item=>item.roomId===room.roomId && room.suggestedIds.includes(item.id))??[];
+export function roomItemKeys(review:RoomItemReview):string[] {
+  return review.candidateKeys??review.rooms.flatMap(room=>room.suggestedIds.map(id=>itemKey(room.placeId,id)));
 }
 
-/** Add only selected items to rooms that still exist in the saved draft. */
-export function applySelectedRoomItems(draft:OpeningDraft, proposal:CityDraft, review:RoomItemReview):CityDraft {
+/** Candidate identity belongs to its place. Its room, availability and displayed count follow the edited proposal and live inventory. */
+export function currentRoomItemReview(proposal:CityDraft,review:RoomItemReview,latest?:{city:CityDraft;scenes:SceneTemplate[]}):RoomItemReview {
+  const candidateKeys=roomItemKeys(review);
+  const known=new Set(candidateKeys);
+  const current=latest?inventory(latest.city,latest.scenes):review.rooms;
+  const existingKeys=new Set(current.flatMap(room=>room.existing.map(item=>itemKey(room.placeId,item.id))));
+  const rooms=current.map(room=>{
+    const checked=review.rooms.some(old=>old.placeId===room.placeId&&old.roomId===room.roomId&&old.checked);
+    const names=new Set(room.existing.map(item=>spaceNameKey(item.name)));
+    const space=proposal.finalization?.spaces.find(entry=>entry.placeId===room.placeId);
+    const suggestedIds:string[]=[];
+    for(const item of space?.objects??[]){
+      const key=itemKey(room.placeId,item.id),name=spaceNameKey(item.name);
+      if(item.roomId!==room.roomId||!known.has(key)||existingKeys.has(key)||names.has(name))continue;
+      suggestedIds.push(item.id);names.add(name);
+    }
+    return {...room,checked:checked||suggestedIds.length>0,suggestedIds};
+  });
+  return {...review,candidateKeys,rooms};
+}
+
+export function suggestedRoomItems(city:CityDraft,room:RoomItemReview['rooms'][number]){
+  return city.finalization?.spaces.find(space=>space.placeId===room.placeId)?.objects
+    .filter(item=>item.roomId===room.roomId&&room.suggestedIds.includes(item.id))??[];
+}
+
+export function applySelectedRoomItems(draft:OpeningDraft,proposal:CityDraft,review:RoomItemReview) {
   const city=structuredClone(draft.body.city);
-  const currentRooms=inventory(city,draft.sources.scenes);
-  for(const room of review.rooms){
-    const current=currentRooms.find(value=>value.placeId===room.placeId && value.roomId===room.roomId);
-    if(!current)continue;
+  const roomItems=currentRoomItemReview(proposal,review,{city,scenes:draft.sources.scenes});
+  const adoptedItemKeys:string[]=[];
+  for(const room of roomItems.rooms){
     for(const item of suggestedRoomItems(proposal,room)){
-      if(review.excludedItems.includes(itemKey(room.placeId,item.id)))continue;
-      if(current.existing.some(existing=>spaceNameKey(existing.name)===spaceNameKey(item.name)) ||
-        currentRooms.some(other=>other.placeId===room.placeId && other.existing.some(existing=>existing.id===item.id)))continue;
+      const key=itemKey(room.placeId,item.id);
+      if(roomItems.excludedItems.includes(key))continue;
       const finalization=city.finalization??={spaces:[],walks:[]};
       let space=finalization.spaces.find(value=>value.placeId===room.placeId);
       if(!space){space={placeId:room.placeId,rooms:[],objects:[],connections:[]};finalization.spaces.push(space);}
       space.objects.push(item);
-      current.existing.push(item);
+      adoptedItemKeys.push(key);
     }
   }
-  return city;
+  return {city,roomItems:{...roomItems,adoptedItemKeys}};
 }

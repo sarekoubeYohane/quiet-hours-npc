@@ -464,3 +464,36 @@ test('preview start controls show the settings that can actually be adopted for 
   assert.deepEqual([control('Cass','場所').disabled,control('Cass','房間').disabled,control('Cass','場所').value,control('Cass','房間').value],[true,true,'right','living']);
  }finally{await React.act(async()=>root.unmount());await close();}
 });
+
+test('取消配物保存失敗時可重試，補路與另開一輪保留這次勾選',async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div'))),original=globalThis.fetch;
+ const places=['home','cafe'].map(id=>({id,name:id,templateId:'scene',version:1}));
+ const scenes=[{id:'scene',version:1,rooms:[{id:'front',name:'前台'},{id:'entry',name:'玄關'}],objects:[],connections:[]}];
+ const live={places,characters:[],finalization:{spaces:[{placeId:'home',rooms:[],connections:[],objects:[{id:'manual',roomId:'entry',name:'木桌',state:{}}]}],walks:[]}};
+ const draft=structuredClone(live);draft.finalization.spaces[0].objects=['木桌','椅子'].map((name,i)=>({id:'i'+i,roomId:'entry',name,state:{}}));
+ const roomItems={excludedItems:[],rooms:scenes[0].rooms.map(room=>({roomName:room.name,roomId:room.id,placeId:'home',placeName:'home',existing:[],checked:true,suggestedIds:room.id==='front'?['i0','i1']:[]}))};
+ const arrangement={state:'complete',operationId:'test',version:0,inputVersion:1,city:draft,roomItems,recommendRoads:true,originalRoads:{walks:[]},preview:{issues:[]}};
+ let fail=true;
+ globalThis.fetch=async(_url,opts)=>{
+  const input=JSON.parse(opts.body);assert.equal(input.action,'selectItems');assert.deepEqual(input.excludedItems,['home:i1']);
+  return fail?Response.json({error:'選擇未保存'},{status:409}):Response.json({arrangement:{...arrangement,roomItems:{...roomItems,excludedItems:input.excludedItems}},operationScope:'a'});
+ };
+ const button=name=>[...document.querySelectorAll('button')].find(node=>node.textContent===name);
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:'d',city:live,arrangement,cards:[],scenes,onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}})));
+  await settle(()=>button('採納所選物品（1 件）'));
+  const room=[...document.querySelectorAll('summary')].find(el=>el.textContent.includes('home・玄關'));
+  assert.match(room.textContent,/沿用 1 件，本輪新增 1 件，選取 1 件/);
+  const check=[...room.parentElement.querySelectorAll('label')].find(el=>el.textContent==='椅子').querySelector('input');
+  await React.act(async()=>check.click());await settle(()=>button('重試保存物品選擇'));
+  assert.equal(check.checked,false);assert.equal(button('請 AI 補路').disabled,true);assert.equal(button('明示請AI另整理一份建議').disabled,true);
+  fail=false;await click('重試保存物品選擇');await settle(()=>!button('重試保存物品選擇'));
+  assert.equal(check.checked,false);assert.equal(button('請 AI 補路').disabled,false);assert.equal(button('明示請AI另整理一份建議').disabled,false);
+  for(const [receipt,expected] of [[{adoptedItemKeys:[]},'已採納所選物品（0 件）'],[{},'已採納所選物品']]){
+   const applied={...arrangement,receipts:{items:'saved'},roomItems:{...roomItems,...receipt}};
+   await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:'d',city:live,arrangement:applied,cards:[],scenes,onPrepare:async()=>({version:2}),onReply:()=>{},onBusy:()=>{}})));
+   assert.equal(document.querySelector('[aria-label="逐房物品建議"] [role="status"]').textContent,expected);
+  }
+ }finally{globalThis.fetch=original;await React.act(async()=>root.unmount());await close();}
+});
