@@ -1,4 +1,4 @@
-import {latestArrangement,actionableArrangement,readArrangement,type ArrangementRow} from './opening-arrangement-store';
+import {latestArrangement,actionableArrangement,readArrangement,arrangementHasReceipt,type ArrangementResult,type ArrangementRow} from './opening-arrangement-store';
 import { saveUuidPattern } from './save-identities';
 import { z } from 'zod';
 import { database } from './store';
@@ -61,7 +61,7 @@ export async function saveOpeningDraft(owner:string,input:z.infer<typeof opening
  return readOpeningDraft(owner,input.id);
 }
 /** The draft CAS and its adoption receipt commit or roll back together. */
-export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer<typeof openingInputSchema>,{body:unknown}>,proposal:ArrangementRow,adoption:string){
+export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer<typeof openingInputSchema>,{body:unknown}>,proposal:ArrangementRow,adoption:string,partialResult?:ArrangementResult){
  if(input.operationScope!==owner||proposal.owner!==owner||proposal.draft_id!==input.id||proposal.state!=='complete'||!proposal.result)throw new SaveAccessError('原整理操作已變更，請保留輸入並核對。',409);
  const previous=await rowFor(owner,input.id);
  if(!previous||previous.finalized_save_id)throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留。',409);
@@ -69,7 +69,7 @@ export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer
   const completed=await readArrangement(owner,input.id,proposal.operation_id);
   // Only the committed receipt for this exact operation can explain a raced
   // version; matching city text or a later version is never proof of adoption.
-  if(completed?.state==='adopted'&&completed.adoption_request===adoption)return readOpeningDraft(owner,input.id);
+  if(completed&&arrangementHasReceipt(completed,adoption))return readOpeningDraft(owner,input.id);
   throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留。',409);
  }
  const {body,sources,candidate}=await prepareOpeningWrite(owner,input,previous),db=database();
@@ -78,13 +78,14 @@ export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer
  // that happens to contain the same city at the next draft version.
  const eligible="owner=? AND draft_id=? AND operation_id=? AND revision=? AND state='complete' AND result=? AND snapshot=? AND request=? AND adoption_request IS NULL AND rowid=(SELECT rowid FROM opening_arrangements latest WHERE latest.owner=? AND latest.draft_id=? AND latest.state IN ('pending','complete','adopted') ORDER BY rowid DESC LIMIT 1)";
  const bindings=[owner,input.id,proposal.operation_id,proposal.revision,proposal.result,proposal.snapshot,proposal.request,owner,input.id];
+ const receiptUpdate = partialResult ? "result=?,revision=revision+1" : "state='adopted',adoption_request=?";
  const noPending="NOT EXISTS (SELECT 1 FROM opening_arrangements pending WHERE pending.owner=? AND pending.draft_id=? AND pending.state='pending')";
  await db.batch([
   db.prepare(`UPDATE opening_drafts SET version=version+1,body=?,sources=?,candidate=?,last_request=? WHERE owner=? AND id=? AND version=? AND finalized_save_id IS NULL AND ${noPending} AND EXISTS (SELECT 1 FROM opening_arrangements WHERE ${eligible})`).bind(JSON.stringify(body),JSON.stringify(sources),JSON.stringify(candidate),adoption,owner,input.id,input.version,owner,input.id,...bindings),
-  db.prepare(`UPDATE opening_arrangements SET state='adopted',adoption_request=? WHERE ${eligible} AND ${noPending} AND EXISTS (SELECT 1 FROM opening_drafts d WHERE d.owner=? AND d.id=? AND d.version=? AND d.last_request=? AND d.finalized_save_id IS NULL)`).bind(adoption,...bindings,owner,input.id,owner,input.id,input.version+1,adoption),
+  db.prepare(`UPDATE opening_arrangements SET ${receiptUpdate} WHERE ${eligible} AND ${noPending} AND EXISTS (SELECT 1 FROM opening_drafts d WHERE d.owner=? AND d.id=? AND d.version=? AND d.last_request=? AND d.finalized_save_id IS NULL)`).bind(partialResult?JSON.stringify(partialResult):adoption,...bindings,owner,input.id,owner,input.id,input.version+1,adoption),
  ]);
  const receipt=await readArrangement(owner,input.id,proposal.operation_id);
- if(receipt?.state!=='adopted'||receipt.adoption_request!==adoption)throw new SaveAccessError('未同步：開局或建議版本已變更，原輸入已保留，請重新核對。',409);
+ if(!receipt||!arrangementHasReceipt(receipt,adoption))throw new SaveAccessError('未同步：開局或建議版本已變更，原輸入已保留，請重新核對。',409);
  return readOpeningDraft(owner,input.id);
 }
 export const confirmOpeningSchema=z.object({operationScope,id:identity,draftId:identity,draftVersion:z.number().int().positive()}).strict();

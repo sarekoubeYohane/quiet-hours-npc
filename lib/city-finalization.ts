@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {walkPairKey,validOpeningWalks} from './opening-road-network';
 import { assertBoundedState } from './adjudication-contract';
 import { cityLimits, type CityDraft, type CityPreview } from './city-draft';
 
@@ -30,7 +31,7 @@ export const cityFinalizationSchema = z.object({
   walks:z.array(cityWalkSchema).max(28),
 }).strict();
 
-export const pairKey = (ids: [string,string]) => [...ids].sort().join(':');
+export const pairKey = walkPairKey;
 export const spaceNameKey = (name: string) => name.trim().normalize('NFKC').toLowerCase();
 
 export function applyCitySpace(draft: CityDraft, base: CityPreview['places'][number], issues: string[]) {
@@ -74,12 +75,5 @@ export function cityWalksForPreview(draft: CityDraft, preview: CityPreview) {
   if (new Set(spaceIds).size!==spaceIds.length || spaceIds.some(id=>!placeIds.has(id))) {
     preview.issues.push('定稿需對應本次城市中各個不同的已選場所。');
   }
-  const keys = new Set<string>();
-  return (draft.finalization?.walks ?? []).filter(walk=>{
-    const key = pairKey(walk.places);
-    const valid = walk.places[0]!==walk.places[1] && walk.places.every(id=>placeIds.has(id)) && !keys.has(key);
-    if (!valid) preview.issues.push('城市道路需要不同的已選場所，且不能重複。');
-    keys.add(key);
-    return valid;
-  });
+  return validOpeningWalks(draft.finalization?.walks ?? [], placeIds, preview.issues);
 }
