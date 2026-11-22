@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {Window} from 'happy-dom';
 const require=createRequire(import.meta.url);
 const window=new Window({url:'http://localhost/new'});
-for(const name of ['window','document','navigator','HTMLElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
+for(const name of ['window','document','navigator','HTMLElement','HTMLInputElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {createRoot}=await import('react-dom/client');
 const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));
@@ -169,6 +169,24 @@ test('首次設定只需查一個服務，離開查詢失敗的服務後保存�
     assert.deepEqual(calls.filter(call=>call.operation==='set-model-key').map(call=>call.mode),['anthropic']);
   }finally{await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort();}
 });
+test('scene groups take the player directly to the missing starting room',async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(),scene={id:'house',version:1,name:'住宅',rooms:[{id:'lobby',name:'客廳'},{id:'entry',name:'玄關'}],objects:[],connections:[]};
+ const card={id:'card-example-cass',version:1,fields:{name:'Cass'},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50};
+ const draft={id,version:1,body:{name:'回到玄關',description:'',step:3,city:{places:[{id:'home',templateId:scene.id,version:1,name:'住宅'}],characters:[{templateId:card.id,version:1,placeId:'home',roomId:''}]}},sources:{cards:[card],scenes:[scene]}};
+ const originalFetch=globalThis.fetch,root=createRoot(document.body.appendChild(document.createElement('div')));
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:'account-operations:a',cards:[card]}:String(url).includes('scene-templates')?{accountScope:'account-operations:a',templates:[scene]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a'});
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('[name="opening-name"]'));
+  await click('場所與道路');await click('帶我去填');
+  await settle(()=>document.activeElement?.getAttribute('aria-label')==='Cass起始房間');
+  await click('人物關係');await click('新增背景人物');
+  await change(document.querySelector('input[aria-label="背景人物名稱"]'),'阿岑');
+  await click('從阿岑建立關係');
+  assert.equal(document.querySelector('[aria-label="關係 1 對象"]').selectedOptions[0].textContent,'阿岑');
+ }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
 
 test('the AI road option follows the number of places and its preview names each disconnected group', async()=>{
  const {Component,close}=await component('components/opening-arrangement-panel.tsx');
@@ -197,4 +215,133 @@ test('the AI road option follows the number of places and its preview names each
   assert.equal(adopt().disabled,false);
   assert.equal(repair(),undefined);
  }finally{await React.act(async()=>root.unmount());await close();}
+});
+
+test('players inspect cards and compare the same tab without changing the party', async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(), scope='account-operations:a';
+ const cards=['Cass','Vera','阿岑'].map((name,i)=>({id:['card-example-cass','card-example-vera','card-custom'][i],version:1,fields:{name},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50,needTraits:{hunger:1,thirst:1,sleep:1}}));
+ const draft={id,version:1,body:{name:'我的草稿',description:'',step:1,city:{characters:[],places:[]}},sources:{cards:[],scenes:[]}};
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:scope,cards}:String(url).includes('scene-templates')?{accountScope:scope,templates:[]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a',drafts:[]});
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ try {
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('input[type=checkbox]'));
+  await click('查看 Cass 詳情');
+  assert.equal(document.querySelectorAll('[role=meter][aria-valuemax="18"]').length,5);
+  assert.ok(document.querySelector('img[alt="Cass 的人物圖"]'));
+  assert.equal(document.querySelectorAll('input:checked').length,0);
+  await click('身體需求');
+  await click('查看 Vera 詳情');
+  assert.ok(document.querySelector('[role=meter][aria-label="Vera 飢餓"]'));
+  await React.act(async()=>document.querySelector('input[aria-label="加入 Vera"]').click());
+  assert.equal(document.querySelectorAll('input:checked').length,1);
+  assert.equal(document.querySelector('input[aria-label="加入 阿岑"]').checked,false);
+ } finally {await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
+
+test('room list counts the current room and adding both objects focuses their names in that room', async () => {
+  const {Component, close} = await component('components/opening-wizard.tsx');
+  const id = crypto.randomUUID();
+  const scene = {id:'home', version:1, name:'住宅', rooms:[{id:'living', name:'客廳'}, {id:'bedroom', name:'臥室'}], objects:[], connections:[]};
+  let draft = {id, version:1, sources:{cards:[], scenes:[scene]}, body:{name:'測試世界', step:3, description:'', city:{
+    places:[{id:'place-1', templateId:'home', version:1, name:'住宅'}], characters:[]
+  }}};
+  let delaySave;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('scene-templates')) return Response.json({accountScope:'account-operations:a', templates:[scene]});
+    if (String(url).includes('character-cards')) return Response.json({accountScope:'account-operations:a', cards:[]});
+    if (init?.method === 'POST' && delaySave) return delaySave();
+    if (init?.method === 'POST') draft = {...draft, version:draft.version + 1, body:JSON.parse(init.body).body};
+    return Response.json({operationScope:'a', draft, preview:{issues:[]}});
+  };
+  let root;
+  async function openDraft() {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await React.act(async () => root.render(React.createElement(Component, {owner:'a', draftId:id})));
+    await settle(() => document.querySelector('[name="opening-name"]'));
+    const group = [...document.querySelectorAll('button')].find(button => button.textContent === '場所與道路');
+    if (group) await React.act(async () => group.click());
+  }
+  try {
+    await openDraft();
+    await click('在 住宅 新增房間');
+    const name = document.activeElement;
+    assert.equal(name?.getAttribute('aria-label'), '房間名稱');
+    await change(name, '玄關');
+    for (const item of ['鞋櫃', '雨傘架']) {
+      await click('＋新增物件');
+      const field = document.activeElement;
+      assert.equal(field?.getAttribute('aria-label'), '物件名稱');
+      await change(field, item);
+    }
+    assert.ok([...document.querySelectorAll('button')].some(button => button.textContent === '玄關（2 件物件）'));
+    await click('臥室（0 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]'), null);
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['鞋櫃', '雨傘架']);
+
+    await click('連接房間');
+    const otherRoom = document.querySelector('select[aria-label="門的另一端"]');
+    assert.equal(otherRoom.selectedOptions[0].textContent, '客廳');
+    await change(document.querySelector('input[aria-label="門名稱"]'), '玄關門');
+    await change(document.querySelector('select[aria-label="門狀態"]'), 'blocked');
+    await click('客廳（0 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+    await click('玄關（2 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+
+    let releaseSave;
+    delaySave = () => new Promise(resolve => { releaseSave = resolve; });
+    await change(document.querySelector('input[aria-label="物件名稱"]'), '玄關鞋櫃');
+    await click('臥室（0 件物件）');
+    await settle(() => document.querySelector('.opening-status').textContent === '保存中');
+    await React.act(async () => releaseSave(Response.json({error:'保存暫時失敗'}, {status:503})));
+    await settle(() => document.querySelector('.opening-status').textContent === '未同步');
+    await click('玄關（2 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]').value, '玄關鞋櫃');
+    delaySave = undefined;
+    await click('恢復草稿保存');
+    await settle(() => document.querySelector('.opening-status').textContent === '已保存至帳號');
+    await React.act(async () => root.unmount());
+    await openDraft();
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['玄關鞋櫃', '雨傘架']);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+    await click('客廳（0 件物件）');
+    assert.equal(document.querySelectorAll('input[aria-label="門名稱"]').length, 1);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+
+  } finally {
+    await React.act(async () => root.unmount());
+    globalThis.fetch = originalFetch;
+    await close();
+    await window.happyDOM.abort();
+  }
+});
+
+test('預覽逐房配置時按件勾選會立即更新房間與採納數量',async()=>{
+ const {Component,close}=await component('components/opening-room-item-suggestions.tsx');
+ const rooms=['前台','玄關','廚房','臥室','客廳','書房','儲藏室'];
+ const rows=rooms.map((name,i)=>({placeId:'home',placeName:'住宅',roomId:'r'+i,roomName:name,checked:i!==6,
+  existing:i===1?[{id:'cabinet',name:'鞋櫃'}]:[],suggestedIds:Array.from({length:[7,0,7,6,6,6,0][i]},(_,j)=>i+'-'+j)}));
+ const city={finalization:{spaces:[{placeId:'home',objects:rows.flatMap(room=>room.suggestedIds.map(id=>({id,roomId:room.roomId,name:id==='0-0'?'客用桌椅':id,state:{}})))}]}};
+ const requests=[],root=createRoot(document.body.appendChild(document.createElement('div')));
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{city,review:{rooms:rows,excludedItems:[]},adopted:false,disabled:false,onSubmit:async(action,excluded)=>{requests.push({action,excluded});return true;}})));
+  assert.ok(document.body.textContent.includes('玄關｜沿用 1 件，已齊備，新增 0 件'));
+  assert.ok(document.body.textContent.includes('儲藏室｜沿用 0 件，尚未核對'));
+  const front=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary').textContent.includes('前台'));
+  assert.equal(front.open,false);front.open=true;
+  const box=[...front.querySelectorAll('label')].find(node=>node.textContent==='客用桌椅').querySelector('input');
+  assert.equal(box.checked,true);
+  await React.act(async()=>box.click());
+  assert.ok(front.querySelector('summary').textContent.includes('本輪新增 7 件，選取 6 件'));
+  assert.ok(document.body.textContent.includes('採納所選物品（31 件）'));
+  assert.deepEqual(requests.at(-1),{action:'selectItems',excluded:['home:0-0']});
+  await React.act(async()=>box.click());
+  assert.ok(document.body.textContent.includes('採納所選物品（32 件）'));
+ }finally{await React.act(async()=>root.unmount());await close();await window.happyDOM.abort();}
 });

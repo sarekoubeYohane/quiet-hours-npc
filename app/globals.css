@@ -194,6 +194,7 @@
 .opening-wizard button.opening-primary:disabled { background: var(--secondary); color: var(--muted-foreground); opacity: 1; }
 .opening-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .opening-option, .opening-empty { padding: 14px; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); }
+.opening-portrait { width: 4rem; height: 4rem; object-fit: cover; border-radius: var(--radius); }
 .opening-option:has(input:checked) { border-color: var(--primary); }
 .opening-option > label { flex-direction: row; align-items: center; color: var(--foreground); font-weight: 600; margin: 0; }
 .opening-option input[type="checkbox"] { width: auto; accent-color: var(--primary); }
@@ -493,3 +494,10 @@ label:has(>input[type=checkbox]),.check-label{flex-direction:row;align-items:cen
 .draft-list button[data-note]{font-weight:600}
 .draft-list button[data-note]::after{content:attr(data-note);font-size:.75rem;font-weight:400;color:var(--muted-foreground)}
 .analysis-needs .meter-mental{margin:10px 0 12px}
+.opening-room-editor,
+.opening-room-editor > section { display: grid; gap: 12px; min-width: 0; }
+.opening-room-editor .opening-actions { align-items: end; }
+.opening-room-editor nav button[aria-pressed="true"] { border-color: var(--primary); font-weight: 700; }
+.opening-room-editor section > button { justify-self: start; }
+.opening-room-editor fieldset { min-width: 0; }
+.opening-room-editor select { max-width: 100%; }

@@ -75,8 +75,9 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
+| 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
 | 開局起點的來源與採納 | `lib/opening-starts.ts` 按人物及場所實例保留玩家選定的場所、房間；`lib/opening-authoring.ts` 標記自動預填。 |
-| 開局精靈介面 | `components/opening-wizard.tsx` |
+| 開局精靈介面 | `components/opening-wizard.tsx`；按場所、房間編輯本局物件與門在 `components/opening-room-editor.tsx` |
 | 樣式 | `app/globals.css`，以手寫語意 class 為主（`.panel`、`.opening-*`、`.analysis-*`） |
 | 新增資料表或欄位 | `db/schema.ts`、`drizzle/`，並依 [docs/testing.md](docs/testing.md) 手動登記到測試 |
 
@@ -250,6 +251,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `opening-drafts.ts` | 開局草稿的版本化儲存與 `confirmOpening` |
 | `opening-arrangement-model.ts` | 依玩家勾選的工作整理 AI 開局建議 |
 | `opening-road-repair.ts` | 只向模型傳入當前路網與缺口，接回可編輯的補路建議 |
+| `opening-room-items.ts`、`components/opening-room-item-suggestions.tsx` | 依場所實例及房間核對既有物品、勾選本輪新增物品並單獨採納 |
 | `opening-road-network.ts`、`components/opening-roads.tsx` | 開局步行路段、隔離與分段連通檢查，以及手動／預覽的道路編輯 |
 | `opening-relationship-generation.ts` | 用模型從開局描述抽出住處、工作、關係 |
 | `opening-authoring.ts` | 瀏覽器端 helper：自動預填、把成品帶回開局草稿 |

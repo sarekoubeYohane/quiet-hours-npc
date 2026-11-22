@@ -329,8 +329,8 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(proposal.city,service,options));
             await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
           }else{
-            const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,requested));
-            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+            const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,requested));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,result.city,{roomItems:result.roomItems}));
           }
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
