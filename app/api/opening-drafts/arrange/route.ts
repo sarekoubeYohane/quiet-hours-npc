@@ -12,7 +12,7 @@ import {saveUuidPattern} from '@/lib/save-identities';
 export const dynamic='force-dynamic';
 const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const common={operationScope:z.string().min(1).max(128),id:z.string().regex(saveUuidPattern),version:z.number().int().nonnegative(),operationId:z.string().regex(/^\d{13}:[0-9a-f-]{36}$/)};
-const inputSchema=z.union([z.object({...common,worldContext:z.string().optional(),supplyRooms:z.boolean().optional(),recommendRoads:z.boolean().optional()}).strict(),z.object({...common,action:z.enum(['adopt','adoptRoads','edit']),proposalVersion:z.number().int().nonnegative(),city:cityDraftSchema}).strict(),
+const inputSchema=z.union([z.object({...common,worldContext:z.string().optional(),supplyRooms:z.boolean().optional(),recommendRoads:z.boolean().optional(),repairOf:z.object({operationId:common.operationId,version:common.version}).strict().optional()}).strict(),z.object({...common,action:z.enum(['adopt','adoptRoads','edit']),proposalVersion:z.number().int().nonnegative(),city:cityDraftSchema}).strict(),
  z.object({...common,action:z.enum(['selectItems','adoptItems']),proposalVersion:z.number().int().nonnegative(),excludedItems:z.array(z.string().max(100)).max(640)}).strict()]);
 export async function POST(request:Request){
  const origin=new URL(request.url).origin;if(request.headers.get('origin')!==origin)return reply({error:'請從開局流程操作。'},403);
@@ -75,7 +75,17 @@ export async function POST(request:Request){
   else{
    if(loaded.draft.version!==input.version||!input.worldContext)return reply({error:'草稿版本已變更或缺少原操作來源，請先核對。'},409);
    if(!loaded.draft.body.city.characters.length||!loaded.draft.body.city.places.length||loaded.draft.sources.cards.length!==loaded.draft.body.city.characters.length)return reply({error:'請先選定完成人物卡與可用場景。'},400);
-   row=await reserveArrangement(owner,input,loaded.draft);
+   if(input.repairOf){
+    const prior=await readArrangement(owner,input.id,input.repairOf.operationId);
+    if(!prior||prior.state!=='complete'||prior.revision!==input.repairOf.version)return reply({error:'建議已變更，請重新核對道路。'},409);
+    const reviewed=arrangementForClient(prior);
+    if(!reviewed.city||!reviewed.recommendRoads||reviewed.receipts?.roads||openingRoadNetwork(reviewed.city).groups.length<2)return reply({error:'目前沒有待補的道路缺口。'},422);
+    const inherited={...JSON.parse(prior.request),operationId:input.operationId,version:input.version,
+      worldContext:input.worldContext,repairOf:input.repairOf,recommendRoads:true};
+    row=await reserveArrangement(owner,inherited,JSON.parse(prior.snapshot) as OpeningDraft);
+   }else{
+    row=await reserveArrangement(owner,input,loaded.draft);
+   }
   }
   const original=JSON.parse(row.request) as {worldContext:string};
   const response=await acceptHostOperation({accountId:owner,binding:accountWorkspaceBinding(owner),body:{operation:'arrange-opening',mode:'demo',target:input.id,operationId:input.operationId,operationScope:'account-operations:'+owner,worldContext:original.worldContext}});
