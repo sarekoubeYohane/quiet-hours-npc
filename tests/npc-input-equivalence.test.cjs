@@ -36,10 +36,27 @@ async function sample(variant,provider='openai'){
  }catch(error){if(!['overlimit','invalid-recall','overflow-recall'].includes(variant))throw error;return {bodies,error:error.message};}
 }
 
+// The transport now supplies the final decision schema alongside the optional
+// recall branch. Keep comparing every other historical byte, including the
+// continuation and the caller-visible result.
+function beforeRecallContract(samples) {
+ const prior=structuredClone(samples);
+ for(const [variant,sample] of Object.entries(prior)){
+  if(!variant.split(':')[0].endsWith('recall') || !sample.bodies.length)continue;
+  const message=sample.bodies[0].messages[0];
+  const boundary=message.content.indexOf('\n\n本次可直接做最終決定');
+  assert.ok(boundary>0);
+  const schema=JSON.parse(message.content.slice(boundary).split('\n').at(-1));
+  assert.ok(schema.required.includes('pursuitSelection'));
+  message.content=message.content.slice(0,boundary);
+ }
+ return JSON.parse(JSON.stringify(prior));
+}
+
 test('fixed decisions preserve the exact pre-refactor provider transcript, schema, receipts and accepted result',async()=>{
  const actual={};for(const variant of ['ordinary','escaped','cues','recall','empty-recall','overlimit'])for(const provider of ['openai','openrouter'])actual[`${variant}:${provider}`]=await sample(variant,provider);
  // Full, lossless pre-refactor output; compression only reduces repository size.
- assert.deepEqual(JSON.parse(JSON.stringify(actual)),expectedTranscripts(fixturePath));
+ assert.deepEqual(beforeRecallContract(actual),expectedTranscripts(fixturePath));
 });
 
 test('test-site dispatch uses v0.2.4 for the first decision and recall continuation, scoped to test',async()=>{
@@ -68,7 +85,8 @@ test('test-site dispatch uses v0.2.4 for the first decision and recall continuat
     delete source.self.personality;
     delete source.self.goal;
     const expected=structuredClone(legacy.bodies[index]);
-    expected.messages[0].content=text;
+    const boundary=expected.messages[0].content.indexOf('\n\n本次可直接做最終決定');
+    expected.messages[0].content=text+(boundary<0?'':expected.messages[0].content.slice(boundary));
     expected.messages[1].content=JSON.stringify(source);
     assert.deepEqual(body,expected);
    }
@@ -91,10 +109,12 @@ test('the complete preparation entry returns the final request and only its actu
  assert.equal(JSON.stringify(w),before);
 });
 
-test('recall escape pressure and invalid or mandatory-overflow outcomes preserve the exact pre-236 transcript',async()=>{
+test('recall under escape pressure preserves bounded projections, continuation and invalid or mandatory-overflow outcomes',async()=>{
  const actual={};for(const variant of ['escaped-recall','invalid-recall','overflow-recall'])for(const provider of ['openai','openrouter'])actual[`${variant}:${provider}`]=await sample(variant,provider);
- const file=path.join(__dirname,'fixtures/npc-input-before-236.json.gz');
- assert.deepEqual(JSON.parse(JSON.stringify(actual)),expectedTranscripts(file));
+ const file=path.join(__dirname,'fixtures/npc-input-recall-pressure.json.gz');
+ const expected=JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(file)));
+ assert.deepEqual(beforeRecallContract(actual),expected);
+ for(const sample of Object.values(actual))for(const body of sample.bodies)assert.ok(Buffer.byteLength(JSON.stringify(body))<164000);
 });
 
 test('recall preparation pins a newly remembered source and produces one coherent final request without writing the world',()=>{

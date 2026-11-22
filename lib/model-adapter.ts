@@ -9,7 +9,7 @@ export function isCandidateFailureReason(value: unknown): value is CandidateFail
   return candidateFailureReasons.includes(value as CandidateFailureReason);
 }
 export type ModelFailureKind = 'candidate-format' | 'candidate-validation' | 'transport' | 'timeout' | 'response-body' | 'provider-body' | 'http' | 'request-mismatch' | 'refusal' | 'output-limit' | 'sensitive-response';
-export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string;timing?:unknown}|{kind:'fetch-start';at:number}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number;at?:number;usage?:TokenUsage}|{kind:'failure';failure:ModelFailureKind;stage:string;reason?:CandidateFailureReason}|{kind:'usage';usage:TokenUsage;at?:number}|{kind:'candidate';raw:string};
+export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string;timing?:unknown}|{kind:'fetch-start';at:number}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number;at?:number;usage?:TokenUsage}|{kind:'failure';failure:ModelFailureKind;stage:string;reason?:CandidateFailureReason;detail?:string}|{kind:'usage';usage:TokenUsage;at?:number}|{kind:'candidate';raw:string};
 export type ModelObserver = (event:ModelObservation)=>void|Promise<void>;
 export type ModelService = { key: string; model: string; provider: ModelProvider };
 export type ModelMessage = { role: string; content: string };

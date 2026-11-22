@@ -124,6 +124,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `activity-lifecycle.ts` | 單一角色計畫的開始、推進、取消、旅程、睡醒 |
 | `paused-activities.ts` | 暫停、復工、放棄 |
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
+| `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
 | `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter）與 observer 事件 |
 | `model-providers.ts`、`provider-api.ts` | 模型服務名稱、執行模式對應與供應商端點。模型設定透過同源 POST 傳入帳號範圍，以新輸入或已保存的 Key 即時讀取各服務清單。只回傳模型 ID 與名稱。 |
 | `direct-models.ts` | 保留既有 OpenAI 模型的嚴格輸出與推理參數 |

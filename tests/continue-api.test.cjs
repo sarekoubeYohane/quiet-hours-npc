@@ -147,7 +147,7 @@ test('OpenRouter continuation eligibility uses its own provider/model and reject
     return Response.json({ choices: [{ message: { content: JSON.stringify(fixturePursuitDecision(JSON.parse(JSON.parse(init.body).messages[1].content),action('continue'))) } }] });
   };
   assert.equal((await aiDecision(world, cass, 'unit-test-key', 'fixture/model', 'openrouter', fetcher)).continueExisting, true);
-  await assert.rejects(aiDecision(world, cass, 'unit-test-key', 'fixture/other', 'openrouter', fetcher), /有效的意圖與行動格式/);
+  await assert.rejects(aiDecision(world, cass, 'unit-test-key', 'fixture/other', 'openrouter', fetcher), /action\.type.*收到 "continue".*預期/);
   assert.equal(calls, 2);
 });
 

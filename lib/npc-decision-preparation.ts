@@ -26,6 +26,7 @@ type PreparationOptions=Pick<ModelService,'model'|'provider'> & {
 // provider wrapper. No receipt or world state is committed here.
 export function prepareNpcDecision(w:World,c:Character,options:PreparationOptions){
  const {messages,allowedTypes}=options;
+ let outgoingMessages=messages;
  const input=options.continuation?.input??normalDecisionInput(w,c,options.modelKey);
  const draft=testSiteNpcPrompt();
  const recalled=options.continuation?.recalled||[];
@@ -41,7 +42,28 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   }else{
    messages[1].content=JSON.stringify(input);
   }
-  return new TextEncoder().encode(modelRequestBody(options,messages,schema,{allowRecall:options.allowRecall})).length<164000;
+  let systemPrompt=messages[0].content;
+  if(options.allowRecall){
+   const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
+   const contract = [
+    '本次可直接做最終決定，也可只回傳 {"type":"recall","questions":["想回想的事"]}。回想限一次，問題一至兩題，每題非空且最多 256 UTF-8 bytes。',
+    '最終決定請依下列 JSON Schema 填寫。頂層省略 type，動作種類只填在 action.type。列舉值用英文，敘述寫繁體中文。',
+    ...(feelings.length ? [feelings.join('、')+' 的 neutral 配 level 0，positive、negative 配非零等級。reason 為非空字串，最多 256 UTF-8 bytes。'] : []),
+    'pursuitSelection.reason 可填空字串。沒有適用的方法變更時，methodAssessment.change 可填 {"kind":"not-applicable","detail":""}。timeIntent.maxMinutes 無上限填 null。活動估時與每回合推進分鐘數分開。',
+    JSON.stringify(schema),
+   ].join('\n');
+   systemPrompt+='\n\n'+contract;
+  }
+  if(options.provider==='deepseek'){
+   const identity=JSON.stringify({contractVersion:input.contractVersion,pursuitContext:input.pursuitContext});
+   systemPrompt+='\n\n最終行動回覆請先逐字複製以下固定欄位和值，再於同一個 JSON 物件內填完本次決策：\n'+identity;
+   systemPrompt+='\n提交前逐一核對頂層必填欄位：'+schema.required.join('、')+'。';
+   if(Object.hasOwn(schema.properties,'processFeeling')){
+    systemPrompt+=' processFeeling 可為 null；有活動感受時，物件只含 direction、level、reason 三欄。';
+   }
+  }
+  if(systemPrompt!==messages[0].content)outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
+  return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};
  const context:NpcDecisionContext={visible,feelingSources:c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):[],phoneReferences:input.phones,knownPeople:knownPeopleForDecision(visible,input.contacts.map(p=>p.id)),memoryReview:input.self.memoryReview,historyCandidates:input.self.cognition.historyCandidates||[]};
@@ -60,5 +82,5 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   messages[1].content=JSON.stringify(input);
   return {input,recalled:handles};
  };
- return {input,schema,messages,context,prepareRecall,arrangementCueReceipts:arrangementCueReceipts(w,c,input),phoneNotificationReceipts:input.self.noticeOpportunities.map(n=>n.id)};
+ return {input,schema,messages:outgoingMessages,context,prepareRecall,arrangementCueReceipts:arrangementCueReceipts(w,c,input),phoneNotificationReceipts:input.self.noticeOpportunities.map(n=>n.id)};
 }
