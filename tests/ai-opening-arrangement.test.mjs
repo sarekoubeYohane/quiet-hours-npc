@@ -348,7 +348,7 @@ test('three starts keep their separate origins across fixed AI suggestions, adop
   };
   const expected=[['east','bedroom'],['west','bedroom'],['east','living']];
   assert.deepEqual(await arrange(actors),[expected,expected]);
-  const legacy=actors.map(({placeOrigin,roomOrigin,...actor})=>({...actor,roomId:'living'}));
+  const legacy=actors.map(({templateId,version,placeId})=>({templateId,version,placeId,roomId:'living'}));
   const oldStarts=[['west','living'],['west','living'],['east','living']];
   assert.deepEqual(await arrange(legacy),[oldStarts,oldStarts]);
  }finally{await app.close();}
