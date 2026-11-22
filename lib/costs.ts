@@ -1,7 +1,8 @@
+import { isModelProvider, type ModelProvider } from './model-providers';
 import type { AIUsage, World } from './world';
 import type { TokenUsage } from './activities';
 
-export type ModelPrice = { id: string; provider: 'openai' | 'openrouter'; model: string; input: number; output: number; cachedInput?: number; source: string; date: string; custom: true; savedAt: number };
+export type ModelPrice = { id: string; provider: ModelProvider; model: string; input: number; output: number; cachedInput?: number; source: string; date: string; custom: true; savedAt: number };
 export type PriceInput = Omit<ModelPrice, 'id' | 'custom' | 'savedAt'>;
 export type CostCohort = { task?:'npc'|'adjudication'|'feelings'; provider: string; model: string; price: ModelPrice | null; calls: number; input: number; output: number; cachedInput: number; knownUsd: number; unknownCalls: number; lastDispatchAt: number };
 export type CostLedger = { total: Record<string, CostCohort>; hour: Record<string, CostCohort> };
@@ -10,7 +11,7 @@ export function validPrice(value: unknown): value is PriceInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const p = value as PriceInput;
   const amount = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
-  return ['openai', 'openrouter'].includes(p.provider) && typeof p.model === 'string' && p.model.trim().length > 0 && p.model.length <= 200 && amount(p.input) && amount(p.output) && (p.cachedInput === undefined || amount(p.cachedInput)) && typeof p.source === 'string' && p.source.trim().length > 0 && p.source.length <= 200 && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(Date.parse(`${p.date}T00:00:00Z`)) && new Date(`${p.date}T00:00:00Z`).toISOString().slice(0,10) === p.date;
+  return isModelProvider(p.provider) && typeof p.model === 'string' && p.model.trim().length > 0 && p.model.length <= 200 && amount(p.input) && amount(p.output) && (p.cachedInput === undefined || amount(p.cachedInput)) && typeof p.source === 'string' && p.source.trim().length > 0 && p.source.length <= 200 && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(Date.parse(`${p.date}T00:00:00Z`)) && new Date(`${p.date}T00:00:00Z`).toISOString().slice(0,10) === p.date;
 }
 export function savePrice(world: World, input: PriceInput) {
   const price: ModelPrice = { provider: input.provider, model: input.model.trim(), input: input.input, output: input.output, ...(input.cachedInput === undefined ? {} : {cachedInput:input.cachedInput}), source: input.source.trim(), date:input.date, id:crypto.randomUUID(),custom:true,savedAt:Date.now() };

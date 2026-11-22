@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {Window} from 'happy-dom';
 const require=createRequire(import.meta.url);
 const window=new Window({url:'http://localhost/new'});
-for(const name of ['window','document','navigator','HTMLElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
+for(const name of ['window','document','navigator','HTMLElement','HTMLInputElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {createRoot}=await import('react-dom/client');
 const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));
@@ -46,6 +46,7 @@ test('model setup saves models and key together; only the explicit continuation 
  globalThis.fetch=async(url,options)=>{
   if(!options?.method)return Response.json(view);
   const body=JSON.parse(options.body);calls.push({url,body});
+  if(body.operation==='list-models')return Response.json({accountScope:view.accountScope,models:Object.values(models).map(({model})=>({id:model,name:model}))});
   if(String(url).includes('model-settings')){assert.equal(body.version,view.version);view={...view,version:view.version+1,effective:body.models,source:'account'};return Response.json(view);}
   if(failKey){failKey=false;return Response.json({error:'controlled key failure'},{status:503});}
   view={...view,modelKeys:{...view.modelKeys,openai:{configured:true,expiresAt:Date.now()+100000}}};
@@ -56,12 +57,13 @@ test('model setup saves models and key together; only the explicit continuation 
   await React.act(async()=>root.render(React.createElement(Component,{originalAccountScope:'account-operations:a',continuation:{label:'保存並繼續這次操作',run:async()=>{resumed++;}}})));
   await settle(()=>document.querySelector('[aria-label="OpenAI 服務 API Key"]'));
   await change(document.querySelector('[aria-label="OpenAI 服務 API Key"]'),'fake-local-key');
+  await click('讀取模型');await settle(()=>document.body.textContent.includes('已取得 2 個模型'));
   await click('保存並繼續這次操作');await settle(()=>document.body.textContent.includes('controlled key failure'));
   assert.equal(resumed,0);assert.equal(document.querySelector('[aria-label="OpenAI 服務 API Key"]').value,'fake-local-key');
   await click('保存模型與 Key');await settle(()=>document.body.textContent.includes('模型與已填的 Key 已保存'));
   assert.equal(resumed,0);assert.equal(document.querySelector('[aria-label="OpenAI 服務 API Key"]').value,'');
   await click('保存並繼續這次操作');await settle(()=>resumed===1);
-  assert.deepEqual(calls.map(value=>value.body.operation).filter(Boolean),['set-model-key','set-model-key']);
+  assert.deepEqual(calls.map(value=>value.body.operation).filter(Boolean),['list-models','set-model-key','set-model-key']);
   assert.ok(calls.every(value=>value.body.accountScope==='account-operations:a'||value.body.operationScope==='account-operations:a'));
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
 });
@@ -102,4 +104,396 @@ test('rereading a committed reroll unlocks allocation in the same mounted editor
   const complete=[...document.querySelectorAll('button')].find(value=>value.textContent==='保存為完成人物卡');assert.equal(complete.disabled,false);assert.equal(writes,1);
   assert.equal(sessionStorage.getItem('quiet-hours:character-reroll:'+draft.accountScope+':'+draft.id),null);
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=old;await close();await window.happyDOM.abort();}
+});
+test('模型選單使用查到的 ID，兩個角色可共用一份清單並獨立選擇', async () => {
+  const { Component, close } = await component('components/model-settings-panel.tsx');
+  const original = globalThis.fetch;
+  const choice = { provider: 'deepseek', model: 'previous-model' };
+  const effective = { npc: choice, adjudication: choice };
+  const settings = { accountScope:'account-operations:a', preference:{mode:'custom',models:effective}, version:1, effective, accountModels:effective,
+    modelKeyStorageAvailable:true, source:'account', modelKeys:{deepseek:{configured:true,expiresAt:Date.now()+60000}} };
+  const requests=[];
+  globalThis.fetch = async (_url, init) => {
+    if (!init?.body) return Response.json(settings);
+    const body=JSON.parse(init.body); requests.push(body);
+    return Response.json(body.operation === 'list-models' ? {accountScope:settings.accountScope,models:[{id:'listed-by-key',name:'帳號可用模型'},{id:'previous-model',name:'舊模型'}]} : settings);
+  };
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  const field=label=>document.querySelector('select[aria-label="'+label+'"]');
+  try {
+    await React.act(async()=>root.render(React.createElement(Component)));
+    await settle(()=>document.querySelector('[aria-label="NPC 模型"]'));
+    assert.ok(field('NPC 模型'), 'NPC 模型應為選單');
+    const button=[...document.querySelectorAll('button')].find(item=>item.textContent.includes('讀取模型'));
+    await React.act(async()=>button.click());
+    await settle(()=>[...field('NPC 模型').options].some(item=>item.value==='listed-by-key'));
+    await React.act(async()=>{field('NPC 模型').value='listed-by-key';field('NPC 模型').dispatchEvent(new window.Event('change',{bubbles:true}));});
+    assert.equal(field('天上意志模型').value, 'previous-model');
+    await React.act(async()=>[...document.querySelectorAll('button')].find(item=>item.textContent==='保存模型與 Key').click());
+    assert.deepEqual(requests.at(-1).models, {npc:{provider:'deepseek',model:'listed-by-key'},adjudication:choice});
+    assert.equal(requests.filter(r=>r.operation==='list-models').length, 1);
+  } finally { await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort(); }
+});
+test('首次設定只需查一個服務，離開查詢失敗的服務後保存不會替換它的 Key', async () => {
+  const {Component, close}=await component('components/model-settings-panel.tsx');
+  const original=globalThis.fetch, calls=[];
+  const settings={accountScope:'account-operations:a',version:0,preference:{mode:'inherit'},effective:{},accountModels:{},source:'missing',modelKeys:{},modelKeyStorageAvailable:true};
+  globalThis.fetch=async(_url,init)=>{
+    if(!init?.body)return Response.json(settings);
+    const body=JSON.parse(init.body);calls.push(body);
+    if(body.operation==='list-models')return body.provider==='deepseek'
+      ? Response.json({error:'Key 驗證失敗'},{status:403})
+      : Response.json({accountScope:settings.accountScope,models:[{id:'claude-from-account',name:'Claude'}]});
+    if(body.operation==='set-model-key')return Response.json({operationScope:settings.accountScope,modelKeys:settings.modelKeys,modelKeyStorageAvailable:true});
+    return Response.json({...settings,version:1,effective:body.models});
+  };
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  const select=async(label,value)=>React.act(async()=>{
+    const field=document.querySelector('select[aria-label="'+label+'"]');field.value=value;field.dispatchEvent(new window.Event('change',{bubbles:true}));
+  });
+  const list=async(provider)=>{
+    const field=document.querySelector('input[aria-label="'+provider+' 服務 API Key"]');
+    await change(field,'test-'+provider.replaceAll(' ','-'));
+    await React.act(async()=>field.closest('fieldset').querySelector('button').click());
+  };
+  try{
+    await React.act(async()=>root.render(React.createElement(Component)));
+    await settle(()=>document.querySelector('select[aria-label="天上意志服務"]'));
+    await select('天上意志服務','deepseek');await list('DeepSeek');
+    await settle(()=>document.body.textContent.includes('Key 驗證失敗'));
+    await select('天上意志服務','anthropic');await list('Anthropic Claude');
+    await settle(()=>document.body.textContent.includes('已取得 1 個模型'));
+    await select('天上意志模型','claude-from-account');
+    assert.equal(document.querySelector('select[aria-label="NPC 模型"]').value,'claude-from-account');
+    await click('保存模型與 Key');await settle(()=>document.body.textContent.includes('模型與已填的 Key 已保存'));
+    assert.deepEqual(calls.filter(call=>call.operation==='set-model-key').map(call=>call.mode),['anthropic']);
+  }finally{await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort();}
+});
+test('scene groups take the player directly to the missing starting room',async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(),scene={id:'house',version:1,name:'住宅',rooms:[{id:'lobby',name:'客廳'},{id:'entry',name:'玄關'}],objects:[],connections:[]};
+ const card={id:'card-example-cass',version:1,fields:{name:'Cass'},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50};
+ const draft={id,version:1,body:{name:'回到玄關',description:'',step:3,city:{places:[{id:'home',templateId:scene.id,version:1,name:'住宅'}],characters:[{templateId:card.id,version:1,placeId:'home',roomId:''}]}},sources:{cards:[card],scenes:[scene]}};
+ const originalFetch=globalThis.fetch,root=createRoot(document.body.appendChild(document.createElement('div')));
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:'account-operations:a',cards:[card]}:String(url).includes('scene-templates')?{accountScope:'account-operations:a',templates:[scene]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a'});
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('[name="opening-name"]'));
+  await click('場所與道路');await click('帶我去填');
+  await settle(()=>document.activeElement?.getAttribute('aria-label')==='Cass起始房間');
+  await click('人物關係');await click('新增背景人物');
+  await change(document.querySelector('input[aria-label="背景人物名稱"]'),'阿岑');
+  await click('從阿岑建立關係');
+  assert.equal(document.querySelector('[aria-label="關係 1 對象"]').selectedOptions[0].textContent,'阿岑');
+ }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
+
+test('the AI road option follows the number of places and its preview names each disconnected group', async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['Kris 的住處','住宅','街角咖啡館','Vera 的房間'].map((name,i)=>({id:'p'+i,name,templateId:'scene',version:1}));
+ const city={characters:[],places,finalization:{spaces:[],walks:[{places:['p0','p1'],minutes:5},{places:['p2','p3'],minutes:6},{places:['p1','p2'],minutes:null}]}};
+ const props={owner:'a',draftId:'draft',cards:[],scenes:[],onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const option=()=>[...document.querySelectorAll('label')].find(label=>label.textContent.includes('建議跨場所步行道路'))?.querySelector('input');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{...city,places:places.slice(0,1)}})));
+  assert.equal(option()?.disabled,true);
+  assert.match(document.body.textContent,/單一場所.*不適用/);
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city,arrangement:{recommendRoads:true,city,state:'complete',version:0,inputVersion:1,operationId:'op',preview:{issues:[]}}})));
+  assert.equal(option().checked,true);
+  const itemsOption=[...document.querySelectorAll('label')].find(label=>label.textContent==='逐房配置物品').querySelector('input');
+  assert.equal(itemsOption.checked,true);
+  await React.act(async()=>itemsOption.click());assert.equal(option().checked,true);
+  await React.act(async()=>option().click());assert.equal(itemsOption.checked,false);
+  await React.act(async()=>option().click());await React.act(async()=>itemsOption.click());
+  const adoptAll=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='全部採納');
+  const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
+  await settle(()=>adopt());
+  assert.equal(adopt().disabled,true);assert.equal(adoptAll().disabled,true);
+  const repair=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='請 AI 補路');
+  assert.ok(repair());
+  assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
+  for(const place of ['街角咖啡館','Vera 的房間']){
+   const check=[...document.querySelectorAll('label')].find(label=>label.textContent==='明示隔離 '+place)?.querySelector('input');
+   assert.ok(check,place);
+   await React.act(async()=>check.click());
+  }
+  assert.equal(adopt().disabled,false);assert.equal(adoptAll().disabled,false);
+  assert.equal(repair(),undefined);
+ }finally{await React.act(async()=>root.unmount());await close();}
+});
+
+test('players inspect cards and compare the same tab without changing the party', async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(), scope='account-operations:a';
+ const cards=['Cass','Vera','阿岑'].map((name,i)=>({id:['card-example-cass','card-example-vera','card-custom'][i],version:1,fields:{name},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50,needTraits:{hunger:1,thirst:1,sleep:1}}));
+ const draft={id,version:1,body:{name:'我的草稿',description:'',step:1,city:{characters:[],places:[]}},sources:{cards:[],scenes:[]}};
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:scope,cards}:String(url).includes('scene-templates')?{accountScope:scope,templates:[]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a',drafts:[]});
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ try {
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('input[type=checkbox]'));
+  await click('查看 Cass 詳情');
+  assert.equal(document.querySelectorAll('[role=meter][aria-valuemax="18"]').length,5);
+  assert.ok(document.querySelector('img[alt="Cass 的人物圖"]'));
+  assert.equal(document.querySelectorAll('input:checked').length,0);
+  await click('身體需求');
+  await click('查看 Vera 詳情');
+  assert.ok(document.querySelector('[role=meter][aria-label="Vera 飢餓"]'));
+  await React.act(async()=>document.querySelector('input[aria-label="加入 Vera"]').click());
+  assert.equal(document.querySelectorAll('input:checked').length,1);
+  assert.equal(document.querySelector('input[aria-label="加入 阿岑"]').checked,false);
+ } finally {await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
+
+test('room list counts the current room and adding both objects focuses their names in that room', async () => {
+  const {Component, close} = await component('components/opening-wizard.tsx');
+  const id = crypto.randomUUID();
+  const scene = {id:'home', version:1, name:'住宅', rooms:[{id:'living', name:'客廳'}, {id:'bedroom', name:'臥室'}], objects:[], connections:[]};
+  let draft = {id, version:1, sources:{cards:[], scenes:[scene]}, body:{name:'測試世界', step:3, description:'', city:{
+    places:[{id:'place-1', templateId:'home', version:1, name:'住宅'}], characters:[]
+  }}};
+  let delaySave;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('scene-templates')) return Response.json({accountScope:'account-operations:a', templates:[scene]});
+    if (String(url).includes('character-cards')) return Response.json({accountScope:'account-operations:a', cards:[]});
+    if (init?.method === 'POST' && delaySave) return delaySave();
+    if (init?.method === 'POST') draft = {...draft, version:draft.version + 1, body:JSON.parse(init.body).body};
+    return Response.json({operationScope:'a', draft, preview:{issues:[]}});
+  };
+  let root;
+  async function openDraft() {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await React.act(async () => root.render(React.createElement(Component, {owner:'a', draftId:id})));
+    await settle(() => document.querySelector('[name="opening-name"]'));
+    const group = [...document.querySelectorAll('button')].find(button => button.textContent === '場所與道路');
+    if (group) await React.act(async () => group.click());
+  }
+  try {
+    await openDraft();
+    await click('在 住宅 新增房間');
+    const name = document.activeElement;
+    assert.equal(name?.getAttribute('aria-label'), '房間名稱');
+    await change(name, '玄關');
+    for (const item of ['鞋櫃', '雨傘架']) {
+      await click('＋新增物件');
+      const field = document.activeElement;
+      assert.equal(field?.getAttribute('aria-label'), '物件名稱');
+      await change(field, item);
+    }
+    assert.ok([...document.querySelectorAll('button')].some(button => button.textContent === '玄關（2 件物件）'));
+    await click('臥室（0 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]'), null);
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['鞋櫃', '雨傘架']);
+
+    await click('連接房間');
+    const otherRoom = document.querySelector('select[aria-label="門的另一端"]');
+    assert.equal(otherRoom.selectedOptions[0].textContent, '客廳');
+    await change(document.querySelector('input[aria-label="門名稱"]'), '玄關門');
+    await change(document.querySelector('select[aria-label="門狀態"]'), 'blocked');
+    await click('客廳（0 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+    await click('玄關（2 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+
+    let releaseSave;
+    delaySave = () => new Promise(resolve => { releaseSave = resolve; });
+    await change(document.querySelector('input[aria-label="物件名稱"]'), '玄關鞋櫃');
+    await click('臥室（0 件物件）');
+    await settle(() => document.querySelector('.opening-status').textContent === '保存中');
+    await React.act(async () => releaseSave(Response.json({error:'保存暫時失敗'}, {status:503})));
+    await settle(() => document.querySelector('.opening-status').textContent === '未同步');
+    await click('玄關（2 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]').value, '玄關鞋櫃');
+    delaySave = undefined;
+    await click('恢復草稿保存');
+    await settle(() => document.querySelector('.opening-status').textContent === '已保存至帳號');
+    await React.act(async () => root.unmount());
+    await openDraft();
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['玄關鞋櫃', '雨傘架']);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+    await click('客廳（0 件物件）');
+    assert.equal(document.querySelectorAll('input[aria-label="門名稱"]').length, 1);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+
+  } finally {
+    await React.act(async () => root.unmount());
+    globalThis.fetch = originalFetch;
+    await close();
+    await window.happyDOM.abort();
+  }
+});
+
+test('review shows shared starts and isolation, edits each exact target and restores its expanded group', async () => {
+  const {Component, close} = await component('components/opening-wizard.tsx');
+  const id = crypto.randomUUID();
+  const cards = ['Cass','Vera','Kris','店主'].map((name,i) => ({
+    id:['card-example-cass','card-example-vera','card-example-kris','shop'][i], version:1, fields:{name}, capacity:70,
+    values:{strength:10, endurance:11, dexterity:12, perception:13, appearance:14}
+  }));
+  const places = ['住宅','街角咖啡館','小屋'].map((name,i) => ({id:'p'+i, name, templateId:'s'+i, version:1}));
+  const scenes = places.map((place,i) => ({id:place.templateId, version:1, name:place.name, rooms:[{id:'room', name:i===0?'客廳':'前台'}], objects:[], connections:[]}));
+  const entrance = {id:'entry',name:'玄關'};
+  const extra = {placeId:'p0',rooms:[entrance],objects:[{id:'shoe',roomId:'entry',name:'鞋櫃',state:{}}],connections:[]};
+
+  const city = {characters:cards.map(card => ({templateId:card.id,version:1,placeId:'p0',roomId:'room'})), places, isolatedPlaceIds:['p2'],
+    backgroundPeople:[{id:'bg',name:'阿岑'}],relationships:[{from:'shop',to:'bg',targetType:'background',description:'常客'}],
+    finalization:{spaces:[extra],walks:[{places:['p0','p1'],minutes:7}]}};
+  let draft = {id, version:1, sources:{cards, scenes}, body:{name:'住宅的早晨', description:'', step:4, city}};
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('character-cards')) return Response.json({accountScope:'account-operations:a', cards});
+    if (String(url).includes('scene-templates')) return Response.json({accountScope:'account-operations:a', templates:scenes});
+    if (init?.method === 'POST') draft = {...draft,version:draft.version+1,body:JSON.parse(init.body).body};
+    const plan = draft.body.city;
+    const preview = {issues:[], places:places.map((place,i)=>{
+      const added = plan.finalization.spaces.find(value=>value.placeId===place.id);
+      return {...scenes[i], id:place.id, name:place.name, templateName:place.name, rooms:[...scenes[i].rooms,...added?.rooms??[]], objects:added?.objects??[]};
+    }), relationships:plan.relationships.map(r=>({from:'店主',to:'阿岑',description:r.description})), characters:plan.characters.map((actor,i)=>({
+      templateId:actor.templateId, name:cards[i].fields.name, place:places.find(p=>p.id===actor.placeId)?.name, room:actor.placeId==='p0'?'客廳':'前台'
+    })), walks:plan.finalization.walks, access:[{placeId:'p2',rule:'private',allowed:[]}]};
+    return Response.json({operationScope:'a', draft, preview, world:{characters:cards.map(card=>({id:card.id, name:card.fields.name,profileSource:card}))}});
+  };
+  const root = createRoot(document.body.appendChild(document.createElement('div')));
+  try {
+    await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+    await settle(()=>document.querySelector('#opening-stage-title'));
+    assert.equal(document.querySelector('#opening-stage-title').textContent, '核對開局');
+    const summary = document.querySelector('[aria-label="開局摘要"]');
+    assert.match(summary.textContent, /4 人同在住宅・客廳/);
+    assert.match(summary.textContent, /Cass.*Vera.*Kris.*店主/);
+    assert.match(summary.textContent, /住宅、街角咖啡館/);
+    assert.match(summary.textContent, /刻意隔離：小屋/);
+    assert.match(document.querySelector('[aria-label="權限例外"]').textContent,/小屋.*僅個別授權/);
+
+    const card = [...document.querySelectorAll('.opening-review article')].find(node=>node.querySelector('h4')?.textContent==='店主');
+    card.querySelector('details').open = true;
+    await click('修改店主起點');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '店主起始場所');
+    await change(document.activeElement, 'p1');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改店主起點');
+    assert.ok(document.activeElement.closest('article').querySelector('details').open);
+    assert.match(document.activeElement.closest('article').textContent,/街角咖啡館・前台/);
+
+    let roomDetails = [...document.querySelectorAll('.opening-review details')].find(node=>node.querySelector('summary')?.textContent.startsWith('玄關（'));
+    roomDetails.open = true;
+    await click('修改住宅・玄關的鞋櫃');
+    await settle(()=>document.activeElement?.value === '鞋櫃');
+    await change(document.activeElement,'鞋架');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改住宅・玄關的鞋架');
+    assert.ok(document.activeElement.closest('details').open);
+
+    await click('修改道路 1');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '道路 1 起點');
+    const minutes = document.querySelector('[aria-label="道路 1 步行分鐘"]');
+    await change(minutes,'11');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改道路 1');
+    assert.match(document.activeElement.parentElement.textContent,/11 分鐘/);
+
+    const relations = [...document.querySelectorAll('.opening-review details')].find(node=>node.querySelector('summary')?.textContent.startsWith('人物關係'));
+    relations.open = true;
+    await click('修改關係 1');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '關係 1 來源');
+    const description = document.activeElement.closest('fieldset').querySelector('input');
+    await change(description, '咖啡館老客人');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改關係 1');
+    assert.match(document.activeElement.parentElement.textContent,/店主 → 阿岑：咖啡館老客人/);
+    assert.ok(document.activeElement.closest('details').open);
+
+  } finally {
+    await React.act(async()=>root.unmount()); globalThis.fetch=originalFetch; await close(); await window.happyDOM.abort();
+  }
+});
+
+test('預覽逐房配置時按件勾選會立即更新房間與採納數量',async()=>{
+ const {Component,close}=await component('components/opening-room-item-suggestions.tsx');
+ const rooms=['前台','玄關','廚房','臥室','客廳','書房','儲藏室'];
+ const rows=rooms.map((name,i)=>({placeId:'home',placeName:'住宅',roomId:'r'+i,roomName:name,checked:i!==6,
+  existing:i===1?[{id:'cabinet',name:'鞋櫃'}]:[],suggestedIds:Array.from({length:[7,0,7,6,6,6,0][i]},(_,j)=>i+'-'+j)}));
+ const city={finalization:{spaces:[{placeId:'home',objects:rows.flatMap(room=>room.suggestedIds.map(id=>({id,roomId:room.roomId,name:id==='0-0'?'客用桌椅':id,state:{}})))}]}};
+ const requests=[],root=createRoot(document.body.appendChild(document.createElement('div')));
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{city,review:{rooms:rows,excludedItems:[]},adopted:false,disabled:false,onSubmit:async(action,excluded)=>{requests.push({action,excluded});return true;}})));
+  assert.ok(document.body.textContent.includes('玄關｜沿用 1 件，已齊備，新增 0 件'));
+  assert.ok(document.body.textContent.includes('儲藏室｜沿用 0 件，尚未核對'));
+  const front=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary').textContent.includes('前台'));
+  assert.equal(front.open,false);front.open=true;
+  const box=[...front.querySelectorAll('label')].find(node=>node.textContent==='客用桌椅').querySelector('input');
+  assert.equal(box.checked,true);
+  await React.act(async()=>box.click());
+  assert.ok(front.querySelector('summary').textContent.includes('本輪新增 7 件，選取 6 件'));
+  assert.ok(document.body.textContent.includes('採納所選物品（31 件）'));
+  assert.deepEqual(requests.at(-1),{action:'selectItems',excluded:['home:0-0']});
+  await React.act(async()=>box.click());
+  assert.ok(document.body.textContent.includes('採納所選物品（32 件）'));
+ }finally{await React.act(async()=>root.unmount());await close();await window.happyDOM.abort();}
+});
+
+test('preview start controls show the settings that can actually be adopted for each selected character',async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['left','right'].map((id,i)=>({id,name:['甲住宅','乙住宅'][i],templateId:'house',version:1}));
+ const person=(templateId,placeId,roomId,placeOrigin,roomOrigin)=>({templateId,version:1,placeId,roomId,placeOrigin,roomOrigin});
+ const characters=[person('Cass','left','living','system','system'),person('Vera','left','living','player','system'),
+  person('店主','right','living','system','player'),person('舊卡','right','bedroom')];
+ const city={places,characters};
+ const recommended=characters.map(p=>({...p,placeId:'left',roomId:'bedroom'}));
+ const props={owner:'a',draftId:'draft',cards:characters.map(p=>({id:p.templateId,fields:{name:p.templateId}})),
+  scenes:[{id:'house',version:1,rooms:[{id:'living',name:'客廳'},{id:'bedroom',name:'臥室'}]}],city,
+  arrangement:{state:'complete',version:0,inputVersion:1,operationId:'op',city:{places,characters:recommended},preview:{issues:[]}},
+  onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const control=(name,field)=>document.querySelector('[aria-label="'+name+'建議起始'+field+'"]');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,props)));
+  await settle(()=>control('Cass','場所'));
+  for(const [name,placeDisabled,roomDisabled,place,room] of [
+   ['Cass',false,false,'left','bedroom'],['Vera',true,false,'left','bedroom'],['店主',true,true,'right','living'],['舊卡',true,true,'right','bedroom']
+  ]){
+   assert.deepEqual([control(name,'場所').disabled,control(name,'房間').disabled,control(name,'場所').value,control(name,'房間').value],
+    [placeDisabled,roomDisabled,place,room],name);
+  }
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{places,characters:[{...characters[0],placeId:'right',roomId:'living',roomOrigin:'player'},...characters.slice(1)]}})));
+  assert.deepEqual([control('Cass','場所').disabled,control('Cass','房間').disabled,control('Cass','場所').value,control('Cass','房間').value],[true,true,'right','living']);
+ }finally{await React.act(async()=>root.unmount());await close();}
+});
+
+test('取消配物保存失敗時可重試，補路與另開一輪保留這次勾選',async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div'))),original=globalThis.fetch;
+ const places=['home','cafe'].map(id=>({id,name:id,templateId:'scene',version:1}));
+ const scenes=[{id:'scene',version:1,rooms:[{id:'front',name:'前台'},{id:'entry',name:'玄關'}],objects:[],connections:[]}];
+ const live={places,characters:[],finalization:{spaces:[{placeId:'home',rooms:[],connections:[],objects:[{id:'manual',roomId:'entry',name:'木桌',state:{}}]}],walks:[]}};
+ const draft=structuredClone(live);draft.finalization.spaces[0].objects=['木桌','椅子'].map((name,i)=>({id:'i'+i,roomId:'entry',name,state:{}}));
+ const roomItems={excludedItems:[],rooms:scenes[0].rooms.map(room=>({roomName:room.name,roomId:room.id,placeId:'home',placeName:'home',existing:[],checked:true,suggestedIds:room.id==='front'?['i0','i1']:[]}))};
+ const arrangement={state:'complete',operationId:'test',version:0,inputVersion:1,city:draft,roomItems,recommendRoads:true,originalRoads:{walks:[]},preview:{issues:[]}};
+ let fail=true;
+ globalThis.fetch=async(_url,opts)=>{
+  const input=JSON.parse(opts.body);assert.equal(input.action,'selectItems');assert.deepEqual(input.excludedItems,['home:i1']);
+  return fail?Response.json({error:'選擇未保存'},{status:409}):Response.json({arrangement:{...arrangement,roomItems:{...roomItems,excludedItems:input.excludedItems}},operationScope:'a'});
+ };
+ const button=name=>[...document.querySelectorAll('button')].find(node=>node.textContent===name);
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:'d',city:live,arrangement,cards:[],scenes,onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}})));
+  await settle(()=>button('採納所選物品（1 件）'));
+  const room=[...document.querySelectorAll('summary')].find(el=>el.textContent.includes('home・玄關'));
+  assert.match(room.textContent,/沿用 1 件，本輪新增 1 件，選取 1 件/);
+  const check=[...room.parentElement.querySelectorAll('label')].find(el=>el.textContent==='椅子').querySelector('input');
+  await React.act(async()=>check.click());await settle(()=>button('重試保存物品選擇'));
+  assert.equal(check.checked,false);assert.equal(button('請 AI 補路').disabled,true);assert.equal(button('明示請AI另整理一份建議').disabled,true);
+  fail=false;await click('重試保存物品選擇');await settle(()=>!button('重試保存物品選擇'));
+  assert.equal(check.checked,false);assert.equal(button('請 AI 補路').disabled,false);assert.equal(button('明示請AI另整理一份建議').disabled,false);
+  for(const [receipt,expected] of [[{adoptedItemKeys:[]},'已採納所選物品（0 件）'],[{},'已採納所選物品']]){
+   const applied={...arrangement,receipts:{items:'saved'},roomItems:{...roomItems,...receipt}};
+   await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:'d',city:live,arrangement:applied,cards:[],scenes,onPrepare:async()=>({version:2}),onReply:()=>{},onBusy:()=>{}})));
+   assert.equal(document.querySelector('[aria-label="逐房物品建議"] [role="status"]').textContent,expected);
+  }
+ }finally{globalThis.fetch=original;await React.act(async()=>root.unmount());await close();}
 });

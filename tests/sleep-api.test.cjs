@@ -13,11 +13,48 @@ async function scenario(prepare=()=>{},judge){
  const world=seedWorld();world.contextId='sleep-v1';world.characters=world.characters.filter(c=>c.id==='owner');world.adjudication={provider:'openai',model:'fixture-judge'};
  const c=world.characters[0];c.needs={version:1,activatedAt:world.minute,updatedAt:world.minute,values:{hunger:39,thirst:39,fatigue:70,sleep:80},assessed:{hunger:0,thirst:0,fatigue:2,sleep:2},history:[],dropped:0};prepare(world);store.install(world);
  const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...b}, 'test-owner'))}));
- await post({operation:'set-model-key',key:'fixture-key'});let npc=0,judgments=0,choose;const inputs=[],old=global.fetch;
- global.fetch=async(_url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);if(input.contractVersion==='world-adjudication.v1'){judgments++;return reply(judge?judge(input):{status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:480,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}},JSON.parse(JSON.parse(init.body).messages[1].content));}npc++;inputs.push(input);return reply(choose?choose(input,npc):npc===1?asleep:awake,JSON.parse(JSON.parse(init.body).messages[1].content));};
- return {post,read:async()=>(await(await GET()).json()).world,choose:f=>{choose=f;},inputs,counts:()=>({npc,judgments}),restore:()=>{global.fetch=old;}};
+ await post({operation:'set-model-key',key:'fixture-key'});let npc=0,judgments=0,choose;const inputs=[],npcPrompts=[],old=global.fetch;
+ global.fetch=async(_url,init)=>{
+  const {messages}=JSON.parse(init.body);
+  const input=JSON.parse(messages[1].content);
+  if(input.contractVersion==='world-adjudication.v1'){
+   judgments++;
+   return reply(judge?judge(input):{status:'accepted',effects:[],stages:[],check:null,routine:null,completionMinutes:480,bodyActivity:{version:1,kind:'sleep',fatiguePerHour:-6,sleepPerHour:-14}},input);
+  }
+  npc++;
+  inputs.push(input);
+  npcPrompts.push(messages.find(message=>message.role==='system').content);
+  return reply(choose?choose(input,npc):npc===1?asleep:awake,input);
+ };
+ return {post,read:async()=>(await(await GET()).json()).world,choose:f=>{choose=f;},inputs,npcPrompts,counts:()=>({npc,judgments}),restore:()=>{global.fetch=old;}};
 }
 async function advance(s,minutes=15,extra={}){const r=await s.post({operation:'advance',minutes,...extra});assert.equal(r.status,200,await r.clone().text());return s.read();}
+test('the autonomous NPC prompt distinguishes awake rest and proposing sleep when the actor feels sleepy',async()=>{
+ const s=await scenario();
+ try {
+  await advance(s);
+  assert.match(s.npcPrompts[0],/清醒[^。]*用 rest/);
+  assert.match(s.npcPrompts[0],/想睡一覺[^。]*用 propose[^。]*目的/);
+  assert.match(s.npcPrompts[0],/由世界[^。]*判定是否實際入睡/);
+ } finally { s.restore(); }
+});
+test('the test site sends the full rewritten prompt and commits a world-confirmed sleep proposal',async()=>{
+ const {env}=load('cloudflare-workers'),previous=env.APP_ENV;
+ const {draftPath}=require('../tooling/experiments/npc-prompt-trial/assemble.cjs');
+ env.APP_ENV='test';
+ globalThis.__TEST_NPC_PROMPT__=require('node:fs').readFileSync(draftPath,'utf8');
+ try {
+  const s=await scenario();
+  try {
+   const world=await advance(s);
+   assert.match(s.npcPrompts[0],/^# 你是誰/);
+   assert.match(s.npcPrompts[0],/想睡一覺時，向眼前可用的床/);
+   assert.ok(s.npcPrompts[0].endsWith('無焦點填 []。'));
+   assert.equal(Object.hasOwn(s.inputs[0].self,'personality'),false);
+   assert.equal(world.characters[0].plan.bodyActivity.kind,'sleep');
+  } finally { s.restore(); }
+ } finally { env.APP_ENV=previous; delete globalThis.__TEST_NPC_PROMPT__; }
+});
 test('actual confirmed sleep crosses ninety minutes with proportional recovery and no hunger-triggered new decision',async()=>{
  const s=await scenario();try{
   await advance(s);await advance(s,30);await advance(s,30);await advance(s,30);const request={operation:'advance',minutes:15,operationId:opid()};await s.post(request);let w=await s.read();

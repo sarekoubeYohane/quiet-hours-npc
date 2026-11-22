@@ -48,6 +48,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | NPC system prompt | `lib/models.ts` 串接；共用原則在 `lib/playbook.ts`，各子系統的 `*Prompt` 在各自檔案 |
 | NPC 輸出的 JSON schema 與契約版本 | `lib/npc-decision-schema.ts`（`npc-decision.v3`） |
 | NPC 輸出的驗證 | `lib/models.ts` 內部的 `parseDecision`，再委派各子系統的 parser |
+| 測試站的 NPC 自主決策提示 | `vite.config.ts` 將 v0.2.4 Markdown 放進測試站建置；`lib/npc-decision-preparation.ts` 依人物實際輸入呼叫 `lib/npc-prompt-rewrite.ts` 組裝，每次派送與回想續答都以完整 request 計算大小。測試站 `/api/environment` 顯示 `npcDecisionPrompt`。 |
 | 實際打模型 API | `lib/model-adapter.ts` 的 `requestModel`，全專案唯一的 LLM HTTP 出口 |
 | 骰子與檢定（D20 與 d100） | `lib/action-checks.ts` 的 `resolveActionCheck`；`lib/d20.ts` 只有 D20 與共用的 `Resolution` 型別 |
 | 天上意志的裁定 | `lib/adjudication.ts`（呼叫）、`lib/adjudication-contract.ts`（schema 與 parser）、`lib/adjudication-limits.ts`（上限） |
@@ -74,7 +75,10 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
-| 開局精靈介面 | `components/opening-wizard.tsx` |
+| 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
+| 開局起點的來源與採納 | `lib/opening-starts.ts` 按人物及場所實例保留玩家選定的場所、房間；`lib/opening-authoring.ts` 標記自動預填。 |
+| 核對開局與返回編輯 | `components/opening-review.tsx` 依本局人物、房間與道路顯示核對結果，記下原項的展開、焦點和捲動位置。 |
+| 開局精靈介面 | `components/opening-wizard.tsx`；按場所、房間編輯本局物件與門在 `components/opening-room-editor.tsx` |
 | 樣式 | `app/globals.css`，以手寫語意 class 為主（`.panel`、`.opening-*`、`.analysis-*`） |
 | 新增資料表或欄位 | `db/schema.ts`、`drizzle/`，並依 [docs/testing.md](docs/testing.md) 手動登記到測試 |
 
@@ -120,8 +124,10 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `activity-lifecycle.ts` | 單一角色計畫的開始、推進、取消、旅程、睡醒 |
 | `paused-activities.ts` | 暫停、復工、放棄 |
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
+| `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
 | `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter）與 observer 事件 |
-| `direct-models.ts` | OpenAI 直連的模型 ID 清單 |
+| `model-providers.ts`、`provider-api.ts` | 模型服務名稱、執行模式對應與供應商端點。模型設定透過同源 POST 傳入帳號範圍，以新輸入或已保存的 Key 即時讀取各服務清單。只回傳模型 ID 與名稱。 |
+| `direct-models.ts` | 保留既有 OpenAI 模型的嚴格輸出與推理參數 |
 | `npc-input.ts` | 組 NPC user message，88 KiB 上限 |
 | `npc-decision-preparation.ts` | 把輸入、schema、messages 收斂成一次請求 |
 | `npc-decision-schema.ts` | NPC 輸出 schema 與契約版本 |
@@ -245,7 +251,11 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `city-access.ts` | 進入許可的建立與執行期查詢（`entryPermission`） |
 | `city-initialization.ts` | 用模型產生 finalization |
 | `opening-drafts.ts` | 開局草稿的版本化儲存與 `confirmOpening` |
-| `opening-arrangement-model.ts` | AI 整理開局：只補留白 |
+| `opening-arrangement-model.ts` | 依玩家勾選的工作整理 AI 開局建議 |
+| `opening-road-repair.ts` | 只向模型傳入當前路網與缺口，接回可編輯的補路建議 |
+| `opening-room-items.ts`、`components/opening-room-item-suggestions.tsx` | 依場所實例及房間核對既有物品、勾選本輪新增物品並單獨採納 |
+| `opening-proposal-adoption.ts` | 採納前核對原草稿、最新手動變更、物品選擇及各組採納收據 |
+| `opening-road-network.ts`、`components/opening-roads.tsx` | 開局步行路段、隔離與分段連通檢查，以及手動／預覽的道路編輯 |
 | `opening-relationship-generation.ts` | 用模型從開局描述抽出住處、工作、關係 |
 | `opening-authoring.ts` | 瀏覽器端 helper：自動預填、把成品帶回開局草稿 |
 | `pixel-scene.ts` | 舊版固定地圖的座標與走位 |

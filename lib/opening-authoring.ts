@@ -9,7 +9,11 @@ export function fillUniqueStarts(city: CityDraft, scenes: SceneTemplate[]): City
     const place = city.places.find(value => value.id === placeId);
     const scene = scenes.find(value => value.id === place?.templateId && value.version === place.version);
     const rooms = [...(scene?.rooms ?? []), ...(city.finalization?.spaces.find(value => value.placeId === placeId)?.rooms ?? [])];
-    return { ...actor, placeId, roomId: actor.roomId || (rooms.length === 1 ? rooms[0].id : '') };
+    const roomId = actor.roomId || (rooms.length === 1 ? rooms[0].id : '');
+    return { ...actor, placeId, roomId,
+      ...(!actor.placeId && placeId ? { placeOrigin: 'system' as const } : {}),
+      ...(!actor.roomId && roomId ? { roomOrigin: 'system' as const } : {}),
+    };
   }) };
 }
 

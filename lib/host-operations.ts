@@ -1,5 +1,7 @@
-import { suggestOpeningResources,mapResourceActors,prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import { readArrangement, storeArrangementResult } from './opening-arrangement-store';
+import { isModelProvider, providerForMode } from './model-providers';
+import { suggestOpeningResources, mapResourceActors, prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
+import {repairOpeningRoads,openingRepairSource} from './opening-road-repair';
+import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
 import { playerAccount, setPlayerAccount } from './player-account-budget';
@@ -44,8 +46,8 @@ import { acceptOperation, respond, restoreWorld, runOperation, traceWorld, type 
 const modelKeyOperation = (): OperationHandler => ({
   accountWorkspace: true,
   async immediate({ b, accountId, id }) {
-      if (!['ai', 'openai'].includes(b.mode || '')) return respond({ error: '請選擇要設定 Key 的模型服務。' }, 400);
-      const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
+      if (b.mode !== 'ai' && !isModelProvider(b.mode)) return respond({ error: '請選擇要設定 Key 的模型服務。' }, 400);
+      const provider = providerForMode(b.mode);
       if (b.operation === 'set-model-key') await saveModelKey(accountId, provider, b.key);
       else await clearModelKey(accountId, provider);
       return respond({operationScope:id,modelKeys:await modelKeyStatus(accountId),modelKeyStorageAvailable:modelKeyStorageAvailable()});
@@ -104,11 +106,11 @@ const advanceOperation = (): OperationHandler => ({
             const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
             await verifyLease();
             if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await workWait(readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter'));
+            dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
-            const provider=b.mode==='openai'?'openai':'openrouter',model=b.model!.trim();
+            const provider=providerForMode(b.mode),model=b.model!.trim();
             const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
             traceWorld(trace,'controlled-feelings-dispatch');
             const dispatch=dispatchModel('feelings',w,c,provider,model,dispatchKey,{evidence:true,withinWorkDeadline:true});
@@ -116,7 +118,7 @@ const advanceOperation = (): OperationHandler => ({
           },
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
-            const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
+            const provider=providerForMode(b.mode);
             const price=accountPlayer.prices.find(p=>p.provider===provider && p.model===b.model!.trim());
             let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
             let dispatch = 0;
@@ -131,7 +133,7 @@ const advanceOperation = (): OperationHandler => ({
               return reservationId;
             };
             const npcDispatch=dispatchModel('npc',w,c,provider,b.model!.trim(),dispatchKey,{evidence:true,withinWorkDeadline:true});
-            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
+            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), providerForMode(b.mode), npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
               beforeDispatch:npcDispatch.beforeDispatch,
               onSettled:npcDispatch.onSettled,
               observer: npcDispatch.observer,
@@ -319,14 +321,14 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
+          const requested=JSON.parse(arrangement.request) as ArrangementRequest;
           const snapshot=JSON.parse(arrangement.snapshot) as OpeningDraft;
-          const {purpose,resourceRequest}=JSON.parse(arrangement.request) as import('./opening-arrangement-store').ArrangementRequest;
           let city=snapshot.body.city;
-          if(purpose==='resources'){
+          if(requested.purpose==='resources'){
             const {world:candidate}=await prepareCity(accountId,city,world,snapshot.sources);
             if(!candidate)throw Error('請先完成起點與物資配置。');
             delete candidate.openingResources;
-            const addition=await runSetup('opening-resources',(service,options)=>suggestOpeningResources(candidate,resourceRequest??'',service,options));
+            const addition=await runSetup('opening-resources',(service,options)=>suggestOpeningResources(candidate,requested.resourceRequest??'',service,options));
             const plan=mapResourceActors(addition,id=>{
               const source=candidate.characters.find(actor=>actor.id===id)?.profileSource?.id;
               if(!source)throw Error('物資指定了未選人物。');
@@ -334,11 +336,18 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             });
             city={...city,resourcePlan:{supplies:[...city.resourcePlan?.supplies??[],...plan.supplies],
               furnishingGrants:[...city.resourcePlan?.furnishingGrants??[],...plan.furnishingGrants.filter(row=>!city.resourcePlan?.furnishingGrants.some(old=>old.objectId===row.objectId))],unavailable:plan.unavailable}};
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,cityDraftSchema.parse(city)));
+          }else if(requested.repairOf){
+            const source=await workWait(readArrangement(accountId,arrangement.draft_id,requested.repairOf.operationId));
+            if(!source?.result||source.revision!==requested.repairOf.version)throw Error('補路依據已變更。');
+            const proposal=storedArrangementResult(source);
+            const frozen=openingRepairSource(JSON.parse(source.snapshot),snapshot,proposal.city);
+            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(frozen,service,options));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
           }else{
-            city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(snapshot,service,options));
-
+            const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(snapshot,service,options,requested));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,result.city,{roomItems:result.roomItems}));
           }
-          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,cityDraftSchema.parse(city)));
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
@@ -438,7 +447,7 @@ const setPriceOperation = (): OperationHandler => ({
 const setAdjudicationOperation = (): OperationHandler => ({
   accountWorkspace: true,
   request({ b }) {
-    if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return respond({error:'請填寫裁定服務與模型。'},400);
+    if(b.operation==='set-adjudication'&&(!b.adjudication||!isModelProvider(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return respond({error:'請填寫裁定服務與模型。'},400);
   },
   run({ b, world }) {
       world.adjudication={provider:b.adjudication!.provider,model:b.adjudication!.model.trim()};

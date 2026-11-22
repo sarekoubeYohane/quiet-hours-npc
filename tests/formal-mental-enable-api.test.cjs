@@ -114,6 +114,20 @@ test('exact openings must fit every declared capacity before drawing instead of 
 
 // Runtime already passed review. These are original-contract boundary evidence,
 // not a claimed RED/bug fix. Only creation randomness, time and transport vary.
+test('formal autonomous decisions receive guidance about companionship even when the actor chooses to keep its feelings open', async () => {
+ const scene = await lifeScene();
+ try {
+  await scene.step();
+  const request = scene.requests.find(({input}) => input.contractVersion === 'npc-decision.v3');
+  const system = request.body.messages.find(message => message.role === 'system').content;
+  assert.match(system, /分別留意自己的心力、疲勞和睡意/);
+  assert.match(system, /還無法判斷時可留 null/);
+  assert.match(system, /對方的陪伴也可能讓你安心、感到壓力，或沒有特別感覺/);
+  const actor = (await scene.read()).characters[0];
+  assert.equal(actor.plan?.mentalProcess?.assessment ?? null, null);
+ } finally { scene.restore(); }
+});
+
 test('actual formal enablement projects all stage boundaries and payment availability without numeric energy in provider requests',async()=>{
  const random=Math.random;Math.random=()=>0; // Saved seed0: owner/natural/slot0 is d6 face2, no first-slot loss.
  const cases=[[0,'見底',false],[1,'見底',false],[2,'吃緊',false],[3,'吃緊',false],[4,'尚可',false],[5,'尚可',true],[6,'有餘',true],[7,'有餘',true],[8,'充沛',true],[9,'充沛',true],[10,'充沛',true]];

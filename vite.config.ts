@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 
@@ -22,7 +23,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    define: { __GIT_COMMIT__: JSON.stringify(gitCommit()), __BUILT_AT__: JSON.stringify(new Date().toISOString()) },
+    define: {
+      __GIT_COMMIT__: JSON.stringify(gitCommit()),
+      __BUILT_AT__: JSON.stringify(new Date().toISOString()),
+      __TEST_NPC_PROMPT__: JSON.stringify(process.env.CLOUDFLARE_ENV === "test"
+        ? readFileSync(new URL("./docs/design/npc-prompt-rewrite-draft.md", import.meta.url), "utf8")
+        : ""),
+    },
     // Only server environments emit maps; keep them out of public client assets.
     environments: {
       // Vite defaults to dropping entry signatures. With vinext's shared browser
