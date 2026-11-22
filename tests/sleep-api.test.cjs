@@ -49,7 +49,7 @@ test('the test site sends the full rewritten prompt and commits a world-confirme
    const world=await advance(s);
    assert.match(s.npcPrompts[0],/^# 你是誰/);
    assert.match(s.npcPrompts[0],/想睡一覺時，向眼前可用的床/);
-   assert.ok(s.npcPrompts[0].endsWith('無焦點填 []。'));
+   assert.match(s.npcPrompts[0],/無焦點填 \[\]。\n最終決策[^\n]*未定義的欄位一律省略[^\n]*null 也要省略整個鍵。$/);
    assert.equal(Object.hasOwn(s.inputs[0].self,'personality'),false);
    assert.equal(world.characters[0].plan.bodyActivity.kind,'sleep');
   } finally { s.restore(); }
