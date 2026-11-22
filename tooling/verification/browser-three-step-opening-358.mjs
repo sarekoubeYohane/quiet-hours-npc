@@ -147,7 +147,8 @@ try{
  await click('全部採納');await page.getByText(/這份建議已採納/).waitFor();
  await reopen();
  const final=(await read()).draft.body.city;
- assert.deepEqual(objects(final),objects(cityAfterItems));
+ const itemsByPlace=city=>Object.fromEntries(city.finalization.spaces.map(space=>[space.placeId,space.objects]));
+ assert.deepEqual(itemsByPlace(final),itemsByPlace(cityAfterItems));
  assert.deepEqual(final.finalization.walks.map(w=>w.minutes),[6,12]);
  assert.equal(final.isolatedPlaceIds.length,1);
  const shop=final.characters.find(a=>a.templateId==='card-example-owner');assert.equal(final.places.find(p=>p.id===shop.placeId).name,'街角咖啡館');assert.equal(shop.roomId,'front');
