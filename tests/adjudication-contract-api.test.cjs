@@ -58,6 +58,40 @@ test('routine approval parsing returns a candidate without binding or changing a
   const invalid=structuredClone(raw);mutate(invalid);assert.throws(()=>contract.parseAdjudicationCandidate(JSON.stringify(invalid)));assert.deepEqual(world,before);
  }
 });
+const cafeWaterReplies = require('./fixtures/cafe-water-adjudications.json');
+
+for (const status of ['denied', 'unsupported']) {
+ test(`cafe water adjudication: the captured ${status} reply is legal only after its activity identity is cleared`, () => {
+  const {parseAdjudicationCandidate} = load('adjudication-contract');
+  const raw = cafeWaterReplies[status];
+  assert.throws(() => parseAdjudicationCandidate(raw), /未核准活動不能確認活動身份/);
+  const corrected = {...JSON.parse(raw), activityIdentity:null};
+  const result = parseAdjudicationCandidate(JSON.stringify(corrected));
+  assert.equal(result.kind, 'effects');
+  assert.equal(result.candidate.status, status);
+  assert.equal(result.candidate.activityIdentity, undefined);
+  assert.deepEqual(result.explanation, corrected.explanation);
+ });
+}
+
+test('the adjudicator receives explicit null identity examples for both non-accepted statuses', async () => {
+ const {buildAdjudicationInput, requestAdjudication} = load('adjudication');
+ const {routineCandidateSchema} = load('adjudication-contract');
+ const world = seedWorld();
+ const input = buildAdjudicationInput(world, world.characters[0], {type:'propose',target:'dispenser',content:'裝水喝',purpose:'解渴'});
+ let system;
+ const fetcher = async (_url, init) => {
+  system = JSON.parse(init.body).messages.find(message=>message.role==='system').content;
+  return Response.json({choices:[{message:{content:cafeWaterReplies.denied}}]});
+ };
+ await requestAdjudication(input, {provider:'deepseek',model:'deepseek-flash',key:'fixture-key'}, routineCandidateSchema, {
+  signal:AbortSignal.timeout(15000), fetcher,
+ });
+ for (const status of ['denied', 'unsupported']) {
+  assert.ok(system.includes(JSON.stringify({status,activityIdentity:null})), status);
+ }
+});
+
 test('denied candidates cannot request a die and the shared ability bound applies to ordinary and result candidates',()=>{
  for(const status of ['denied','unsupported'])assert.throws(()=>parseEffectCandidate(JSON.stringify({status,effects:[],check:{difficulty:12,ability:'處理'}})));
  for(const ability of ['', 'x'.repeat(101)])assert.throws(()=>parseEffectCandidate(JSON.stringify({...accepted,check:{difficulty:12,ability}})));
