@@ -4,7 +4,9 @@ function fieldDiagnostic(field: string, received: unknown, expected: string, sec
   const value = received === undefined ? '缺少欄位' : JSON.stringify(received);
   const safe = redactDiagnosticText(value, secrets);
   const shown = safe.length > 120 ? safe.slice(0, 119) + '…' : safe;
-  return redactDiagnosticText(`欄位 ${field}：收到 ${shown}，預期 ${expected}。`, secrets);
+  const path = redactDiagnosticText(field, secrets);
+  const shownPath = path.length > 120 ? path.slice(0, 119) + '…' : path;
+  return redactDiagnosticText(`欄位 ${shownPath}：收到 ${shown}，預期 ${expected}。`, secrets);
 }
 
 export class DecisionFieldError extends Error {
