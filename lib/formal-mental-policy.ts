@@ -16,6 +16,11 @@ export function formalDie(actor:Character,source:string,slot:number,die:number):
  const limit=Math.floor(0x100000000/die)*die;
  for(;;){h=(h+0x9e3779b9)>>>0;let z=h;z=Math.imul(z^(z>>>16),0x21f0aaad);z=Math.imul(z^(z>>>15),0x735a2d97);z=(z^(z>>>15))>>>0;if(z<limit)return z%die+1;}
 }
+const ratios={'充沛':90,'有餘':70,'尚可':50,'吃緊':30,'見底':10};
+export function openingEnergyValue(capacity:number,opening:FormalOpening={}) {
+ const ratio=opening.stage?ratios[opening.stage]:70;
+ return opening.current??(Math.floor(capacity/100)*ratio+Math.floor(((capacity%100)*ratio+50)/100));
+}
 export function createFormalMentalEnergy(actor:Pick<Character,'id'|'mentalEnergy'>,minute:number,opening:FormalOpening={}):MentalEnergy{
  if(!opening||typeof opening!=='object'||Array.isArray(opening)||typeof actor.id!=='string'||!actor.id||!Number.isFinite(minute)||Object.keys(opening).some(key=>!['capacity','minimum','maximum','current','stage','seed'].includes(key)))throw Error('正式精神電量開局格式無效。');
  if(['capacity','minimum','maximum','current','seed'].some(key=>opening[key as keyof FormalOpening]!==undefined&&!Number.isSafeInteger(opening[key as keyof FormalOpening])))throw Error('正式開局數值必須明示整數。');
@@ -29,9 +34,8 @@ export function createFormalMentalEnergy(actor:Pick<Character,'id'|'mentalEnergy
   capacity=(capacityDice[0]+capacityDice[1]+6)*5;
  }
  if(!Number.isSafeInteger(capacity)||capacity<=0||opening.minimum!==undefined&&capacity<min||opening.maximum!==undefined&&capacity>max)throw Error('特殊容量必須明示正整數且不違反背景範圍。');
- const ratios={'充沛':90,'有餘':70,'尚可':50,'吃緊':30,'見底':10};
  if(opening.stage!==undefined&&!Object.hasOwn(ratios,opening.stage))throw Error('開局電量階段無效。');
- const initial=opening.current??(Math.floor(capacity!/100)*(opening.stage?ratios[opening.stage]:70)+Math.floor(((capacity!%100)*(opening.stage?ratios[opening.stage]:70)+50)/100));
+ const initial=openingEnergyValue(capacity,opening);
  if(!Number.isSafeInteger(initial)||initial<0||initial>capacity!)throw Error('正式目前電量必須是容量內整數。');
  if(opening.current!==undefined&&opening.stage!==undefined&&['見底','吃緊','尚可','有餘','充沛'][formalEnergyStageIndex(initial,capacity!)]!==opening.stage)throw Error('明示目前電量與階段互相矛盾。');
  const seed=opening.seed??Math.floor(Math.random()*0x100000000);

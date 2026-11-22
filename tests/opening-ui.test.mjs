@@ -195,3 +195,27 @@ test('the AI road option follows the number of places and its preview names each
   assert.equal(adopt().disabled,false);
  }finally{await React.act(async()=>root.unmount());await close();}
 });
+
+test('players inspect cards and compare the same tab without changing the party', async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(), scope='account-operations:a';
+ const cards=['Cass','Vera','阿岑'].map((name,i)=>({id:['card-example-cass','card-example-vera','card-custom'][i],version:1,fields:{name},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50,needTraits:{hunger:1,thirst:1,sleep:1}}));
+ const draft={id,version:1,body:{name:'我的草稿',description:'',step:1,city:{characters:[],places:[]}},sources:{cards:[],scenes:[]}};
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:scope,cards}:String(url).includes('scene-templates')?{accountScope:scope,templates:[]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a',drafts:[]});
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ try {
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('input[type=checkbox]'));
+  await click('查看 Cass 詳情');
+  assert.equal(document.querySelectorAll('[role=meter][aria-valuemax="18"]').length,5);
+  assert.ok(document.querySelector('img[alt="Cass 的人物圖"]'));
+  assert.equal(document.querySelectorAll('input:checked').length,0);
+  await click('身體需求');
+  await click('查看 Vera 詳情');
+  assert.ok(document.querySelector('[role=meter][aria-label="Vera 飢餓"]'));
+  await React.act(async()=>document.querySelector('input[aria-label="加入 Vera"]').click());
+  assert.equal(document.querySelectorAll('input:checked').length,1);
+  assert.equal(document.querySelector('input[aria-label="加入 阿岑"]').checked,false);
+ } finally {await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});

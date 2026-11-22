@@ -1,4 +1,5 @@
 'use client';
+import {OpeningCardPicker,defaultOpeningNeeds} from './opening-character-cards';
 import {fillUniqueStarts} from '@/lib/opening-authoring';
 import {useDraftNavigation} from './use-draft-navigation';
 import {boundPath} from '@/lib/bound-navigation';
@@ -20,13 +21,13 @@ type OpeningCity=CityDraft;
 type Body={name:string;step:number;description:string;city:OpeningCity};
 type Draft={id:string;version:number;body:Body;sources:{cards:CharacterCard[];scenes:SceneTemplate[]};finalizedSaveId?:string};
 type Reply={previousArrangement?:ArrangementView;arrangement?:ArrangementView;operationScope?:string;draft?:Draft;preview?:CityPreview;world?:World;error?:string};
-const steps=['準備人物','場景與安排','核對並開始'];
+const steps=['選人物','場景與安排','核對並開始'];
 const storedSteps=[1,3,4];
 const stageOf=(step:number)=>step===1?1:step<=3?2:3;
 const initial=():Body=>({name:'新的世界',step:1,description:'',city:{characters:[],places:[]}});
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 const needs=[['hunger','飢餓'],['thirst','口渴'],['fatigue','體力疲勞'],['sleep','睡眠需求']] as const;
-const defaults={hunger:20,thirst:20,fatigue:15,sleep:20};
+const defaults=defaultOpeningNeeds;
 function mergeSources<T extends {id:string;version:number}>(available:T[],saved:T[]){const result=new Map(available.map(value=>[JSON.stringify([value.id,value.version]),value]));for(const value of saved)result.set(JSON.stringify([value.id,value.version]),value);return [...result.values()];}
 function unselectedCharacterReferences(city:OpeningCity){
  const selected=new Set(city.characters.map(actor=>actor.templateId));
@@ -106,18 +107,13 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
     <h2 id="opening-stage-title" tabIndex={-1}>{steps[stage-1]}</h2>
     {stage===1&&<>
      <p className="hint">勾選要一起生活的人物卡；人物卡的數值不會因為選入而改變。</p>{!cards.length&&<aside className="journey-note"><strong>還沒有人物卡</strong><p>先到人物頁做一張，完成後會自動帶回這裡並勾選。第一次製作需要設定模型與 API Key，人物頁會帶你完成。</p></aside>}
+     <OpeningCardPicker cards={cards} city={body.city} onToggle={cardToggle} startLabel={actor=>{
+       const place=body.city.places.find(p=>p.id===actor.placeId);
+       return [place?.name,roomsFor(actor.placeId).find(room=>room.id===actor.roomId)?.name].filter(Boolean).join('・')||'待安排';
+     }}/>
      <div className="opening-actions">
-      <button className={!cards.length?'opening-primary':undefined} onClick={()=>void author('/character-templates')}>{cards.length?'再做一張人物卡':'製作第一張人物卡'}</button>
+      <button onClick={()=>void author('/character-templates')}>{cards.length?'再做一張人物卡':'製作第一張人物卡'}</button>
       {!!cards.length&&<button onClick={()=>void refresh()}>重新讀取人物與場景庫</button>}
-     </div>
-     
-     <div className="opening-grid">
-      {cards.map(card=><article className="opening-option" key={card.id}>
-       <label><input type="checkbox" checked={body.city.characters.some(actor=>actor.templateId===card.id)} onChange={event=>cardToggle(card,event.target.checked)}/>
-        {card.fields.name}{cards.filter(other=>other.fields.name===card.fields.name).length>1?`（版本 ${card.version}）`:''}</label>
-       {card.fields.background&&<p>{card.fields.background}</p>}
-       <details><summary>查看人物數值</summary><p>力量 {card.values.strength}／耐力 {card.values.endurance}／靈巧 {card.values.dexterity}／感知 {card.values.perception}／外觀 {card.values.appearance}；精神容量 {card.capacity}</p></details>
-      </article>)}
      </div>
     </>}
     {stage===2&&<>
