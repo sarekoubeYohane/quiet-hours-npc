@@ -1,5 +1,5 @@
 import type { World, Character } from './world';
-import { isCandidateFailureReason, type ModelObserver, type ModelObservation } from './model-adapter';
+import { providerTokenUsage, isCandidateFailureReason, type ModelObserver, type ModelObservation } from './model-adapter';
 import { decisionTraceLimits, omitDecisionTraceContent, type DecisionTrace } from './decision-traces';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 
@@ -61,7 +61,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       else if(active&&event.kind==='headers'){active.httpStatus=event.httpStatus;active.headersReceivedAt=Date.now();active.stage='response-headers';trace.lastKnownStage='response-headers';}
       else if(active&&(event.kind==='response'||event.kind==='late-response')){if(actor&&!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=event.at??Date.now();if(event.kind==='response'&&event.usage){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
         active.discarded=true;
-        try{const usage=JSON.parse(event.responseBody)?.usage;if(typeof usage?.prompt_tokens==='number'&&typeof usage?.completion_tokens==='number'&&Number.isFinite(usage.prompt_tokens)&&Number.isFinite(usage.completion_tokens)&&usage.prompt_tokens>=0&&usage.completion_tokens>=0)active.lateUsage={inputTokens:usage.prompt_tokens,outputTokens:usage.completion_tokens};}catch{/* Malformed late bodies remain raw evidence. */}
+        try{const usage=providerTokenUsage(provider,JSON.parse(event.responseBody));if(usage)active.lateUsage=usage;}catch{/* Malformed late bodies remain raw evidence. */}
       }}
       else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}
       else if(active&&event.kind==='candidate'){if(actor&&!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}

@@ -103,3 +103,32 @@ test('rereading a committed reroll unlocks allocation in the same mounted editor
   assert.equal(sessionStorage.getItem('quiet-hours:character-reroll:'+draft.accountScope+':'+draft.id),null);
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=old;await close();await window.happyDOM.abort();}
 });
+test('模型選單使用查到的 ID，兩個角色可共用一份清單並獨立選擇', async () => {
+  const { Component, close } = await component('components/model-settings-panel.tsx');
+  const original = globalThis.fetch;
+  const choice = { provider: 'deepseek', model: 'previous-model' };
+  const effective = { npc: choice, adjudication: choice };
+  const settings = { accountScope:'account-operations:a', preference:{mode:'custom',models:effective}, version:1, effective, accountModels:effective,
+    modelKeyStorageAvailable:true, source:'account', modelKeys:{deepseek:{configured:true,expiresAt:Date.now()+60000}} };
+  const requests=[];
+  globalThis.fetch = async (_url, init) => {
+    if (!init?.body) return Response.json(settings);
+    const body=JSON.parse(init.body); requests.push(body);
+    return Response.json(body.operation === 'list-models' ? {accountScope:settings.accountScope,models:[{id:'listed-by-key',name:'帳號可用模型'},{id:'previous-model',name:'舊模型'}]} : settings);
+  };
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  const field=label=>document.querySelector('select[aria-label="'+label+'"]');
+  try {
+    await React.act(async()=>root.render(React.createElement(Component)));
+    await settle(()=>document.querySelector('[aria-label="NPC 模型"]'));
+    assert.ok(field('NPC 模型'), 'NPC 模型應為選單');
+    const button=[...document.querySelectorAll('button')].find(item=>item.textContent.includes('讀取模型'));
+    await React.act(async()=>button.click());
+    await settle(()=>[...field('NPC 模型').options].some(item=>item.value==='listed-by-key'));
+    await React.act(async()=>{field('NPC 模型').value='listed-by-key';field('NPC 模型').dispatchEvent(new window.Event('change',{bubbles:true}));});
+    assert.equal(field('天上意志模型').value, 'previous-model');
+    await React.act(async()=>[...document.querySelectorAll('button')].find(item=>item.textContent==='保存模型與 Key').click());
+    assert.deepEqual(requests.at(-1).models, {npc:{provider:'deepseek',model:'listed-by-key'},adjudication:choice});
+    assert.equal(requests.filter(r=>r.operation==='list-models').length, 1);
+  } finally { await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort(); }
+});

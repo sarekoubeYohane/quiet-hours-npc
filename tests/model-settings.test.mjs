@@ -52,6 +52,30 @@ async function fixture() {
 }
 
 const models = {npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
+
+test('玩家可以用新 Key 查詢供應商模型，查詢不會保存 Key 或變更設定', async () => {
+  const { db, request } = await fixture();
+  const oldFetch = globalThis.fetch;
+  try {
+    let calls = 0;
+    globalThis.fetch = async (url, init) => {
+      calls++;
+      assert.equal(String(url), 'https://api.deepseek.com/models');
+      assert.equal(new Headers(init.headers).get('authorization'), 'Bearer test-catalog-secret');
+      return Response.json({ data: [{ id: 'newly-released-model' }] });
+    };
+    const query = { operation: 'list-models', provider: 'deepseek', key: 'test-catalog-secret' };
+    assert.equal((await request({ ...query, accountScope: 'account-operations:other' })).status, 409);
+    const result = await request(query);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body.models.map(model => model.id), ['newly-released-model']);
+    assert.equal(JSON.stringify(result.body).includes(query.key), false);
+    assert.equal(calls, 1);
+    const settings = (await request()).body;
+    assert.equal(settings.version, 0);
+    assert.equal(settings.modelKeys.deepseek.configured, false);
+  } finally { globalThis.fetch = oldFetch; db.close(); }
+});
 test('account model defaults persist through the product API with conflict and lost response recovery, without dispatching', async()=>{
  const {db,context,request,worldRequest}=await fixture(); let calls=0;const oldFetch=globalThis.fetch;globalThis.fetch=async()=>{calls++;throw Error('unexpected model');};
  try {
@@ -330,4 +354,75 @@ test('a parallel NPC request rejected before provider dispatch creates no fake p
    const rejected=await worldRequest(advance,second);assert.equal(rejected.status,502);assert.equal(rejected.body.world.turn,0);assert.equal(rejected.body.world.aiUsage.totalCalls,0);assert.equal(calls,1);
    release();assert.equal((await pending).status,200);assert.equal((await budgetRequest()).body.usage.totalCalls,1+context.formationCalls);
  }finally{release?.();globalThis.fetch=oldFetch;db.close();}
+});
+test('兩個角色可保存新模型，並用各家已保存的 Key 查清單', async () => {
+  const { db, request, worldRequest } = await fixture();
+  const oldFetch = globalThis.fetch;
+  try {
+    const roles = { npc: { provider: 'deepseek', model: 'chosen-model' }, adjudication: { provider: 'anthropic', model: 'claude-choice' } };
+    assert.equal((await request({ mode: 'custom', version: 0, models: roles })).status, 200);
+    assert.deepEqual((await request()).body.effective, roles);
+    for (const [provider, mode, host, header] of [
+      ['openai', 'openai', 'api.openai.com', 'authorization'],
+      ['openrouter', 'ai', 'openrouter.ai', 'authorization'],
+      ['deepseek', 'deepseek', 'api.deepseek.com', 'authorization'],
+      ['gemini', 'gemini', 'generativelanguage.googleapis.com', 'x-goog-api-key'],
+      ['anthropic', 'anthropic', 'api.anthropic.com', 'x-api-key'],
+    ]) {
+      const key = 'test-only-' + provider;
+      assert.equal((await worldRequest({ operation: 'set-model-key', mode, key })).status, 200);
+      let pages = 0;
+      globalThis.fetch = async (url, init) => {
+        pages++;
+        const target = new URL(url);
+        assert.equal(target.hostname, host);
+        assert.equal(new Headers(init.headers).get(header), (header === 'authorization' ? 'Bearer ' : '') + key);
+        if (provider === 'openrouter') assert.equal(target.pathname, '/api/v1/models/user');
+        if (provider === 'gemini') return Response.json(pages === 1
+          ? { models: [{ name: 'models/embed', supportedGenerationMethods: ['embedContent'] }], nextPageToken: 'p2' }
+          : { models: [{ name: 'models/chosen-model', supportedGenerationMethods: ['generateContent'] }] });
+        if (provider === 'anthropic' && !target.searchParams.has('after_id')) return Response.json({ data: [], has_more: true, last_id: 'p2' });
+        return Response.json({ data: [{ id: 'chosen-model' }] });
+      };
+      const found = await request({ operation: 'list-models', provider });
+      assert.equal(found.status, 200);
+      assert.deepEqual(found.body.models.map(item => item.id), ['chosen-model']);
+      assert.equal(pages, ['anthropic', 'gemini'].includes(provider) ? 2 : 1);
+    }
+  } finally { globalThis.fetch = oldFetch; db.close(); }
+});
+test('玩家選擇的服務和模型實際用於天上意志，原生 Claude 回應也能結算用量', async () => {
+  const { db, request, worldRequest, budgetRequest, createWorld } = await fixture();
+  const oldFetch = globalThis.fetch;
+  try {
+    const save = await createWorld('模型選單');
+    const before = (await budgetRequest()).body.usage.totalInputTokens;
+    let version = 0;
+    for (const [provider, endpoint] of [
+      ['anthropic', 'https://api.anthropic.com/v1/messages'],
+      ['deepseek', 'https://api.deepseek.com/chat/completions'],
+      ['gemini', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'],
+    ]) {
+      const choice = { provider, model: provider + '-selected' };
+      assert.equal((await request({ version: version++, mode: 'custom', models: { npc: choice, adjudication: choice } }, save)).status, 200);
+      assert.equal((await worldRequest({ operation: 'set-model-key', mode: provider, key: 'test-' + provider })).status, 200);
+      globalThis.fetch = async (url, init) => {
+        assert.equal(String(url), endpoint);
+        const body = JSON.parse(init.body), headers = new Headers(init.headers);
+        assert.equal(body.model, choice.model);
+        const content = '{"background":"修鐘人"}';
+        if (provider === 'anthropic') {
+          assert.equal(headers.get('x-api-key'), 'test-anthropic');
+          assert.ok(body.system);
+          assert.equal(body.messages[0].role, 'user');
+          return Response.json({ content: [{ type: 'text', text: content }], stop_reason: 'end_turn', usage: { input_tokens: 2, cache_read_input_tokens: 3, output_tokens: 4 } });
+        }
+        assert.equal(headers.get('authorization'), 'Bearer test-' + provider);
+        return Response.json({ choices: [{ message: { content } }], usage: { prompt_tokens: 5, completion_tokens: 4 } });
+      };
+      const result = await worldRequest(generationOperation, save);
+      assert.equal(result.status, 200, result.body.error);
+    }
+    assert.equal((await budgetRequest()).body.usage.totalInputTokens - before, 15);
+  } finally { globalThis.fetch = oldFetch; db.close(); }
 });

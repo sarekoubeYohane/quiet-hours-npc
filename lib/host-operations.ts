@@ -1,3 +1,4 @@
+import { isModelProvider, providerForMode } from './model-providers';
 import { prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
 import { readArrangement, storeArrangementResult } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
@@ -44,8 +45,8 @@ import { acceptOperation, respond, restoreWorld, runOperation, traceWorld, type 
 const modelKeyOperation = (): OperationHandler => ({
   accountWorkspace: true,
   async immediate({ b, accountId, id }) {
-      if (!['ai', 'openai'].includes(b.mode || '')) return respond({ error: '請選擇要設定 Key 的模型服務。' }, 400);
-      const provider = b.mode === 'openai' ? 'openai' : 'openrouter';
+      if (b.mode !== 'ai' && !isModelProvider(b.mode)) return respond({ error: '請選擇要設定 Key 的模型服務。' }, 400);
+      const provider = providerForMode(b.mode);
       if (b.operation === 'set-model-key') await saveModelKey(accountId, provider, b.key);
       else await clearModelKey(accountId, provider);
       return respond({operationScope:id,modelKeys:await modelKeyStatus(accountId),modelKeyStorageAvailable:modelKeyStorageAvailable()});
@@ -104,11 +105,11 @@ const advanceOperation = (): OperationHandler => ({
             const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
             await verifyLease();
             if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await workWait(readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter'));
+            dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
           evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
-            const provider=b.mode==='openai'?'openai':'openrouter',model=b.model!.trim();
+            const provider=providerForMode(b.mode),model=b.model!.trim();
             const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
             traceWorld(trace,'controlled-feelings-dispatch');
             const dispatch=dispatchModel('feelings',w,c,provider,model,dispatchKey,{evidence:true,withinWorkDeadline:true});
@@ -116,7 +117,7 @@ const advanceOperation = (): OperationHandler => ({
           },
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
-            const provider=b.mode === 'openai' ? 'openai' : 'openrouter';
+            const provider=providerForMode(b.mode);
             const price=accountPlayer.prices.find(p=>p.provider===provider && p.model===b.model!.trim());
             let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
             let dispatch = 0;
@@ -131,7 +132,7 @@ const advanceOperation = (): OperationHandler => ({
               return reservationId;
             };
             const npcDispatch=dispatchModel('npc',w,c,provider,b.model!.trim(),dispatchKey,{evidence:true,withinWorkDeadline:true});
-            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), b.mode === 'openai' ? 'openai' : 'openrouter', npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
+            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), providerForMode(b.mode), npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
               beforeDispatch:npcDispatch.beforeDispatch,
               onSettled:npcDispatch.onSettled,
               observer: npcDispatch.observer,
@@ -420,7 +421,7 @@ const setPriceOperation = (): OperationHandler => ({
 const setAdjudicationOperation = (): OperationHandler => ({
   accountWorkspace: true,
   request({ b }) {
-    if(b.operation==='set-adjudication'&&(!b.adjudication||!['openai','openrouter'].includes(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return respond({error:'請填寫裁定服務與模型。'},400);
+    if(b.operation==='set-adjudication'&&(!b.adjudication||!isModelProvider(b.adjudication.provider)||typeof b.adjudication.model!=='string'||!b.adjudication.model.trim()||b.adjudication.model.length>120||Object.keys(b.adjudication).some(k=>!['provider','model'].includes(k)))) return respond({error:'請填寫裁定服務與模型。'},400);
   },
   run({ b, world }) {
       world.adjudication={provider:b.adjudication!.provider,model:b.adjudication!.model.trim()};
