@@ -12,7 +12,7 @@ const scene={id:crypto.randomUUID(),version:1,name:'小屋',note:'',rooms:[{id:'
 const place={id:'home',templateId:scene.id,version:1,name:'小屋'};
 test('unique starts fill only empty choices; multiple rooms and explicit choices are preserved',()=>{
  const city={characters:[actor],places:[place]};
- assert.deepEqual(fillUniqueStarts(city,[scene]).characters[0],{...actor,placeId:'home',roomId:'room'});
+ assert.deepEqual(fillUniqueStarts(city,[scene]).characters[0],{...actor,placeId:'home',roomId:'room',placeOrigin:'system',roomOrigin:'system'});
  assert.deepEqual(city.characters[0],actor);
  assert.equal(fillUniqueStarts({...city,places:[place,{...place,id:'other'}]},[scene]).characters[0].placeId,'');
  assert.equal(fillUniqueStarts(city,[{...scene,rooms:[...scene.rooms,{id:'bed',name:'臥室'}]}]).characters[0].roomId,'');
