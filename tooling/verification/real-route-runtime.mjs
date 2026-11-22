@@ -16,7 +16,7 @@ export async function startApp({root=process.cwd(), port=0, databasePath, modelR
   root=resolve(root);
   if(!port){const probe=http.createServer();await new Promise(done=>probe.listen(0,'127.0.0.1',done));port=probe.address().port;await new Promise(done=>probe.close(done));}
   const require=createRequire(join(root,'package.json'));
-  const {createServer}=await import(pathToFileURL(require.resolve('vite')).href);
+  const {createServer,normalizePath}=await import(pathToFileURL(require.resolve('vite')).href);
   const {default:vinext}=await import(pathToFileURL(join(root,'node_modules/vinext/dist/index.js')).href);
   const directory=await mkdtemp(join(tmpdir(),'quiet-real-routes-'));
   await chmod(directory,0o700);
@@ -70,16 +70,17 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
 `);
   const commit=execFileSync('git',['rev-parse','--short','HEAD'],{cwd:root,encoding:'utf8'}).trim();
   const builtAt=new Date().toISOString();
+  const libFile = name => normalizePath(join(root, 'lib', name));
   const boundary={
     name:'local-acceptance-boundaries',enforce:'pre',
     resolveId(source,importer){
-      if(source==='cloudflare:workers')return bindings;
-      if(source==='@/lib/auth'||source===join(root,'lib/auth.ts')||source===join(root,'lib/auth')||(source==='./auth'&&importer?.startsWith(join(root,'lib'))))return auth;
+      if(source==='cloudflare:workers')return normalizePath(bindings);
+      if(source==='@/lib/auth'||normalizePath(source)===libFile('auth.ts')||normalizePath(source)===libFile('auth')||(source==='./auth'&&importer&&normalizePath(importer).startsWith(libFile('')+'/')))return normalizePath(auth);
     },
     transform(source,id){
-      if(dicePath&&id.split('?')[0]===join(root,'lib/character-formation.ts')){const marker='const sample=Math.random();';if(!source.includes(marker))throw Error('Character dice boundary changed');return `import {cardRandom} from ${JSON.stringify(dicePath)};\n`+source.replace(marker,'const sample=cardRandom();');}
-      if(checkDicePath&&id.split('?')[0]===join(root,'lib/action-checks.ts'))return `import {checkRandom} from ${JSON.stringify(checkDicePath)};\n`+source.replace('const sample=random();','const sample=checkRandom();').replace('rollD20(random)','rollD20(checkRandom)');
-      if(id.split('?')[0]!==join(root,'lib/model-adapter.ts'))return;
+      if(dicePath&&normalizePath(id.split('?')[0])===libFile('character-formation.ts')){const marker='const sample=Math.random();';if(!source.includes(marker))throw Error('Character dice boundary changed');return `import {cardRandom} from ${JSON.stringify(normalizePath(dicePath))};\n`+source.replace(marker,'const sample=cardRandom();');}
+      if(checkDicePath&&normalizePath(id.split('?')[0])===libFile('action-checks.ts'))return `import {checkRandom} from ${JSON.stringify(normalizePath(checkDicePath))};\n`+source.replace('const sample=random();','const sample=checkRandom();').replace('rollD20(random)','rollD20(checkRandom)');
+      if(normalizePath(id.split('?')[0])!==libFile('model-adapter.ts'))return;
       const expected='options.fetcher || fetch';
       if(!source.includes(expected))throw Error('Model boundary changed: update the acceptance harness before testing');
       return source.replace(expected,`((_url, init) => (options.fetcher || fetch)(${JSON.stringify(modelUrl)}, {...init, headers:{'Content-Type':'application/json'}}))`);
@@ -93,6 +94,6 @@ export const finishGitHubLogin=startGitHubLogin,signOut=startGitHubLogin;
   }catch(error){await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});throw error;}
   const url=`http://127.0.0.1:${server.httpServer.address().port}`;
   return {url,commit,builtAt,sqlitePath,requests,modelRequests,
-    async close(){await server.environments.rsc.runner.import(bindings).then(module=>module.closeDatabase());await server.close();await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});},
+    async close(){await server.environments.rsc.runner.import(normalizePath(bindings)).then(module=>module.closeDatabase());await server.close();await new Promise(done=>relay.close(done));await rm(cacheDir,{recursive:true,force:true});await rm(directory,{recursive:true,force:true});},
   };
 }
