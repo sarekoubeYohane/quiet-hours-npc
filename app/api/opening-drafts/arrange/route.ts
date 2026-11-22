@@ -1,3 +1,5 @@
+import {reconcileOpeningStarts,sameExceptOpeningStarts} from '@/lib/opening-starts';
+import type {CityDraft} from '@/lib/city-draft';
 import {z} from 'zod';
 import {getGitHubUser} from '@/lib/auth';
 import {readOpeningDraft,adoptOpeningArrangement} from '@/lib/opening-drafts';
@@ -26,13 +28,13 @@ export async function POST(request:Request){
    if(input.action==='adopt'&&row.state==='adopted'&&row.adoption_request===adoption)return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});
    if((await actionableArrangement(owner,input.id))?.operationId!==input.operationId)return reply({error:'已有較新的整理操作，請查看最新建議。'},409);
    if(input.version!==loaded.draft.version)return reply({error:'開局草稿版本已變更，原輸入已保留。'},409);
-   const originalDraft=JSON.parse(row.snapshot) as {body:{city:unknown;description:string}};
-   if(JSON.stringify(originalDraft.body.city)!==JSON.stringify(loaded.draft.body.city)||originalDraft.body.description!==loaded.draft.body.description)return reply({error:'整理依據的開局內容已變更，原輸入已保留；請核對或手動完成。'},409);
+   const originalDraft=JSON.parse(row.snapshot) as {body:{city:CityDraft;description:string}};
+   if(!sameExceptOpeningStarts(originalDraft.body.city,loaded.draft.body.city)||originalDraft.body.description!==loaded.draft.body.description)return reply({error:'整理依據的開局內容已變更，原輸入已保留；請核對或手動完成。'},409);
    if(input.action==='edit'){const edited=await editArrangement(owner,row,input.proposalVersion,input.city,input.version);return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(edited)});}
    if(row.adoption_request&&row.adoption_request!==adoption)return reply({error:'原建議已採納，後續修改請使用手動配置。'},409);
    if(input.proposalVersion!==row.revision||!row.result||JSON.stringify(JSON.parse(row.result).city)!==JSON.stringify(input.city))return reply({error:'建議已變更，請先保存修改並核對原版本。'},409);
    if(!JSON.parse(row.result).world||JSON.parse(row.result).preview.issues.length)return reply({error:'建議仍有開局阻擋問題，請修改後再採納。',preview:JSON.parse(row.result).preview},422);
-   const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:input.city}},row,adoption);
+   const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:reconcileOpeningStarts(input.city,loaded.draft.body.city)}},row,adoption);
    return reply({operationScope:owner,...result,arrangement:arrangementForClient((await readArrangement(owner,input.id,input.operationId))!)});
   }
   if(row){if(input.worldContext!==undefined&&JSON.parse(row.request).worldContext!==input.worldContext)return reply({error:'原整理操作來源不符。'},409);if(row.input_version!==input.version)return reply({error:'原整理操作版本不符。'},409);if(row.state!=='pending')return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});}
