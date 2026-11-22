@@ -4,12 +4,12 @@ import {prepareCity} from './city-creation';
 import type {OpeningDraft} from './opening-drafts';
 import type {CityDraft,CityPreview} from './city-draft';
 import type {World} from './world';
-export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string;supplyRooms?:boolean};
-export type ArrangementResult={receipts?:Partial<Record<'items'|'roads',string>>;roomItems?:import('./opening-room-items').RoomItemReview;city:CityDraft;preview:CityPreview;world?:World};
+export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string;supplyRooms?:boolean;recommendRoads?:boolean};
+export type ArrangementResult={roomItems?:import('./opening-room-items').RoomItemReview;city:CityDraft;preview:CityPreview;world?:World;receipts?:Partial<Record<'roads'|'items',string>>};
 export const storedArrangementResult=(row:ArrangementRow)=>JSON.parse(row.result!) as ArrangementResult;
 export const arrangementHasReceipt=(row:ArrangementRow,request:string)=>row.adoption_request===request||!!row.result&&Object.values(storedArrangementResult(row).receipts??{}).includes(request);
 export type ArrangementRow={owner:string;draft_id:string;operation_id:string;input_version:number;revision:number;request:string;snapshot:string;state:'pending'|'complete'|'failed'|'adopted';result:string|null;error:string|null;adoption_request:string|null};
-export const arrangementForClient=(row:ArrangementRow)=>({operationId:row.operation_id,version:row.revision,inputVersion:row.input_version,state:row.state,...(row.state!=='pending'&&row.result?JSON.parse(row.result) as ArrangementResult:{}),...(row.error?{error:row.error}:{})});
+export const arrangementForClient=(row:ArrangementRow)=>({operationId:row.operation_id,version:row.revision,inputVersion:row.input_version,state:row.state,recommendRoads:(JSON.parse(row.request) as ArrangementRequest).recommendRoads,...(row.state!=='pending'&&row.result?storedArrangementResult(row):{}),...(row.error?{error:row.error}:{})});
 export type ArrangementView=ReturnType<typeof arrangementForClient>;
 export async function readArrangement(owner:string,draftId:string,operationId:string){return database().prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=? AND operation_id=?').bind(owner,draftId,operationId).first<ArrangementRow>();}
 export async function latestArrangement(owner:string,draftId:string){const row=await database().prepare('SELECT * FROM opening_arrangements WHERE owner=? AND draft_id=? ORDER BY rowid DESC LIMIT 1').bind(owner,draftId).first<ArrangementRow>();return row?arrangementForClient(row):undefined;}
