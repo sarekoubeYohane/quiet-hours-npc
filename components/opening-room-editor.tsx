@@ -85,7 +85,7 @@ export function OpeningRoomEditor({city, cards, scenes, update, onNavigate, init
 
   return <section ref={panel} aria-label="房間與物件" className="opening-room-editor">
     <div className="opening-actions">
-      <label>編輯場所<select value={place.id} onChange={event => switchTo(event.target.value, '')}>
+      <label>編輯場所<select aria-label="編輯場所" value={place.id} onChange={event => switchTo(event.target.value, '')}>
         {city.places.map((value, index) => <option key={value.id} value={value.id}>{value.name}{city.places.some(other => other.id !== value.id && other.name === value.name) ? '（場所 '+(index+1)+'）' : ''}</option>)}
       </select></label>
       <button onClick={addRoom}>在 {place.name} 新增房間</button>
