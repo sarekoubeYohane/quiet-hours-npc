@@ -136,7 +136,11 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
 // The caller owns the candidate schema, validation, dispatch budget and commit authority.
 export function requestAdjudication(input: AdjudicationInput, service: ModelService, schema: object, options: Parameters<typeof requestModel>[3]): Promise<string> {
   return requestModel(service, [
-    { role: 'system', content: '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。' },
+    { role: 'system', content: [
+      '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。',
+      '先決定 status，再填 activityIdentity。凡 status 不等於 "accepted"，頂層 activityIdentity 必須填 JSON 的 null。',
+      '對照這兩個欄位的配對 {"status":"denied","activityIdentity":null}、{"status":"unsupported","activityIdentity":null}，其餘必填欄位依本次契約填齊。',
+    ].join('\n') },
     { role: 'user', content: JSON.stringify(input) },
   ], schema, {...options,...('routineOffer' in input&&input.routineOffer?{maxOutputTokens:routineWorldLimits.maxOutputTokens}:{})});
 }
