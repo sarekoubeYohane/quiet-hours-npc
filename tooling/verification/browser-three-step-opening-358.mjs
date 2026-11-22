@@ -55,7 +55,7 @@ const label=name=>page.getByLabel(name,{exact:true});
 const saved=()=>page.locator('.opening-status',{hasText:'已保存至帳號'}).waitFor();
 const click=name=>button(name).click();
 const choose=(name,option)=>label(name).selectOption({label:option});
-const screenshot=name=>page.screenshot({path:join(output,name+'.png')});
+const screenshot=(name,surface=page)=>surface.screenshot({path:join(output,name+'.png')});
 const checks=[];
 async function api(path,body){
  const response=await context.request.fetch(app.url+path,{method:body?'POST':'GET',data:body,headers:{Origin:app.url,'X-World-Time-Policy':'round-v1'}});
@@ -114,7 +114,7 @@ try{
  const rooms=page.getByRole('navigation',{name:'住宅的房間'});
  await rooms.getByRole('button',{name:/玄關（2 件/}).click();
  assert.deepEqual(await label('物件名稱').evaluateAll(els=>els.map(el=>el.value)),['鞋櫃','雨傘架']);
- await page.getByText('玄關門 · 通往客廳 · 關閉',{exact:true}).waitFor();await screenshot('02-重開玄關');
+ await page.getByText('玄關門 · 通往客廳 · 關閉',{exact:true}).waitFor();await screenshot('02-重開玄關',page.getByRole('region',{name:'住宅・玄關',exact:true}));
  await rooms.getByRole('button',{name:/客廳/}).click();await page.getByText('玄關門 · 通往玄關 · 關閉',{exact:true}).waitFor();
  checks.push('同一草稿重開：兩件物品、一扇雙向核對的門、方向關係、手選起點');
  const base=(await read()).draft.body.city;
@@ -132,7 +132,7 @@ try{
  await chair.check();await button('採納所選物品（32 件）').waitFor();await chair.uncheck();
  assert.equal(await roads.getByRole('button',{name:'採納道路',exact:true}).isDisabled(),true);
  assert.equal(await button('全部採納').isDisabled(),true);
- await click('採納所選物品（31 件）');await items.getByText(/已採納所選物品/).waitFor();await screenshot('03-道路未通先採納31件');
+ await click('採納所選物品（31 件）');await items.getByText(/已採納所選物品/).waitFor();await screenshot('03-道路未通先採納31件',items);
  await reopen();
  const cityAfterItems=(await read()).draft.body.city;
  const objects=city=>city.finalization.spaces.flatMap(s=>s.objects);
@@ -160,13 +160,14 @@ try{
  await storeStart.click();await choose('店主起始房間','前台');await click('返回核對');
  await storeCard.getByText('起點：街角咖啡館・前台',{exact:true}).waitFor();
  assert.equal(await storeStart.evaluate(el=>el===document.activeElement),true);
+ await page.getByRole('heading',{name:'核對開局',exact:true}).evaluate(el=>el.scrollIntoView({block:'start'}));
  await screenshot('04-核對開局');assert.equal((await api('/api/saves')).saves.length,0);
  await click('確認開局，進入觀察');await page.waitForURL(url=>url.pathname==='/observe'&&url.searchParams.get('save')===id);
  const world=(await api('/api/world?save='+id)).world;
  assert.equal(world.turn,0);assert.equal(world.characters.length,4);assert.equal(world.objects.filter(o=>o.label==='雨傘架').length,1);
  const cassAtZero=world.characters.find(person=>person.name==='Cass');assert.equal(cassAtZero.needs.values.hunger,24);assert.equal(cassAtZero.mentalEnergy.value,31);
  assert.deepEqual(tasks,['opening-arrangement-v1','opening-road-repair-v1']);
- assert.deepEqual(errors,[]);await screenshot('05-進入觀察第0回合');
+ assert.deepEqual(errors,[]);await page.getByText(/世界已保存.*第 0 回合/).first().waitFor();await screenshot('05-進入觀察第0回合');
  checks.push('確認前沒有正式存檔；確認後觀察頁與世界 API 對應同一存檔，停在第 0 回合');
  const evidence={commit:app.commit,draftId:id,checks,modelTasks:tasks,paidCalls:0,selectedItems:31,manualObjects:2,walkMinutes:[6,12],turn:world.turn};
  await writeFile(join(output,'evidence.json'),JSON.stringify(evidence,null,2));console.log(evidence);
