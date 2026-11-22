@@ -65,7 +65,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
       }}
       else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}
       else if(active&&event.kind==='candidate'){if(actor&&!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
-      else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage,...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
+      else if(active&&event.kind==='failure'){active.failure={kind:event.failure,stage:event.stage,...(event.detail&&!omitContent()?{detail:scrub(event.detail)}:{}),...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
       await persist();
     };
   };

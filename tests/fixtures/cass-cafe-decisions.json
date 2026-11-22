@@ -1,0 +1,112 @@
+[
+  {
+    "contractVersion": "npc-decision.v3",
+    "pursuitContext": "cafe-fixture-context",
+    "interpretation": "我在街角咖啡館前台，口渴，店主就在旁邊，飲水機也在這附近，正好可以解決口渴。",
+    "mood": "平靜",
+    "pursuitCandidates": [],
+    "pursuitSelection": {
+      "adoptions": [],
+      "declinedCandidateIds": [],
+      "focus": null
+    },
+    "pursuitUpdates": [],
+    "action": {
+      "type": "say",
+      "target": "npc:2",
+      "content": "不好意思，請問我可以跟您借點水嗎？我現在有點口渴。",
+      "purpose": "向前台店主確認能否使用飲水機。"
+    },
+    "timeIntent": {
+      "kind": "completion",
+      "maxMinutes": null
+    },
+    "durationMinutes": 15,
+    "reconfirmBodyConsequences": false,
+    "methodAssessment": {
+      "purpose": "解渴，順便和店主建立最基本的互動。",
+      "method": "直接開口問店主能不能裝水。",
+      "reason": "店就在眼前、人也在，先問一聲最簡單。",
+      "choice": "new",
+      "change": "not-applicable",
+      "knownResults": [],
+      "intentIds": [],
+      "selectedAction": {
+        "type": "say",
+        "target": "npc:2"
+      }
+    },
+    "memorySelections": [],
+    "cognitiveUpdates": [],
+    "preferenceUpdates": [],
+    "arrangementUpdates": [],
+    "habitCandidates": [],
+    "feelingUpdates": [],
+    "processFeeling": null,
+    "emotionRegulation": null,
+    "focusIntentId": null
+  },
+  {
+    "contractVersion": "npc-decision.v3",
+    "pursuitContext": "cafe-fixture-context",
+    "interpretation": "我在咖啡館前台，明顯口渴，店主就在旁邊，飲水機也在附近；先解渴，再慢慢安頓自己。",
+    "mood": "平靜但有些拘謹",
+    "pursuitCandidates": [],
+    "pursuitSelection": {
+      "adoptions": [],
+      "declinedCandidateIds": [],
+      "focus": null
+    },
+    "focusIntentId": null,
+    "methodAssessment": {
+      "purpose": "解渴，順便熟悉眼前環境。",
+      "method": "走到飲水機旁裝水喝。",
+      "reason": "身體明顯口渴，飲水機就在前台，不需要麻煩別人。",
+      "choice": "new",
+      "change": "not-applicable",
+      "knownResults": [],
+      "intentIds": [],
+      "selectedAction": {
+        "type": "propose",
+        "target": "place:place-1:object:water-dispenser"
+      }
+    },
+    "action": {
+      "type": "propose",
+      "target": "place:place-1:object:water-dispenser",
+      "content": "走到飲水機前，找杯子或直接裝水來喝。",
+      "purpose": "解渴。"
+    },
+    "timeIntent": {
+      "kind": "completion"
+    },
+    "durationMinutes": 5,
+    "reconfirmBodyConsequences": false,
+    "attentionConditions": [],
+    "memorySelections": [
+      {
+        "id": "cafe-short",
+        "version": 1,
+        "reason": "這是我開始新生活後第一個明確的需求與被提醒的時刻。"
+      }
+    ],
+    "cognitiveUpdates": [],
+    "preferenceUpdates": [],
+    "arrangementUpdates": [],
+    "habitCandidates": [],
+    "feelingUpdates": [
+      {
+        "source": "cafe-feeling",
+        "direction": "neutral",
+        "level": 1,
+        "mood": null
+      }
+    ],
+    "processFeeling": {
+      "direction": "正面",
+      "level": 1,
+      "reason": "喝水能讓身體舒服一些，也讓我覺得可以自己處理小事。"
+    },
+    "emotionRegulation": null
+  }
+]

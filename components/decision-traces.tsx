@@ -13,7 +13,7 @@ type Trace = {
   baseVersion:number; resultVersion?:number; redacted:boolean; gaps:string[];
   dispatches:Array<{sequence:number;task:string;actorId:string;requestId:string;provider:string;model:string;
     startedAt:number;requestBody?:string;responseBody?:string;httpStatus?:number;stage:string;
-    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown;failure?:{kind:string;stage?:string;reason?:CandidateFailureReason};discarded?:boolean;lateUsage?:unknown}>;
+    worldSnapshot?:unknown;rawCandidate?:unknown;parsedCandidate?:unknown;validation?:unknown;usage?:unknown;failure?:{kind:string;stage?:string;reason?:CandidateFailureReason;detail?:string};discarded?:boolean;lateUsage?:unknown}>;
   steps:Array<{kind:string;actorId?:string;source:string;data:unknown}>;
   result?:unknown;
 };
@@ -97,7 +97,7 @@ export default function DecisionTraces({worldEndpoint='/api/world',operationId,l
         <p>{dispatch.provider} / {dispatch.model}<br/>請求：{dispatch.requestId}<br/>階段：{dispatch.stage} · HTTP {dispatch.httpStatus??'未記錄'}</p>
         {dispatch.stage==='dispatch-prepared'&&<p>派送前保存點：是否真正發送未知；這筆準備紀錄不能證明供應商已收到請求。</p>}
         {dispatch.failure&&<p>技術故障：{dispatch.failure.kind}{dispatch.failure.stage?` · ${dispatch.failure.stage}`:''}。這不是模型對世界行動的正常否決。</p>}
-        {dispatch.task==='npc'&&dispatch.failure&&['candidate-format','candidate-validation'].includes(dispatch.failure.kind)&&<p>安全驗證原因：{dispatch.failure.reason&&Object.hasOwn(candidateReasons,dispatch.failure.reason)?candidateReasons[dispatch.failure.reason]:'未記錄／未知；不推測舊候選原因'}。</p>}
+        {dispatch.task==='npc'&&dispatch.failure&&['candidate-format','candidate-validation'].includes(dispatch.failure.kind)&&<p>安全驗證原因：{dispatch.failure.detail ?? (dispatch.failure.reason&&Object.hasOwn(candidateReasons,dispatch.failure.reason)?candidateReasons[dispatch.failure.reason]:'未記錄／未知；不推測舊候選原因')}。</p>}
         {dispatch.discarded&&<p>此回覆遲到或已失效，未交給世界執行；不代表候選或效果已提交。</p>}
         {dispatch.requestBody===undefined?<p>當次請求本文未保存。</p>:<JsonDetails label={dispatch.stage==='dispatch-prepared'?'已準備的請求本文（派送狀態未知）':'實際送出的請求本文'} value={dispatch.requestBody}/>}
         {dispatch.responseBody===undefined?<p>當次回覆本文缺失；不推定模型沒有回覆。</p>:<JsonDetails label="實際收到的回覆本文" value={dispatch.responseBody}/>}

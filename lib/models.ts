@@ -1,3 +1,4 @@
+import { DecisionFieldError, readDecisionField } from './decision-field-error';
 import { modelMode, type ModelProvider } from './model-providers';
 import { emotionRegulationPrompt, parseEmotionRegulation } from './emotion-regulation';
 import { processFeelingPromptFor, parseProcessFeeling } from './mental-process';
@@ -42,58 +43,88 @@ function parseMethodAssessment(value:unknown, action:{type:string;target?:string
   const data=value as MethodAssessment;
   const plain=(item:unknown,keys:string[])=>!!item&&typeof item==='object'&&!Array.isArray(item)&&Object.keys(item).length===keys.length&&Object.keys(item).every(key=>keys.includes(key));
   const text=(item:unknown,limit:number)=>typeof item==='string'&&item.length<=limit;
-  if(!plain(data,methodAssessmentSchema.required)||!text(data.purpose,300)||!text(data.method,300)||!text(data.reason,256)||!methodChoices.includes(data.choice)||!plain(data.change,['kind','detail'])||!methodChanges.includes(data.change.kind)||!text(data.change.detail,256)||!plain(data.selectedAction,['type','target'])||data.selectedAction.type!==action.type||data.selectedAction.target!==action.target||(data.choice==='continue')!==(data.selectedAction.type==='continue')||!Array.isArray(data.intentIds)||data.intentIds.length>12||new Set(data.intentIds).size!==data.intentIds.length||data.intentIds.some(id=>typeof id!=='string'||!intents.some(intent=>intent.id===id&&intent.status==='active')))throw Error('方法評估與本次行動或意圖引用不一致。');
+  if(!plain(data.change,['kind','detail']))throw new DecisionFieldError('methodAssessment.change',data.change,'含 kind 與 detail 的物件');
+  if(!plain(data,methodAssessmentSchema.required)||!text(data.purpose,300)||!text(data.method,300)||!text(data.reason,256)||!methodChoices.includes(data.choice)||!methodChanges.includes(data.change.kind)||!text(data.change.detail,256)||!plain(data.selectedAction,['type','target'])||data.selectedAction.type!==action.type||data.selectedAction.target!==action.target||(data.choice==='continue')!==(data.selectedAction.type==='continue')||!Array.isArray(data.intentIds)||data.intentIds.length>12||new Set(data.intentIds).size!==data.intentIds.length||data.intentIds.some(id=>typeof id!=='string'||!intents.some(intent=>intent.id===id&&intent.status==='active')))throw Error('方法評估與本次行動或意圖引用不一致。');
   if(!Array.isArray(data.knownResults)||data.knownResults.length>4||new Set(data.knownResults.map(ref=>[ref?.kind,ref?.id,ref?.version].join(':'))).size!==data.knownResults.length||data.knownResults.some(ref=>!plain(ref,['kind','id','version'])||!['short','long'].includes(ref.kind)||typeof ref.id!=='string'||!Number.isSafeInteger(ref.version)||!(ref.kind==='short'?context.visible.shortTerm:context.visible.longTerm)?.some(item=>item.id===ref.id&&item.version===ref.version)))throw Error('方法評估引用不屬於當次可見來源。');
   return data;
 }
 
 function parseDecision(value: unknown, allowedTypes: string[], world: World, character: Character, context: NpcDecisionContext): ActivityDecision {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new DecisionFieldError('$',value,'NPC 決策物件');
   const original = value as Record<string, unknown>;
   let data = original;
   if(original.action!==undefined){
-    if(!original.action||typeof original.action!=='object'||Array.isArray(original.action)||Object.keys(original.action).sort().join(',')!=='content,purpose,target,type'||['type','target','content','purpose'].some(key=>Object.hasOwn(original,key)))throw Error('行動欄位格式無效。');
+    if(!original.action||typeof original.action!=='object'||Array.isArray(original.action)||Object.keys(original.action).sort().join(',')!=='content,purpose,target,type'||['type','target','content','purpose'].some(key=>Object.hasOwn(original,key)))throw new DecisionFieldError('action',original.action,'type、target、content、purpose 四個欄位，只放在 action 內');
     data={...original,...original.action};delete data.action;
   }
-  if(original.contractVersion!==npcContractVersion||original.pursuitContext!==world.pursuitContext)throw Error('NPC 追求契約或世界不相容。');
-  if(original.contractVersion===npcContractVersion&&(original.action===undefined||original.methodAssessment===undefined))throw Error('本版決策需行動與方法評估。');
-  if(data.reconfirmBodyConsequences!==undefined&&typeof data.reconfirmBodyConsequences!=='boolean')throw Error('身體後果重新確認選擇格式無效。');
-  if(data.reconfirmBodyConsequences===true&&data.type!=='propose')throw Error('只有新提案可選擇重新確認身體後果。');
+  if(original.contractVersion!==npcContractVersion)throw new DecisionFieldError('contractVersion',original.contractVersion,npcContractVersion);
+  if(original.pursuitContext!==world.pursuitContext)throw new DecisionFieldError('pursuitContext',original.pursuitContext,'本次 self.pursuitContext 的值');
+  if(original.action===undefined)throw new DecisionFieldError('action',undefined,'含 type、target、content、purpose 的物件');
+  if(original.methodAssessment===undefined)throw new DecisionFieldError('methodAssessment',undefined,'本次行動的方法評估物件');
+  if(data.reconfirmBodyConsequences!==undefined&&typeof data.reconfirmBodyConsequences!=='boolean')throw new DecisionFieldError('reconfirmBodyConsequences',data.reconfirmBodyConsequences,'布林值');
+  if(data.reconfirmBodyConsequences===true&&data.type!=='propose')throw new DecisionFieldError('reconfirmBodyConsequences',true,'非 propose 行動填 false');
   const work = { emotionRegulation:data.emotionRegulation,processFeeling:data.processFeeling,feelingUpdates:data.feelingUpdates,pursuitCandidates:data.pursuitCandidates,pursuitSelection:data.pursuitSelection,pursuitUpdates:data.pursuitUpdates, arrangementUpdates:data.arrangementUpdates, methodAssessment:data.methodAssessment, habitCandidates:data.habitCandidates, preferenceUpdates: data.preferenceUpdates, memoryOperations: data.memoryOperations, memorySelections: data.memorySelections, cognitiveUpdates: data.cognitiveUpdates, interpretation: data.interpretation };
-  if (memoryBytes(work) > 8192 || (data.emotionRegulation?1:0) + (data.processFeeling?1:0) + (Array.isArray(data.feelingUpdates)?data.feelingUpdates.length:0) + (Array.isArray(data.pursuitUpdates)?data.pursuitUpdates.length:0) + (Array.isArray(data.arrangementUpdates)?data.arrangementUpdates.length:0) + (Array.isArray(data.habitCandidates)?data.habitCandidates.length:0) + (Array.isArray(data.memorySelections) ? data.memorySelections.length : 0) + (Array.isArray(data.cognitiveUpdates) ? data.cognitiveUpdates.length : 0) + (Array.isArray(data.memoryOperations) ? data.memoryOperations.length : 0) + (Array.isArray(data.preferenceUpdates) ? data.preferenceUpdates.length : 0) > 4) throw Error();
+  const workItems = [data.feelingUpdates, data.pursuitUpdates, data.arrangementUpdates, data.habitCandidates,
+    data.memorySelections, data.cognitiveUpdates, data.memoryOperations, data.preferenceUpdates]
+    .reduce<number>((total, items) => total + (Array.isArray(items) ? items.length : 0), 0)
+    + Number(Boolean(data.emotionRegulation)) + Number(Boolean(data.processFeeling));
+  if (workItems > 4) throw new DecisionFieldError('心理更新合計', workItems, '同一次決策最多 4 項');
+  const workBytes = memoryBytes(work);
+  if (workBytes > 8192) throw new DecisionFieldError('心理更新合計', workBytes, '序列化後最多 8192 UTF-8 bytes');
   const text = (value: unknown, max: number, nonempty = false) => typeof value === 'string' && value.length <= max && (!nonempty || value.trim().length > 0);
-  if (!allowedTypes.includes(data.type as string) || !text(data.target, 100) || !text(data.content, 500) || !text(data.mood, 20) ||
-    !activityDurations.includes(data.durationMinutes as number) || data.focusIntentId!==null&&!text(data.focusIntentId,64,true) ||
-    Object.keys(data).some(key => ![...actionSchema.required, 'contractVersion'].includes(key))) throw Error();
+  if (!allowedTypes.includes(data.type as string)) throw new DecisionFieldError('action.type', data.type, allowedTypes.join('／'));
+  for (const [key,limit] of [['target',100],['content',500],['mood',20]] as const) {
+    if (!text(data[key],limit)) throw new DecisionFieldError(key === 'mood' ? key : 'action.' + key, data[key], '最多 ' + limit + ' 字元的字串');
+  }
+  if (!activityDurations.includes(data.durationMinutes as number)) throw new DecisionFieldError('durationMinutes', data.durationMinutes, '15 至 1440 的 15 分鐘整數倍');
+  if (data.focusIntentId !== null && !text(data.focusIntentId,64,true)) throw new DecisionFieldError('focusIntentId', data.focusIntentId, 'null 或不超過 64 字元的非空 ID');
+  const unexpected = Object.keys(data).find(key => ![...actionSchema.required,'contractVersion'].includes(key));
+  if (unexpected) throw new DecisionFieldError('$', unexpected, '已定義的決策欄位名稱');
   let timeIntent: TimeIntent | undefined;
   if(data.timeIntent !== undefined){
-    if(!data.timeIntent || typeof data.timeIntent !== 'object' || Array.isArray(data.timeIntent))throw Error();
+    if(!data.timeIntent || typeof data.timeIntent !== 'object' || Array.isArray(data.timeIntent))throw new DecisionFieldError('timeIntent',data.timeIntent,'含 kind、maxMinutes 的物件');
     const timing=data.timeIntent as Record<string,unknown>;
-    if(Object.keys(timing).sort().join(',')!=='kind,maxMinutes'||!['completion','open-ended'].includes(timing.kind as string)||timing.maxMinutes!==null&&(typeof timing.maxMinutes!=='number'||!Number.isFinite(timing.maxMinutes)||timing.maxMinutes<=0||timing.maxMinutes>adjudicationLimits.maxMinutes)||timing.kind==='open-ended'&&timing.maxMinutes!==null)throw Error();
+    if (!['completion','open-ended'].includes(timing.kind as string)) throw new DecisionFieldError('timeIntent.kind',timing.kind,'completion 或 open-ended');
+    if(timing.maxMinutes!==null&&(typeof timing.maxMinutes!=='number'||!Number.isFinite(timing.maxMinutes)||timing.maxMinutes<=0||timing.maxMinutes>adjudicationLimits.maxMinutes||timing.kind==='open-ended')) {
+      throw new DecisionFieldError('timeIntent.maxMinutes',timing.maxMinutes,timing.kind==='open-ended'?'null':'null 或大於 0 且最多 1440 的分鐘數');
+    }
+    if(Object.keys(timing).length!==2)throw new DecisionFieldError('timeIntent',timing,'只有 kind 與 maxMinutes 的物件');
     timeIntent=timing as TimeIntent;
   }
-  const emotionRegulation=parseEmotionRegulation(character,data.emotionRegulation);
-  const processFeeling=parseProcessFeeling(character,data.processFeeling);
-  const feelingUpdates=parseFeelingUpdates(character,data.feelingUpdates,context.feelingSources,world.minute);
-  const pursuit=updatePursuits(world,character,data.pursuitUpdates,context.visible);
+  const emotionRegulation=readDecisionField('emotionRegulation', data.emotionRegulation, () => parseEmotionRegulation(character,data.emotionRegulation));
+  const processFeeling=readDecisionField('processFeeling', data.processFeeling, () => parseProcessFeeling(character,data.processFeeling));
+  const feelingUpdates=readDecisionField('feelingUpdates', data.feelingUpdates, () => parseFeelingUpdates(character,data.feelingUpdates,context.feelingSources,world.minute));
+  const pursuit=readDecisionField('pursuitUpdates', data.pursuitUpdates, () => updatePursuits(world,character,data.pursuitUpdates,context.visible));
   const intents=pursuit.intents;
-  const pursuitEvidence=parsePursuitSelection(character,context.visible,data.pursuitCandidates,data.pursuitSelection,data.pursuitUpdates,intents,data.focusIntentId);
-  if(data.focusIntentId!==null&&!intents.some(i=>i.id===data.focusIntentId&&i.status==='active'))throw Error('追求焦點不存在。');
-  const attention = parseAttention(world, character, data.attentionConditions);
-  if (data.interpretation !== undefined && (!text(data.interpretation, 256) || new TextEncoder().encode(data.interpretation as string).length > 256)) throw Error();
-  const cognition = updateCognition(character, data.cognitiveUpdates, world.minute, context);
-  const arrangement = updateArrangements(world,character,data.arrangementUpdates,context.visible,intents);
-  const memoryCandidate=evaluateMemories({ ...character, ...(cognition ? {cognition} : {}) },data.memorySelections,data.memoryOperations,context.visible.longTerm as Parameters<typeof evaluateMemories>[3],context.memoryReview,context.visible.shortTerm||[]);
+  const pursuitEvidence=readDecisionField('pursuitSelection', data.pursuitSelection, () => parsePursuitSelection(character,context.visible,data.pursuitCandidates,data.pursuitSelection,data.pursuitUpdates,intents,data.focusIntentId));
+  if(data.focusIntentId!==null&&!intents.some(i=>i.id===data.focusIntentId&&i.status==='active'))throw new DecisionFieldError('focusIntentId',data.focusIntentId,'有效追求的 ID 或 null');
+  const attention = readDecisionField('attentionConditions', data.attentionConditions, () => parseAttention(world, character, data.attentionConditions));
+  if (data.interpretation !== undefined && (!text(data.interpretation, 256) || new TextEncoder().encode(data.interpretation as string).length > 256)) throw new DecisionFieldError('interpretation',data.interpretation,'最多 256 UTF-8 bytes 的字串');
+  const cognition = readDecisionField('cognitiveUpdates', data.cognitiveUpdates, () => updateCognition(character, data.cognitiveUpdates, world.minute, context));
+  const arrangement = readDecisionField('arrangementUpdates', data.arrangementUpdates, () => updateArrangements(world,character,data.arrangementUpdates,context.visible,intents));
+  const memoryCandidate = (() => {
+    try {
+      return evaluateMemories({ ...character, ...(cognition ? {cognition} : {}) }, data.memorySelections, data.memoryOperations,
+        context.visible.longTerm as Parameters<typeof evaluateMemories>[3], context.memoryReview, context.visible.shortTerm || []);
+    } catch (error) {
+      const field = error instanceof MemorySelectionReferenceError || error instanceof MemorySelectionFormatError ? 'memorySelections' : 'memoryOperations';
+      throw new DecisionFieldError(field, data[field], error instanceof Error ? error.message : '有效的記憶更新', error);
+    }
+  })();
   if(arrangement.experiences.length)memoryCandidate.shortTerm=[...(memoryCandidate.shortTerm||character.shortTerm||[]),...arrangement.experiences];
-  const preferences = updatePreferences(character, data.preferenceUpdates, world.minute, context.visible);
+  const preferences = readDecisionField('preferenceUpdates', data.preferenceUpdates, () => updatePreferences(character, data.preferenceUpdates, world.minute, context.visible));
   const composed={...character,...memoryCandidate,...(cognition?{cognition}:{}),...(arrangement.arrangements?{arrangements:arrangement.arrangements}:{})};
   normalizeMemory(composed);memoryCandidate.shortTerm=composed.shortTerm;
-  if(data.type==='propose'&&(!text(data.purpose,300,true)||!text(data.content,500,true)))throw Error();
+  if(data.type==='propose') {
+    for(const [field,limit] of [['purpose',300],['content',500]] as const) {
+      if(!text(data[field],limit,true))throw new DecisionFieldError('action.'+field,data[field],`propose 需要非空字串，最多 ${limit} 字元`);
+    }
+  }
   const action = { type: data.type, target: data.target, content: data.content, mood: data.mood, ...(data.type==='propose'?{purpose:data.purpose}:{}) } as Action;
   if(data.type==='phone'){if(data.durationMinutes!==15||timeIntent?.kind==='open-ended')throw Error('手機是15分鐘單次操作。');validatePhoneActionReferences(world,context.visible,action,context.phoneReferences);}
-  const methodAssessment=parseMethodAssessment(data.methodAssessment,action,intents,context);
-  if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw Error('方法與追求焦點不一致。');
-  return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
+  const methodAssessment=readDecisionField('methodAssessment', data.methodAssessment, () => parseMethodAssessment(data.methodAssessment,action,intents,context));
+  if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw new DecisionFieldError('methodAssessment.intentIds',methodAssessment?.intentIds,JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]));
+  return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:readDecisionField('habitCandidates', data.habitCandidates, () => updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[])), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:ModelProvider,fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const mode=modelMode(provider);
@@ -136,7 +167,9 @@ try {
   const value = JSON.parse(raw.replace(/^\s*`{3}(?:json)?\s*/, '').replace(/\s*`{3}\s*$/, ''));
   candidateStage='npc-candidate-validation';
   if(value?.type === 'recall') {
-    if(!recall?.enabled || recalled || Object.keys(value).some(key=>!['type','questions'].includes(key)) || !Array.isArray(value.questions) || value.questions.length<1 || value.questions.length>2 || value.questions.some((q:unknown)=>typeof q!=='string'||!q.trim()||new TextEncoder().encode(q).length>256)) throw Error('只能提出一輪、最多兩題回想。');
+    if(!recall?.enabled || recalled) throw new DecisionFieldError('type',value.type,'本次需提交最終行動，只能提出一輪回想');
+    if(Object.keys(value).some(key=>!['type','questions'].includes(key)))throw new DecisionFieldError('recall',value,'只含 type、questions 的物件');
+    if(!Array.isArray(value.questions) || value.questions.length<1 || value.questions.length>2 || value.questions.some((q:unknown)=>typeof q!=='string'||!q.trim()||new TextEncoder().encode(q).length>256)) throw new DecisionFieldError('questions',value.questions,'一至兩題回想，每題為最多 256 UTF-8 bytes 的非空字串');
     recalled=true;
     candidateStage='recall-service';
     const memories=await recall.search(value.questions);
@@ -157,7 +190,22 @@ try {
   decision.phoneNotificationReceipts=prepared.phoneNotificationReceipts;
   return decision;
 }
-catch(e) { if(candidateStage.startsWith('npc-')){try{await recall?.observer?.({kind:'failure',failure:candidateStage==='npc-candidate-parse'?'candidate-format':'candidate-validation',stage:candidateStage,reason:candidateStage==='npc-candidate-parse'?'json-parse':e instanceof MemorySelectionReferenceError?'memory-selection-reference':e instanceof MemoryValidationError&&!(e instanceof MemorySelectionFormatError)?'memory-constraint':'field-format'});}catch{/* Evidence cannot change the original validation failure. */}}if(recalled && e instanceof Error) throw e; throw Error('模型未回傳有效的意圖與行動格式。請換個模型再試。'); }
+catch(error) {
+  if(candidateStage==='recall-service') throw error;
+  const parseFailure = candidateStage==='npc-candidate-parse';
+  const issue = error instanceof DecisionFieldError ? error : parseFailure
+    ? new DecisionFieldError('$', `無法解析的文字（${new TextEncoder().encode(raw).length} bytes）`, '有效的 JSON 物件')
+    : new DecisionFieldError('$', '無效決策', error instanceof Error && error.message ? error.message : '符合本次 NPC 決策契約的物件');
+  const cause = issue.cause ?? error;
+  const reason = parseFailure ? 'json-parse'
+    : cause instanceof MemorySelectionReferenceError ? 'memory-selection-reference'
+    : cause instanceof MemoryValidationError && !(cause instanceof MemorySelectionFormatError) ? 'memory-constraint' : 'field-format';
+  const detail = issue.diagnostic([key]);
+  try {
+    await recall?.observer?.({kind:'failure', failure:parseFailure?'candidate-format':'candidate-validation', stage:candidateStage, reason, detail});
+  } catch { /* Trace capture must preserve the validation result. */ }
+  throw new Error(detail);
+}
 }
 }
 

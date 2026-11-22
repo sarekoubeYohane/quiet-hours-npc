@@ -1,3 +1,4 @@
+import { DecisionFieldError } from './decision-field-error';
 import { applyFormalFeelingUpdates } from './formal-mental-policy';
 import { appendMentalHistory } from './mental-history';
 import type { Character } from './world';
@@ -28,7 +29,12 @@ export function parseFeelingUpdates(actor:Character,value:unknown,visibleSources
  if(!value.length)return [];
  const state=actor.mentalEnergy;if(!state?.policy.experience)throw new MemoryValidationError('未啟用明示自然感受測試政策');
  const origins=[...(actor.shortTerm||[]),...(actor.longTerm||[])].flatMap(m=>m.feelingOrigins||[]),seen=new Set<string>();
- for(const u of value){if(!u||typeof u!=='object'||Object.keys(u).sort().join(',')!=='direction,level,mood,reason,source'||typeof u.source!=='string'||seen.has(u.source)||!['positive','negative','neutral'].includes(u.direction)||!(state.policy.kind==='formal'?[0,1,2,3]:[0,1,2]).includes(u.level)||u.direction==='neutral'&&u.level!==0||u.direction!=='neutral'&&u.level===0||typeof u.reason!=='string'||!u.reason.trim()||new TextEncoder().encode(u.reason).length>256||u.mood!==null&&(typeof u.mood!=='string'||!u.mood.trim()||u.mood.length>20))throw new MemoryValidationError('自然感受格式無效');seen.add(u.source);
+ for(const [index,u] of value.entries()){
+ if(u && typeof u==='object'){
+   if(typeof u.reason!=='string'||!u.reason.trim()||new TextEncoder().encode(u.reason).length>256)throw new DecisionFieldError('feelingUpdates['+index+'].reason',u.reason,'非空字串，最多 256 UTF-8 bytes',new MemoryValidationError('自然感受理由無效'));
+   if(u.direction==='neutral'&&u.level!==0)throw new DecisionFieldError('feelingUpdates['+index+'].level',u.level,'neutral 對應 0',new MemoryValidationError('自然感受等級無效'));
+ }
+ if(!u||typeof u!=='object'||Object.keys(u).sort().join(',')!=='direction,level,mood,reason,source'||typeof u.source!=='string'||seen.has(u.source)||!['positive','negative','neutral'].includes(u.direction)||!(state.policy.kind==='formal'?[0,1,2,3]:[0,1,2]).includes(u.level)||u.direction!=='neutral'&&u.level===0||u.mood!==null&&(typeof u.mood!=='string'||!u.mood.trim()||u.mood.length>20))throw new MemoryValidationError('自然感受格式無效');seen.add(u.source);
  const origin=origins.find(o=>o.id===u.source&&o.actorId===actor.id&&o.version===1);
  if(!visibleSources.includes(u.source)||!origin||!eligibleFeelingOrigin(actor,origin,minute))throw new MemoryValidationError('自然感受只能引用本次可見、有效且未結算的本人來源');
  }
