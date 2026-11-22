@@ -4,17 +4,19 @@ const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.c
 const {seedWorld}=load('world'),{aiDecision}=load('models');
 const {decision}=require('./pursuit-selection-fixture.cjs');
 const fixturePath=path.join(__dirname,'fixtures/npc-input-before-235.json.gz');
+const fieldRule='最終決策的每一層都只輸出本次 schema 定義的欄名，拼寫須完全相同。未定義的欄位一律省略，即使值是 null 也要省略整個鍵。';
 
 // Keep the historical captures intact and account for the intentional system prompt addition.
-function expectedTranscripts(file) {
+function expectedTranscripts(file, {includeLayout=true} = {}) {
  const expected=JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(file)));
- const addition=[
+ const layout=[
   '輸出 JSON 時請核對欄位層級。以下是路徑說明，其他欄位照既有契約填寫。',
   'action 只含 type、target、content、purpose。reconfirmBodyConsequences 填在最外層，與 action 同層，使用布林值。',
   'methodAssessment.selectedAction 只含 type、target。methodAssessment.intentIds 與 selectedAction 同層，填當次焦點 ID 的陣列，無焦點填 []。',
 ].join('\n');
+ const addition=(includeLayout ? '\n\n'+layout : '')+'\n'+fieldRule;
  for (const {bodies} of Object.values(expected)) {
-  for (const body of bodies) body.messages[0].content += '\n\n' + addition;
+  for (const body of bodies) body.messages[0].content += addition;
  }
  return expected;
 }
@@ -85,8 +87,9 @@ test('test-site dispatch uses v0.2.4 for the first decision and recall continuat
     delete source.self.personality;
     delete source.self.goal;
     const expected=structuredClone(legacy.bodies[index]);
-    const boundary=expected.messages[0].content.indexOf('\n\n本次可直接做最終決定');
-    expected.messages[0].content=text+(boundary<0?'':expected.messages[0].content.slice(boundary));
+    const boundary=expected.messages[0].content.indexOf('\n'+fieldRule);
+    assert.ok(boundary>0);
+    expected.messages[0].content=text+expected.messages[0].content.slice(boundary);
     expected.messages[1].content=JSON.stringify(source);
     assert.deepEqual(body,expected);
    }
@@ -112,8 +115,7 @@ test('the complete preparation entry returns the final request and only its actu
 test('recall under escape pressure preserves bounded projections, continuation and invalid or mandatory-overflow outcomes',async()=>{
  const actual={};for(const variant of ['escaped-recall','invalid-recall','overflow-recall'])for(const provider of ['openai','openrouter'])actual[`${variant}:${provider}`]=await sample(variant,provider);
  const file=path.join(__dirname,'fixtures/npc-input-recall-pressure.json.gz');
- const expected=JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync(file)));
- assert.deepEqual(beforeRecallContract(actual),expected);
+ assert.deepEqual(beforeRecallContract(actual),expectedTranscripts(file,{includeLayout:false}));
  for(const sample of Object.values(actual))for(const body of sample.bodies)assert.ok(Buffer.byteLength(JSON.stringify(body))<164000);
 });
 

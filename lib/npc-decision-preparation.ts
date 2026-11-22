@@ -42,7 +42,10 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   }else{
    messages[1].content=JSON.stringify(input);
   }
-  let systemPrompt=messages[0].content;
+  let systemPrompt=messages[0].content+'\n最終決策的每一層都只輸出本次 schema 定義的欄名，拼寫須完全相同。未定義的欄位一律省略，即使值是 null 也要省略整個鍵。';
+  if(Object.hasOwn(schema.properties,'processFeeling')){
+   systemPrompt+=' processFeeling.direction 為 "neutral" 時，processFeeling.level 必須填數字 0。例如 {"direction":"neutral","level":0,"reason":"這件事讓我感覺平常。"}。';
+  }
   if(options.allowRecall){
    const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
    const contract = [
@@ -62,7 +65,7 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
     systemPrompt+=' processFeeling 可為 null；有活動感受時，物件只含 direction、level、reason 三欄。';
    }
   }
-  if(systemPrompt!==messages[0].content)outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
+  outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
   return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};
