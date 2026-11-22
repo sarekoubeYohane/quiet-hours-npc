@@ -77,7 +77,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
 | 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
 | 開局起點的來源與採納 | `lib/opening-starts.ts` 按人物及場所實例保留玩家選定的場所、房間；`lib/opening-authoring.ts` 標記自動預填。 |
-| 開局精靈介面 | `components/opening-wizard.tsx` |
+| 開局精靈介面 | `components/opening-wizard.tsx`；按場所、房間編輯本局物件與門在 `components/opening-room-editor.tsx` |
 | 樣式 | `app/globals.css`，以手寫語意 class 為主（`.panel`、`.opening-*`、`.analysis-*`） |
 | 新增資料表或欄位 | `db/schema.ts`、`drizzle/`，並依 [docs/testing.md](docs/testing.md) 手動登記到測試 |
 
