@@ -378,6 +378,7 @@ test('兩個角色可保存新模型，並用各家已保存的 Key 查清單', 
         assert.equal(target.hostname, host);
         assert.equal(new Headers(init.headers).get(header), (header === 'authorization' ? 'Bearer ' : '') + key);
         if (provider === 'openrouter') assert.equal(target.pathname, '/api/v1/models/user');
+        if (provider === 'openai') return Response.json({ data: ['chosen-model','text-embedding-3-small','whisper-1','gpt-4o-mini-tts','gpt-image-1'].map(id => ({id})) });
         if (provider === 'gemini') return Response.json(pages === 1
           ? { models: [{ name: 'models/embed', supportedGenerationMethods: ['embedContent'] }], nextPageToken: 'p2' }
           : { models: [{ name: 'models/chosen-model', supportedGenerationMethods: ['generateContent'] }] });
@@ -425,4 +426,31 @@ test('玩家選擇的服務和模型實際用於天上意志，原生 Claude 回
     }
     assert.equal((await budgetRequest()).body.usage.totalInputTokens - before, 15);
   } finally { globalThis.fetch = oldFetch; db.close(); }
+});
+test('一回合以 DeepSeek 的 Key 派送 NPC 決策，以 Claude 的 Key 裁定並結算', async () => {
+  const { db, request, worldRequest, createWorld } = await fixture();
+  const oldFetch = globalThis.fetch, calls = [];
+  const {fixtureDecision} = require('./pursuit-fixture.cjs');
+  try {
+    const save = await createWorld('分開選模型');
+    const roles = {npc:{provider:'deepseek',model:'live-npc-id'},adjudication:{provider:'anthropic',model:'live-judge-id'}};
+    assert.equal((await request({version:0,mode:'custom',models:roles},save)).status,200);
+    for (const mode of ['deepseek','anthropic']) await worldRequest({operation:'set-model-key',mode,key:'key-for-'+mode});
+    globalThis.fetch = async (url,init) => {
+      const body=JSON.parse(init.body), headers=new Headers(init.headers);
+      calls.push([String(url),body.model]);
+      if (body.model==='live-npc-id') {
+        assert.equal(headers.get('authorization'),'Bearer key-for-deepseek');
+        const input=JSON.parse(body.messages[1].content);
+        const action=fixtureDecision(input,{type:'propose',target:'place:home',content:'輕聲哼唱',purpose:'聽自己聲音',durationMinutes:15});
+        return Response.json({usage:{prompt_tokens:3,completion_tokens:2,prompt_cache_hit_tokens:1},choices:[{message:{content:JSON.stringify(action)}}]});
+      }
+      assert.equal(headers.get('x-api-key'),'key-for-anthropic');
+      return Response.json({usage:{input_tokens:2,output_tokens:2},content:[{type:'text',text:'{"status":"denied","effects":[],"check":null}'}],stop_reason:'end_turn'});
+    };
+    const round=await worldRequest({operation:'advance',mode:'deepseek',minutes:5,timeContract:'five-minute-v1'},save);
+    assert.equal(round.status,200,round.body.error);
+    assert.equal(round.body.world.turn,1);
+    assert.deepEqual(calls, [['https://api.deepseek.com/chat/completions','live-npc-id'],['https://api.anthropic.com/v1/messages','live-judge-id']]);
+  } finally {globalThis.fetch=oldFetch;db.close();}
 });

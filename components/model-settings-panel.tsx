@@ -14,6 +14,7 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
   const [scope, setScope] = useState<'account' | 'save'>(saveId ? 'save' : 'account');
   const [view, setView] = useState<ModelSettingsView>();
   const [models, setModels] = useState<Required<ModelRoles>>(blank);
+  const touchedRoles = useRef(new Set<keyof ModelRoles>());
   const [inherit, setInherit] = useState(false);
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false);
   const [keys, setKeys] = useState<Partial<Record<Provider, string>>>({});
@@ -58,7 +59,7 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
       const body = await response.json() as ModelSettingsView & { error?: string };
       if (!response.ok) throw Error(body.error || '無法讀取模型設定。');
       if (signal.aborted) return;
-      capture(body.accountScope); setView(body);
+      capture(body.accountScope); setView(body); touchedRoles.current.clear();
       setModels({ npc: body.effective.npc ?? blank.npc, adjudication: body.effective.adjudication ?? blank.adjudication });
       setInherit(scope === 'save' && body.preference.mode === 'inherit'); setError('');
     } catch (cause) { if (!signal.aborted) setError(cause instanceof Error ? cause.message : '無法讀取模型設定。'); }
@@ -85,7 +86,7 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
       if (!response.ok) throw Error(next.error || '模型設定未同步，原輸入已保留。');
       capture(next.accountScope); if (!alive.current) return;
       savedModels = true; setView(next);
-      for (const provider of modelProviders) {
+      for (const provider of requiredProviders) {
         if (keys[provider]?.trim()) next = await writeKey(provider, false, next);
       }
       if (!alive.current) return;
@@ -108,14 +109,23 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
     finally { if (alive.current) setSaving(false); }
   }
   const effective = scope === 'save' && inherit ? view?.accountModels : models;
-  const requiredProviders = [...new Set([...Object.values(effective ?? {}).map(choice => choice.provider), ...modelProviders.filter(provider => keys[provider]?.trim())])];
+  const requiredProviders = [...new Set(Object.values(effective ?? {}).map(choice => choice.provider))];
   const inheriting = scope === 'save' && inherit;
-  const canSave = !!view && !saving && (inheriting || (['npc', 'adjudication'] as const).every(role => {
-    const choice = models[role], saved = view.effective[role];
-    if (!choice.model) return false;
+  const canSave = !!view && !saving && (['npc', 'adjudication'] as const).every(role => {
+    const choice = effective?.[role], saved = view.effective[role];
+    if (inheriting && (!choice || !keys[choice.provider]?.trim())) return true;
+    if (!choice?.model) return false;
     if (!keys[choice.provider]?.trim() && saved?.provider === choice.provider && saved.model === choice.model) return true;
     return catalogs[choice.provider]?.models?.some(option => option.id === choice.model);
-  }));
+  });
+  function chooseModel(role: keyof ModelRoles, model: string) {
+    touchedRoles.current.add(role);
+    const other = role === 'npc' ? 'adjudication' : 'npc';
+    const fillOther = !!model && !models[other].model && !touchedRoles.current.has(other);
+    const choice = { ...models[role], model };
+    setModels(previous => ({ ...previous, [role]: choice, ...(fillOther ? { [other]: choice } : {}) }));
+    if (fillOther) setNotice('已將同一模型填入另一個尚未設定的角色。兩個選單可分開更改。');
+  }
   return <section className="panel model-setup" aria-label="模型設定面板">
     <header className="journey-panel-heading"><div><span className="eyebrow">模型與連線</span><h2 ref={heading} tabIndex={-1}>準備這次需要的模型</h2></div>{onClose && <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>{notice ? '完成，關閉設定' : '關閉設定'}</Button>}</header>
     <p className="hint">先選服務，填入或沿用 API Key，再按「讀取模型」。人物補完與數值形成使用「天上意志」。</p>
@@ -126,15 +136,17 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
       <div className="model-role-grid">{(['adjudication', 'npc'] as const).map(role => <fieldset key={role} disabled={saving || (scope === 'save' && inherit)}><legend>{role === 'npc' ? 'NPC 自主決策' : '天上意志 · 人物與世界製作'}</legend>
         <label>{role === 'npc' ? 'NPC 服務' : '天上意志服務'}<select aria-label={role === 'npc' ? 'NPC 服務' : '天上意志服務'} value={effective?.[role]?.provider ?? models[role].provider} onChange={event => {
           const provider = event.target.value as Provider;
+          touchedRoles.current.add(role);
           setModels(previous => ({ ...previous, [role]: { provider, model: view?.effective[role]?.provider === provider ? view.effective[role]!.model : '' } }));
         }}>{modelProviders.map(provider => <option key={provider} value={provider}>{providerNames[provider]}</option>)}</select></label>
         <label>{role === 'npc' ? 'NPC 模型' : '天上意志模型'}<RoleModelSelect
           label={role === 'npc' ? 'NPC 模型' : '天上意志模型'} model={effective?.[role]?.model ?? ''}
           catalog={catalogs[effective?.[role]?.provider ?? models[role].provider]}
-          onChange={model => setModels(previous => ({ ...previous, [role]: { ...previous[role], model } }))} /></label>
+          onChange={model => chooseModel(role, model)} /></label>
       </fieldset>)}</div>
       {requiredProviders.map(provider => <fieldset key={provider} disabled={saving || !view?.modelKeyStorageAvailable}>
         <legend>{providerNames[provider]} API Key</legend>
+        {provider === 'anthropic' && <p className="hint">請使用已綁定 Claude 工作區的 API Key。</p>}
         <p className="hint">{view?.modelKeys[provider]?.configured ? '已保存 Key，可留空沿用。填入新 Key 才會替換。' : '請貼上此服務的 Key，再讀取模型。'}</p>
         <label>{providerNames[provider]} 服務 API Key<input aria-label={providerNames[provider] + ' 服務 API Key'} type="password" value={keys[provider] ?? ''} autoComplete="off" maxLength={4096} onChange={event => {
           const key = event.target.value;
@@ -144,7 +156,7 @@ export default function ModelSettingsPanel({ saveId, onClose, onSaved, originalA
           {catalogs[provider]?.loading ? '讀取中…' : catalogs[provider]?.models ? '重新讀取模型' : '讀取模型'}
         </Button>
         {catalogs[provider]?.error && <p role="alert">{catalogs[provider]?.error}</p>}
-        {catalogs[provider]?.models && <p role="status">{catalogs[provider]!.models!.length ? '已取得 ' + catalogs[provider]!.models!.length + ' 個模型。' : '供應商沒有列出可選模型。'}</p>}
+        {catalogs[provider]?.models && <p role="status">{catalogs[provider]!.models!.length ? '已取得 ' + catalogs[provider]!.models!.length + ' 個模型。供應商列出的模型仍須支援文字對話與 JSON 回覆。' : '供應商沒有列出可選模型。'}</p>}
       </fieldset>)}
       {view && !view.modelKeyStorageAvailable && <p role="alert">本站的 Key 保存服務尚未就緒。可先保存人物文字，待服務恢復再形成數值。</p>}
       <p className="hint">Key 只在本站同帳號、同服務共用，不放進人物卡、世界或草稿。規則模式推進世界不需要 Key。</p>

@@ -36,8 +36,10 @@ function providerFailure(status:number){
 export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean}={}){
  const {model,provider}=service;
  if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048});
- if (provider === 'openai' && directModels.includes(model)) {
-   return JSON.stringify({model,messages,store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),reasoning_effort:model==='gpt-6-luna'?'none':'low',response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}}});
+ if (provider === 'openai') {
+   return JSON.stringify({model,messages,store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),
+     ...(directModels.includes(model) ? {reasoning_effort:model==='gpt-6-luna'?'none':'low'} : {}),
+     response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}}});
  }
  const instructions = options.allowRecall ? '僅回傳 JSON 物件。' : '僅回傳符合以下 JSON Schema 的物件：' + JSON.stringify(schema);
  const system = [...messages.filter(message => message.role === 'system').map(message => message.content), instructions].join('\n');
@@ -45,7 +47,7 @@ export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,m
  const limit = options.maxOutputTokens ?? 4096;
  if (provider === 'anthropic') return JSON.stringify({model,system,messages:conversation,max_tokens:limit});
  return JSON.stringify({model, messages:[{role:'system',content:system}, ...conversation], response_format:{type:'json_object'},
-   ...(provider === 'openai' ? {max_completion_tokens:limit,store:false} : {max_tokens:limit}),
+   max_tokens:limit,
    ...(provider === 'deepseek' ? {thinking:{type:'disabled'}} : {})});
 }
 export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };

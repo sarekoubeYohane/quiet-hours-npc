@@ -20,6 +20,14 @@ type ModelEntry = {
 type ModelPage = {
   data?: ModelEntry[]; models?: ModelEntry[]; has_more?: boolean; last_id?: string; nextPageToken?: string;
 };
+// OpenAI's list identifies models by ID and omits endpoint capabilities.
+// Keep new text models discoverable while excluding documented specialist endpoints.
+function supportsTextChat(provider: ModelProvider, id: string, entry: ModelEntry) {
+  if (entry.architecture?.output_modalities && !entry.architecture.output_modalities.includes('text')) return false;
+  if (provider === 'gemini') return !!entry.supportedGenerationMethods?.includes('generateContent') && !/(?:^|-)(?:image|tts|live|native-audio)(?:-|$)/i.test(id);
+  if (provider === 'openai') return !/^(?:text-embedding-|text-moderation-|omni-moderation-|dall-e-|gpt-image-|chatgpt-image-|whisper-|tts-|sora-|babbage-|davinci-|computer-use-|codex-mini-latest$)|(?:^|-)(?:realtime|transcribe|tts|deep-research|instruct)(?:-|$)/i.test(id);
+  return true;
+}
 export class CatalogError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
@@ -30,6 +38,7 @@ export async function listProviderModels(provider: ModelProvider, key: string, s
   for (;;) {
     const response = await fetch(url, { headers: providerHeaders(provider, key, true), redirect: 'error', signal, cache: 'no-store' });
     if (!response.ok) {
+      if (provider === 'anthropic' && response.status === 400) throw new CatalogError('Claude 拒絕這次查詢，請確認使用已綁定工作區的 API Key。', 400);
       const denied = response.status === 401 || response.status === 403;
       throw new CatalogError(denied ? '供應商拒絕這把 Key，請確認服務和讀取模型的權限。' : response.status === 429 ? '供應商暫時限流，請稍後重新查詢。' : '供應商暫時無法列出模型，請重新查詢。', denied ? 403 : response.status === 429 ? 429 : 502);
     }
@@ -38,10 +47,8 @@ export async function listProviderModels(provider: ModelProvider, key: string, s
     if (!Array.isArray(entries)) throw new CatalogError('供應商回傳的模型清單格式無法辨識。', 502);
     for (const entry of entries) {
       if (!entry || typeof entry !== 'object') continue;
-      if (provider === 'gemini' && !entry.supportedGenerationMethods?.includes('generateContent')) continue;
-      if (entry.architecture?.output_modalities && !entry.architecture.output_modalities.includes('text')) continue;
       const id = provider === 'gemini' ? entry.name?.replace(/^models\//, '') : entry.id;
-      if (!validModelId(id) || id.includes(key)) continue;
+      if (!validModelId(id) || id.includes(key) || !supportsTextChat(provider, id, entry)) continue;
       const label = entry.displayName || entry.display_name || entry.name || id;
       models.set(id, { id, name: typeof label === 'string' && !label.includes(key) ? label.slice(0, 180) : id });
     }
