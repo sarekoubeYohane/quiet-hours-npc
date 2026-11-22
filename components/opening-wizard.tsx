@@ -8,7 +8,8 @@ import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import SaveNavigation from './save-navigation';
-import {OpeningRelations,OpeningRoads,OpeningExtrasEditor} from './opening-configuration-controls';
+import {OpeningRoomEditor} from './opening-room-editor';
+import {OpeningRelations,OpeningRoads} from './opening-configuration-controls';
 import OpeningArrangementPanel from './opening-arrangement-panel';
 import type {ArrangementView} from '@/lib/opening-arrangement-store';
 import {CityAccessPreview} from './city-access-editor';
@@ -158,7 +159,7 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
     </article>;})}
    </>}
    {stage===2&&sceneGroup==='場所與道路'&&<>
-    <OpeningExtrasEditor city={body.city} cards={cards} scenes={scenes} update={updateCity}/>
+    <OpeningRoomEditor city={body.city} cards={cards} scenes={scenes} update={updateCity} onNavigate={()=>{if(!failed&&!conflict)void flush();}}/>
     <OpeningRoads city={body.city} update={updateCity}/>
    </>}
    {stage===2&&sceneGroup==='人物關係'&&<OpeningRelations city={body.city} cards={cards} update={updateCity} expanded/>}

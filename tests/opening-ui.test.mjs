@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {Window} from 'happy-dom';
 const require=createRequire(import.meta.url);
 const window=new Window({url:'http://localhost/new'});
-for(const name of ['window','document','navigator','HTMLElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
+for(const name of ['window','document','navigator','HTMLElement','HTMLInputElement','Element','Node','Event','MouseEvent','DocumentFragment','MutationObserver','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,name,{configurable:true,value:['requestAnimationFrame','cancelAnimationFrame'].includes(name)?window[name].bind(window):window[name]});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {createRoot}=await import('react-dom/client');
 const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));
@@ -236,4 +236,85 @@ test('players inspect cards and compare the same tab without changing the party'
   assert.equal(document.querySelectorAll('input:checked').length,1);
   assert.equal(document.querySelector('input[aria-label="加入 阿岑"]').checked,false);
  } finally {await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});
+
+test('room list counts the current room and adding both objects focuses their names in that room', async () => {
+  const {Component, close} = await component('components/opening-wizard.tsx');
+  const id = crypto.randomUUID();
+  const scene = {id:'home', version:1, name:'住宅', rooms:[{id:'living', name:'客廳'}, {id:'bedroom', name:'臥室'}], objects:[], connections:[]};
+  let draft = {id, version:1, sources:{cards:[], scenes:[scene]}, body:{name:'測試世界', step:3, description:'', city:{
+    places:[{id:'place-1', templateId:'home', version:1, name:'住宅'}], characters:[]
+  }}};
+  let delaySave;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('scene-templates')) return Response.json({accountScope:'account-operations:a', templates:[scene]});
+    if (String(url).includes('character-cards')) return Response.json({accountScope:'account-operations:a', cards:[]});
+    if (init?.method === 'POST' && delaySave) return delaySave();
+    if (init?.method === 'POST') draft = {...draft, version:draft.version + 1, body:JSON.parse(init.body).body};
+    return Response.json({operationScope:'a', draft, preview:{issues:[]}});
+  };
+  let root;
+  async function openDraft() {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await React.act(async () => root.render(React.createElement(Component, {owner:'a', draftId:id})));
+    await settle(() => document.querySelector('[name="opening-name"]'));
+    const group = [...document.querySelectorAll('button')].find(button => button.textContent === '場所與道路');
+    if (group) await React.act(async () => group.click());
+  }
+  try {
+    await openDraft();
+    await click('在 住宅 新增房間');
+    const name = document.activeElement;
+    assert.equal(name?.getAttribute('aria-label'), '房間名稱');
+    await change(name, '玄關');
+    for (const item of ['鞋櫃', '雨傘架']) {
+      await click('＋新增物件');
+      const field = document.activeElement;
+      assert.equal(field?.getAttribute('aria-label'), '物件名稱');
+      await change(field, item);
+    }
+    assert.ok([...document.querySelectorAll('button')].some(button => button.textContent === '玄關（2 件物件）'));
+    await click('臥室（0 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]'), null);
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['鞋櫃', '雨傘架']);
+
+    await click('連接房間');
+    const otherRoom = document.querySelector('select[aria-label="門的另一端"]');
+    assert.equal(otherRoom.selectedOptions[0].textContent, '客廳');
+    await change(document.querySelector('input[aria-label="門名稱"]'), '玄關門');
+    await change(document.querySelector('select[aria-label="門狀態"]'), 'blocked');
+    await click('客廳（0 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+    await click('玄關（2 件物件）');
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+
+    let releaseSave;
+    delaySave = () => new Promise(resolve => { releaseSave = resolve; });
+    await change(document.querySelector('input[aria-label="物件名稱"]'), '玄關鞋櫃');
+    await click('臥室（0 件物件）');
+    await settle(() => document.querySelector('.opening-status').textContent === '保存中');
+    await React.act(async () => releaseSave(Response.json({error:'保存暫時失敗'}, {status:503})));
+    await settle(() => document.querySelector('.opening-status').textContent === '未同步');
+    await click('玄關（2 件物件）');
+    assert.equal(document.querySelector('input[aria-label="物件名稱"]').value, '玄關鞋櫃');
+    delaySave = undefined;
+    await click('恢復草稿保存');
+    await settle(() => document.querySelector('.opening-status').textContent === '已保存至帳號');
+    await React.act(async () => root.unmount());
+    await openDraft();
+    await click('玄關（2 件物件）');
+    assert.deepEqual([...document.querySelectorAll('input[aria-label="物件名稱"]')].map(field => field.value), ['玄關鞋櫃', '雨傘架']);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往客廳 · 阻塞'));
+    await click('客廳（0 件物件）');
+    assert.equal(document.querySelectorAll('input[aria-label="門名稱"]').length, 1);
+    assert.ok(document.body.textContent.includes('玄關門 · 通往玄關 · 阻塞'));
+
+  } finally {
+    await React.act(async () => root.unmount());
+    globalThis.fetch = originalFetch;
+    await close();
+    await window.happyDOM.abort();
+  }
 });
