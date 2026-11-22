@@ -42,6 +42,7 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   }else{
    messages[1].content=JSON.stringify(input);
   }
+  let systemPrompt=messages[0].content;
   if(options.allowRecall){
    const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
    const contract = [
@@ -51,8 +52,17 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
     'pursuitSelection.reason 可填空字串。沒有適用的方法變更時，methodAssessment.change 可填 {"kind":"not-applicable","detail":""}。timeIntent.maxMinutes 無上限填 null。活動估時與每回合推進分鐘數分開。',
     JSON.stringify(schema),
    ].join('\n');
-   outgoingMessages=[{...messages[0],content:messages[0].content+'\n\n'+contract},...messages.slice(1)];
+   systemPrompt+='\n\n'+contract;
   }
+  if(options.provider==='deepseek'){
+   const identity=JSON.stringify({contractVersion:input.contractVersion,pursuitContext:input.pursuitContext});
+   systemPrompt+='\n\n最終行動回覆請先逐字複製以下固定欄位和值，再於同一個 JSON 物件內填完本次決策：\n'+identity;
+   systemPrompt+='\n提交前逐一核對頂層必填欄位：'+schema.required.join('、')+'。';
+   if(Object.hasOwn(schema.properties,'processFeeling')){
+    systemPrompt+=' processFeeling 可為 null；有活動感受時，物件只含 direction、level、reason 三欄。';
+   }
+  }
+  if(systemPrompt!==messages[0].content)outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
   return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};

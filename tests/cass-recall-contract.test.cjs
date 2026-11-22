@@ -101,3 +101,20 @@ test('additional action and root fields report their path and value even for emp
     await assert.rejects(replay(candidate),pattern);
   }
 });
+
+
+test('DeepSeek receives the exact response identity and the enabled field layout for this dispatch', () => {
+  for (const allowRecall of [true,false]) {
+    const world=seedWorld(), cass=world.characters.find(actor=>actor.id==='cass');
+    world.pursuitContext=allowRecall?'first-dispatch-context':'final-dispatch-context';
+    cass.mentalEnergy=createFormalMentalEnergy(cass,world.minute,{capacity:50,current:35,seed:1});
+    const options={provider:'deepseek',model:'deepseek-flash',modelKey:'deepseek:deepseek-flash',allowedTypes:['say','propose'],
+      allowRecall,messages:[{role:'system',content:'玩家規則'},{role:'user',content:''}]};
+    const prepared=prepareNpcDecision(world,cass,options);
+    const request=JSON.parse(modelRequestBody(options,prepared.messages,prepared.schema,options));
+    const prompt=request.messages[0].content;
+    assert.ok(prompt.includes(JSON.stringify({contractVersion:'npc-decision.v3',pursuitContext:world.pursuitContext})));
+    assert.ok(prompt.includes(prepared.schema.required.join('、')));
+    assert.match(prompt,/processFeeling[^。\n]{0,50}direction、level、reason/);
+  }
+});
