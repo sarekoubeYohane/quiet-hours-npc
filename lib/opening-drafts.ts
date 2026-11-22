@@ -73,6 +73,8 @@ export async function adoptOpeningArrangement(owner:string,input:Extract<z.infer
   throw new SaveAccessError('未同步：開局草稿已變更，原輸入已保留。',409);
  }
  const {body,sources,candidate}=await prepareOpeningWrite(owner,input,previous),db=database();
+ if(!partialResult&&(!candidate.world||candidate.preview.issues.length))
+  throw new SaveAccessError(candidate.preview.issues.join(' ')||'建議仍有開局阻擋問題，請修改後再採納。',422);
  // Both statements use the same proposal revision and frozen result. The unique
  // adoption request marks this operation, rather than an unrelated manual save
  // that happens to contain the same city at the next draft version.

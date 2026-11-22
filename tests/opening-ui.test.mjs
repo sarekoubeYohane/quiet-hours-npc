@@ -201,9 +201,15 @@ test('the AI road option follows the number of places and its preview names each
   assert.match(document.body.textContent,/單一場所.*不適用/);
   await React.act(async()=>root.render(React.createElement(Component,{...props,city,arrangement:{recommendRoads:true,city,state:'complete',version:0,inputVersion:1,operationId:'op',preview:{issues:[]}}})));
   assert.equal(option().checked,true);
+  const itemsOption=[...document.querySelectorAll('label')].find(label=>label.textContent==='逐房配置物品').querySelector('input');
+  assert.equal(itemsOption.checked,true);
+  await React.act(async()=>itemsOption.click());assert.equal(option().checked,true);
+  await React.act(async()=>option().click());assert.equal(itemsOption.checked,false);
+  await React.act(async()=>option().click());await React.act(async()=>itemsOption.click());
+  const adoptAll=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='全部採納');
   const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
   await settle(()=>adopt());
-  assert.equal(adopt().disabled,true);
+  assert.equal(adopt().disabled,true);assert.equal(adoptAll().disabled,true);
   const repair=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='請 AI 補路');
   assert.ok(repair());
   assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
@@ -212,7 +218,7 @@ test('the AI road option follows the number of places and its preview names each
    assert.ok(check,place);
    await React.act(async()=>check.click());
   }
-  assert.equal(adopt().disabled,false);
+  assert.equal(adopt().disabled,false);assert.equal(adoptAll().disabled,false);
   assert.equal(repair(),undefined);
  }finally{await React.act(async()=>root.unmount());await close();}
 });
