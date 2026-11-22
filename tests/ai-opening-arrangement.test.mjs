@@ -165,3 +165,47 @@ test('adoption uses the saved proposal revision and duplicate concurrent request
   assert.equal(db.prepare('SELECT version FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id).version,base.version+1);assert.equal(app.modelRequests.length,2);
  }finally{db?.close();await app.close();}
 });
+
+test('road suggestions identify disconnected places and allow independent adoption after the player connects or isolates them', async () => {
+ let seen;
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  seen=input;
+  const answer=proposal(input);
+  answer.finalization.walks=[{places:['cafe','vera'],minutes:7}];
+  return answer;
+ }});
+ try {
+  const j=await journey(app);
+  const places=['home','kris','cafe','vera'].map((id,i)=>({...j.draft.body.city.places[0],id,name:['住宅','Kris 的住處','街角咖啡館','Vera 的房間'][i]}));
+  const manual={places:['home','kris'],minutes:5};
+  const city={...j.draft.body.city,places,finalization:{spaces:[],walks:[manual,{places:['home','cafe'],minutes:null}]}};
+  const draft=(await j.ok('/api/opening-drafts',{id:j.draft.id,version:j.draft.version,operationScope:'a',body:{...j.draft.body,description:'',city}})).draft;
+  const base={id:draft.id,operationId:operationId(),version:draft.version,operationScope:'a'};
+  const arranged=await j.ok('/api/opening-drafts/arrange',{...base,recommendRoads:true,worldContext:j.scope.world.contextId});
+  assert.equal(seen.recommendRoads,true);
+  assert.deepEqual(arranged.draft.body.city,city);
+  const proposalCity=arranged.arrangement.city;
+  const action={...base,city:proposalCity,action:'adoptRoads',proposalVersion:arranged.arrangement.version};
+  const blocked=await j.request('/api/opening-drafts/arrange',action);
+  assert.equal(blocked.status,422);
+  for(const place of places)assert.ok(blocked.body.error.includes(place.name),blocked.body.error);
+  proposalCity.finalization.walks=[manual,{places:['home','cafe'],minutes:9}];
+  proposalCity.isolatedPlaceIds=['vera'];
+  const edited=await j.ok('/api/opening-drafts/arrange',{...action,action:'edit'});
+  const adopt={...action,proposalVersion:edited.arrangement.version};
+  const adopted=await j.ok('/api/opening-drafts/arrange',adopt);
+  const reopened=await j.ok('/api/opening-drafts?id='+draft.id+'&operationScope=a');
+  assert.deepEqual(reopened.draft.body.city.finalization.walks,proposalCity.finalization.walks);
+  assert.deepEqual(reopened.draft.body.city.isolatedPlaceIds,['vera']);
+  assert.deepEqual(reopened.draft.body.city.characters,city.characters);
+  assert.deepEqual(reopened.draft.body.city.finalization.spaces,[]);
+  assert.equal(reopened.arrangement.state,'complete');
+  assert.ok(reopened.arrangement.receipts.roads);
+  assert.equal((await j.ok('/api/opening-drafts/arrange',adopt)).draft.version,adopted.draft.version);
+  const noRoads=await j.ok('/api/opening-drafts/arrange',{...base,operationId:operationId(),version:adopted.draft.version,worldContext:j.scope.world.contextId,recommendRoads:false});
+  assert.equal(seen.recommendRoads,false);
+  assert.deepEqual(noRoads.arrangement.city.finalization.walks,proposalCity.finalization.walks);
+ } finally {await app.close();}
+});

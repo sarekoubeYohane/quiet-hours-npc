@@ -169,3 +169,29 @@ test('首次設定只需查一個服務，離開查詢失敗的服務後保存�
     assert.deepEqual(calls.filter(call=>call.operation==='set-model-key').map(call=>call.mode),['anthropic']);
   }finally{await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort();}
 });
+
+test('the AI road option follows the number of places and its preview names each disconnected group', async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['Kris 的住處','住宅','街角咖啡館','Vera 的房間'].map((name,i)=>({id:'p'+i,name,templateId:'scene',version:1}));
+ const city={characters:[],places,finalization:{spaces:[],walks:[{places:['p0','p1'],minutes:5},{places:['p2','p3'],minutes:6},{places:['p1','p2'],minutes:null}]}};
+ const props={owner:'a',draftId:'draft',cards:[],scenes:[],onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const option=()=>[...document.querySelectorAll('label')].find(label=>label.textContent.includes('建議跨場所步行道路'))?.querySelector('input');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{...city,places:places.slice(0,1)}})));
+  assert.equal(option()?.disabled,true);
+  assert.match(document.body.textContent,/單一場所.*不適用/);
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city,arrangement:{recommendRoads:true,city,state:'complete',version:0,inputVersion:1,operationId:'op',preview:{issues:[]}}})));
+  assert.equal(option().checked,true);
+  const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
+  await settle(()=>adopt());
+  assert.equal(adopt().disabled,true);
+  assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
+  for(const place of ['街角咖啡館','Vera 的房間']){
+   const check=[...document.querySelectorAll('label')].find(label=>label.textContent==='明示隔離 '+place)?.querySelector('input');
+   assert.ok(check,place);
+   await React.act(async()=>check.click());
+  }
+  assert.equal(adopt().disabled,false);
+ }finally{await React.act(async()=>root.unmount());await close();}
+});

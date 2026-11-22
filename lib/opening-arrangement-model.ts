@@ -25,10 +25,11 @@ export function mergeOpeningSuggestion(draft:OpeningDraft,value:z.infer<typeof r
  const city={...original,characters,backgroundPeople:preserve(original.backgroundPeople??[],value.backgroundPeople,item=>item.id),relationships:preserve(original.relationships??[],value.relationships,item=>JSON.stringify([item.from,item.to,item.targetType])),accessGrants:preserve(original.accessGrants??[],value.accessGrants.map(({roomId,...grant})=>({...grant,...(roomId?{roomId}:{})})),item=>JSON.stringify([item.placeId,item.roomId,item.characterTemplateId])),finalization:{spaces,walks:preserve(original.finalization?.walks??[],value.finalization.walks,item=>pairKey(item.places))}};
  const parsed=cityDraftSchema.safeParse(city);if(!parsed.success)throw Error('AI 建議超出開局的合法格式或容量，原設定已保留。');return parsed.data;
 }
-export async function arrangeOpening(draft:OpeningDraft,service:ModelService,options:Parameters<typeof requestModel>[3]) {
- const input={task:'opening-arrangement-v1',description:draft.body.description,city:draft.body.city,cards:draft.sources.cards,scenes:draft.sources.scenes};
- const messages=[{role:'system',content:'為使用者本次開局整理可查看修改的配置建議。只用提供的已選人物卡與場所實例；同源場所各自獨立，同住共用同一實例。保留已填起點、住處、工作、所有權、關係、道路、許可、需求與精神電量；只補留白或新增不衝突建議。不可重建人物、改數值或來源範本。住處/工作/關係/道路可不安排，不為通過驗證偷偷補路。人物知情由程式按起點/角色/隱私決定，許可不代表物理通行、熟悉或同意。只回受限JSON，物件state為key/value陣列，新增房間/物件/門只放finalization；未指定可用空陣列/null，不輸出世界/骰/Key或程式。'},{role:'user',content:JSON.stringify(input)}];
+export async function arrangeOpening(draft:OpeningDraft,service:ModelService,options:Parameters<typeof requestModel>[3], work:{recommendRoads?:boolean}={}) {
+ const input={task:'opening-arrangement-v1',recommendRoads:work.recommendRoads,description:draft.body.description,city:draft.body.city,cards:draft.sources.cards,scenes:draft.sources.scenes};
+ const messages=[{role:'system',content:'為使用者本次開局整理可查看修改的配置建議。只用提供的已選人物卡與場所實例；同源場所各自獨立，同住共用同一實例。保留已填起點、住處、工作、所有權、關係、道路、許可、需求與精神電量；只補留白或新增不衝突建議。不可重建人物、改數值或來源範本。住處/工作/關係可不安排。若 recommendRoads 為 true，開局描述留白也要建議可步行路段，讓未明示隔離的各場所可分段互達；保留玩家既有道路與隔離。為 false 時不要新增道路。不得替玩家指定隔離。人物知情由程式按起點/角色/隱私決定，許可不代表物理通行、熟悉或同意。只回受限JSON，物件state為key/value陣列，新增房間/物件/門只放finalization；未指定可用空陣列/null，不輸出世界/骰/Key或程式。'},{role:'user',content:JSON.stringify(input)}];
  if(new TextEncoder().encode(JSON.stringify(messages)).length>88*1024)throw Error('開局整理輸入過長，請減少選取內容後另行明示操作。');
  const raw=await requestModel(service,messages,schema,{...options,maxOutputTokens:8192});let candidate:unknown;try{if(raw.length>100000)throw Error();candidate=JSON.parse(raw);}catch{throw Error('AI 未回傳有效的開局建議，原設定已保留。');}
- const parsed=replySchema.safeParse(candidate);if(!parsed.success)throw Error('AI 建議不符合受限開局格式，原設定已保留。');return mergeOpeningSuggestion(draft,parsed.data);
+ const parsed=replySchema.safeParse(candidate);if(!parsed.success)throw Error('AI 建議不符合受限開局格式，原設定已保留。');if(work.recommendRoads===false)parsed.data.finalization.walks=[];
+ return mergeOpeningSuggestion(draft,parsed.data);
 }

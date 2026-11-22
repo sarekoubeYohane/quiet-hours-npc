@@ -247,7 +247,8 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `city-access.ts` | 進入許可的建立與執行期查詢（`entryPermission`） |
 | `city-initialization.ts` | 用模型產生 finalization |
 | `opening-drafts.ts` | 開局草稿的版本化儲存與 `confirmOpening` |
-| `opening-arrangement-model.ts` | AI 整理開局：只補留白 |
+| `opening-arrangement-model.ts` | 依玩家勾選的工作整理 AI 開局建議 |
+| `opening-road-network.ts`、`components/opening-roads.tsx` | 開局步行路段、隔離與分段連通檢查，以及手動／預覽的道路編輯 |
 | `opening-relationship-generation.ts` | 用模型從開局描述抽出住處、工作、關係 |
 | `opening-authoring.ts` | 瀏覽器端 helper：自動預填、把成品帶回開局草稿 |
 | `pixel-scene.ts` | 舊版固定地圖的座標與走位 |

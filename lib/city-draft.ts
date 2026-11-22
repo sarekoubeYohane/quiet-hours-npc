@@ -12,6 +12,7 @@ export type CityWalk = { places:[string,string]; minutes:number|null };
 export type CitySpace = { placeId:string; rooms:FinalizedRoom[]; objects:FinalizedObject[]; connections:FinalizedConnection[] };
 export type CityFinalization = { spaces:CitySpace[]; walks:CityWalk[] };
 export type CityDraft = {
+  isolatedPlaceIds?: string[];
   places: { id: string; templateId: string; version: number; name: string }[];
   characters: {
     templateId: string; version: number; placeId: string; roomId: string; homeId?: string; homeRoomId?: string;

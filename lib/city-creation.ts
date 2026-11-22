@@ -26,6 +26,7 @@ const version = z.number().int().positive().safe();
 export const cardMentalOpeningSchema=z.object({current:z.number().int().nonnegative().safe().optional(),stage:z.enum(['充沛','有餘','尚可','吃緊','見底']).optional()}).strict();
 const openingNeedsSchema=z.object({hunger:z.number().min(0).max(100).multipleOf(.01),thirst:z.number().min(0).max(100).multipleOf(.01),fatigue:z.number().min(0).max(100).multipleOf(.01),sleep:z.number().min(0).max(100).multipleOf(.01)}).strict();
 export const cityDraftSchema = z.object({
+  isolatedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
