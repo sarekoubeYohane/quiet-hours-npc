@@ -1,3 +1,4 @@
+import {protectOpeningStart} from './opening-starts';
 import {z} from 'zod';
 import {requestModel,type ModelService} from './model-adapter';
 import {cityDraftSchema} from './city-creation';
@@ -15,7 +16,7 @@ function preserve<T>(existing:T[],suggested:T[],key:(value:T)=>string){const val
 export function mergeOpeningSuggestion(draft:OpeningDraft,value:z.infer<typeof replySchema>):CityDraft {
  const original=draft.body.city;
  if(value.characters.length!==original.characters.length||new Set(value.characters.map(actor=>actor.templateId)).size!==value.characters.length||value.characters.some(actor=>!original.characters.some(old=>old.templateId===actor.templateId)))throw Error('AI 建議的人物必須與已選人物卡一致。');
- const characters=original.characters.map(actor=>{const next=value.characters.find(item=>item.templateId===actor.templateId)!;return {...actor,placeId:actor.placeId||next.placeId,roomId:actor.roomId||next.roomId,...(actor.homeId?{}:next.homeId?{homeId:next.homeId}:{}),...(actor.homeRoomId?{}:next.homeRoomId?{homeRoomId:next.homeRoomId}:{}),workplaceIds:actor.workplaceIds?.length?[...actor.workplaceIds]:next.workplaceIds,ownedPlaceIds:actor.ownedPlaceIds?.length?[...actor.ownedPlaceIds]:next.ownedPlaceIds};});
+ const characters=original.characters.map(actor=>{const next=value.characters.find(item=>item.templateId===actor.templateId)!;return {...actor,...protectOpeningStart(actor,next),...(actor.homeId?{}:next.homeId?{homeId:next.homeId}:{}),...(actor.homeRoomId?{}:next.homeRoomId?{homeRoomId:next.homeRoomId}:{}),workplaceIds:actor.workplaceIds?.length?[...actor.workplaceIds]:next.workplaceIds,ownedPlaceIds:actor.ownedPlaceIds?.length?[...actor.ownedPlaceIds]:next.ownedPlaceIds};});
  const spaces=(original.finalization?.spaces??[]).map(space=>structuredClone(space));
  for(const proposed of value.finalization.spaces){const selection=original.places.find(place=>place.id===proposed.placeId);if(!selection)throw Error('AI 建議不能新增未選場所。');const source=draft.sources.scenes.find(scene=>scene.id===selection.templateId&&scene.version===selection.version);if(!source)throw Error('找不到已凍結的場所來源。');let old=spaces.find(space=>space.placeId===proposed.placeId);if(!old){old={placeId:proposed.placeId,rooms:[],objects:[],connections:[]};spaces.push(old);}
   old.rooms=preserve(old.rooms,proposed.rooms.filter(room=>!source.rooms.some(base=>base.id===room.id)).map(({privateFor,...room})=>({...room,...(privateFor?{privateFor}:{})})),room=>room.id);
@@ -27,7 +28,7 @@ export function mergeOpeningSuggestion(draft:OpeningDraft,value:z.infer<typeof r
 }
 export async function arrangeOpening(draft:OpeningDraft,service:ModelService,options:Parameters<typeof requestModel>[3]) {
  const input={task:'opening-arrangement-v1',description:draft.body.description,city:draft.body.city,cards:draft.sources.cards,scenes:draft.sources.scenes};
- const messages=[{role:'system',content:'為使用者本次開局整理可查看修改的配置建議。只用提供的已選人物卡與場所實例；同源場所各自獨立，同住共用同一實例。保留已填起點、住處、工作、所有權、關係、道路、許可、需求與精神電量；只補留白或新增不衝突建議。不可重建人物、改數值或來源範本。住處/工作/關係/道路可不安排，不為通過驗證偷偷補路。人物知情由程式按起點/角色/隱私決定，許可不代表物理通行、熟悉或同意。只回受限JSON，物件state為key/value陣列，新增房間/物件/門只放finalization；未指定可用空陣列/null，不輸出世界/骰/Key或程式。'},{role:'user',content:JSON.stringify(input)}];
+ const messages=[{role:'system',content:'為使用者本次開局整理可查看修改的配置建議。只用提供的已選人物卡與場所實例；同源場所各自獨立，同住共用同一實例。起點的 placeOrigin、roomOrigin 標為 system 時可以提出替代。保留玩家選擇及來源不明的已填起點；手選場所只能建議該處房間，手選房間要保留所屬場所實例。保留住處、工作、所有權、關係、道路、許可、需求與精神電量；只補留白或新增不衝突建議。不可重建人物、改數值或來源範本。住處/工作/關係/道路可不安排，不為通過驗證偷偷補路。人物知情由程式按起點/角色/隱私決定，許可不代表物理通行、熟悉或同意。只回受限JSON，物件state為key/value陣列，新增房間/物件/門只放finalization；未指定可用空陣列/null，不輸出世界/骰/Key或程式。'},{role:'user',content:JSON.stringify(input)}];
  if(new TextEncoder().encode(JSON.stringify(messages)).length>88*1024)throw Error('開局整理輸入過長，請減少選取內容後另行明示操作。');
  const raw=await requestModel(service,messages,schema,{...options,maxOutputTokens:8192});let candidate:unknown;try{if(raw.length>100000)throw Error();candidate=JSON.parse(raw);}catch{throw Error('AI 未回傳有效的開局建議，原設定已保留。');}
  const parsed=replySchema.safeParse(candidate);if(!parsed.success)throw Error('AI 建議不符合受限開局格式，原設定已保留。');return mergeOpeningSuggestion(draft,parsed.data);

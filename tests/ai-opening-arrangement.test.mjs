@@ -165,3 +165,27 @@ test('adoption uses the saved proposal revision and duplicate concurrent request
   assert.equal(db.prepare('SELECT version FROM opening_drafts WHERE owner=? AND id=?').get('a',j.draft.id).version,base.version+1);assert.equal(app.modelRequests.length,2);
  }finally{db?.close();await app.close();}
 });
+test('AI may move a prefilled start, while a player choice after preview survives adoption and reopening',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  const reply=proposal(input);
+  reply.characters[0].placeId='second';
+  return reply;
+ }});
+ try{
+  const j=await journey(app), original=j.draft.body.city;
+  const city={...original,places:[...original.places,{...original.places[0],id:'second',name:'同格局工房'}],characters:[{...original.characters[0],placeId:'home',roomId:'front',placeOrigin:'system',roomOrigin:'system'}]};
+  const save=(version,city)=>j.ok('/api/opening-drafts',{operationScope:'a',id:j.draft.id,version,body:{...j.draft.body,city}});
+  const {draft}=await save(j.draft.version,city);
+  const base={operationScope:'a',id:draft.id,operationId:operationId()};
+  const result=await j.ok('/api/opening-drafts/arrange',{...base,version:draft.version,worldContext:j.scope.world.contextId});
+  assert.equal(result.draft.body.city.characters[0].placeId,'home');
+  assert.equal(result.arrangement.city.characters[0].placeId,'second');
+  const manual={...city,characters:[{...city.characters[0],roomOrigin:'player'}]};
+  const latest=await save(draft.version,manual);
+  await j.ok('/api/opening-drafts/arrange',{...base,version:latest.draft.version,action:'adopt',proposalVersion:result.arrangement.version,city:result.arrangement.city});
+  const reopened=await j.ok('/api/opening-drafts?id='+draft.id+'&operationScope=a');
+  assert.deepEqual([reopened.draft.body.city.characters[0].placeId,reopened.draft.body.city.characters[0].roomId,reopened.draft.body.city.characters[0].roomOrigin],['home','front','player']);
+ }finally{await app.close();}
+});
