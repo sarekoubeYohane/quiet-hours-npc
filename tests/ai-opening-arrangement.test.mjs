@@ -319,3 +319,37 @@ test('逐房配物以空白描述預覽各房結果，再採納所選三十一�
   assert.deepEqual(next.arrangement.roomItems.rooms.find(r=>r.roomId==='front').suggestedIds,['front-0']);
  }finally{await app.close();}
 });
+
+test('three starts keep their separate origins across fixed AI suggestions, adoption and reopening two residences',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  const targets=[['east','bedroom'],['west','bedroom'],['west','living']];
+  return {characters:input.city.characters.map((actor,i)=>({templateId:actor.templateId,placeId:targets[i][0],roomId:targets[i][1],
+   homeId:null,homeRoomId:null,workplaceIds:[],ownedPlaceIds:[]})),backgroundPeople:[],relationships:[],accessGrants:[],finalization:{spaces:[],walks:[]}};
+ }});
+ try{
+  const j=await journey(app);
+  const {cards}=await j.ok('/api/character-cards?accountScope=account-operations%3Aa');
+  const house=(await j.ok('/api/scene-templates',{accountScope:'account-operations:a',id:crypto.randomUUID(),version:0,
+   name:'住宅',note:'',rooms:[{id:'living',name:'客廳'},{id:'bedroom',name:'臥室'}],objects:[],connections:[]})).template;
+  const places=['west','east'].map((id,i)=>({id,name:['西住宅','東住宅'][i],templateId:house.id,version:house.version}));
+  const actors=cards.slice(0,3).map((c,i)=>({templateId:c.id,version:c.version,placeId:i===2?'east':'west',roomId:i===1?'':'living',
+   placeOrigin:i===1?'player':'system',roomOrigin:i===2?'player':'system'}));
+  const starts=city=>city.characters.map(c=>[c.placeId,c.roomId]);
+  const arrange=async(characters)=>{
+   const draft=(await j.ok('/api/opening-drafts',{operationScope:'a',id:crypto.randomUUID(),version:0,body:{...j.draft.body,city:{places,characters}}})).draft;
+   const base={operationScope:'a',id:draft.id,version:draft.version,operationId:operationId()};
+   const proposed=await j.ok('/api/opening-drafts/arrange',{...base,worldContext:j.scope.world.contextId});
+   assert.deepEqual(starts(proposed.draft.body.city),starts(draft.body.city));
+   await j.ok('/api/opening-drafts/arrange',{...base,action:'adopt',proposalVersion:proposed.arrangement.version,city:proposed.arrangement.city});
+   const reopened=await j.ok('/api/opening-drafts?id='+draft.id+'&operationScope=a');
+   return [starts(proposed.arrangement.city),starts(reopened.draft.body.city)];
+  };
+  const expected=[['east','bedroom'],['west','bedroom'],['east','living']];
+  assert.deepEqual(await arrange(actors),[expected,expected]);
+  const legacy=actors.map(({placeOrigin,roomOrigin,...actor})=>({...actor,roomId:'living'}));
+  const oldStarts=[['west','living'],['west','living'],['east','living']];
+  assert.deepEqual(await arrange(legacy),[oldStarts,oldStarts]);
+ }finally{await app.close();}
+});
