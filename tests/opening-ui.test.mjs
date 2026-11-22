@@ -187,3 +187,53 @@ test('scene groups take the player directly to the missing starting room',async(
   assert.equal(document.querySelector('[aria-label="關係 1 對象"]').selectedOptions[0].textContent,'阿岑');
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
 });
+
+test('the AI road option follows the number of places and its preview names each disconnected group', async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['Kris 的住處','住宅','街角咖啡館','Vera 的房間'].map((name,i)=>({id:'p'+i,name,templateId:'scene',version:1}));
+ const city={characters:[],places,finalization:{spaces:[],walks:[{places:['p0','p1'],minutes:5},{places:['p2','p3'],minutes:6},{places:['p1','p2'],minutes:null}]}};
+ const props={owner:'a',draftId:'draft',cards:[],scenes:[],onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const option=()=>[...document.querySelectorAll('label')].find(label=>label.textContent.includes('建議跨場所步行道路'))?.querySelector('input');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{...city,places:places.slice(0,1)}})));
+  assert.equal(option()?.disabled,true);
+  assert.match(document.body.textContent,/單一場所.*不適用/);
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city,arrangement:{recommendRoads:true,city,state:'complete',version:0,inputVersion:1,operationId:'op',preview:{issues:[]}}})));
+  assert.equal(option().checked,true);
+  const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
+  await settle(()=>adopt());
+  assert.equal(adopt().disabled,true);
+  assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
+  for(const place of ['街角咖啡館','Vera 的房間']){
+   const check=[...document.querySelectorAll('label')].find(label=>label.textContent==='明示隔離 '+place)?.querySelector('input');
+   assert.ok(check,place);
+   await React.act(async()=>check.click());
+  }
+  assert.equal(adopt().disabled,false);
+ }finally{await React.act(async()=>root.unmount());await close();}
+});
+
+test('players inspect cards and compare the same tab without changing the party', async()=>{
+ const {Component,close}=await component('components/opening-wizard.tsx');
+ const id=crypto.randomUUID(), scope='account-operations:a';
+ const cards=['Cass','Vera','阿岑'].map((name,i)=>({id:['card-example-cass','card-example-vera','card-custom'][i],version:1,fields:{name},values:{strength:7,endurance:9,dexterity:14,perception:15,appearance:11},capacity:50,needTraits:{hunger:1,thirst:1,sleep:1}}));
+ const draft={id,version:1,body:{name:'我的草稿',description:'',step:1,city:{characters:[],places:[]}},sources:{cards:[],scenes:[]}};
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async url=>Response.json(String(url).includes('character-cards')?{accountScope:scope,cards}:String(url).includes('scene-templates')?{accountScope:scope,templates:[]}:String(url).includes('id=')?{operationScope:'a',draft}:{operationScope:'a',drafts:[]});
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ try {
+  await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+  await settle(()=>document.querySelector('input[type=checkbox]'));
+  await click('查看 Cass 詳情');
+  assert.equal(document.querySelectorAll('[role=meter][aria-valuemax="18"]').length,5);
+  assert.ok(document.querySelector('img[alt="Cass 的人物圖"]'));
+  assert.equal(document.querySelectorAll('input:checked').length,0);
+  await click('身體需求');
+  await click('查看 Vera 詳情');
+  assert.ok(document.querySelector('[role=meter][aria-label="Vera 飢餓"]'));
+  await React.act(async()=>document.querySelector('input[aria-label="加入 Vera"]').click());
+  assert.equal(document.querySelectorAll('input:checked').length,1);
+  assert.equal(document.querySelector('input[aria-label="加入 阿岑"]').checked,false);
+ } finally {await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
+});

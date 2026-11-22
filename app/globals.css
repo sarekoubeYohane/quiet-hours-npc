@@ -194,6 +194,7 @@
 .opening-wizard button.opening-primary:disabled { background: var(--secondary); color: var(--muted-foreground); opacity: 1; }
 .opening-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .opening-option, .opening-empty { padding: 14px; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); }
+.opening-portrait { width: 4rem; height: 4rem; object-fit: cover; border-radius: var(--radius); }
 .opening-option:has(input:checked) { border-color: var(--primary); }
 .opening-option > label { flex-direction: row; align-items: center; color: var(--foreground); font-weight: 600; margin: 0; }
 .opening-option input[type="checkbox"] { width: auto; accent-color: var(--primary); }

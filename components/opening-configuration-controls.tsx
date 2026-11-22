@@ -29,10 +29,7 @@ export function OpeningRelations({city,cards,update,expanded=false}:{city:Openin
  </>;
  return expanded?<section aria-label="人物關係">{form}</section>:<details><summary>可選：人物關係與背景人物</summary>{form}</details>;
 }
-export function OpeningRoads({city,update}:{city:OpeningCity;update:(city:OpeningCity)=>void}){
- const walks=city.finalization?.walks??[];const set=(value:NonNullable<CityDraft['finalization']>['walks'])=>update({...city,finalization:{spaces:city.finalization?.spaces??[],walks:value}});
- return <details><summary>可選：跨場所道路</summary><p>未建立道路的場所不互通；不會自動補路。</p><button disabled={city.places.length<2} onClick={()=>set([...walks,{places:[city.places[0].id,city.places[1].id],minutes:5}])}>新增道路</button>{walks.map((walk,index)=><fieldset key={index}><legend>道路 {index+1}</legend>{([0,1] as const).map(side=><label key={side}>{side===0?'起點':'終點'}<select value={walk.places[side]} onChange={event=>set(walks.map((value,i)=>i===index?{...value,places:side===0?[event.target.value,value.places[1]]:[value.places[0],event.target.value]}:value))}>{city.places.map(place=><option key={place.id} value={place.id}>{place.name}</option>)}</select></label>)}<label>步行分鐘（留空表示不能步行）<input type="number" min={1} max={1440} step={1} value={walk.minutes??''} onChange={event=>set(walks.map((value,i)=>i===index?{...value,minutes:event.target.value===''?null:Number(event.target.value)}:value))}/></label><button onClick={()=>set(walks.filter((_,i)=>i!==index))}>移除道路</button></fieldset>)}</details>;
-}
+export {OpeningRoads} from './opening-roads';
 
 /** Shared manual controls: edits only this opening's additional space, never its scene source. */
 export function OpeningExtrasEditor({city,cards,scenes,update}:{city:CityDraft;cards:CharacterCard[];scenes:SceneTemplate[];update:(city:CityDraft)=>void}){
