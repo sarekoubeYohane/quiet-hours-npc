@@ -1,6 +1,6 @@
 import { isModelProvider, providerForMode } from './model-providers';
 import { prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import {repairOpeningRoads} from './opening-road-repair';
+import {repairOpeningRoads,openingRepairSource} from './opening-road-repair';
 import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
@@ -326,7 +326,8 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             const source=await workWait(readArrangement(accountId,arrangement.draft_id,requested.repairOf.operationId));
             if(!source?.result||source.revision!==requested.repairOf.version)throw Error('補路依據已變更。');
             const proposal=storedArrangementResult(source);
-            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(proposal.city,service,options));
+            const frozen=openingRepairSource(JSON.parse(source.snapshot),JSON.parse(arrangement.snapshot),proposal.city);
+            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(frozen,service,options));
             await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
           }else{
             const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,requested));

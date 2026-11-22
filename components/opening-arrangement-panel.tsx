@@ -7,7 +7,7 @@ import type {OpeningDraft} from '@/lib/opening-drafts';
 import type {CharacterCard} from '@/lib/character-cards';
 import type {SceneTemplate} from '@/lib/scene-templates';
 import type {CityDraft,CityPreview} from '@/lib/city-draft';
-import {reconcileOpeningRoads,roadBaseline} from '@/lib/opening-proposal-adoption';
+import {reconcileOpeningRoads} from '@/lib/opening-proposal-adoption';
 import {openingRoadNetwork,withOpeningRoads} from '@/lib/opening-road-network';
 import {openingStartLocks,protectOpeningStart} from '@/lib/opening-starts';
 import type {World} from '@/lib/world';
@@ -25,6 +25,7 @@ export default function OpeningArrangementPanel({owner,draftId,city,arrangement,
  const multiplePlaces=city.places.length>1;
  const recommendRoads=multiplePlaces&&requestRoads;
  const roadCity=edited&&arrangement?.originalRoads?reconcileOpeningRoads(arrangement.originalRoads,city,edited):edited;
+ const unsavedSelection=!!arrangement&&unsavedSelectionFor===arrangement.operationId;
  const network=roadCity&&arrangement?.recommendRoads?openingRoadNetwork(roadCity):undefined;
  const roadProblems=arrangement?.receipts?.roads?[]:network?.problems??[];
  const alive=useRef(true),sequence=useRef(0);useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -41,8 +42,8 @@ export default function OpeningArrangementPanel({owner,draftId,city,arrangement,
     let repairOf:Pending['repairOf'];
     if(repair&&arrangement&&edited){
      let revision=arrangement.version;
-     if(dirty||roadCity&&JSON.stringify(roadBaseline(roadCity))!==JSON.stringify(roadBaseline(edited))){
-      const saved=await post({operationScope:owner,id:draftId,operationId:arrangement.operationId,version:prepared.version,proposalVersion:revision,action:'edit',city:roadCity?withOpeningRoads(edited,roadCity):edited},active);
+     if(dirty){
+      const saved=await post({operationScope:owner,id:draftId,operationId:arrangement.operationId,version:prepared.version,proposalVersion:revision,action:'edit',city:edited},active);
       if(!saved?.arrangement)return;
       onReply(saved);
       revision=saved.arrangement.version;
@@ -102,7 +103,7 @@ export default function OpeningArrangementPanel({owner,draftId,city,arrangement,
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
   <label><input type="checkbox" checked={supplyRooms} disabled={busy||pendingView} onChange={event=>setSupplyRooms(event.target.checked)}/>逐房配置物品</label>
   {supplyRooms&&<p>依各房間用途核對現有物品，列出建議新增的物品供逐件勾選。開局描述可留白。</p>}
-  {pendingView?<button disabled={busy} onClick={()=>void generate(true)}>恢復原AI整理操作</button>:<button disabled={busy||dirty} onClick={()=>void generate()}>{arrangement?'明示請AI另整理一份建議':'請AI整理本次開局'}</button>}
+  {pendingView?<button disabled={busy} onClick={()=>void generate(true)}>恢復原AI整理操作</button>:<button disabled={busy||dirty||unsavedSelection} onClick={()=>void generate()}>{arrangement?'明示請AI另整理一份建議':'請AI整理本次開局'}</button>}
   {previousArrangement&&arrangement?.state==='failed'&&<button disabled={busy} onClick={()=>{onReply({arrangement:previousArrangement});setError('');setNotice('已讀回前一份保存建議，沒有重新呼叫模型。');}}>取回前一份已保存建議</button>}
   {arrangement?.state==='failed'&&<p>原操作已停止：{arrangement.error}。沒有自動重試；若要重新請求，請明示按整理按鈕。</p>}
   {arrangement?.state==='adopted'&&<p>這份建議已採納，後續以本次開局的手動配置為準。</p>}
@@ -110,9 +111,9 @@ export default function OpeningArrangementPanel({owner,draftId,city,arrangement,
     const current=city.characters.find(person=>person.templateId===actor.templateId)??actor;
     const start=protectOpeningStart(current,actor), locks=openingStartLocks(current);
     const name=cards.find(card=>card.id===actor.templateId)?.fields.name??'人物';const rooms=(placeId:string)=>{const place=edited.places.find(place=>place.id===placeId);const source=scenes.find(scene=>scene.id===place?.templateId&&scene.version===place?.version);return [...(source?.rooms??[]),...(edited.finalization?.spaces.find(space=>space.placeId===placeId)?.rooms??[])];};const update=(patch:Partial<typeof actor>)=>changed({...edited,characters:edited.characters.map((value,i)=>i===index?{...value,...patch}:value)});return <article key={actor.templateId}><h4>{name}的建議安排</h4>{locks.keepPlace&&<p>{locks.keepRoom?'沿用草稿的起始場所與房間。':'沿用草稿的起始場所，可調整該處的房間。'}</p>}<label>建議起始場所<select aria-label={name+'建議起始場所'} disabled={locks.keepPlace} value={start.placeId} onChange={event=>update({placeId:event.target.value,roomId:''})}><option value="">未指定</option>{edited.places.map(place=><option key={place.id} value={place.id}>{place.name}</option>)}</select></label><label>建議起始房間<select aria-label={name+'建議起始房間'} disabled={locks.keepRoom||!start.placeId} value={start.roomId} onChange={event=>update({placeId:start.placeId,roomId:event.target.value})}><option value="">未指定</option>{rooms(start.placeId).map(room=><option key={room.id} value={room.id}>{room.name}</option>)}</select></label><label>建議住處<select aria-label={name+'建議住處'} value={actor.homeId??''} onChange={event=>update({homeId:event.target.value||undefined,homeRoomId:undefined})}><option value="">未指定</option>{edited.places.map(place=><option key={place.id} value={place.id}>{place.name}</option>)}</select></label><label>建議臥室<select aria-label={name+'建議臥室'} value={actor.homeRoomId??''} onChange={event=>update({homeRoomId:event.target.value||undefined})}><option value="">未指定</option>{rooms(actor.homeId??'').map(room=><option key={room.id} value={room.id}>{room.name}</option>)}</select></label><fieldset><legend>建議工作與所有權</legend>{(['workplaceIds','ownedPlaceIds'] as const).map(key=><div key={key}><button onClick={()=>update({[key]:[]})}>{key==='workplaceIds'?'清空建議工作':'清空建議所有權'}</button>{edited.places.map(place=><label key={place.id}><input type="checkbox" checked={actor[key]?.includes(place.id)??false} onChange={event=>update({[key]:event.target.checked?[...(actor[key]??[]),place.id]:(actor[key]??[]).filter(id=>id!==place.id)})}/>{name}的{place.name}{key==='workplaceIds'?'工作':'所有權'}</label>)}</div>)}</fieldset></article>;})}
-   {arrangement.roomItems&&<OpeningRoomItemSuggestions key={arrangement.operationId} city={edited} review={arrangement.roomItems} adopted={!!arrangement.receipts?.items} disabled={busy} onSubmit={submitItems}/>}
-   <OpeningGrantsEditor city={edited} cards={cards} scenes={scenes} update={changed}/><OpeningExtrasEditor city={edited} cards={cards} scenes={scenes} update={changed}/><OpeningRelations city={edited} cards={cards} update={changed}/>{arrangement.recommendRoads?<section aria-label="道路建議"><h4>跨場所步行道路</h4><p aria-live="polite">{roadProblems.join(' ')||'未隔離的場所可分段互達。'}</p>{(network?.groups.length??0)>1&&!arrangement.receipts?.roads&&<button type="button" disabled={busy} onClick={()=>void generate(false,true)}>請 AI 補路</button>}<OpeningRoads city={arrangement.receipts?.roads?city:roadCity??edited} update={value=>changed(withOpeningRoads(edited,value))} preview disabled={!!arrangement.receipts?.roads}/><button type="button" disabled={busy||!!arrangement.receipts?.roads||roadProblems.length>0} onClick={()=>void saveProposal('roads')}>{arrangement.receipts?.roads?'道路已採納':'採納道路'}</button></section>:arrangement.recommendRoads===undefined?<OpeningRoads city={edited} update={changed}/>:null}
-   {arrangement.preview?.issues.length?<ul role="alert">{arrangement.preview.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>:null}<button disabled={!dirty||busy} onClick={()=>void saveProposal(false)}>保存建議修改</button>{roadProblems.length>0&&<p id="opening-adopt-road-gap">採納道路與全部採納前，請補上連接或指定隔離。{roadProblems.join(' ')}</p>}<button aria-describedby={roadProblems.length?'opening-adopt-road-gap':undefined} disabled={busy||roadProblems.length>0||unsavedSelectionFor===arrangement.operationId} onClick={()=>void saveProposal(true)}>全部採納</button>
+   {arrangement.roomItems&&<OpeningRoomItemSuggestions key={arrangement.operationId} city={edited} latest={{city,scenes}} review={arrangement.roomItems} adopted={!!arrangement.receipts?.items} disabled={busy} onSubmit={submitItems}/>}
+   <OpeningGrantsEditor city={edited} cards={cards} scenes={scenes} update={changed}/><OpeningExtrasEditor city={edited} cards={cards} scenes={scenes} update={changed}/><OpeningRelations city={edited} cards={cards} update={changed}/>{arrangement.recommendRoads?<section aria-label="道路建議"><h4>跨場所步行道路</h4><p aria-live="polite">{roadProblems.join(' ')||'未隔離的場所可分段互達。'}</p>{(network?.groups.length??0)>1&&!arrangement.receipts?.roads&&<button type="button" disabled={busy||unsavedSelection} onClick={()=>void generate(false,true)}>請 AI 補路</button>}<OpeningRoads city={arrangement.receipts?.roads?city:roadCity??edited} update={value=>changed(withOpeningRoads(edited,value))} preview disabled={!!arrangement.receipts?.roads}/><button type="button" disabled={busy||!!arrangement.receipts?.roads||roadProblems.length>0} onClick={()=>void saveProposal('roads')}>{arrangement.receipts?.roads?'道路已採納':'採納道路'}</button></section>:arrangement.recommendRoads===undefined?<OpeningRoads city={edited} update={changed}/>:null}
+   {arrangement.preview?.issues.length?<ul role="alert">{arrangement.preview.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>:null}<button disabled={!dirty||busy} onClick={()=>void saveProposal(false)}>保存建議修改</button>{roadProblems.length>0&&<p id="opening-adopt-road-gap">採納道路與全部採納前，請補上連接或指定隔離。{roadProblems.join(' ')}</p>}<button aria-describedby={roadProblems.length?'opening-adopt-road-gap':undefined} disabled={busy||roadProblems.length>0||unsavedSelection} onClick={()=>void saveProposal(true)}>全部採納</button>
   </fieldset>}
   {models&&<ModelSettingsPanel originalAccountScope={'account-operations:'+owner} onClose={()=>setModels(false)}/>}
  </section>;

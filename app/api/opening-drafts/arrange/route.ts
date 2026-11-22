@@ -2,10 +2,11 @@ import {reconcileOpeningStarts,sameExceptOpeningStarts} from '@/lib/opening-star
 import {z} from 'zod';
 import {getGitHubUser} from '@/lib/auth';
 import {reconcileOpeningProposal,reconcileOpeningRoads,roadBaseline} from '@/lib/opening-proposal-adoption';
+import {openingRepairSnapshot,openingRepairSource} from '@/lib/opening-road-repair';
 import {openingRoadNetwork} from '@/lib/opening-road-network';
 import {readOpeningDraft,adoptOpeningArrangement,type OpeningDraft} from '@/lib/opening-drafts';
 import {readArrangement,reserveArrangement,settleArrangement,arrangementForClient,editArrangement,actionableArrangement,storedArrangementResult,arrangementHasReceipt} from '@/lib/opening-arrangement-store';
-import {applySelectedRoomItems,itemKey} from '@/lib/opening-room-items';
+import {applySelectedRoomItems,roomItemKeys} from '@/lib/opening-room-items';
 import {cityDraftSchema} from '@/lib/city-creation';
 import { acceptHostOperation } from '@/lib/host-operations';
 import { accountWorkspaceBinding, SaveAccessError } from '@/lib/world-saves';
@@ -35,7 +36,7 @@ export async function POST(request:Request){
     const proposal=storedArrangementResult(row);
     if(row.state!=='complete'||!proposal.roomItems||proposal.receipts?.items)throw new SaveAccessError('物品建議已採納或未啟用。',409);
     if(input.version!==loaded.draft.version)throw new SaveAccessError('開局草稿版本已變更，請重新核對。',409);
-    const known=new Set(proposal.roomItems.rooms.flatMap(room=>room.suggestedIds.map(id=>itemKey(room.placeId,id))));
+    const known=new Set(roomItemKeys(proposal.roomItems));
     if(input.excludedItems.some(key=>!known.has(key)))throw new SaveAccessError('請重新核對本輪建議的物品。',409);
     const roomItems={...proposal.roomItems,excludedItems:[...new Set(input.excludedItems)]};
     if(input.action==='selectItems'){
@@ -43,9 +44,9 @@ export async function POST(request:Request){
      return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(updated)});
     }
     if(input.proposalVersion!==row.revision)throw new SaveAccessError('建議已變更，請重新核對所選物品。',409);
-    const city=applySelectedRoomItems(loaded.draft,proposal.city,roomItems);
-    if(!cityDraftSchema.safeParse(city).success)throw new SaveAccessError('採納後的物件數量超過開局上限，請減少所選物品。',422);
-    const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city}},row,adoption,{...proposal,roomItems,receipts:{...proposal.receipts,items:adoption}});
+    const applied=applySelectedRoomItems(loaded.draft,proposal.city,roomItems);
+    if(!cityDraftSchema.safeParse(applied.city).success)throw new SaveAccessError('採納後的物件數量超過開局上限，請減少所選物品。',422);
+    const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:applied.city}},row,adoption,{groupResult:{...proposal,roomItems:applied.roomItems,receipts:{...proposal.receipts,items:adoption}}});
     return reply({operationScope:owner,...result});
    }
    if(input.version!==loaded.draft.version)return reply({error:'開局草稿版本已變更，原輸入已保留。'},409);
@@ -67,12 +68,12 @@ export async function POST(request:Request){
     if(saved.receipts?.roads)return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});
     const city=roads;
     const partial={...saved,receipts:{...saved.receipts,roads:adoption}};
-    const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city}},row,adoption,partial);
+    const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city}},row,adoption,{groupResult:partial});
     return reply({operationScope:owner,...result});
    }
-   const city=grouped?reconcileOpeningProposal(originalDraft.body.city,loaded.draft,saved.city,saved):reconcileOpeningStarts(input.city,loaded.draft.body.city);
-   if(!cityDraftSchema.safeParse(city).success)return reply({error:'採納後超出開局容量，請調整建議並核對。'},422);
-   const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city}},row,adoption);
+   const applied=grouped?reconcileOpeningProposal(originalDraft.body.city,loaded.draft,saved.city,saved):{city:reconcileOpeningStarts(input.city,loaded.draft.body.city),roomItems:undefined};
+   if(!cityDraftSchema.safeParse(applied.city).success)return reply({error:'採納後超出開局容量，請調整建議並核對。'},422);
+   const result=await adoptOpeningArrangement(owner,{operationScope:owner,id:input.id,version:input.version,body:{...loaded.draft.body,city:applied.city}},row,adoption,applied.roomItems?{finalResult:{...saved,roomItems:applied.roomItems}}:undefined);
    return reply({operationScope:owner,...result,arrangement:arrangementForClient((await readArrangement(owner,input.id,input.operationId))!)});
   }
   if(row){if(input.worldContext!==undefined&&JSON.parse(row.request).worldContext!==input.worldContext)return reply({error:'原整理操作來源不符。'},409);if(row.input_version!==input.version)return reply({error:'原整理操作版本不符。'},409);if(row.state!=='pending')return reply({operationScope:owner,...loaded,arrangement:arrangementForClient(row)});}
@@ -83,10 +84,12 @@ export async function POST(request:Request){
     const prior=await readArrangement(owner,input.id,input.repairOf.operationId);
     if(!prior||prior.state!=='complete'||prior.revision!==input.repairOf.version)return reply({error:'建議已變更，請重新核對道路。'},409);
     const reviewed=arrangementForClient(prior);
-    if(!reviewed.city||!reviewed.recommendRoads||reviewed.receipts?.roads||openingRoadNetwork(reviewed.city).groups.length<2)return reply({error:'目前沒有待補的道路缺口。'},422);
+    const original=JSON.parse(prior.snapshot) as OpeningDraft;
+    const frozen=openingRepairSnapshot(original,loaded.draft);
+    if(!reviewed.city||!reviewed.recommendRoads||reviewed.receipts?.roads||openingRoadNetwork(openingRepairSource(original,frozen,reviewed.city)).groups.length<2)return reply({error:'目前沒有待補的道路缺口。'},422);
     const inherited={...JSON.parse(prior.request),operationId:input.operationId,version:input.version,
       worldContext:input.worldContext,repairOf:input.repairOf,recommendRoads:true};
-    row=await reserveArrangement(owner,inherited,JSON.parse(prior.snapshot) as OpeningDraft);
+    row=await reserveArrangement(owner,inherited,frozen);
    }else{
     row=await reserveArrangement(owner,input,loaded.draft);
    }
