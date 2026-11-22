@@ -345,3 +345,31 @@ test('預覽逐房配置時按件勾選會立即更新房間與採納數量',asy
   assert.ok(document.body.textContent.includes('採納所選物品（32 件）'));
  }finally{await React.act(async()=>root.unmount());await close();await window.happyDOM.abort();}
 });
+
+test('preview start controls show the settings that can actually be adopted for each selected character',async()=>{
+ const {Component,close}=await component('components/opening-arrangement-panel.tsx');
+ const root=createRoot(document.body.appendChild(document.createElement('div')));
+ const places=['left','right'].map((id,i)=>({id,name:['甲住宅','乙住宅'][i],templateId:'house',version:1}));
+ const person=(templateId,placeId,roomId,placeOrigin,roomOrigin)=>({templateId,version:1,placeId,roomId,placeOrigin,roomOrigin});
+ const characters=[person('Cass','left','living','system','system'),person('Vera','left','living','player','system'),
+  person('店主','right','living','system','player'),person('舊卡','right','bedroom')];
+ const city={places,characters};
+ const recommended=characters.map(p=>({...p,placeId:'left',roomId:'bedroom'}));
+ const props={owner:'a',draftId:'draft',cards:characters.map(p=>({id:p.templateId,fields:{name:p.templateId}})),
+  scenes:[{id:'house',version:1,rooms:[{id:'living',name:'客廳'},{id:'bedroom',name:'臥室'}]}],city,
+  arrangement:{state:'complete',version:0,inputVersion:1,operationId:'op',city:{places,characters:recommended},preview:{issues:[]}},
+  onPrepare:async()=>({version:1}),onReply:()=>{},onBusy:()=>{}};
+ const control=(name,field)=>document.querySelector('[aria-label="'+name+'建議起始'+field+'"]');
+ try{
+  await React.act(async()=>root.render(React.createElement(Component,props)));
+  await settle(()=>control('Cass','場所'));
+  for(const [name,placeDisabled,roomDisabled,place,room] of [
+   ['Cass',false,false,'left','bedroom'],['Vera',true,false,'left','bedroom'],['店主',true,true,'right','living'],['舊卡',true,true,'right','bedroom']
+  ]){
+   assert.deepEqual([control(name,'場所').disabled,control(name,'房間').disabled,control(name,'場所').value,control(name,'房間').value],
+    [placeDisabled,roomDisabled,place,room],name);
+  }
+  await React.act(async()=>root.render(React.createElement(Component,{...props,city:{places,characters:[{...characters[0],placeId:'right',roomId:'living',roomOrigin:'player'},...characters.slice(1)]}})));
+  assert.deepEqual([control('Cass','場所').disabled,control('Cass','房間').disabled,control('Cass','場所').value,control('Cass','房間').value],[true,true,'right','living']);
+ }finally{await React.act(async()=>root.unmount());await close();}
+});
