@@ -29,6 +29,7 @@ export const cityDraftSchema = z.object({
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
+    placeOrigin: z.enum(['system','player']).optional(), roomOrigin: z.enum(['system','player']).optional(),
     mentalOpening: z.union([mentalOpeningSchema,cardMentalOpeningSchema]).optional(), openingNeeds:openingNeedsSchema.optional(), openingFeelings:z.object({hunger:z.number().int().min(0).max(3).optional(),thirst:z.number().int().min(0).max(3).optional(),fatigue:z.number().int().min(0).max(3).optional(),sleep:z.number().int().min(0).max(3).optional()}).strict().optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
