@@ -328,6 +328,91 @@ test('room list counts the current room and adding both objects focuses their na
   }
 });
 
+test('review shows shared starts and isolation, edits each exact target and restores its expanded group', async () => {
+  const {Component, close} = await component('components/opening-wizard.tsx');
+  const id = crypto.randomUUID();
+  const cards = ['Cass','Vera','Kris','店主'].map((name,i) => ({
+    id:['card-example-cass','card-example-vera','card-example-kris','shop'][i], version:1, fields:{name}, capacity:70,
+    values:{strength:10, endurance:11, dexterity:12, perception:13, appearance:14}
+  }));
+  const places = ['住宅','街角咖啡館','小屋'].map((name,i) => ({id:'p'+i, name, templateId:'s'+i, version:1}));
+  const scenes = places.map((place,i) => ({id:place.templateId, version:1, name:place.name, rooms:[{id:'room', name:i===0?'客廳':'前台'}], objects:[], connections:[]}));
+  const entrance = {id:'entry',name:'玄關'};
+  const extra = {placeId:'p0',rooms:[entrance],objects:[{id:'shoe',roomId:'entry',name:'鞋櫃',state:{}}],connections:[]};
+
+  const city = {characters:cards.map(card => ({templateId:card.id,version:1,placeId:'p0',roomId:'room'})), places, isolatedPlaceIds:['p2'],
+    backgroundPeople:[{id:'bg',name:'阿岑'}],relationships:[{from:'shop',to:'bg',targetType:'background',description:'常客'}],
+    finalization:{spaces:[extra],walks:[{places:['p0','p1'],minutes:7}]}};
+  let draft = {id, version:1, sources:{cards, scenes}, body:{name:'住宅的早晨', description:'', step:4, city}};
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('character-cards')) return Response.json({accountScope:'account-operations:a', cards});
+    if (String(url).includes('scene-templates')) return Response.json({accountScope:'account-operations:a', templates:scenes});
+    if (init?.method === 'POST') draft = {...draft,version:draft.version+1,body:JSON.parse(init.body).body};
+    const plan = draft.body.city;
+    const preview = {issues:[], places:places.map((place,i)=>{
+      const added = plan.finalization.spaces.find(value=>value.placeId===place.id);
+      return {...scenes[i], id:place.id, name:place.name, templateName:place.name, rooms:[...scenes[i].rooms,...added?.rooms??[]], objects:added?.objects??[]};
+    }), relationships:plan.relationships.map(r=>({from:'店主',to:'阿岑',description:r.description})), characters:plan.characters.map((actor,i)=>({
+      templateId:actor.templateId, name:cards[i].fields.name, place:places.find(p=>p.id===actor.placeId)?.name, room:actor.placeId==='p0'?'客廳':'前台'
+    })), walks:plan.finalization.walks, access:[{placeId:'p2',rule:'private',allowed:[]}]};
+    return Response.json({operationScope:'a', draft, preview, world:{characters:cards.map(card=>({id:card.id, name:card.fields.name,profileSource:card}))}});
+  };
+  const root = createRoot(document.body.appendChild(document.createElement('div')));
+  try {
+    await React.act(async()=>root.render(React.createElement(Component,{owner:'a',draftId:id})));
+    await settle(()=>document.querySelector('#opening-stage-title'));
+    assert.equal(document.querySelector('#opening-stage-title').textContent, '核對開局');
+    const summary = document.querySelector('[aria-label="開局摘要"]');
+    assert.match(summary.textContent, /4 人同在住宅・客廳/);
+    assert.match(summary.textContent, /Cass.*Vera.*Kris.*店主/);
+    assert.match(summary.textContent, /住宅、街角咖啡館/);
+    assert.match(summary.textContent, /刻意隔離：小屋/);
+    assert.match(document.querySelector('[aria-label="權限例外"]').textContent,/小屋.*僅個別授權/);
+
+    const card = [...document.querySelectorAll('.opening-review article')].find(node=>node.querySelector('h4')?.textContent==='店主');
+    card.querySelector('details').open = true;
+    await click('修改店主起點');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '店主起始場所');
+    await change(document.activeElement, 'p1');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改店主起點');
+    assert.ok(document.activeElement.closest('article').querySelector('details').open);
+    assert.match(document.activeElement.closest('article').textContent,/街角咖啡館・前台/);
+
+    let roomDetails = [...document.querySelectorAll('.opening-review details')].find(node=>node.querySelector('summary')?.textContent.startsWith('玄關（'));
+    roomDetails.open = true;
+    await click('修改住宅・玄關的鞋櫃');
+    await settle(()=>document.activeElement?.value === '鞋櫃');
+    await change(document.activeElement,'鞋架');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改住宅・玄關的鞋架');
+    assert.ok(document.activeElement.closest('details').open);
+
+    await click('修改道路 1');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '道路 1 起點');
+    const minutes = document.querySelector('[aria-label="道路 1 步行分鐘"]');
+    await change(minutes,'11');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改道路 1');
+    assert.match(document.activeElement.parentElement.textContent,/11 分鐘/);
+
+    const relations = [...document.querySelectorAll('.opening-review details')].find(node=>node.querySelector('summary')?.textContent.startsWith('人物關係'));
+    relations.open = true;
+    await click('修改關係 1');
+    await settle(()=>document.activeElement?.getAttribute('aria-label') === '關係 1 來源');
+    const description = document.activeElement.closest('fieldset').querySelector('input');
+    await change(description, '咖啡館老客人');
+    await click('返回核對');
+    await settle(()=>document.activeElement?.textContent === '修改關係 1');
+    assert.match(document.activeElement.parentElement.textContent,/店主 → 阿岑：咖啡館老客人/);
+    assert.ok(document.activeElement.closest('details').open);
+
+  } finally {
+    await React.act(async()=>root.unmount()); globalThis.fetch=originalFetch; await close(); await window.happyDOM.abort();
+  }
+});
+
 test('預覽逐房配置時按件勾選會立即更新房間與採納數量',async()=>{
  const {Component,close}=await component('components/opening-room-item-suggestions.tsx');
  const rooms=['前台','玄關','廚房','臥室','客廳','書房','儲藏室'];
