@@ -74,7 +74,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
       if(!Object.hasOwn(original.action,key))throw new DecisionFieldError('action.'+key,undefined,'行動物件的必填字串');
     }
     const extra=Object.keys(original.action).find(key=>!actionFields.includes(key));
-    if(extra)throw new DecisionFieldError('action',extra,'只含 type、target、content、purpose 的物件');
+    if(extra!==undefined)throw new DecisionFieldError(`action[${JSON.stringify(extra)}]`,(original.action as Record<string,unknown>)[extra],'省略未定義的行動欄位');
     data={...original,...original.action};delete data.action;
   }
   if(original.contractVersion!==npcContractVersion)throw new DecisionFieldError('contractVersion',original.contractVersion,npcContractVersion);
@@ -99,7 +99,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if (!activityDurations.includes(data.durationMinutes as number)) throw new DecisionFieldError('durationMinutes', data.durationMinutes, '15 至 1440 的 15 分鐘整數倍');
   if (data.focusIntentId !== null && !text(data.focusIntentId,64,true)) throw new DecisionFieldError('focusIntentId', data.focusIntentId, 'null 或不超過 64 字元的非空 ID');
   const unexpected = Object.keys(data).find(key => ![...actionSchema.required,'contractVersion'].includes(key));
-  if (unexpected) throw new DecisionFieldError('$', unexpected, '已定義的決策欄位名稱');
+  if (unexpected!==undefined) throw new DecisionFieldError(`$[${JSON.stringify(unexpected)}]`,data[unexpected],'省略未定義的決策欄位');
   let timeIntent: TimeIntent | undefined;
   if(data.timeIntent !== undefined){
     if(!data.timeIntent || typeof data.timeIntent !== 'object' || Array.isArray(data.timeIntent))throw new DecisionFieldError('timeIntent',data.timeIntent,'含 kind、maxMinutes 的物件');

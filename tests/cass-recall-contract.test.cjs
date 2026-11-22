@@ -92,3 +92,12 @@ test('final decisions report the misplaced root type even when the nested action
     await assert.rejects(replay(candidate,raw), /欄位 \$\.type：收到 "json_object"，預期.*省略.*action\.type/);
   }
 });
+
+
+test('additional action and root fields report their path and value even for empty keys', async () => {
+  for(const [scope,pattern] of [['action', /action\[""\].*收到 1.*預期.*省略/],['root', /\$\[""\].*收到 1.*預期.*省略/]]){
+    const candidate=structuredClone(captured[0]);
+    (scope==='action'?candidate.action:candidate)['']=1;
+    await assert.rejects(replay(candidate),pattern);
+  }
+});
