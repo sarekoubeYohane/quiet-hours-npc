@@ -1,3 +1,4 @@
+import { providerForMode } from './model-providers';
 import { newObservedActivity, observeActivity } from './observed-activity';
 import { finishPendingNeeds } from './body-needs-policy';
 import { prepareControlledFeelings, acknowledgeControlledFeelings, type ControlledFeelingRequest, type ControlledFeelingCandidate } from './controlled-feelings';
@@ -245,7 +246,7 @@ export async function advanceActivities(world: World, options: {
   }
   if(ai&&options.evaluateControlledFeelings)for(const character of world.characters){
     if(!controlledActors.has(character.id))continue;
-    const request=prepareControlledFeelings(world,character,modelKey,{provider:mode==='openai'?'openai':'openrouter',model:modelKey.slice(modelKey.indexOf(':')+1)},controlledStarts.get(character.id));
+    const request=prepareControlledFeelings(world,character,modelKey,{provider:providerForMode(mode),model:modelKey.slice(modelKey.indexOf(':')+1)},controlledStarts.get(character.id));
     if(!request)continue;
     if(budgetReached(usage,limits))throw new BudgetExceeded();
     await options.beforeDecision?.();

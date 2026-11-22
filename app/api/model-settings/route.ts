@@ -3,6 +3,9 @@ import { getGitHubUser } from '@/lib/auth';
 import { bindWorldSave, SaveAccessError } from '@/lib/world-saves';
 import { readModelPreference } from '@/lib/model-settings';
 import { modelSettingsView, saveModelPreference } from '@/lib/model-settings-store';
+import { isModelProvider } from '@/lib/model-providers';
+import { ModelKeyError, readModelKey, validatedModelKey } from '@/lib/model-keys';
+import { CatalogError, listProviderModels } from '@/lib/provider-api';
 export const dynamic = 'force-dynamic';
 const reply = (body: object, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 async function scope(request: Request) {
@@ -23,8 +26,20 @@ export async function POST(request: Request) {
     const context = await scope(request);
     if (!context) return reply({ error: '請先登入。' }, 401);
     const raw = await request.text();
+    if (raw.length > 6400) return reply({ error: '設定內容過長。' }, 400);
+    const submitted=JSON.parse(raw) as {version?:number;accountScope?:unknown;operation?:unknown;provider?:unknown;key?:unknown};if(!matchesScope(authoringScope(context.owner),submitted?.accountScope))throw new SaveAccessError('原帳號已變更或缺少識別，模型設定仍未同步。',409);
+    if (submitted.operation === 'list-models') {
+      if (!isModelProvider(submitted.provider)) return reply({ error: '請選擇模型服務。' }, 400);
+      try {
+        const key = submitted.key === undefined ? await readModelKey(context.owner, submitted.provider) : validatedModelKey(submitted.key);
+        const models = await listProviderModels(submitted.provider, key, AbortSignal.any([request.signal, AbortSignal.timeout(15000)]));
+        return reply({ accountScope: authoringScope(context.owner), models });
+      } catch (error) {
+        if (error instanceof ModelKeyError || error instanceof CatalogError) return reply({ error: error.message }, error.status);
+        return reply({ error: '無法取得供應商的模型清單，請重新查詢。' }, 502);
+      }
+    }
     if (raw.length > 2000) return reply({ error: '設定內容過長。' }, 400);
-    const submitted=JSON.parse(raw) as {version?:number;accountScope?:unknown};if(!matchesScope(authoringScope(context.owner),submitted?.accountScope))throw new SaveAccessError('原帳號已變更或缺少識別，模型設定仍未同步。',409);
     const input={...submitted};delete input.accountScope;
     const preference = readModelPreference(input, !!context.binding?.saveId);
     if (!preference || !Number.isSafeInteger(input.version) || input.version! < 0 || input.version! >= Number.MAX_SAFE_INTEGER) return reply({ error: '請填寫 NPC 與天上意志的合法模型，原輸入已保留。' }, 400);

@@ -46,6 +46,7 @@ test('model setup saves models and key together; only the explicit continuation 
  globalThis.fetch=async(url,options)=>{
   if(!options?.method)return Response.json(view);
   const body=JSON.parse(options.body);calls.push({url,body});
+  if(body.operation==='list-models')return Response.json({accountScope:view.accountScope,models:Object.values(models).map(({model})=>({id:model,name:model}))});
   if(String(url).includes('model-settings')){assert.equal(body.version,view.version);view={...view,version:view.version+1,effective:body.models,source:'account'};return Response.json(view);}
   if(failKey){failKey=false;return Response.json({error:'controlled key failure'},{status:503});}
   view={...view,modelKeys:{...view.modelKeys,openai:{configured:true,expiresAt:Date.now()+100000}}};
@@ -56,12 +57,13 @@ test('model setup saves models and key together; only the explicit continuation 
   await React.act(async()=>root.render(React.createElement(Component,{originalAccountScope:'account-operations:a',continuation:{label:'保存並繼續這次操作',run:async()=>{resumed++;}}})));
   await settle(()=>document.querySelector('[aria-label="OpenAI 服務 API Key"]'));
   await change(document.querySelector('[aria-label="OpenAI 服務 API Key"]'),'fake-local-key');
+  await click('讀取模型');await settle(()=>document.body.textContent.includes('已取得 2 個模型'));
   await click('保存並繼續這次操作');await settle(()=>document.body.textContent.includes('controlled key failure'));
   assert.equal(resumed,0);assert.equal(document.querySelector('[aria-label="OpenAI 服務 API Key"]').value,'fake-local-key');
   await click('保存模型與 Key');await settle(()=>document.body.textContent.includes('模型與已填的 Key 已保存'));
   assert.equal(resumed,0);assert.equal(document.querySelector('[aria-label="OpenAI 服務 API Key"]').value,'');
   await click('保存並繼續這次操作');await settle(()=>resumed===1);
-  assert.deepEqual(calls.map(value=>value.body.operation).filter(Boolean),['set-model-key','set-model-key']);
+  assert.deepEqual(calls.map(value=>value.body.operation).filter(Boolean),['list-models','set-model-key','set-model-key']);
   assert.ok(calls.every(value=>value.body.accountScope==='account-operations:a'||value.body.operationScope==='account-operations:a'));
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=originalFetch;await close();await window.happyDOM.abort();}
 });
@@ -102,4 +104,68 @@ test('rereading a committed reroll unlocks allocation in the same mounted editor
   const complete=[...document.querySelectorAll('button')].find(value=>value.textContent==='保存為完成人物卡');assert.equal(complete.disabled,false);assert.equal(writes,1);
   assert.equal(sessionStorage.getItem('quiet-hours:character-reroll:'+draft.accountScope+':'+draft.id),null);
  }finally{await React.act(async()=>root.unmount());globalThis.fetch=old;await close();await window.happyDOM.abort();}
+});
+test('模型選單使用查到的 ID，兩個角色可共用一份清單並獨立選擇', async () => {
+  const { Component, close } = await component('components/model-settings-panel.tsx');
+  const original = globalThis.fetch;
+  const choice = { provider: 'deepseek', model: 'previous-model' };
+  const effective = { npc: choice, adjudication: choice };
+  const settings = { accountScope:'account-operations:a', preference:{mode:'custom',models:effective}, version:1, effective, accountModels:effective,
+    modelKeyStorageAvailable:true, source:'account', modelKeys:{deepseek:{configured:true,expiresAt:Date.now()+60000}} };
+  const requests=[];
+  globalThis.fetch = async (_url, init) => {
+    if (!init?.body) return Response.json(settings);
+    const body=JSON.parse(init.body); requests.push(body);
+    return Response.json(body.operation === 'list-models' ? {accountScope:settings.accountScope,models:[{id:'listed-by-key',name:'帳號可用模型'},{id:'previous-model',name:'舊模型'}]} : settings);
+  };
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  const field=label=>document.querySelector('select[aria-label="'+label+'"]');
+  try {
+    await React.act(async()=>root.render(React.createElement(Component)));
+    await settle(()=>document.querySelector('[aria-label="NPC 模型"]'));
+    assert.ok(field('NPC 模型'), 'NPC 模型應為選單');
+    const button=[...document.querySelectorAll('button')].find(item=>item.textContent.includes('讀取模型'));
+    await React.act(async()=>button.click());
+    await settle(()=>[...field('NPC 模型').options].some(item=>item.value==='listed-by-key'));
+    await React.act(async()=>{field('NPC 模型').value='listed-by-key';field('NPC 模型').dispatchEvent(new window.Event('change',{bubbles:true}));});
+    assert.equal(field('天上意志模型').value, 'previous-model');
+    await React.act(async()=>[...document.querySelectorAll('button')].find(item=>item.textContent==='保存模型與 Key').click());
+    assert.deepEqual(requests.at(-1).models, {npc:{provider:'deepseek',model:'listed-by-key'},adjudication:choice});
+    assert.equal(requests.filter(r=>r.operation==='list-models').length, 1);
+  } finally { await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort(); }
+});
+test('首次設定只需查一個服務，離開查詢失敗的服務後保存不會替換它的 Key', async () => {
+  const {Component, close}=await component('components/model-settings-panel.tsx');
+  const original=globalThis.fetch, calls=[];
+  const settings={accountScope:'account-operations:a',version:0,preference:{mode:'inherit'},effective:{},accountModels:{},source:'missing',modelKeys:{},modelKeyStorageAvailable:true};
+  globalThis.fetch=async(_url,init)=>{
+    if(!init?.body)return Response.json(settings);
+    const body=JSON.parse(init.body);calls.push(body);
+    if(body.operation==='list-models')return body.provider==='deepseek'
+      ? Response.json({error:'Key 驗證失敗'},{status:403})
+      : Response.json({accountScope:settings.accountScope,models:[{id:'claude-from-account',name:'Claude'}]});
+    if(body.operation==='set-model-key')return Response.json({operationScope:settings.accountScope,modelKeys:settings.modelKeys,modelKeyStorageAvailable:true});
+    return Response.json({...settings,version:1,effective:body.models});
+  };
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  const select=async(label,value)=>React.act(async()=>{
+    const field=document.querySelector('select[aria-label="'+label+'"]');field.value=value;field.dispatchEvent(new window.Event('change',{bubbles:true}));
+  });
+  const list=async(provider)=>{
+    const field=document.querySelector('input[aria-label="'+provider+' 服務 API Key"]');
+    await change(field,'test-'+provider.replaceAll(' ','-'));
+    await React.act(async()=>field.closest('fieldset').querySelector('button').click());
+  };
+  try{
+    await React.act(async()=>root.render(React.createElement(Component)));
+    await settle(()=>document.querySelector('select[aria-label="天上意志服務"]'));
+    await select('天上意志服務','deepseek');await list('DeepSeek');
+    await settle(()=>document.body.textContent.includes('Key 驗證失敗'));
+    await select('天上意志服務','anthropic');await list('Anthropic Claude');
+    await settle(()=>document.body.textContent.includes('已取得 1 個模型'));
+    await select('天上意志模型','claude-from-account');
+    assert.equal(document.querySelector('select[aria-label="NPC 模型"]').value,'claude-from-account');
+    await click('保存模型與 Key');await settle(()=>document.body.textContent.includes('模型與已填的 Key 已保存'));
+    assert.deepEqual(calls.filter(call=>call.operation==='set-model-key').map(call=>call.mode),['anthropic']);
+  }finally{await React.act(async()=>root.unmount());globalThis.fetch=original;await close();await window.happyDOM.abort();}
 });

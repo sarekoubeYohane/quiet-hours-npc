@@ -1,3 +1,4 @@
+import { modelMode, type ModelProvider } from './model-providers';
 import { emotionRegulationPrompt, parseEmotionRegulation } from './emotion-regulation';
 import { processFeelingPromptFor, parseProcessFeeling } from './mental-process';
 import { feelingPromptFor, parseFeelingUpdates } from './mental-experiences';
@@ -94,9 +95,9 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw Error('方法與追求焦點不一致。');
   return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[]), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:'openai'|'openrouter',fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
-const direct=provider==='openai';
-const resumable=canResumeActivity(w,c,`${direct?'openai':'ai'}:${model}`);
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:ModelProvider,fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
+const mode=modelMode(provider);
+const resumable=canResumeActivity(w,c,`${mode}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
 const continuationPrompt=`本次可選的 type：${allowedTypes.join('、')}。${resumable?'原活動可延續；仍由你判斷續做或切換。':'沒有可延續的原活動（可能已完成或決策模式／模型已改變），必須選擇新行動，不能回傳 continue。'}`;
 let continuation:Parameters<typeof prepareNpcDecision>[2]['continuation'];
@@ -126,7 +127,7 @@ for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
 // context. The route rechecks operation version/lease after completion.
-const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${direct?'openai':'ai'}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
+const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${mode}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
 const {schema,context:decisionContext}=prepared;
 const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
 await recall?.verifyCurrent?.();

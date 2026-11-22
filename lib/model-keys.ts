@@ -2,7 +2,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { env } from 'cloudflare:workers';
 import { database } from './store';
 
-export type ModelProvider = 'openai' | 'openrouter';
+import { modelProviders, type ModelProvider } from './model-providers';
+export type { ModelProvider } from './model-providers';
 export type ModelKeyStatus = Record<ModelProvider, { configured: boolean; expiresAt: number | null }>;
 export class ModelKeyError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
@@ -26,21 +27,26 @@ async function purgeExpired() {
 }
 export async function modelKeyStatus(owner: string): Promise<ModelKeyStatus> {
   await purgeExpired();
-  const status: ModelKeyStatus = { openai: { configured: false, expiresAt: null }, openrouter: { configured: false, expiresAt: null } };
-  for (const provider of ['openai', 'openrouter'] as const) {
+  const status = {} as ModelKeyStatus;
+  for (const provider of modelProviders) {
+    status[provider] = { configured: false, expiresAt: null };
     const row = await database().prepare('SELECT expires_at FROM account_model_keys WHERE scope = ? AND owner = ? AND provider = ? AND expires_at > ?')
       .bind(scope(), owner, provider, Date.now()).first<{ expires_at: number }>();
     if (row) status[provider] = { configured: modelKeyStorageAvailable(), expiresAt: row.expires_at };
   }
   return status;
 }
-export async function saveModelKey(owner: string, provider: ModelProvider, value: unknown) {
+export function validatedModelKey(value: unknown) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > 4096 || /[\s\x00-\x1f\x7f]/.test(value.trim())) throw new ModelKeyError('請貼上有效的 API Key，最多 4,096 字元，不能包含空白或換行。');
+  return value.trim();
+}
+export async function saveModelKey(owner: string, provider: ModelProvider, value: unknown) {
+  const key = validatedModelKey(value);
   const expiresAt = Date.now() + lifetime;
   const nonce = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', encryptionKey(), nonce);
   cipher.setAAD(context(owner, provider, expiresAt));
-  const ciphertext = Buffer.concat([cipher.update(value.trim(), 'utf8'), cipher.final()]).toString('base64');
+  const ciphertext = Buffer.concat([cipher.update(key, 'utf8'), cipher.final()]).toString('base64');
   await purgeExpired();
   await database().prepare(`INSERT INTO account_model_keys (scope, owner, provider, ciphertext, nonce, tag, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(scope, owner, provider) DO UPDATE SET ciphertext = excluded.ciphertext, nonce = excluded.nonce, tag = excluded.tag, expires_at = excluded.expires_at`)

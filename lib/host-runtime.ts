@@ -1,3 +1,4 @@
+import { isModelProvider, modelMode, modelProviders, providerForMode, type ModelProvider } from './model-providers';
 import { playerAccount, playerBilling, reconcileOperationUsage, type PlayerAccountView } from './player-account-budget';
 import { readEffectiveModels } from './model-settings-store';
 import { ensureAccountOperationLedger } from './world-saves';
@@ -17,7 +18,6 @@ import { boundRecallStorage } from './recall';
 import { RecallServiceError } from './recall-services';
 import { loadWorld, database } from './store';
 import { normalizeWorld, type Action, type AIUsage, type World, type Character } from './world';
-import { directModels } from './models';
 import { BudgetExceeded, currentUsage, validBudgetLimits, budgetReached, type BudgetLimits, type TokenUsage } from './activities';
 import { readModelKey, modelKeyStatus, ModelKeyError } from './model-keys';
 import type { SaveBinding } from './world-saves';
@@ -90,7 +90,7 @@ export function journalView(journal: Journal, contextId: string | undefined, ope
 }
 
 export type OperationReply = { status: number; body: Record<string, unknown> };
-export type OperationBody = { resourceRequest?:unknown; mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:'openai'|'openrouter';model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
+export type OperationBody = { resourceRequest?:unknown; mentalOpenings?:unknown; bodyNeeds?:unknown; characterSetup?:unknown; city?:unknown; expectedVersion?:number; worldContext?:string; adjudication?:{provider:ModelProvider;model:string}; operationScope?: string; operationId?: string; operation?: string; minutes?: number; timeContract?:'five-minute-v1'; mode?: string; key?: string; model?: string; text?: string; target?: string; limits?: BudgetLimits; price?: PriceInput; action?: Action; characterGeneration?:unknown; openingDescription?:unknown };
 export type OperationInput = {
   accountId: string; binding: SaveBinding; body: OperationBody; bodyLength: number;
   /** 用戶端帶來的回合等待政策版本。 */
@@ -112,7 +112,7 @@ export type OperationContext = WorldChecks & {
   operationId: string; issuedAt: number; accountPlayer: PlayerAccountView; services?: WorldTaskServices; trace: WorldTrace;
   decisionTrace: ReturnType<typeof createDecisionTrace> | undefined; workDeadline: number;
   verifyLease: () => Promise<void>; workWait: <T>(promise: Promise<T>) => Promise<T>; modelSignal: () => AbortSignal;
-  dispatchModel: (task: 'npc' | 'adjudication' | 'feelings', world: World, actor: Character | undefined, provider: 'openai' | 'openrouter', model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch }) => ModelDispatch;
+  dispatchModel: (task: 'npc' | 'adjudication' | 'feelings', world: World, actor: Character | undefined, provider: ModelProvider, model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch }) => ModelDispatch;
   /** 切換故事後，讓較早的操作身分全部視為已過期。 */
   forgetEarlierOperations: () => void;
 };
@@ -239,7 +239,7 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     if (handler?.immediate) return await handler.immediate(checks);
     if (b.key !== undefined) return respond({ error: '請先在模型設定保存 Key；推進回合不接受 API Key。' }, 400);
     if (!handler) return respond({ error: '無效操作。' }, 400);
-    if (!['ai', 'openai', 'demo'].includes(b.mode || '')) return respond({ error: '模式無效。' }, 400);
+    if (b.mode !== 'demo' && b.mode !== 'ai' && !isModelProvider(b.mode)) return respond({ error: '模式無效。' }, 400);
     if (b.limits !== undefined && !validBudgetLimits(b.limits)) return respond({ error: '有限預算必須是大於 0 的安全整數；無上限請明確選擇。' }, 400);
     { const blocked = await handler.request?.(checks); if (blocked) return blocked; }
     const generatingSetup = handler.kind === 'setup';
@@ -311,12 +311,11 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
         if (!settings.effective.adjudication || (!generatingSetup && !settings.effective.npc)) return respond({ error: '請在原流程補齊模型設定。', modelSettingsRequired: true }, 400);
         ephemeralModels = true;
         world.adjudication = { ...settings.effective.adjudication };
-        if (!generatingSetup) { b.mode = settings.effective.npc!.provider === 'openai' ? 'openai' : 'ai'; b.model = settings.effective.npc!.model; }
+        if (!generatingSetup) { b.mode = modelMode(settings.effective.npc!.provider); b.model = settings.effective.npc!.model; }
       }
       if (!generatingSetup && (typeof b.model !== 'string' || !b.model.trim())) return respond({ error: '請填入模型 ID。', modelSettingsRequired: true }, 400);
-      if (!generatingSetup && b.mode === 'openai' && !directModels.includes(b.model || '')) return respond({ error: '請選擇網站支援的 OpenAI 模型。' }, 400);
     }
-    if (paidAdvance) await readModelKey(accountId, b.mode === 'openai' ? 'openai' : 'openrouter');
+    if (paidAdvance) await readModelKey(accountId, providerForMode(b.mode));
     if(paidAdvance){
       if(!world.adjudication)return respond({error:'請先設定天上意志的裁定服務、模型與 API Key。'},400);
       const status=await modelKeyStatus(accountId);
@@ -355,7 +354,7 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     // checkpoint: an NPC input can accidentally contain the other provider key.
     decisionTrace.step('time-policy',undefined,{version:roundTimePolicy.version,leaseCreatedAt,leaseAcquiredAt:Date.now(),workDeadline,leaseDeadline:lease,clientMs:roundClientMs});
     const configuredKeys=await workWait(modelKeyStatus(accountId));
-    for(const provider of ['openai','openrouter'] as const)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await workWait(readModelKey(accountId,provider)));}catch{decisionTrace.omitUnsafeContent();}}
+    for(const provider of modelProviders)if(configuredKeys[provider].configured){try{decisionTrace.registerSecret(await workWait(readModelKey(accountId,provider)));}catch{decisionTrace.omitUnsafeContent();}}
     await workWait(decisionTrace.persist());
     const verifyLease = async () => {
       workSignal!.throwIfAborted();
@@ -365,7 +364,7 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     };
     // 派送模型的共同接線：帳號預算預留與結算、決策追溯與操作證據的 observer 都在這裡接上。
     // 各派送點的差異以參數明示（#338 對照表），這裡不改變任何一處的既有行為。
-    const dispatchModel=(task:'npc'|'adjudication'|'feelings',w:World,actor:Character|undefined,provider:'openai'|'openrouter',model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch})=>{
+    const dispatchModel=(task:'npc'|'adjudication'|'feelings',w:World,actor:Character|undefined,provider:ModelProvider,model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch})=>{
       const observer:ModelObserver|undefined=decisionTrace?.observer(task,actor,{...w,modelPrices:accountPlayer.prices},provider,model,key,options.evidence&&actor?evidence?.observer(task,actor.id,provider,model,key):undefined);
       return {
         observer:options.withinWorkDeadline&&observer?((event:Parameters<ModelObserver>[0])=>workWait(Promise.resolve(observer(event)))) as ModelObserver:observer,
