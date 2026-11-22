@@ -21,6 +21,7 @@ export type CityDraft = {
   }[];
   backgroundPeople?: { id: string; name: string }[];
   relationships?: OpeningRelationship[];
+  resourcePlan?:import('./opening-resources').ResourcePlan;
   finalization?: CityFinalization;
   accessGrants?: EntryGrant[];
 };

@@ -6,7 +6,7 @@ import {prepareCity} from './city-creation';
 import type {OpeningDraft} from './opening-drafts';
 import type {CityDraft,CityPreview} from './city-draft';
 import type {World} from './world';
-export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string;supplyRooms?:boolean;recommendRoads?:boolean;repairOf?:{operationId:string;version:number}};
+export type ArrangementRequest={id:string;version:number;operationId:string;operationScope:string;worldContext?:string;purpose?:'resources';resourceRequest?:string;supplyRooms?:boolean;recommendRoads?:boolean;repairOf?:{operationId:string;version:number}};
 export type ArrangementResult={roomItems?:import('./opening-room-items').RoomItemReview;city:CityDraft;preview:CityPreview;world?:World;receipts?:Partial<Record<'roads'|'items',string>>};
 export const storedArrangementResult=(row:ArrangementRow)=>JSON.parse(row.result!) as ArrangementResult;
 export const arrangementHasReceipt=(row:ArrangementRow,request:string)=>row.adoption_request===request||!!row.result&&Object.values(storedArrangementResult(row).receipts??{}).includes(request);

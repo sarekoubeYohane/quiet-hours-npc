@@ -108,6 +108,9 @@ export function OpeningReview({name, description, city, preview, world, cards, b
           </details>
         </article>;
       })}</div>
+      {world?.openingResources&&<section aria-label="開局物資"><h3>開局物資</h3>
+        <ul>{world.supplies?.map(item=><li key={item.id}>{world.configuration?.regions.find(room=>room.id===item.region)?.name} · {item.label} {item.remaining} 份</li>)}</ul>
+      </section>}
       <h3>場所與房間</h3>
       {preview.places.map(place => <section key={place.id}>
         <h4>{placeName(place.id)}</h4>

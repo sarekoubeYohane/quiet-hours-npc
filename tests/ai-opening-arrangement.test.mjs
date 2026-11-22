@@ -37,6 +37,41 @@ test('explicit AI arrangement uses frozen selected sources, stays a proposal, th
  }finally{await app.close();}
 });
 
+test('開局配給與逐房配物可分次核對，兩者在第 0 回合各保存一次',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  if(input.contractVersion==='opening-resources.v1'){
+   assert.equal(input.request,'準備兩份飲水');
+   return {supplies:[{kind:'water',label:'瓶裝飲水',region:input.actors[0].region,portions:2,responsible:'world',allowedTo:[input.actors[0].id],reason:'場所管理者提供給住戶'}],furnishingGrants:[],unavailable:[]};
+  }
+  return proposal(input);
+ }});
+ try{
+  const j=await journey(app),city=structuredClone(j.draft.body.city);
+  Object.assign(city.characters[0],{placeId:'home',roomId:'front',homeId:'home'});
+  const scope={operationScope:'a',id:j.draft.id};
+  let {draft}=await j.ok('/api/opening-drafts',{...scope,version:j.draft.version,body:{...j.draft.body,city}});
+  const generate=(work)=>j.ok('/api/opening-drafts/arrange',{...scope,version:draft.version,operationId:operationId(),worldContext:j.scope.world.contextId,...work});
+  let {arrangement}=await generate({purpose:'resources',resourceRequest:'準備兩份飲水'});
+  const act=(action,fields)=>j.ok('/api/opening-drafts/arrange',{...scope,version:draft.version,operationId:arrangement.operationId,proposalVersion:arrangement.version,action,...fields});
+  assert.equal(arrangement.city.resourcePlan.supplies[0].portions,2);
+  assert.equal(draft.body.city.resourcePlan,undefined);
+  ({draft}=await act('adopt',{city:arrangement.city}));
+  ({arrangement}=await generate({supplyRooms:true,recommendRoads:false}));
+  const edited=structuredClone(arrangement.city);
+  edited.resourcePlan.supplies[0].portions=3;
+  ({arrangement}=await act('edit',{city:edited}));
+  ({draft,arrangement}=await act('adoptItems',{excludedItems:[]}));
+  assert.equal(draft.body.city.resourcePlan.supplies[0].portions,2);
+  ({draft}=await act('adopt',{city:arrangement.city}));
+  const saved=await j.ok('/api/saves',{operationScope:'a',id:crypto.randomUUID(),draftId:draft.id,draftVersion:draft.version});
+  assert.equal(saved.world.turn,0);
+  assert.deepEqual(saved.world.supplies.filter(row=>row.label==='瓶裝飲水').map(row=>row.remaining),[3]);
+  assert.equal(saved.world.objects.filter(row=>row.label==='木桌').length,1);
+ }finally{await app.close();}
+});
+
 test('proposal edits are durable and versioned before adoption, and invalid proposals cannot bypass manual confirmation',async()=>{
  const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{const input=JSON.parse(request.messages.at(-1).content);return input.task==='character-card-assessment-v1'?{bonuses:[]}:proposal(input);}});
  try{

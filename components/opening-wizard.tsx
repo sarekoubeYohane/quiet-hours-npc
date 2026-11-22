@@ -157,6 +157,7 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
       </article>)}
      </div>
      <h3 className="opening-section-title">本次場所（{body.city.places.length}／8）</h3>
+     {!!body.city.places.length&&<a href="#opening-supplies">設定開局物資與份數</a>}
      {!body.city.places.length&&<p className="opening-empty">尚未加入任何場所。</p>}
      {body.city.places.map((place,index)=><div className="opening-place-row" key={place.id}>
       <label>場所 {index+1} 名稱<input value={place.name} maxLength={80} onChange={event=>updateCity({...body.city,places:body.city.places.map(value=>value.id===place.id?{...value,name:event.target.value}:value)})}/></label>
@@ -183,7 +184,7 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
    {stage===3&&<OpeningReview name={body.name} description={body.description} city={body.city} preview={preview} world={candidate} cards={sources.cards} bookmark={reviewVisit} onEdit={editFromReview}/>}
 
   </section></fieldset>
-  {stage===2&&<OpeningArrangementPanel city={body.city} key={id} owner={owner} draftId={id} arrangement={arrangement} previousArrangement={previousArrangement} cards={sources.cards} scenes={sources.scenes} onPrepare={async()=>{if(!await flush())return;return {version:version.current};}} onBusy={setBusy} onReply={data=>{if(data.draft){apply(data.draft);setStatus('已保存至帳號');}acceptArrangement(data);setPreview(data.preview);setCandidate(data.world);}}/>}
+  {stage===2&&<OpeningArrangementPanel city={body.city} updateCity={updateCity} locked={conflict||creating} key={id} owner={owner} draftId={id} arrangement={arrangement} previousArrangement={previousArrangement} cards={cards} scenes={scenes} onPrepare={async()=>{if(!await flush())return;return {version:version.current};}} onBusy={setBusy} onReply={data=>{if(data.draft){apply(data.draft);setStatus('已保存至帳號');}acceptArrangement(data);setPreview(data.preview);setCandidate(data.world);}}/>}
   <footer className="panel opening-footer">
    <p className="hint" id="opening-next-hint">{blockedReason||(
     stage===1?`已選 ${body.city.characters.length} 名人物`:

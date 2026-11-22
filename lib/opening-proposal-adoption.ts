@@ -69,6 +69,7 @@ export function reconcileOpeningProposal(original:CityDraft, current:OpeningDraf
   });
   const roads=groups.receipts?.roads?latest:reconcileOpeningRoads(roadBaseline(original),latest,proposal);
   const city=reconcileOpeningStarts({...roads,characters,finalization:{spaces,walks:roads.finalization?.walks??[]},
+    resourcePlan:same(original.resourcePlan,latest.resourcePlan)?proposal.resourcePlan:latest.resourcePlan,
     backgroundPeople:mergeRows(original.backgroundPeople,latest.backgroundPeople,proposal.backgroundPeople,byId),
     relationships:mergeRows(original.relationships,latest.relationships,proposal.relationships,r=>JSON.stringify([r.from,r.to,r.targetType])),
     accessGrants:mergeRows(original.accessGrants,latest.accessGrants,proposal.accessGrants,r=>JSON.stringify([r.placeId,r.roomId,r.characterTemplateId])),
