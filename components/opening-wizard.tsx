@@ -4,7 +4,7 @@ import {fillUniqueStarts} from '@/lib/opening-authoring';
 import {useDraftNavigation} from './use-draft-navigation';
 import {boundPath} from '@/lib/bound-navigation';
 import {saveUuidPattern} from '@/lib/save-identities';
-import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import SaveNavigation from './save-navigation';
@@ -12,7 +12,7 @@ import {OpeningRoomEditor} from './opening-room-editor';
 import {OpeningRelations,OpeningRoads} from './opening-configuration-controls';
 import OpeningArrangementPanel from './opening-arrangement-panel';
 import type {ArrangementView} from '@/lib/opening-arrangement-store';
-import {CityAccessPreview} from './city-access-editor';
+import {OpeningReview,focusReviewEditor,restoreReviewPosition,type ReviewBookmark} from './opening-review';
 import type {CharacterCard} from '@/lib/character-cards';
 import type {SceneTemplate} from '@/lib/scene-templates';
 import type {CityDraft,CityPreview} from '@/lib/city-draft';
@@ -22,7 +22,7 @@ type OpeningCity=CityDraft;
 type Body={name:string;step:number;description:string;city:OpeningCity};
 type Draft={id:string;version:number;body:Body;sources:{cards:CharacterCard[];scenes:SceneTemplate[]};finalizedSaveId?:string};
 type Reply={previousArrangement?:ArrangementView;arrangement?:ArrangementView;operationScope?:string;draft?:Draft;preview?:CityPreview;world?:World;error?:string};
-const steps=['選人物','場景與安排','核對並開始'];
+const steps=['選人物','場景與安排','核對開局'];
 const storedSteps=[1,3,4];
 const stageOf=(step:number)=>step===1?1:step<=3?2:3;
 const initial=():Body=>({name:'新的世界',step:1,description:'',city:{characters:[],places:[]}});
@@ -42,9 +42,15 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
  const [creating,setCreating]=useState(false);
  const [arrangement,setArrangement]=useState<ArrangementView>(),[previousArrangement,setPreviousArrangement]=useState<ArrangementView>();
  const [sceneGroup,setSceneGroup]=useState<'人物'|'場所與道路'|'人物關係'>('場所與道路');
+ const stageFocus=useRef<(()=>void)|undefined>(undefined);
+ const [reviewVisit,setReviewVisit]=useState<ReviewBookmark>();
  const [selectionNotice,setSelectionNotice]=useState('');
  const [id,setId]=useState(''),[body,setBody]=useState<Body>(initial),[sources,setSources]=useState<Draft['sources']>({cards:[],scenes:[]}),[library,setLibrary]=useState<Draft['sources']>({cards:[],scenes:[]}),[loading,setLoading]=useState(true),[status,setStatus]=useState(''),[error,setError]=useState(''),[failed,setFailed]=useState(false),[conflict,setConflict]=useState(false),[busy,setBusy]=useState(false),[preview,setPreview]=useState<CityPreview>(),[candidate,setCandidate]=useState<World>(),[finalized,setFinalized]=useState<string>();
  const current=useRef<Body>(initial()),version=useRef(0),alive=useRef(true),writing=useRef<Promise<boolean>|null>(null),dirty=useRef(false),pendingCreation=useRef<{id:string;draftId:string;draftVersion:number;operationScope:string}|undefined>(undefined),generation=useRef(0),accountScope=useRef(owner);
+ useLayoutEffect(()=>{
+  if(busy||!stageFocus.current)return;
+  const focus=stageFocus.current;stageFocus.current=undefined;focus();
+ },[busy,body.step]);
  const cards=mergeSources(library.cards,sources.cards),scenes=mergeSources(library.scenes,sources.scenes);
  const acceptArrangement=useCallback((data:Reply)=>{setArrangement(previous=>data.arrangement?.state==='failed'&&data.previousArrangement?.operationId===previous?.operationId?data.previousArrangement:data.arrangement);setPreviousArrangement(data.previousArrangement);},[]);
  const apply=useCallback((draft:Draft,replace=true)=>{version.current=draft.version;setSources(draft.sources);setFinalized(draft.finalizedSaveId);if(replace){current.current=draft.body;setBody(draft.body);dirty.current=false;}},[]);
@@ -71,9 +77,20 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
  const sceneFor=(placeId:string)=>{const place=body.city.places.find(value=>value.id===placeId);return place&&scenes.find(scene=>scene.id===place.templateId&&scene.version===place.version);};
  const roomsFor=(placeId:string)=>[...(sceneFor(placeId)?.rooms??[]),...(body.city.finalization?.spaces.find(space=>space.placeId===placeId)?.rooms??[])];
  const sourceName=(cardId:string)=>cards.find(card=>card.id===cardId)?.fields.name??cardId;
- const transition=async(step:number)=>{if(step>1&&!body.city.characters.length){setError('至少選擇一位完成人物卡。');return;}if(step>3&&!body.city.places.length){setError('至少選擇一處場景。');return;}setBusy(true);change({...current.current,step,...(step===3?{city:fillUniqueStarts(current.current.city,scenes)}:{})});if(await flush()){if(step>=4){try{const r=await fetch('/api/opening-drafts?id='+id+'&preview=1&operationScope='+encodeURIComponent(accountScope.current));const data=await r.json() as Reply;if(!r.ok)throw Error(data.error||'無法確認開局。');setPreview(data.preview);setCandidate(data.world);acceptArrangement(data);}catch(cause){setError(cause instanceof Error?cause.message:'無法確認開局。');}}}setBusy(false);requestAnimationFrame(()=>document.getElementById('opening-stage-title')?.focus());};
+ const transition=async(step:number,after?:()=>void)=>{if(step>1&&!body.city.characters.length){setError('至少選擇一位完成人物卡。');return;}if(step>3&&!body.city.places.length){setError('至少選擇一處場景。');return;}if(!after)setReviewVisit(undefined);setBusy(true);change({...current.current,step,...(step===3?{city:fillUniqueStarts(current.current.city,scenes)}:{})});if(await flush()){if(step>=4){try{const r=await fetch('/api/opening-drafts?id='+id+'&preview=1&operationScope='+encodeURIComponent(accountScope.current));const data=await r.json() as Reply;if(!r.ok)throw Error(data.error||'無法確認開局。');setPreview(data.preview);setCandidate(data.world);acceptArrangement(data);}catch(cause){setError(cause instanceof Error?cause.message:'無法確認開局。');}}}stageFocus.current=after??(()=>document.getElementById('opening-stage-title')?.focus());setBusy(false);};
  const create=async()=>{const token=generation.current,requestScope=accountScope.current;const active=()=>alive.current&&generation.current===token&&accountScope.current===requestScope;setBusy(true);try{if(!pendingCreation.current){if(!await flush()||!active())return;if(!candidate||preview?.issues.length)throw Error('請先返回確認並修正開局問題。');pendingCreation.current={id,draftId:id,draftVersion:version.current,operationScope:accountScope.current};setCreating(true);}const response=await fetch('/api/saves',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingCreation.current)});const data=await response.json() as {save?:{id:string};error?:string};if(!response.ok||!data.save?.id)throw Error(data.error||'保存結果尚未確認，請恢復原存檔操作。');if(active())router.push(boundPath('/observe',requestScope,{save:data.save.id}));}catch(cause){if(active())setError(cause instanceof Error?cause.message:'尚未確認保存，原草稿與操作已保留。');}finally{if(active())setBusy(false);}};
  const author=async(path:string)=>{const token=generation.current,requestScope=accountScope.current;setBusy(true);const saved=await flush();if(!alive.current||generation.current!==token||accountScope.current!==requestScope)return;if(saved)router.push(boundPath(path,requestScope,{returnTo:boundPath('/new',requestScope,{draft:id})}));else setBusy(false);};
+ const editFromReview=(visit:ReviewBookmark)=>{
+  setReviewVisit(visit);
+  setSceneGroup(visit.target.kind==='actor'?'人物':visit.target.kind==='relation'?'人物關係':'場所與道路');
+  void transition(3,()=>focusReviewEditor(visit.target));
+ };
+ const goForward=()=>{
+  if(stage===2&&reviewVisit){void transition(4,()=>restoreReviewPosition(reviewVisit));return;}
+  if(stage<3){void transition(storedSteps[stage]);return;}
+  void create();
+ };
+
  const cardToggle=(card:CharacterCard,checked:boolean)=>updateCity({...body.city,characters:checked?[...body.city.characters,{templateId:card.id,version:card.version,placeId:'',roomId:'',openingNeeds:{...defaults}}]:body.city.characters.filter(value=>value.templateId!==card.id)});
  const clearUnselectedReferences=()=>{const selected=new Set(body.city.characters.map(actor=>actor.templateId));updateCity({...body.city,relationships:body.city.relationships?.filter(relation=>selected.has(relation.from)&&(relation.targetType!=='character'||selected.has(relation.to))),accessGrants:body.city.accessGrants?.filter(grant=>selected.has(grant.characterTemplateId))});};
  const addPlace=(scene:SceneTemplate)=>{let n=1;while(body.city.places.some(place=>place.id==='place-'+n))n++;updateCity(fillUniqueStarts({...body.city,places:[...body.city.places,{id:'place-'+n,templateId:scene.id,version:scene.version,name:scene.name}]},scenes));};
@@ -159,11 +176,11 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
     </article>;})}
    </>}
    {stage===2&&sceneGroup==='場所與道路'&&<>
-    <OpeningRoomEditor city={body.city} cards={cards} scenes={scenes} update={updateCity} onNavigate={()=>{if(!failed&&!conflict)void flush();}}/>
+    <OpeningRoomEditor initialTarget={reviewVisit?.target.kind==='room'?reviewVisit.target:undefined} city={body.city} cards={cards} scenes={scenes} update={updateCity} onNavigate={()=>{if(!failed&&!conflict)void flush();}}/>
     <OpeningRoads city={body.city} update={updateCity}/>
    </>}
    {stage===2&&sceneGroup==='人物關係'&&<OpeningRelations city={body.city} cards={cards} update={updateCity} expanded/>}
-   {stage===3&&<><div className="journey-note"><h3>{body.name}</h3><p>{body.city.characters.length} 名人物 · {body.city.places.length} 個場所 · 第 0 回合</p><p>{body.description}</p><p>確認後保存並進入觀察。時間保持在開局，直到你主動推進。</p></div>{!preview&&<p>請等待草稿保存及確認結果。</p>}{preview?.issues.length? <div role="alert"><h3>建立前需修正</h3><ul>{preview.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul></div>:null}{candidate&&<><h3>本次實際人物與初值</h3>{candidate.characters.map(actor=><article key={actor.id}><h4>{actor.name} · 來源：{sources.cards.find(card=>card.id===actor.profileSource?.id&&card.version===actor.profileSource?.version)?.fields.name??'完成人物卡'}（版本 {actor.profileSource?.version}）</h4><p>{actor.profile?.background}</p><p>力量 {actor.attributes?.values.strength}／耐力 {actor.attributes?.values.endurance}／靈巧 {actor.attributes?.values.dexterity}／感知 {actor.attributes?.values.perception}／外觀 {actor.attributes?.values.appearance}（外觀不參與檢定）</p><p>精神容量 {actor.mentalEnergy?.policy.maximum}，目前 {actor.mentalEnergy?.value}</p><p>需求：飢餓 {actor.needs?.values.hunger}／口渴 {actor.needs?.values.thirst}／體力疲勞 {actor.needs?.values.fatigue}／睡眠 {actor.needs?.values.sleep}</p><p>起點：{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.place}／{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.room}</p><p>住處：{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.home||'未指定'}；臥室：{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.bedroom||'未指定'}；工作場所：{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.workplaces?.join('、')||'未指定'}；所有場所：{preview?.characters.find(person=>person.templateId===actor.profileSource?.id)?.ownedPlaces?.join('、')||'未指定'}</p><p>需求特性：飢餓 {actor.needs?.personal?.traits.hunger}／口渴 {actor.needs?.personal?.traits.thirst}／睡眠 {actor.needs?.personal?.traits.sleep}</p></article>)}<h3>本次場所及連接</h3>{preview?.places.map(place=><article key={place.id}><h4>{place.name}（來源 {place.templateName}）</h4><p>房間：{place.rooms.map(room=>room.name).join('、')}</p><p>物件：{place.objects.map(object=>object.name).join('、')||'無'}</p><p>門：{place.connections.map(connection=>connection.name+'（'+(connection.state==='closed'?'關閉':connection.state==='open'?'開啟':connection.state)+'）').join('、')||'無'}</p></article>)}<p>跨場所道路：{preview?.walks?.map(walk=>walk.places.map(id=>body.city.places.find(place=>place.id===id)?.name).join(' ↔ ')+' '+(walk.minutes===null?'不可步行':walk.minutes+'分鐘')).join('；')||'未安排；場所間不可步行'}</p>{preview&&<CityAccessPreview preview={preview}/>}{preview?.relationships?.map((relation,index)=><p key={index}>{relation.from} → {relation.to}：{relation.description}</p>)}</>}</>}
+   {stage===3&&<OpeningReview name={body.name} description={body.description} city={body.city} preview={preview} world={candidate} cards={sources.cards} bookmark={reviewVisit} onEdit={editFromReview}/>}
 
   </section></fieldset>
   {stage===2&&<OpeningArrangementPanel city={body.city} key={id} owner={owner} draftId={id} arrangement={arrangement} previousArrangement={previousArrangement} cards={sources.cards} scenes={sources.scenes} onPrepare={async()=>{if(!await flush())return;return {version:version.current};}} onBusy={setBusy} onReply={data=>{if(data.draft){apply(data.draft);setStatus('已保存至帳號');}acceptArrangement(data);setPreview(data.preview);setCandidate(data.world);}}/>}
@@ -175,8 +192,8 @@ export default function OpeningWizard({draftId,restartSaveId,owner,header}:{draf
     {missingStart&&!failed&&!conflict&&<button type="button" disabled={busy} onClick={goToMissingStart}>帶我去填</button>}
     {stage>1&&<button disabled={busy||creating||arrangement?.state==='pending'} onClick={()=>void transition(storedSteps[stage-2])}>上一步，返回修改</button>}
     <button className="opening-primary" aria-describedby={blockedReason?'opening-next-hint':undefined}
-     disabled={busy||Boolean(blockedReason)} onClick={()=>void(stage<3?transition(storedSteps[stage]):create())}>
-     {busy?'處理中…':stage<3?`下一步：${steps[stage]}`:creating?'恢復原存檔操作':'確認開局，進入觀察'}
+     disabled={busy||Boolean(blockedReason)} onClick={goForward}>
+     {busy?'處理中…':stage===2&&reviewVisit?'返回核對':stage<3?`下一步：${steps[stage]}`:creating?'恢復原存檔操作':'確認開局，進入觀察'}
     </button>
    </div>
   </footer>
