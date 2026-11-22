@@ -30,13 +30,18 @@ export function parseFeelingUpdates(actor:Character,value:unknown,visibleSources
  const state=actor.mentalEnergy;if(!state?.policy.experience)throw new MemoryValidationError('未啟用明示自然感受測試政策');
  const origins=[...(actor.shortTerm||[]),...(actor.longTerm||[])].flatMap(m=>m.feelingOrigins||[]),seen=new Set<string>();
  for(const [index,u] of value.entries()){
- if(u && typeof u==='object'){
-   if(typeof u.reason!=='string'||!u.reason.trim()||new TextEncoder().encode(u.reason).length>256)throw new DecisionFieldError('feelingUpdates['+index+'].reason',u.reason,'非空字串，最多 256 UTF-8 bytes',new MemoryValidationError('自然感受理由無效'));
-   if(u.direction==='neutral'&&u.level!==0)throw new DecisionFieldError('feelingUpdates['+index+'].level',u.level,'neutral 對應 0',new MemoryValidationError('自然感受等級無效'));
- }
- if(!u||typeof u!=='object'||Object.keys(u).sort().join(',')!=='direction,level,mood,reason,source'||typeof u.source!=='string'||seen.has(u.source)||!['positive','negative','neutral'].includes(u.direction)||!(state.policy.kind==='formal'?[0,1,2,3]:[0,1,2]).includes(u.level)||u.direction!=='neutral'&&u.level===0||u.mood!==null&&(typeof u.mood!=='string'||!u.mood.trim()||u.mood.length>20))throw new MemoryValidationError('自然感受格式無效');seen.add(u.source);
+ const field=`feelingUpdates[${index}]`;
+ const fail=(name:string,received:unknown,expected:string):never=>{throw new DecisionFieldError(field+name,received,expected,new MemoryValidationError('自然感受格式無效'));};
+ if(!u||typeof u!=='object'||Array.isArray(u))fail('',u,'含 source、direction、level、reason 與 mood 的物件');
+ if(typeof u.reason!=='string'||!u.reason.trim()||new TextEncoder().encode(u.reason).length>256)fail('.reason',u.reason,'非空字串，最多 256 UTF-8 bytes');
+ if(!['positive','negative','neutral'].includes(u.direction))fail('.direction',u.direction,'positive、negative 或 neutral');
+ const allowed=u.direction==='neutral'?[0]:state.policy.kind==='formal'?[1,2,3]:[1,2];
+ if(!allowed.includes(u.level))fail('.level',u.level,u.direction+' 對應 '+allowed.join('／'));
+ if(u.mood!==null&&(typeof u.mood!=='string'||!u.mood.trim()||u.mood.length>20))fail('.mood',u.mood,'null 或非空字串，最多 20 字元');
  const origin=origins.find(o=>o.id===u.source&&o.actorId===actor.id&&o.version===1);
- if(!visibleSources.includes(u.source)||!origin||!eligibleFeelingOrigin(actor,origin,minute))throw new MemoryValidationError('自然感受只能引用本次可見、有效且未結算的本人來源');
+ if(typeof u.source!=='string'||seen.has(u.source)||!visibleSources.includes(u.source)||!origin||!eligibleFeelingOrigin(actor,origin,minute))fail('.source',u.source,'本次可見、未重複且未結算的本人來源');
+ if(Object.keys(u).sort().join(',')!=='direction,level,mood,reason,source')fail('',u,'只含 source、direction、level、reason 與 mood');
+ seen.add(u.source);
  }
  return (value as FeelingUpdate[]).map(u=>({...u,originAt:origins.find(o=>o.id===u.source)!.at,originKind:origins.find(o=>o.id===u.source)!.kind}));
 }

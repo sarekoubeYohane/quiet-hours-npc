@@ -44,8 +44,20 @@ function parseMethodAssessment(value:unknown, action:{type:string;target?:string
   const plain=(item:unknown,keys:string[])=>!!item&&typeof item==='object'&&!Array.isArray(item)&&Object.keys(item).length===keys.length&&Object.keys(item).every(key=>keys.includes(key));
   const text=(item:unknown,limit:number)=>typeof item==='string'&&item.length<=limit;
   if(!plain(data.change,['kind','detail']))throw new DecisionFieldError('methodAssessment.change',data.change,'含 kind 與 detail 的物件');
-  if(!plain(data,methodAssessmentSchema.required)||!text(data.purpose,300)||!text(data.method,300)||!text(data.reason,256)||!methodChoices.includes(data.choice)||!methodChanges.includes(data.change.kind)||!text(data.change.detail,256)||!plain(data.selectedAction,['type','target'])||data.selectedAction.type!==action.type||data.selectedAction.target!==action.target||(data.choice==='continue')!==(data.selectedAction.type==='continue')||!Array.isArray(data.intentIds)||data.intentIds.length>12||new Set(data.intentIds).size!==data.intentIds.length||data.intentIds.some(id=>typeof id!=='string'||!intents.some(intent=>intent.id===id&&intent.status==='active')))throw Error('方法評估與本次行動或意圖引用不一致。');
-  if(!Array.isArray(data.knownResults)||data.knownResults.length>4||new Set(data.knownResults.map(ref=>[ref?.kind,ref?.id,ref?.version].join(':'))).size!==data.knownResults.length||data.knownResults.some(ref=>!plain(ref,['kind','id','version'])||!['short','long'].includes(ref.kind)||typeof ref.id!=='string'||!Number.isSafeInteger(ref.version)||!(ref.kind==='short'?context.visible.shortTerm:context.visible.longTerm)?.some(item=>item.id===ref.id&&item.version===ref.version)))throw Error('方法評估引用不屬於當次可見來源。');
+  for(const [key,limit] of [['purpose',300],['method',300],['reason',256]] as const){
+    if(!text(data[key],limit))throw new DecisionFieldError('methodAssessment.'+key,data[key],`最多 ${limit} 字元的字串`);
+  }
+  if(!methodChoices.includes(data.choice))throw new DecisionFieldError('methodAssessment.choice',data.choice,methodChoices.join('／'));
+  if(!methodChanges.includes(data.change.kind))throw new DecisionFieldError('methodAssessment.change.kind',data.change.kind,methodChanges.join('／'));
+  if(!text(data.change.detail,256))throw new DecisionFieldError('methodAssessment.change.detail',data.change.detail,'最多 256 字元的字串');
+  if(!plain(data.selectedAction,['type','target']))throw new DecisionFieldError('methodAssessment.selectedAction',data.selectedAction,'含 type 與 target 的物件');
+  for(const key of ['type','target'] as const){
+    if(data.selectedAction[key]!==action[key])throw new DecisionFieldError('methodAssessment.selectedAction.'+key,data.selectedAction[key],JSON.stringify(action[key]));
+  }
+  if((data.choice==='continue')!==(action.type==='continue'))throw new DecisionFieldError('methodAssessment.choice',data.choice,action.type==='continue'?'continue':'new／retry／wait／switch／drop');
+  if(!Array.isArray(data.intentIds)||data.intentIds.length>12||new Set(data.intentIds).size!==data.intentIds.length||data.intentIds.some(id=>typeof id!=='string'||!intents.some(intent=>intent.id===id&&intent.status==='active')))throw new DecisionFieldError('methodAssessment.intentIds',data.intentIds,'至多 12 個不重複且有效的追求 ID');
+  if(!Array.isArray(data.knownResults)||data.knownResults.length>4||new Set(data.knownResults.map(ref=>[ref?.kind,ref?.id,ref?.version].join(':'))).size!==data.knownResults.length||data.knownResults.some(ref=>!plain(ref,['kind','id','version'])||!['short','long'].includes(ref.kind)||typeof ref.id!=='string'||!Number.isSafeInteger(ref.version)||!(ref.kind==='short'?context.visible.shortTerm:context.visible.longTerm)?.some(item=>item.id===ref.id&&item.version===ref.version)))throw new DecisionFieldError('methodAssessment.knownResults',data.knownResults,'至多 4 筆當次可見且未重複的 short／long 記憶引用');
+  if(!plain(data,methodAssessmentSchema.required))throw new DecisionFieldError('methodAssessment',data,'只含 schema 定義的方法評估欄位');
   return data;
 }
 
@@ -58,7 +70,7 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
     data={...original,...original.action};delete data.action;
   }
   if(original.contractVersion!==npcContractVersion)throw new DecisionFieldError('contractVersion',original.contractVersion,npcContractVersion);
-  if(original.pursuitContext!==world.pursuitContext)throw new DecisionFieldError('pursuitContext',original.pursuitContext,'本次 self.pursuitContext 的值');
+  if(original.pursuitContext!==world.pursuitContext)throw new DecisionFieldError('pursuitContext',original.pursuitContext,JSON.stringify(world.pursuitContext));
   if(original.action===undefined)throw new DecisionFieldError('action',undefined,'含 type、target、content、purpose 的物件');
   if(original.methodAssessment===undefined)throw new DecisionFieldError('methodAssessment',undefined,'本次行動的方法評估物件');
   if(data.reconfirmBodyConsequences!==undefined&&typeof data.reconfirmBodyConsequences!=='boolean')throw new DecisionFieldError('reconfirmBodyConsequences',data.reconfirmBodyConsequences,'布林值');

@@ -14,7 +14,11 @@ export function parseProcessFeeling(actor:Character,value:unknown):ProcessFeelin
  if(!actor.mentalEnergy?.policy.process||!value||typeof value!=='object'||Array.isArray(value))throw new MemoryValidationError('未啟用有效活動感受政策');
  const p=value as ProcessFeeling;
  if(!['positive','negative','neutral'].includes(p.direction))throw new DecisionFieldError('processFeeling.direction',p.direction,'positive、negative 或 neutral',new MemoryValidationError('活動感受方向無效'));
- if(Object.keys(p).sort().join(',')!=='direction,level,reason'||!(actor.mentalEnergy?.policy.kind==='formal'?[0,1,2,3]:[0,1,2]).includes(p.level)||p.direction==='neutral'&&p.level!==0||p.direction!=='neutral'&&p.level===0||typeof p.reason!=='string'||!p.reason.trim()||new TextEncoder().encode(p.reason).length>256)throw new MemoryValidationError('活動感受只能給有界方向、等級及理由');
+ const levels=actor.mentalEnergy.policy.kind==='formal'?[1,2,3]:[1,2];
+ const allowed=p.direction==='neutral'?[0]:levels;
+ if(!allowed.includes(p.level))throw new DecisionFieldError('processFeeling.level',p.level,p.direction+' 對應 '+allowed.join('／'),new MemoryValidationError('活動感受等級無效'));
+ if(typeof p.reason!=='string'||!p.reason.trim()||new TextEncoder().encode(p.reason).length>256)throw new DecisionFieldError('processFeeling.reason',p.reason,'非空字串，最多 256 UTF-8 bytes',new MemoryValidationError('活動感受理由無效'));
+ if(Object.keys(p).sort().join(',')!=='direction,level,reason')throw new MemoryValidationError('活動感受只能給有界方向、等級及理由');
  return {...p};
 }
 /** A newly chosen activity never inherits the decision round's backdated time. */

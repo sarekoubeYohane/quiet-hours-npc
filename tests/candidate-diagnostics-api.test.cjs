@@ -21,7 +21,7 @@ for(const [kind,reason] of [['json','json-parse'],['long','memory-selection-refe
   assert.equal(trace.dispatches[1].failure.stage,kind==='json'?'npc-candidate-parse':'npc-candidate-validation');
   const detail=trace.dispatches[1].failure.detail;
   assert.match(detail,kind==='json'?/欄位 \$.*收到.*預期.*JSON/:/欄位 memorySelections.*收到.*預期/);
-  assert.ok(JSON.stringify(first).includes(detail));
+  assert.equal(first.error,detail);
   const actual=structuredClone(data.world),expected=structuredClone(before);delete actual.aiUsage;delete expected.aiUsage;assert.deepEqual(actual,expected);
   assert.equal(data.world.aiUsage.totalCalls,2);assert.equal(data.world.aiUsage.totalInputTokens,18);
   assert.deepEqual((await lookup(op.operationId)).decisionTrace,trace);

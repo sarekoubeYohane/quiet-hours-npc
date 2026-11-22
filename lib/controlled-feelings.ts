@@ -1,3 +1,4 @@
+import { DecisionFieldError } from './decision-field-error';
 import type { Action, Character, World } from './world';
 import { normalDecisionInput, boundDecisionRequest } from './npc-input';
 import { feelingPromptFor, feelingSourceMinutes, feelingReceiptCapacity, feelingUpdatesSchema, visibleFeelingSources, parseFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
@@ -41,7 +42,7 @@ export async function requestControlledFeelings(actor:Character,minute:number,pr
   const value=JSON.parse(raw);
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='contractVersion,feelingUpdates,processFeeling'||value.contractVersion!==contractVersion||!Array.isArray(value.feelingUpdates)||value.feelingUpdates.length+(value.processFeeling===null?0:1)>4||memoryBytes(value)>8192||value.processFeeling!==null&&!prepared.activityId)throw new MemoryValidationError('接管感受只允許合法經歷與實際活動感受，不能越權決策或調節');
   return {feelingUpdates:parseFeelingUpdates(actor,value.feelingUpdates,prepared.sources.map(r=>r.id),minute),processFeeling:parseProcessFeeling(actor,value.processFeeling)};
- }catch(error){try{await options.observer?.({kind:'failure',failure:error instanceof SyntaxError?'candidate-format':'candidate-validation',stage:'controlled-feelings-validation',reason:error instanceof SyntaxError?'json-parse':'field-format'});}catch{/* Preserve original candidate failure. */}if(error instanceof MemoryValidationError)throw error;throw new MemoryValidationError('接管感受回覆格式無效，本回合已回復');}
+ }catch(error){try{await options.observer?.({kind:'failure',failure:error instanceof SyntaxError?'candidate-format':'candidate-validation',stage:'controlled-feelings-validation',reason:error instanceof SyntaxError?'json-parse':'field-format'});}catch{/* Preserve original candidate failure. */}if(error instanceof DecisionFieldError && error.cause instanceof MemoryValidationError)throw error.cause;if(error instanceof MemoryValidationError)throw error;throw new MemoryValidationError('接管感受回覆格式無效，本回合已回復');}
 }
 export function acknowledgeControlledFeelings(actor:Character,request:ControlledFeelingRequest,minute:number):void{
  const energy=actor.mentalEnergy!;const old=checkedState(actor),protectedActivities=new Set([actor.plan?.mentalProcess?.id,actor.pausedActivity?.plan.mentalProcess?.id]);

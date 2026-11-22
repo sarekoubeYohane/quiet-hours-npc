@@ -35,17 +35,6 @@ function providerFailure(status:number){
 // Transport sees only the already filtered transcript and task schema, never World.
 export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean}={}){
  const {model,provider}=service;
- if (options.allowRecall) {
-   const contract = [
-     '本次可直接做最終決定，也可只回傳 {"type":"recall","questions":["想回想的事"]}。回想限一次，問題一至兩題，每題非空且最多 256 UTF-8 bytes。',
-     '最終決定請依下列 JSON Schema 填寫。使用列出的英文字面值，敘述寫繁體中文。feelingUpdates 與 processFeeling 的 neutral 配 level 0，positive、negative 配非零等級。',
-     'pursuitSelection.reason 可填空字串。新方法填 methodAssessment.change={"kind":"not-applicable","detail":""}。timeIntent.maxMinutes 無上限填 null。活動估時與世界每回合推進分鐘數分開。',
-     JSON.stringify(schema),
-   ].join('\n');
-   const firstSystem = messages.findIndex(message => message.role === 'system');
-   messages = firstSystem < 0 ? [{role:'system',content:contract}, ...messages]
-     : messages.map((message, index) => index === firstSystem ? {...message,content:message.content + '\n\n' + contract} : message);
- }
  if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048});
  if (provider === 'openai') {
    return JSON.stringify({model,messages,store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),
