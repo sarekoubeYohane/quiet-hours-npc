@@ -186,6 +186,8 @@ test('the AI road option follows the number of places and its preview names each
   const adopt=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='採納道路');
   await settle(()=>adopt());
   assert.equal(adopt().disabled,true);
+  const repair=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='請 AI 補路');
+  assert.ok(repair());
   assert.match(document.body.textContent,/Kris 的住處、住宅.*街角咖啡館、Vera 的房間/);
   for(const place of ['街角咖啡館','Vera 的房間']){
    const check=[...document.querySelectorAll('label')].find(label=>label.textContent==='明示隔離 '+place)?.querySelector('input');
@@ -193,5 +195,6 @@ test('the AI road option follows the number of places and its preview names each
    await React.act(async()=>check.click());
   }
   assert.equal(adopt().disabled,false);
+  assert.equal(repair(),undefined);
  }finally{await React.act(async()=>root.unmount());await close();}
 });

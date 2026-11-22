@@ -1,6 +1,7 @@
 import { isModelProvider, providerForMode } from './model-providers';
 import { prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import { readArrangement, storeArrangementResult } from './opening-arrangement-store';
+import {repairOpeningRoads} from './opening-road-repair';
+import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
 import { playerAccount, setPlayerAccount } from './player-account-budget';
@@ -320,8 +321,17 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
-          const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,JSON.parse(arrangement.request)));
-          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+          const requested=JSON.parse(arrangement.request) as ArrangementRequest;
+          if(requested.repairOf){
+            const source=await workWait(readArrangement(accountId,arrangement.draft_id,requested.repairOf.operationId));
+            if(!source?.result||source.revision!==requested.repairOf.version)throw Error('補路依據已變更。');
+            const proposal=storedArrangementResult(source);
+            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(proposal.city,service,options));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
+          }else{
+            const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,requested));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+          }
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
