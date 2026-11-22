@@ -320,6 +320,64 @@ test('逐房配物以空白描述預覽各房結果，再採納所選三十一�
  }finally{await app.close();}
 });
 
+test('同輪新增房間與物品可預覽、勾選並分次或全部採納',async()=>{
+ const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
+  const input=JSON.parse(request.messages.at(-1).content);
+  if(input.task==='character-card-assessment-v1')return {bonuses:[]};
+  const reply=proposal(input),space=reply.finalization.spaces[0];
+  space.rooms=[{id:'studio',name:'畫室',privateFor:null},{id:'closet',name:'儲物間',privateFor:null}];
+  space.objects=[
+   {id:'easel',roomId:'studio',name:'畫架',state:[],hidden:false},
+   {id:'stool',roomId:'studio',name:'矮凳',state:[],hidden:false},
+   {id:'box',roomId:'closet',name:'收納箱',state:[],hidden:false},
+   {id:'bench',roomId:'old',name:'長椅',state:[],hidden:false},
+   {id:'stray',roomId:'unknown',name:'無房間物品',state:[],hidden:false},
+  ];
+  reply.checkedRooms=['studio','closet','unknown'].map(roomId=>({placeId:'home',roomId}));
+  return reply;
+ }});
+ try{
+  const j=await journey(app);
+  for(const itemsFirst of [false,true]){
+   const city={...j.draft.body.city,finalization:{spaces:[{placeId:'home',rooms:[{id:'old',name:'舊房間'}],objects:[],connections:[]}],walks:[]}};
+   let {draft}=await j.ok('/api/opening-drafts',{operationScope:'a',id:crypto.randomUUID(),version:0,body:{...j.draft.body,city}});
+   const base={operationScope:'a',id:draft.id,operationId:operationId()};
+   let {arrangement}=await j.ok('/api/opening-drafts/arrange',{...base,version:draft.version,supplyRooms:true,worldContext:j.scope.world.contextId});
+   const action=(action,extra)=>j.ok('/api/opening-drafts/arrange',{...base,version:draft.version,proposalVersion:arrangement.version,action,...extra});
+   const rows=arrangement.roomItems.rooms;
+   assert.deepEqual(rows.find(room=>room.roomId==='studio')?.suggestedIds,['easel','stool']);
+   assert.deepEqual(rows.find(room=>room.roomId==='studio').existing,[]);
+   assert.deepEqual(rows.find(room=>room.roomId==='closet')?.suggestedIds,['box']);
+   assert.deepEqual(rows.find(room=>room.roomId==='old')?.suggestedIds,['bench']);
+   assert.ok(!rows.some(room=>room.roomId==='unknown'));
+   const read=()=>j.ok('/api/opening-drafts?id='+draft.id+'&operationScope=a');
+   assert.deepEqual((await read()).draft.body.city,city);
+   // Rename the proposed room, then remove an existing room from the live draft.
+   const edited=structuredClone(arrangement.city);
+   edited.finalization.spaces[0].rooms.find(room=>room.id==='studio').name='版畫室';
+   ({arrangement}=await action('edit',{city:edited}));
+   assert.equal(arrangement.roomItems.rooms.find(room=>room.roomId==='studio').roomName,'版畫室');
+   city.finalization.spaces[0].rooms=[];
+   ({draft}=await j.ok('/api/opening-drafts',{operationScope:'a',id:draft.id,version:draft.version,body:{...j.draft.body,city}}));
+   const excludedItems=['home:stool','home:box'];
+   ({arrangement}=await action('selectItems',{excludedItems}));
+   if(itemsFirst){
+    await action('adoptItems',{excludedItems});
+    ({draft,arrangement}=await read());
+    const partial=draft.body.city.finalization.spaces[0];
+    assert.deepEqual(partial.rooms,[{id:'studio',name:'版畫室'}]);
+    assert.deepEqual(partial.objects.map(item=>[item.roomId,item.id]),[['studio','easel']]);
+    assert.deepEqual(arrangement.roomItems.adoptedItemKeys,['home:easel']);
+    assert.deepEqual(draft.body.city.characters,j.draft.body.city.characters);
+   }
+   await action('adopt',{city:arrangement.city});
+   const saved=(await read()).draft.body.city.finalization.spaces[0];
+   assert.deepEqual(saved.rooms.map(room=>room.id),['studio','closet']);
+   assert.deepEqual(saved.objects.map(item=>[item.roomId,item.id]),[['studio','easel']]);
+  }
+ }finally{await app.close();}
+});
+
 test('three starts keep their separate origins across fixed AI suggestions, adoption and reopening two residences',async()=>{
  const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:request=>{
   const input=JSON.parse(request.messages.at(-1).content);

@@ -30,6 +30,7 @@ export default function OpeningRoomItemSuggestions({city,review,latest,adopted,d
     <h4>逐房物品建議</h4>
     {rows.map(({room,items,selected})=><details key={itemKey(room.placeId,room.roomId)}>
       <summary>{room.placeName}・{room.roomName}｜沿用 {room.existing.length} 件，{!room.checked?'尚未核對':items.length===0?'已齊備，新增 0 件':'本輪新增 '+items.length+' 件'}，選取 {selected} 件</summary>
+      {room.proposedRoom&&!adopted&&<p>這是建議新增的房間。採納此房的物品時會一併建立房間。</p>}
       {room.existing.length>0&&<p>沿用物品：{room.existing.map(item=>item.name).join('、')}</p>}
       {items.map(item=>{
         const key=itemKey(room.placeId,item.id);
