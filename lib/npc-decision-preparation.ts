@@ -46,7 +46,7 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
    const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
    const contract = [
     '本次可直接做最終決定，也可只回傳 {"type":"recall","questions":["想回想的事"]}。回想限一次，問題一至兩題，每題非空且最多 256 UTF-8 bytes。',
-    '最終決定請依下列 JSON Schema 填寫。列舉值用英文，敘述寫繁體中文。',
+    '最終決定請依下列 JSON Schema 填寫。頂層省略 type，動作種類只填在 action.type。列舉值用英文，敘述寫繁體中文。',
     ...(feelings.length ? [feelings.join('、')+' 的 neutral 配 level 0，positive、negative 配非零等級。reason 為非空字串，最多 256 UTF-8 bytes。'] : []),
     'pursuitSelection.reason 可填空字串。沒有適用的方法變更時，methodAssessment.change 可填 {"kind":"not-applicable","detail":""}。timeIntent.maxMinutes 無上限填 null。活動估時與每回合推進分鐘數分開。',
     JSON.stringify(schema),

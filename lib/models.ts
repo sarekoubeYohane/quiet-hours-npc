@@ -66,7 +66,15 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   const original = value as Record<string, unknown>;
   let data = original;
   if(original.action!==undefined){
-    if(!original.action||typeof original.action!=='object'||Array.isArray(original.action)||Object.keys(original.action).sort().join(',')!=='content,purpose,target,type'||['type','target','content','purpose'].some(key=>Object.hasOwn(original,key)))throw new DecisionFieldError('action',original.action,'type、target、content、purpose 四個欄位，只放在 action 內');
+    const actionFields = ['type','target','content','purpose'];
+    const misplaced = actionFields.find(key => Object.hasOwn(original,key));
+    if(misplaced)throw new DecisionFieldError('$.'+misplaced,original[misplaced],`省略此頂層欄位，只在 action.${misplaced} 填寫`);
+    if(!original.action||typeof original.action!=='object'||Array.isArray(original.action))throw new DecisionFieldError('action',original.action,'含 type、target、content、purpose 的物件');
+    for(const key of actionFields){
+      if(!Object.hasOwn(original.action,key))throw new DecisionFieldError('action.'+key,undefined,'行動物件的必填字串');
+    }
+    const extra=Object.keys(original.action).find(key=>!actionFields.includes(key));
+    if(extra)throw new DecisionFieldError('action',extra,'只含 type、target、content、purpose 的物件');
     data={...original,...original.action};delete data.action;
   }
   if(original.contractVersion!==npcContractVersion)throw new DecisionFieldError('contractVersion',original.contractVersion,npcContractVersion);

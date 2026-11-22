@@ -20,6 +20,7 @@ test('a recall-enabled dispatch describes both choices and the actual decision c
     assert.match(prompt, /"type":"recall","questions"/);
     assert.match(prompt, /neutral.{0,18}0/);
     assert.match(prompt, /reason.{0,25}256 UTF-8 bytes/);
+    assert.match(prompt, /頂層省略 type.{0,45}action\.type/);
     assert.equal(messages[0].content, '玩家規則');
   }
 });
@@ -76,4 +77,18 @@ test('Cass approaching the dispenser receives the specific cause at each validat
   assert.equal((await replay(candidate)).action.type,'propose');
   candidate.processFeeling.reason='水'.repeat(86);
   await assert.rejects(replay(candidate), /processFeeling\.reason.*收到.*水.*預期.*256 UTF-8 bytes/);
+});
+
+
+test('final decisions report the misplaced root type even when the nested action is valid', async () => {
+  const siteFile=process.env.QUIET_HOURS_CASS_RETEST;
+  const candidates=siteFile
+    ? JSON.parse(require('node:fs').readFileSync(siteFile,'utf8')).attempts.flatMap(attempt =>
+      attempt.failedTrace.dispatches.filter(dispatch => dispatch.failure).map(dispatch => dispatch.rawCandidate))
+    : ['move','say'].map(type => JSON.stringify({...captured[0],type:'json_object',action:{...captured[0].action,type}}));
+  assert.equal(candidates.length,2);
+  for(const raw of candidates) {
+    const candidate=JSON.parse(raw);
+    await assert.rejects(replay(candidate,raw), /欄位 \$\.type：收到 "json_object"，預期.*省略.*action\.type/);
+  }
 });
