@@ -4,6 +4,7 @@ const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.c
 const {seedWorld}=load('world'),{aiDecision}=load('models');
 const {decision}=require('./pursuit-selection-fixture.cjs');
 const fixturePath=path.join(__dirname,'fixtures/npc-input-before-235.json.gz');
+const fieldRule='最終決策的每一層都只輸出本次 schema 定義的欄名，拼寫須完全相同。未定義的欄位一律省略，即使值是 null 也要省略整個鍵。';
 
 // Keep the historical captures intact and account for the intentional system prompt addition.
 function expectedTranscripts(file) {
@@ -12,6 +13,7 @@ function expectedTranscripts(file) {
   '輸出 JSON 時請核對欄位層級。以下是路徑說明，其他欄位照既有契約填寫。',
   'action 只含 type、target、content、purpose。reconfirmBodyConsequences 填在最外層，與 action 同層，使用布林值。',
   'methodAssessment.selectedAction 只含 type、target。methodAssessment.intentIds 與 selectedAction 同層，填當次焦點 ID 的陣列，無焦點填 []。',
+  fieldRule,
 ].join('\n');
  for (const {bodies} of Object.values(expected)) {
   for (const body of bodies) body.messages[0].content += '\n\n' + addition;
@@ -85,8 +87,9 @@ test('test-site dispatch uses v0.2.4 for the first decision and recall continuat
     delete source.self.personality;
     delete source.self.goal;
     const expected=structuredClone(legacy.bodies[index]);
-    const boundary=expected.messages[0].content.indexOf('\n\n本次可直接做最終決定');
-    expected.messages[0].content=text+(boundary<0?'':expected.messages[0].content.slice(boundary));
+    const boundary=expected.messages[0].content.indexOf('\n'+fieldRule);
+    assert.ok(boundary>0);
+    expected.messages[0].content=text+expected.messages[0].content.slice(boundary);
     expected.messages[1].content=JSON.stringify(source);
     assert.deepEqual(body,expected);
    }
