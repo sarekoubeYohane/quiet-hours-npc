@@ -4,10 +4,13 @@ import {cityDraftSchema} from './city-creation';
 import {pairKey} from './city-finalization';
 import type {OpeningDraft} from './opening-drafts';
 import type {CityDraft} from './city-draft';
+import {reviewRoomItems} from './opening-room-items';
 const id=z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),label=z.string().trim().min(1).max(80);
 const character=z.object({templateId:id,placeId:id,roomId:id,homeId:id.nullable(),homeRoomId:id.nullable(),workplaceIds:z.array(id).max(8),ownedPlaceIds:z.array(id).max(8)}).strict();
 const connection=z.object({id,name:label,rooms:z.tuple([id,id]),state:z.enum(['open','closed','blocked'])}).strict();
 const replySchema=z.object({characters:z.array(character).max(8),backgroundPeople:z.array(z.object({id,name:label}).strict()).max(8),relationships:z.array(z.object({from:id,to:id,targetType:z.enum(['character','background']),description:z.string().trim().min(1).max(256)}).strict()).max(32),accessGrants:z.array(z.object({placeId:id,roomId:id.nullable(),characterTemplateId:id}).strict()).max(128),finalization:z.object({spaces:z.array(z.object({placeId:id,rooms:z.array(z.object({id,name:label,privateFor:id.nullable()}).strict()).max(20),objects:z.array(z.object({id,roomId:id,name:label,state:z.array(z.object({key:z.string().min(1).max(80),value:z.string().min(1).max(256)}).strict()).max(16),hidden:z.boolean()}).strict()).max(80),connections:z.array(connection).max(40)}).strict()).max(8),walks:z.array(z.object({places:z.tuple([id,id]),minutes:z.number().int().min(1).max(180).nullable()}).strict()).max(28)}).strict()}).strict();
+const checkedRoom=z.object({placeId:id,roomId:id}).strict();
+const roomReplySchema=replySchema.extend({checkedRooms:z.array(checkedRoom).max(320).optional()});
 const text={type:'string'},array=(items:unknown,maxItems:number)=>({type:'array',items,maxItems}),object=(properties:Record<string,unknown>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false}),nullableText={type:['string','null']};
 const schema=object({characters:array(object({templateId:text,placeId:text,roomId:text,homeId:nullableText,homeRoomId:nullableText,workplaceIds:array(text,8),ownedPlaceIds:array(text,8)}),8),backgroundPeople:array(object({id:text,name:text}),8),relationships:array(object({from:text,to:text,targetType:{type:'string',enum:['character','background']},description:text}),32),accessGrants:array(object({placeId:text,roomId:nullableText,characterTemplateId:text}),128),finalization:object({spaces:array(object({placeId:text,rooms:array(object({id:text,name:text,privateFor:nullableText}),20),objects:array(object({id:text,roomId:text,name:text,state:array(object({key:text,value:text}),16),hidden:{type:'boolean'}}),80),connections:array(object({id:text,name:text,rooms:array(text,2),state:{type:'string',enum:['open','closed','blocked']}}),40)}),8),walks:array(object({places:array(text,2),minutes:{type:['integer','null']}}),28)})});
 function preserve<T>(existing:T[],suggested:T[],key:(value:T)=>string){const values=new Map(existing.map(value=>[key(value),value]));for(const value of suggested)if(!values.has(key(value)))values.set(key(value),value);return [...values.values()];}
@@ -25,10 +28,18 @@ export function mergeOpeningSuggestion(draft:OpeningDraft,value:z.infer<typeof r
  const city={...original,characters,backgroundPeople:preserve(original.backgroundPeople??[],value.backgroundPeople,item=>item.id),relationships:preserve(original.relationships??[],value.relationships,item=>JSON.stringify([item.from,item.to,item.targetType])),accessGrants:preserve(original.accessGrants??[],value.accessGrants.map(({roomId,...grant})=>({...grant,...(roomId?{roomId}:{})})),item=>JSON.stringify([item.placeId,item.roomId,item.characterTemplateId])),finalization:{spaces,walks:preserve(original.finalization?.walks??[],value.finalization.walks,item=>pairKey(item.places))}};
  const parsed=cityDraftSchema.safeParse(city);if(!parsed.success)throw Error('AI 建議超出開局的合法格式或容量，原設定已保留。');return parsed.data;
 }
-export async function arrangeOpening(draft:OpeningDraft,service:ModelService,options:Parameters<typeof requestModel>[3]) {
- const input={task:'opening-arrangement-v1',description:draft.body.description,city:draft.body.city,cards:draft.sources.cards,scenes:draft.sources.scenes};
+export async function arrangeOpening(draft:OpeningDraft,service:ModelService,options:Parameters<typeof requestModel>[3],selection:{supplyRooms?:boolean}={}) {
+ const input={supplyRooms:selection.supplyRooms,task:'opening-arrangement-v1',description:draft.body.description,city:draft.body.city,cards:draft.sources.cards,scenes:draft.sources.scenes};
  const messages=[{role:'system',content:'為使用者本次開局整理可查看修改的配置建議。只用提供的已選人物卡與場所實例；同源場所各自獨立，同住共用同一實例。保留已填起點、住處、工作、所有權、關係、道路、許可、需求與精神電量；只補留白或新增不衝突建議。不可重建人物、改數值或來源範本。住處/工作/關係/道路可不安排，不為通過驗證偷偷補路。人物知情由程式按起點/角色/隱私決定，許可不代表物理通行、熟悉或同意。只回受限JSON，物件state為key/value陣列，新增房間/物件/門只放finalization；未指定可用空陣列/null，不輸出世界/骰/Key或程式。'},{role:'user',content:JSON.stringify(input)}];
+ if(selection.supplyRooms)messages[0].content+=' 本次已選逐房配置物品，即使開局描述留白，也要依每間房的名稱、用途及其現有物品補齊缺少的配置。將核對過的房間都列入 checkedRooms，包括已齊備而毋須新增的房間。只把該房缺少的物品列入 finalization.spaces[].objects。';
+ else if(selection.supplyRooms===false)messages[0].content+=' 本次未選逐房配置物品，請保持各房既有物件。';
+ const outputSchema=selection.supplyRooms?object({...schema.properties,checkedRooms:array(object({placeId:text,roomId:text}),320)}):schema;
  if(new TextEncoder().encode(JSON.stringify(messages)).length>88*1024)throw Error('開局整理輸入過長，請減少選取內容後另行明示操作。');
- const raw=await requestModel(service,messages,schema,{...options,maxOutputTokens:8192});let candidate:unknown;try{if(raw.length>100000)throw Error();candidate=JSON.parse(raw);}catch{throw Error('AI 未回傳有效的開局建議，原設定已保留。');}
- const parsed=replySchema.safeParse(candidate);if(!parsed.success)throw Error('AI 建議不符合受限開局格式，原設定已保留。');return mergeOpeningSuggestion(draft,parsed.data);
+ const raw=await requestModel(service,messages,outputSchema,{...options,maxOutputTokens:8192});let candidate:unknown;try{if(raw.length>100000)throw Error();candidate=JSON.parse(raw);}catch{throw Error('AI 未回傳有效的開局建議，原設定已保留。');}
+ const parsed=roomReplySchema.safeParse(candidate);if(!parsed.success)throw Error('AI 建議不符合受限開局格式，原設定已保留。');const suggestion=parsed.data;
+ if(selection.supplyRooms===false)for(const space of suggestion.finalization.spaces)space.objects=[];
+ const city=mergeOpeningSuggestion(draft,suggestion);
+ if(!selection.supplyRooms)return {city};
+ const roomItems=reviewRoomItems(draft,city,(suggestion.checkedRooms??[]));
+ return {city,roomItems};
 }

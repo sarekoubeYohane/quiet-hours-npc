@@ -320,8 +320,8 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
-          const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options));
-          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+          const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options,JSON.parse(arrangement.request)));
+          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,result.city,{roomItems:result.roomItems}));
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
