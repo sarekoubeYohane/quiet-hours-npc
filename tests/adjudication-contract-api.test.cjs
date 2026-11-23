@@ -60,6 +60,69 @@ test('routine approval parsing returns a candidate without binding or changing a
 });
 const cafeWaterReplies = require('./fixtures/cafe-water-adjudications.json');
 
+test('the spare-cup adjudication distinguishes an observable object from one the owner can physically reach', async t => {
+ const {adjudication:raw} = require(process.env.QUIET_HOURS_ROUND_THIRTEEN_REPLIES || './fixtures/cafe-round-thirteen-replies.json');
+ const {authorityForProposal,commitFreeAction,commitActivityPhase} = load('world-effects');
+ const {buildAdjudicationInput,requestAdjudication} = load('adjudication');
+ const {parseAdjudicationCandidate,routineCandidateSchema} = load('adjudication-contract');
+ const {probeCurrent} = load('perception');
+ const region = 'place:place-1:room:storeroom', id = 'place:place-1:object:spare-cups';
+ const proposal = {type:'propose',target:region,content:'在儲藏室找出備用杯，一個一個數清楚存量。',purpose:'清點備用杯'};
+ for (const [result,roll] of [['mixed',0.375],['success',0.675]]) {
+  await t.test(result, async t => {
+   const world=seedWorld(), owner=world.characters.find(c=>c.id==='owner');
+   owner.region=region; world.characters=[owner];
+   const cups={id,source:id,region,label:'備用杯',kind:'furnishing',lifecycle:'active',revision:1,owner:'world',holder:null,knownTo:[],allowedTo:[],state:{count:'未清點'}};
+   world.objects=[cups];
+   t.mock.method(Math,'random',()=>roll);
+   const event={id:'check-storeroom',actor:owner.id,time:world.minute,kind:'observe',scene:{target:region,content:'sight'}};
+   probeCurrent(world,owner,event);
+   assert.equal(event.perception[0].resolution.outcome,result);
+   const recognized=result==='success';
+   assert.deepEqual(cups.knownTo,recognized?[owner.id]:[]);
+   const input={...buildAdjudicationInput(world,owner,proposal),...authorityForProposal(world,owner,proposal)};
+   let sent;
+   const response=await requestAdjudication(input,{provider:'deepseek',model:'deepseek-flash',key:'fixture-key'},routineCandidateSchema,{
+    signal:AbortSignal.timeout(15000),fetcher:async(_url,init)=>{
+     sent=JSON.parse(JSON.parse(init.body).messages.find(m=>m.role==='user').content);
+     return Response.json({choices:[{message:{content:raw}}]});
+    },
+   });
+   const {candidate}=parseAdjudicationCandidate(response);
+   const validate=()=>commitFreeAction(world,owner,candidate,proposal,{validateOnly:true});
+   if(recognized){
+    assert.equal(validate(),true);
+    assert.equal(cups.state.count,'未清點');
+    commitActivityPhase(world,owner,candidate.stages[0],0);
+    assert.equal(world.objects[0].state.count,'已清點');
+   }else{
+    assert.throws(validate,error=>error.details?.reason==='object_precondition');
+    assert.equal(cups.state.count,'未清點');
+   }
+   const object=sent.objects.find(o=>o.id===id);
+   assert.equal(object.actorCanPhysicallyReach,recognized);
+   assert.deepEqual(object.allowedTo,[]);
+   assert.match(sent.effectRules.join('\n'),/actorCanPhysicallyReach[^。\n]*false[^。\n]*discover/);
+   assert.equal(Object.hasOwn(cups,'actorCanPhysicallyReach'),false);
+  });
+ }
+});
+
+test('ordinary consumption of held food remains possible when sight is obstructed', () => {
+ const {authorityForProposal,commitActivityPhase}=load('world-effects');
+ const {regionOf}=load('perception');
+ const world=seedWorld(), actor=world.characters[0], region=regionOf(actor);
+ const food={id:'held-food',source:'meal',label:'食物',kind:'food',region,holder:actor.id,owner:actor.id,
+  lifecycle:'active',revision:1,knownTo:[actor.id],allowedTo:[],state:{}};
+ world.objects=[food];
+ world.scene={doors:{},noise:{},occluded:[region]};
+ const input=authorityForProposal(world,actor);
+ assert.equal(input.objects.find(o=>o.id===food.id).actorCanPhysicallyReach,false);
+ assert.match(effectRules.join('\n'),/consume、ingest[^。]*已持有[^。]*視線受阻/);
+ commitActivityPhase(world,actor,{afterMinutes:5,preconditions:[],effects:[{kind:'consume',objectId:food.id,expectedRevision:1}]},0);
+ assert.equal(world.objects[0].lifecycle,'consumed');
+});
+
 for (const status of ['denied', 'unsupported']) {
  test(`cafe water adjudication: the captured ${status} reply is legal only after its activity identity is cleared`, () => {
   const {parseAdjudicationCandidate} = load('adjudication-contract');

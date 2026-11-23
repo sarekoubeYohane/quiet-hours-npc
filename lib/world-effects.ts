@@ -85,7 +85,7 @@ export function knownWorldSupplies(w:World,c:Character){
 export function authorityForProposal(w:World,c:Character,action?:Action){
  const local=regionOf(c),objectIds=new Set(objectObservationCandidates(w,c).filter(item=>item.region===local).map(item=>item.objectId)),supplyIds=new Set(supplyObservationCandidates(w,c).filter(item=>item.region===local).map(item=>item.supplyId));
  const eligibleObjects=(w.objects||[]).filter(object=>objectIds.has(object.id)||object.lifecycle==='active'&&object.holder===c.id)
-  .map(object=>{const copy={...object};delete copy.physicalHistory;delete copy.physicalHistoryDropped;delete copy.unpermittedCount;return copy;});
+  .map(object=>{const copy={...object,actorCanPhysicallyReach:canPhysicallyReachObject(w,c,object)};delete copy.physicalHistory;delete copy.physicalHistoryDropped;delete copy.unpermittedCount;return copy;});
  const eligibleSupplies=(w.supplies||[]).filter(supply=>supplyIds.has(supply.id)).map(supply=>({...supply,materializedObjectId:supply.remaining>0?materializedObjectId(supply):null}));
  const eligibleRestrictions=[...(w.supplies||[]).map(source=>({type:'supply' as const,source})),...(w.objects||[]).map(source=>({type:'object' as const,source}))].flatMap(({type,source})=>{
   const scope=finiteSourceScope(source);
@@ -95,7 +95,7 @@ export function authorityForProposal(w:World,c:Character,action?:Action){
  // execution snapshot. Prefer the requested identity and actor's own objects.
  eligibleObjects.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target)||Number(b.holder===c.id)-Number(a.holder===c.id));
  eligibleSupplies.sort((a,b)=>Number(b.id===action?.target)-Number(a.id===action?.target));
- const objects:WorldObject[]=[],supplies:(SceneSupply&{materializedObjectId:string|null})[]=[];
+ const objects:typeof eligibleObjects=[],supplies:(SceneSupply&{materializedObjectId:string|null})[]=[];
  const finiteRestrictions:typeof eligibleRestrictions=[];
  let bytes=32;
  const retain=<T,>(source:T[],target:T[])=>{for(const item of source){const size=new TextEncoder().encode(JSON.stringify(item)).length+2;if(target.length<32&&bytes+size<=64*1024){target.push(item);bytes+=size;}}};

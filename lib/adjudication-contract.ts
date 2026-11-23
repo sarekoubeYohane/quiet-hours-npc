@@ -40,6 +40,7 @@ export function assertBoundedState(value:unknown):asserts value is Record<string
 // These rules are sent with the schema: JSON shape alone cannot teach the model
 // identity, sequential revisions or the authority required by applyEffects.
 export const effectRules = [
+ 'objects 是主持可核對的物件。actorCanPhysicallyReach=false 時，若提案是在當前可查範圍尋找物件，可用 discover，辨識結果交給程式。若提案必須以要求物理可及的效果（例如對物件 change-state）才能完成，裁定 denied，effects、stages 填空陣列。不能在同次查找中預設辨識成功再清點或取用。房間進出授權 entryPermission 不會讓角色認得物件。actorCanPhysicallyReach=true 只代表符合物理可及條件。各效果仍依自身前提判定，例如一般 consume、ingest 可使用本人已持有且有使用權的食物，即使視線受阻。',
  'bodyConsequencesReconfirmation=true表示角色明示想重新確認既有方法對自己身體的實際影響，本次沿原普通裁定slot處理；accepted時必須以獨立routine.version=3範圍保存包含真正ingest或bodyActivity的程序。舊範圍與既有成果保留，不改寫歷史、不從consume名稱猜恢復量。尚無明示有界身體後果可承接時可denied/unsupported，不假裝已確認；已確認且仍適用的範圍不應再次裁定。',
  'bodyActivity version=1 是本次活動每實際世界小時的額外需求變化，與程式的 fatigue+1/時、sleep+4/時清醒基線合成後執行。kind=rest：fatiguePerHour=-20..0，sleepPerHour必須0，清醒休息不恢復睡眠需求；kind=exertion：fatiguePerHour=0..20，sleepPerHour必須0，體力活動不能產生疲勞或睡眠需求恢復；kind=sleep：fatiguePerHour=-20..0，sleepPerHour至少-20且嚴格小於-4，睡眠需求淨變化必須為負。所有值必須有限，不能跨kind挪用恢復能力。只算真正開始後的已發生分鐘，不預支完整時段；sleep只在確實入睡時確認，嘗試入睡不等於已睡著。缺省/null表示沒有新確認，不從活動文字推論；日常核准頂層bodyActivity=null，逐program.bodyActivity沿相同kind界線保存確認，舊program缺欄位不補造。',
  'ingest version=1：真正攝取本人持有且可消耗的同一物件，objectId/expectedRevision沿consume前提，hungerRelief/thirstRelief各0至60且至少一項大於0；完整消耗這份具體物件並同步緩解需求。部分攝取先separate出明示份量；不能以形成食物、敘述成功或普通body狀態代替。一般consume舊原義不自動取得未確認的需求效果。',
