@@ -116,5 +116,13 @@ test('DeepSeek receives the exact response identity and the enabled field layout
     assert.ok(prompt.includes(JSON.stringify({contractVersion:'npc-decision.v3',pursuitContext:world.pursuitContext})));
     assert.ok(prompt.includes(prepared.schema.required.join('、')));
     assert.match(prompt,/processFeeling[^。\n]{0,50}direction、level、reason/);
+    const formLine = prompt.split('\n').find(line=>line.startsWith('本次最終決策填寫格式：'));
+    assert.ok(formLine, 'DeepSeek must receive a complete fill-in form');
+    const form = JSON.parse(formLine.slice('本次最終決策填寫格式：'.length));
+    assert.deepEqual(Object.keys(form).sort(), [...prepared.schema.required].sort());
+    assert.equal(form.contractVersion, 'npc-decision.v3');
+    assert.equal(form.pursuitContext, world.pursuitContext);
+    assert.equal(Object.hasOwn(form, 'focusIntentId'), true);
+    assert.match(prompt, /existing[^。\n]*focusIntentId[^。\n]*focus\.id/);
   }
 });

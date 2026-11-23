@@ -11,17 +11,26 @@ const {createFormalMentalEnergy} = load('formal-mental-policy');
 // The shared fixture replaces save-specific handles. The local replay also accepts the original strings.
 const replies = require(process.env.QUIET_HOURS_ROUND_NINE_REPLIES || './fixtures/cafe-round-nine-decisions.json');
 
-function replay(actorId, reply, fetcher = async () => Response.json({choices:[{message:{content:reply}}]}), recall) {
+function replay(actorId, reply, fetcher = async () => Response.json({choices:[{message:{content:reply}}]}), recall, context) {
   const world = seedWorld();
   const actor = world.characters.find(c => c.id === actorId);
   const captured = JSON.parse(reply);
-  world.pursuitContext = captured.pursuitContext;
+  world.pursuitContext = context ?? captured.pursuitContext;
   actor.id = actorId === 'owner' ? 'npc:2' : 'npc:1';
   actor.intents = [{...initialDirection(actor), version:2}];
   actor.mentalEnergy = createFormalMentalEnergy(actor, world.minute, {capacity:50,current:35,seed:1});
-  actor.shortTerm = captured.methodAssessment.knownResults.map(({id,version}) => ({
+  const kept = captured.arrangementUpdates.find(update=>update.operation==='keep');
+  const refs=[...captured.methodAssessment.knownResults,...captured.memorySelections,...(kept?.references||[])];
+  actor.shortTerm = [...new Map(refs.map(ref=>[ref.id,ref])).values()].map(({id,version}) => ({
     id, version, characterId:actor.id, time:world.minute, text:'店主告知了杯子的位置。', source:{kind:'experience'},
   }));
+  if(kept){
+    // The dispatch showed the owner's existing 22:10 arrangement and its source memory.
+    const {id,version,text,condition,references,pursuit}=kept;
+    const item={id,version,text,condition,references,pursuit,characterId:actor.id,status:'active',time:1305,memory:{id:references[0].id,version:1}};
+    actor.arrangements={schemaVersion:1,items:[item]};
+    actor.shortTerm.find(memory=>memory.id===item.memory.id).text=load('arrangements').arrangementExperience(item);
+  }
   return aiDecision(world, actor, 'fixture-key', 'deepseek-flash', 'deepseek', fetcher, undefined, recall);
 }
 
@@ -33,6 +42,30 @@ test('the owner can propose counting cups once the undefined field is omitted', 
   const decision = await replay('owner', JSON.stringify(corrected));
   assert.equal(decision.action.content, corrected.action.content);
   assert.equal(decision.interpretation, corrected.interpretation);
+});
+
+test('the two owner responses must explicitly echo request identity and selected focus', async () => {
+  const audit = process.env.QUIET_HOURS_OWNER_AUDIT;
+  const raws = audit ? JSON.parse(require('node:fs').readFileSync(audit,'utf8')).attempts.map(a=>a.trace.dispatches.at(-1).rawCandidate)
+    : require('./fixtures/cafe-owner-required-fields.json');
+  const context = JSON.parse(raws[1]).pursuitContext;
+  for (const [index,raw] of raws.entries()) {
+    const run = value => replay('owner',value,undefined,undefined,context);
+    await assert.rejects(run(raw),index===0?/contractVersion.*缺少欄位/:/focusIntentId.*缺少欄位/);
+    const corrected=JSON.parse(raw);
+    if(index===0){
+      corrected.contractVersion='npc-decision.v3';
+      await assert.rejects(run(JSON.stringify(corrected)),/pursuitContext.*缺少欄位/);
+      corrected.pursuitContext=context;
+    }else{
+      corrected.focusIntentId=corrected.pursuitSelection.focus.id;
+    }
+    await assert.rejects(run(JSON.stringify(corrected)),/methodAssessment.choice.*continue/);
+    corrected.methodAssessment.choice='new';
+    const decision=await run(JSON.stringify(corrected));
+    assert.equal(decision.action.content,corrected.action.content);
+    assert.equal(decision.focusIntentId,'npc:2:direction');
+  }
 });
 
 test('Cass can propose looking for a cup once the neutral process feeling has level zero', async () => {
