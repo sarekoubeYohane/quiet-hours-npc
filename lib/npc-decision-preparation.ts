@@ -61,6 +61,16 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
    const identity=JSON.stringify({contractVersion:input.contractVersion,pursuitContext:input.pursuitContext});
    systemPrompt+='\n\n最終行動回覆請先逐字複製以下固定欄位和值，再於同一個 JSON 物件內填完本次決策：\n'+identity;
    systemPrompt+='\n提交前逐一核對頂層必填欄位：'+schema.required.join('、')+'。';
+   const form:Record<string,unknown>={contractVersion:input.contractVersion,pursuitContext:input.pursuitContext,focusIntentId:'〈正式追求 ID 或 null〉'};
+   for(const field of schema.required){
+    if(Object.hasOwn(form,field))continue;
+    const property=schema.properties[field as keyof typeof schema.properties];
+    form[field]=property && 'type' in property && property.type==='array'?[]:'〈依本次決策填寫〉';
+   }
+   systemPrompt+='\n最終決策從這份格式填起。保留每個鍵，依人物這次的選擇填值並替換所有〈〉，陣列有項目就填入。';
+   systemPrompt+='\n本次最終決策填寫格式：'+JSON.stringify(form);
+   systemPrompt+='\n依 pursuitSelection.focus 填頂層 focusIntentId：existing 時 focusIntentId 填 focus.id；candidate 時填相應 adoption.pursuitId；無焦點時明填 null。methodAssessment.intentIds 依序填 [focusIntentId] 或 []。';
+   systemPrompt+='\naction.type 與 methodAssessment.choice 必須同時是 continue 才算續做既有活動。即使沿用同一個追求，重新 propose 也須依實際選擇填 new、retry、switch、wait 或 drop。';
   }
   outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
   return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
