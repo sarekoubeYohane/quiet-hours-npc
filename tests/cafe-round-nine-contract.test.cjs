@@ -14,7 +14,7 @@ const replies = require(process.env.QUIET_HOURS_ROUND_NINE_REPLIES || './fixture
 function replay(actorId, reply, fetcher = async () => Response.json({choices:[{message:{content:reply}}]}), recall) {
   const world = seedWorld();
   const actor = world.characters.find(c => c.id === actorId);
-  const captured = JSON.parse(replies[actorId]);
+  const captured = JSON.parse(reply);
   world.pursuitContext = captured.pursuitContext;
   actor.id = actorId === 'owner' ? 'npc:2' : 'npc:1';
   actor.intents = [{...initialDirection(actor), version:2}];
@@ -61,5 +61,18 @@ test('the actual NPC request gives both field rules before and after recall', as
   for (const prompt of prompts) {
     assert.match(prompt, /未定義的欄位.{0,12}省略.{0,30}null/);
     assert.match(prompt, /processFeeling\.direction.{0,15}"neutral".{0,20}processFeeling\.level.{0,12}0/);
+    assert.match(prompt, /processFeeling[^。\n]{0,50}direction、level、reason/);
+    assert.match(prompt, /processFeeling\.mood[^。\n]*null[^。\n]*省略/);
   }
+});
+
+test('the round thirteen proposal keeps its top-level mood after omitting only processFeeling.mood', async () => {
+  const {cass:raw} = require(process.env.QUIET_HOURS_ROUND_THIRTEEN_REPLIES || './fixtures/cafe-round-thirteen-replies.json');
+  await assert.rejects(replay('cass', raw), /processFeeling.*"mood":null.*活動感受只能給有界方向、等級及理由/);
+  const corrected = JSON.parse(raw);
+  delete corrected.processFeeling.mood;
+  const decision = await replay('cass', JSON.stringify(corrected));
+  assert.deepEqual(decision.processFeeling, corrected.processFeeling);
+  assert.equal(decision.action.mood, corrected.mood);
+  assert.equal(decision.action.content, corrected.action.content);
 });

@@ -44,7 +44,7 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   }
   let systemPrompt=messages[0].content+'\n最終決策的每一層都只輸出本次 schema 定義的欄名，拼寫須完全相同。未定義的欄位一律省略，即使值是 null 也要省略整個鍵。';
   if(Object.hasOwn(schema.properties,'processFeeling')){
-   systemPrompt+=' processFeeling.direction 為 "neutral" 時，processFeeling.level 必須填數字 0。例如 {"direction":"neutral","level":0,"reason":"這件事讓我感覺平常。"}。';
+   systemPrompt+=' processFeeling 可為 null；填物件時只留 direction、level、reason 三欄。processFeeling.mood 即使是 null 也必須省略，決策頂層的 mood 照常填寫。processFeeling.direction 為 "neutral" 時，processFeeling.level 必須填數字 0。例如 {"direction":"neutral","level":0,"reason":"這件事讓我感覺平常。"}。';
   }
   if(options.allowRecall){
    const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
@@ -61,9 +61,6 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
    const identity=JSON.stringify({contractVersion:input.contractVersion,pursuitContext:input.pursuitContext});
    systemPrompt+='\n\n最終行動回覆請先逐字複製以下固定欄位和值，再於同一個 JSON 物件內填完本次決策：\n'+identity;
    systemPrompt+='\n提交前逐一核對頂層必填欄位：'+schema.required.join('、')+'。';
-   if(Object.hasOwn(schema.properties,'processFeeling')){
-    systemPrompt+=' processFeeling 可為 null；有活動感受時，物件只含 direction、level、reason 三欄。';
-   }
   }
   outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
   return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
