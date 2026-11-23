@@ -153,6 +153,9 @@ test('the adjudicator receives explicit null identity examples for both non-acce
  for (const status of ['denied', 'unsupported']) {
   assert.ok(system.includes(JSON.stringify({status,activityIdentity:null})), status);
  }
+ const wireSchema=JSON.parse(system.split('僅回傳符合以下 JSON Schema 的物件：').at(-1));
+ assert.deepEqual(Object.keys(wireSchema.properties).slice(0,2),['status','activityIdentity']);
+ assert.deepEqual(wireSchema.required.slice(0,2),['status','activityIdentity']);
 });
 
 test('denied candidates cannot request a die and the shared ability bound applies to ordinary and result candidates',()=>{

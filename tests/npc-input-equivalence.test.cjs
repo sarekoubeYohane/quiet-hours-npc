@@ -81,6 +81,9 @@ test('test-site dispatch uses v0.2.4 for the first decision and recall continuat
     const source=JSON.parse(legacy.bodies[index].messages[1].content);
     const {text}=assemble(source,source.self,{draft,recall:index===0});
     assert.match(text,/^# 你是誰/);
+    const budget=text.split('\n').find(line=>line.includes('**額度**'));
+    for(const field of ['feelingUpdates','pursuitUpdates','arrangementUpdates','memorySelections','memoryOperations','cognitiveUpdates','preferenceUpdates','habitCandidates','emotionRegulation','processFeeling'])assert.ok(budget.includes(field),field);
+    assert.match(text,/node\.basis[^。\n]*kind[^。\n]*text[^。\n]*。[^\n]*pursuitUpdates\[\]\.references/);
     assert.ok(text.endsWith('無焦點填 []。'));
     assert.equal(text.includes('## 回想\n'),index===0);
     assert.doesNotMatch(legacy.bodies[index].messages[0].content,/^# 你是誰/);

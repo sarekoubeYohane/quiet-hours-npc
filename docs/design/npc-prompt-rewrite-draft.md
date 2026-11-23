@@ -179,7 +179,7 @@ NPC 決策 system prompt 草稿 v0.2.4（2026-11-21）。測試站建置使用�
 | 持續的方向，目前顧到了 | `active` | `enough` |
 | 你覺得滿足了 | `satisfied` | `ready` |
 
-`basis.kind`：依你的感受或理解填 `subjective`；依實際經歷填 `known-result`，並在 `references` 引用那筆經歷。這回合才要做的行動還不是成果，所以剛承接的追求要等第一步做過才能評為滿足。已滿足的追求不會再打開；之後想再做，用新的 id。評為滿足的那一回合，焦點就要離開它。
+`assess` 的 `node.basis` 只含 `kind` 和 `text`。依你的感受或理解填 `subjective`，依實際經歷填 `known-result`，在該筆更新的 `pursuitUpdates[].references` 引用那筆經歷。這回合才要做的行動還不是成果，所以剛承接的追求要等第一步做過才能評為滿足。已滿足的追求不會再打開；之後想再做，用新的 id。評為滿足的那一回合，焦點就要離開它。
 
 〔條件：`self.intents` 有上下層關係，或節點數 ≥ 8，或 `pursuitCapacity.archivable` 非空〕
 
@@ -296,7 +296,7 @@ NPC 決策 system prompt 草稿 v0.2.4（2026-11-21）。測試站建置使用�
 - **引用**：凡是填 id 加 version 的地方，都要是本次輸入裡實際出現的。
 - **版本**：新建的項目 `version` 填 0；修改既有項目，填輸入裡看到的版本。你新建的 id 以「你的 id 加冒號」開頭。
 - **沒提到就保留**：陣列留空表示不變。要改、要放下，就明確寫出來。
-- **額度**：`pursuitUpdates`、`arrangementUpdates`、`memorySelections`、`memoryOperations`、`cognitiveUpdates`、`preferenceUpdates`、`habitCandidates` 合計一回合最多 4 項，整份回覆的心理內容不超過 8 KiB。挑最重要的做。
+- **額度**：`feelingUpdates`、`pursuitUpdates`、`arrangementUpdates`、`memorySelections`、`memoryOperations`、`cognitiveUpdates`、`preferenceUpdates`、`habitCandidates` 的每筆各算 1 項。`emotionRegulation` 和 `processFeeling` 各在填物件時算 1 項，填 null 算 0 項。以上合計一回合最多 4 項，心理內容最多 8 KiB。先選最重要的項目。例如已有活動感受、感受更新、記憶選留、追求評估各一項，就已用完 4 項。原有安排會保留，沒有要變更時可填空陣列。
 - **寫短**：每段文字一兩句就好。`pursuitCandidates` 整體 2 KiB 內、`pursuitSelection` 1 KiB 內、`pursuitUpdates` 4 KiB 內、`methodAssessment` 2 KiB 內（中文一個字約 3 bytes）。
 
 `pursuitContext` 把輸入的值原樣回傳。`contractVersion` 填 `npc-decision.v3`。
