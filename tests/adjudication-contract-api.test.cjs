@@ -108,6 +108,21 @@ test('the spare-cup adjudication distinguishes an observable object from one the
  }
 });
 
+test('ordinary consumption of held food remains possible when sight is obstructed', () => {
+ const {authorityForProposal,commitActivityPhase}=load('world-effects');
+ const {regionOf}=load('perception');
+ const world=seedWorld(), actor=world.characters[0], region=regionOf(actor);
+ const food={id:'held-food',source:'meal',label:'食物',kind:'food',region,holder:actor.id,owner:actor.id,
+  lifecycle:'active',revision:1,knownTo:[actor.id],allowedTo:[],state:{}};
+ world.objects=[food];
+ world.scene={doors:{},noise:{},occluded:[region]};
+ const input=authorityForProposal(world,actor);
+ assert.equal(input.objects.find(o=>o.id===food.id).actorCanPhysicallyReach,false);
+ assert.match(effectRules.join('\n'),/consume、ingest[^。]*已持有[^。]*視線受阻/);
+ commitActivityPhase(world,actor,{afterMinutes:5,preconditions:[],effects:[{kind:'consume',objectId:food.id,expectedRevision:1}]},0);
+ assert.equal(world.objects[0].lifecycle,'consumed');
+});
+
 for (const status of ['denied', 'unsupported']) {
  test(`cafe water adjudication: the captured ${status} reply is legal only after its activity identity is cleared`, () => {
   const {parseAdjudicationCandidate} = load('adjudication-contract');
