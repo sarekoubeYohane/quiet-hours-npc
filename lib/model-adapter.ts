@@ -41,6 +41,13 @@ function deepseekReasoningEffort(): 'low' | 'high' | 'max' | undefined {
   return value === 'low' || value === 'high' || value === 'max' ? value : undefined;
 }
 const deepseekReasoningTokens = 4096;
+// Also injected at build time. '1' lets a candidate that fails format validation get one repair
+// turn (NPC decision and world adjudication); absent or any other value keeps the original
+// contract: an invalid candidate fails the round after a single dispatch.
+declare const __FORMAT_REPAIR__: string | undefined;
+export function formatRepairEnabled(): boolean {
+  return typeof __FORMAT_REPAIR__ === 'string' && __FORMAT_REPAIR__ === '1';
+}
 // Transport sees only the already filtered transcript and task schema, never World.
 export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean;allowThinking?:boolean}={}){
  const {model,provider}=service;

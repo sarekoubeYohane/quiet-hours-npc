@@ -34,6 +34,13 @@ const observeSelection=(observe:RoutineSelectionObserver|undefined,data:unknown)
 export type RoutinePlace={location:string;purpose:'cafe'|'home'|'custom';description?:string;operators:string[];confirmedOperations?:RoutineOperation[]};
 
 // World binding is deliberately separate from pure candidate parsing.
+// Pure format check with the same offered scope as resolveRoutineCandidate. It never binds or
+// changes the world, so a failure here can be retried before anything is resolved.
+export function adjudicationFormatError(raw:string,w:World,c:Character,a:Action):string|undefined {
+ const offer=routineOffer(w,c,a);
+ try{parseAdjudicationCandidate(raw,{routineOperations:offer?.operations||[],allowGenericMethods:!!offer?.genericMethods});return;}
+ catch(error){return error instanceof Error&&error.message?error.message:'裁定候選格式無效。';}
+}
 export function resolveRoutineCandidate(raw:string,w:World,c:Character,a:Action,duration:number,elapsedMinutes=15,maxMinutes:number|null=null,observe?:RoutineSelectionObserver,onParsed?:(value:ReturnType<typeof parseAdjudicationCandidate>)=>void):EffectCandidate {
  const offer=routineOffer(w,c,a);const parsed=parseAdjudicationCandidate(raw,{routineOperations:offer?.operations||[],allowGenericMethods:!!offer?.genericMethods});
  if(parsed.kind==='effects')parsed.candidate.check=confirmNewCheck(c,parsed.candidate.check);
