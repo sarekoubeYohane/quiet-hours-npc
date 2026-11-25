@@ -128,7 +128,7 @@ try {
   allTests.push('tests/world-saves-api.test.cjs','tests/save-management-api.test.cjs');
   allTests.push('tests/formal-mental-policy-api.test.cjs','tests/formal-mental-enable-api.test.cjs');
   const selected = process.argv.slice(2);
-  allTests.push('tests/cass-recall-contract.test.cjs', 'tests/cafe-round-nine-contract.test.cjs');
+  allTests.push('tests/cass-recall-contract.test.cjs', 'tests/cafe-round-nine-contract.test.cjs', 'tests/deepseek-thinking-api.test.cjs');
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }

@@ -7,6 +7,15 @@ const services = {
   gemini: { list: 'https://generativelanguage.googleapis.com/v1beta/models', chat: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions' },
   anthropic: { list: 'https://api.anthropic.com/v1/models', chat: 'https://api.anthropic.com/v1/messages' },
 };
+// The provider's own reasoning text from a chat-completion body. Observer evidence only: it is
+// read back from the saved response and never enters World, NPC input or the decision candidate.
+export function providerReasoning(responseBody: string | undefined): string | undefined {
+  if (!responseBody) return;
+  try {
+    const reasoning = JSON.parse(responseBody)?.choices?.[0]?.message?.reasoning_content;
+    return typeof reasoning === 'string' && reasoning.trim() ? reasoning : undefined;
+  } catch { return; }
+}
 export function chatEndpoint(provider: ModelProvider) { return services[provider].chat; }
 export function providerHeaders(provider: ModelProvider, key: string, list = false): Record<string, string> {
   if (provider === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
