@@ -42,7 +42,7 @@ function deepseekReasoningEffort(): 'low' | 'high' | 'max' | undefined {
 }
 const deepseekReasoningTokens = 4096;
 // Transport sees only the already filtered transcript and task schema, never World.
-export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean}={}){
+export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean;allowThinking?:boolean}={}){
  const {model,provider}=service;
  if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048});
  if (provider === 'openai') {
@@ -57,12 +57,15 @@ export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,m
  if (provider === 'anthropic') return JSON.stringify({model,system,messages:conversation,max_tokens:limit});
  // DeepSeek does not document whether max_tokens covers reasoning tokens, so an opted-in
  // request reserves separate room for them; the decision itself keeps its usual limit.
- const effort = provider === 'deepseek' ? deepseekReasoningEffort() : undefined;
+ // Only callers that opt in think. Measured on the test site (2026-11-25): an NPC decision with
+ // thinking returned in about 8 seconds, while world adjudication exceeded the 25-second model
+ // deadline twice, so adjudication and authoring tasks keep thinking disabled.
+ const effort = provider === 'deepseek' && options.allowThinking ? deepseekReasoningEffort() : undefined;
  return JSON.stringify({model, messages:[{role:'system',content:system}, ...conversation], response_format:{type:'json_object'},
    max_tokens:effort ? limit + deepseekReasoningTokens : limit,
    ...(provider === 'deepseek' ? effort ? {thinking:{type:'enabled'},reasoning_effort:effort} : {thinking:{type:'disabled'}} : {})});
 }
-export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
+export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; allowThinking?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
 export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: ModelRequestOptions): Promise<string> {
   try { return await executeRequestModel(service,messages,schema,options); } finally { await options.onSettled?.(); }
 }

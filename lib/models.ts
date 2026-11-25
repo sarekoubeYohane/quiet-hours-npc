@@ -180,7 +180,7 @@ const requestId = crypto.randomUUID();
 // context. The route rechecks operation version/lease after completion.
 const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${mode}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
 const {schema,context:decisionContext}=prepared;
-const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
+const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,allowThinking:true,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
 try {

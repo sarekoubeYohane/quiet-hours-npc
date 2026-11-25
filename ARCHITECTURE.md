@@ -395,7 +395,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | `world.pursuitVersion === 1` | 分層追求已啟用 |
 | `character.memories` 等舊欄位 | 是 `shortTerm` 的相容投影，不要直接寫入；`relationships` 同理，來源是 `cognition.relationshipTags` |
 | `acceptance.original` 與 `acceptance.snapshot` | 驗收場景的舊版未壓縮備份與現行 gzip 備份 |
-| 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 開啟 thinking 並用該強度，否則關閉。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
+| 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉，因為裁定開 thinking 會超過 25 秒的模型期限。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
 
 NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v1`、`controlled-feelings.v1`。
 

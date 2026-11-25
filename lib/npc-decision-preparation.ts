@@ -73,7 +73,7 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
    systemPrompt+='\naction.type 與 methodAssessment.choice 必須同時是 continue 才算續做既有活動。即使沿用同一個追求，重新 propose 也須依實際選擇填 new、retry、switch、wait 或 drop。';
   }
   outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
-  return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
+  return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall,allowThinking:true})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};
  const context:NpcDecisionContext={visible,feelingSources:c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):[],phoneReferences:input.phones,knownPeople:knownPeopleForDecision(visible,input.contacts.map(p=>p.id)),memoryReview:input.self.memoryReview,historyCandidates:input.self.cognition.historyCandidates||[]};

@@ -4,7 +4,7 @@ const load = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${na
 const { modelRequestBody, requestModel } = load('model-adapter');
 const { providerReasoning } = load('provider-api');
 const messages = [{role:'system',content:'規則'},{role:'user',content:'{}'}];
-const body = (provider, options) => JSON.parse(modelRequestBody({provider,model:'test'}, messages, {type:'object'}, options));
+const body = (provider, options) => JSON.parse(modelRequestBody({provider,model:'test'}, messages, {type:'object'}, {allowThinking:true,...options}));
 const withThinking = (value, run) => { globalThis.__DEEPSEEK_THINKING__ = value; try { return run(); } finally { delete globalThis.__DEEPSEEK_THINKING__; } };
 
 test('DeepSeek thinking stays disabled unless the build names a supported effort', () => {
@@ -30,6 +30,25 @@ test('an opted-in build enables DeepSeek thinking at that effort and leaves room
   assert.equal(Object.hasOwn(request, 'thinking'), false, provider);
   assert.deepEqual(request, body(provider), provider);
  }
+});
+
+test('only tasks that opt in think: world adjudication keeps thinking disabled in an opted-in build', async () => {
+ const request = withThinking('low', () => body('deepseek', {allowThinking:false}));
+ assert.deepEqual(request.thinking, {type:'disabled'});
+ assert.equal(request.max_tokens, 4096);
+ const {buildAdjudicationInput, requestAdjudication} = load('adjudication'), {routineCandidateSchema} = load('adjudication-contract'), {seedWorld} = load('world');
+ const world = seedWorld();
+ const input = buildAdjudicationInput(world, world.characters[0], {type:'propose',target:'dispenser',content:'裝水喝',purpose:'解渴'});
+ let sent;
+ globalThis.__DEEPSEEK_THINKING__ = 'low';
+ try {
+  await requestAdjudication(input, {provider:'deepseek',model:'deepseek-flash',key:'fixture-key'}, routineCandidateSchema, {
+   signal:AbortSignal.timeout(15000),
+   fetcher:async (_url, init) => { sent = JSON.parse(init.body); return Response.json({choices:[{message:{content:'{"status":"denied","effects":[],"check":null}'}}]}); },
+  });
+ } finally { delete globalThis.__DEEPSEEK_THINKING__; }
+ assert.deepEqual(sent.thinking, {type:'disabled'});
+ assert.equal(Object.hasOwn(sent, 'reasoning_effort'), false);
 });
 
 test('provider reasoning is kept as observer evidence and never becomes the decision candidate', async () => {
