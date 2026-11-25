@@ -210,7 +210,8 @@ export function parseEffectCandidate(raw:string):EffectCandidate & {explanation?
  for(const e of v.effects){if(!validDiscovery(e)&&!validIngestEffect(e)&&!validScheduleNatural(e)&&!validFormationEffect(e,assertBoundedState)&&!validPhysicalEffect(e)&&!validStateChange(e)&&!validBodyDisplacement(e)&&!(exact(e,['kind','supplyId','expectedRemaining'])&&e.kind===effectKinds.materialize&&reference(e.supplyId)&&integer(e.expectedRemaining))&&!(exact(e,['kind','objectId','expectedRevision'])&&([effectKinds.consume,effectKinds.destroy] as readonly string[]).includes(e.kind as string)&&reference(e.objectId)&&integer(e.expectedRevision))&&!(exact(e,['kind','objectId','expectedRevision','toHolder','toRegion'])&&e.kind===effectKinds.transfer&&reference(e.objectId)&&integer(e.expectedRevision)&&(e.toHolder===null||reference(e.toHolder))&&reference(e.toRegion))&&!(exact(e,['kind','objectId','expectedRevision','key','value'])&&e.kind===effectKinds.state&&reference(e.objectId)&&integer(e.expectedRevision)&&reference(e.key)&&typeof e.value==='string'&&e.value.length<=adjudicationLimits.maxValueLength)&&!(exact(e,['kind','targetId','recipient'])&&e.kind===effectKinds.grant&&reference(e.targetId)&&reference(e.recipient))&&!(exact(e,['kind','objectId'])&&e.kind===effectKinds.consent&&reference(e.objectId)))throw Error('裁定效果格式無效。');}
  if(v.status!=='accepted'&&bodyActivity)throw Error('未核准活動不能確認身體後果。');
  if(v.status!=='accepted'&&confirmedDurationMinutes!==undefined)throw Error('未核准活動不能宣稱完成耗時。');
- if(activityIdentity&&v.status!=='accepted')throw Error('未核准活動不能確認活動身份。');
+ // 未核准活動沒有已執行的選擇可分類；模型多填的身份不採用，原文仍留在決策追溯。
+  if(v.status!=='accepted')activityIdentity=undefined;
  const candidate={...v,...(activityIdentity?{activityIdentity}:{}),...(resumable===undefined?{}:{resumable}),...(confirmedDurationMinutes===undefined?{}:{confirmedDurationMinutes})} as unknown as EffectCandidate;
  // Under the completion contract top-level effects are final results. A model
  // must put meaningful preparation in an explicitly timed stage instead.
@@ -248,7 +249,8 @@ export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:
  const explanation=parseExplanation(parsed?.explanation);
  if(parsed&&typeof parsed==='object')delete parsed.explanation;
  if(approval?.version!==3&&raw.length>adjudicationLimits.maxCandidateLength)throw Error('裁定候選超出容量。');
- if(approval!=null&&'activityIdentity' in parsed){if(parsed.activityIdentity!==null)throw Error('日常活動身份由已確認 operation 承接。');delete parsed.activityIdentity;}
+ // 日常活動身份由已確認 operation 承接；模型多填的身份不採用，原文仍留在決策追溯。
+ if(approval!=null&&'activityIdentity' in parsed)delete parsed.activityIdentity;
  if(approval!=null&&parsed.branches===null)delete parsed.branches;
  if(approval!=null&&parsed.completionMinutes!==undefined){if(parsed.completionMinutes!==null)throw Error('日常耗時須由整組規則確認。');delete parsed.completionMinutes;}
  if(approval===undefined||approval===null){if(parsed&&typeof parsed==='object')delete parsed.routine;return {kind:'effects',candidate:parseEffectCandidate(JSON.stringify({...parsed,...(explanation?{explanation}:{})})),...(explanation?{explanation}:{})};}
