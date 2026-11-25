@@ -50,7 +50,8 @@ export const effectRules = [
  ...formationRules,
  `共同界線：effects kinds=${Object.values(effectKinds).join("/")}；status=${adjudicationLimits.statuses.join('/')}；effects 至多${adjudicationLimits.maxEffects}；stages 至多${adjudicationLimits.maxStages}；completionMinutes 必須是正數且至多${adjudicationLimits.maxMinutes}，向上對齊${adjudicationLimits.minuteStep}分鐘；階段時點=${adjudicationLimits.phaseMinutes.join('/')}；不確定難度=${adjudicationLimits.difficulties.join('/')}。`,
  'activityIdentity：一般 accepted 新方法可確認 {version:1,key:穩定語義代碼,label:短活動名稱}；key以小寫英文字開頭、僅英數._-、最多64字，label最多64字。不以物件實例ID、原句hash或成敗級別分類。同語義換措辭／換杯子應沿用 knownActivityIdentities 的 key/label；不同方法不得共用。找不到等義才新增身份。routine非null或未核准時填null，舊缺欄位不補造。這只分類已執行選擇，不是喜歡、成功或強制意圖。',
- '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
+ '沒有物件增減的持續活動（例如畫圖、寫作、練習、修整手邊的東西）可以核准：對提案指定或實際使用的既有本地物件提出 change-state，把這段時間合理能達到的可觀察進度寫成外在狀態（沿用既有鍵或新增一個簡短的鍵，from 等於當前值），並確認 completionMinutes；只記這次的進度，不宣稱整件作品完成。物件的 allowedTo 不含 actor.id 時用 access=physical。不因「無法表達逐步完成」回 unsupported；現場沒有任何可承載進度的物件時才回 unsupported。',
+ '一般效果分支（routine=null）的 accepted 必須包含至少一個可執行效果或活動階段，或以非 null branches 確認結果分支；只有確認了非 null bodyActivity 的活動（例如就寢、清醒休息）可以不含效果。舊版日常核准分支（routine.version=1）只能 accepted、effects=[]、stages=[]、check=null、completionMinutes=null、branches=null，由完整 routine.timings 提供唯一耗時並交程式承接；前提不成立回傳 denied，目前效果無法表達的方法回傳 unsupported。兩者 effects/stages 為空且 check=null，不虛構成功。',
  'effects 依陣列順序執行，後一效果使用前一效果產生的狀態。expectedRevision 必須等於該步執行前的版本；state、transfer、consume、destroy 每次加一，grant、consent 不改版本。',
  'materialize：僅使用本地、已知、allowedTo 含 actor.id 且 remaining>0 的供應，expectedRemaining 等於當前庫存。產生 supplies.materializedObjectId，revision=1、holder=actor.id、owner 保留供應所有者，庫存減一。供應 id 不能當作 objectId。',
  'consume：明示 consumable=true 的物件且 holder=actor.id 才可食用；consumable=false 不可，只有舊資料缺 consumable 才以 kind=food 相容，不以新kind名稱決定。之後 lifecycle=consumed、holder=null、已保存quantity歸零，不會補貨。桌上可食用物件先 transfer 拿取再 consume，第二步版本加一。容器本身不能因裝有飲品而被食用；杯中獨立飲品按其可消耗能力consume，並在同批更新原杯contents，保留飲品與容器連續性。',
@@ -280,9 +281,15 @@ export function parseAdjudicationCandidate(raw:string,scope:{routineOperations?:
 }
 
 
+// #384：模型曾把 family 當成場所類型、把空的 operations 讀成禁止。family 仍是
+// 回覆與已保存規則使用的固定識別碼，這裡只說明它的意思，不改 wire 值。
+const dailyScopeRule='routineOffer.family 是日常封套的固定識別碼（歷史命名），候選原樣回填即可，不代表場所是咖啡館，也不限定活動種類；場所的類型、用途與本人身分只看 routineOffer.place 的 purpose、description 與 actorRoles。routineOffer.operations 是預設項目清單，空陣列只表示這個場所沒有預設項目，不是禁止日常活動；genericMethods 是新方法的名額上限，本來就不列出方法。符合該場所與本人身分的普通活動，可用 version=3 新方法確認，或以 routine=null 沿一般效果承接。不得以 family 名稱或 operations 為空作為 denied、unsupported 的理由。';
+// #384：一個提案常同時含取物、交付與說話。交付他人的同意前提不放寬。
+const multiPartRule='提案含多個動作或多個對象時逐項判斷：本次契約能表達且前提成立的物理部分照常核准，其餘不落實。說話、告知、答應之後要做的事不是世界效果，不需要也不能由裁定落實，由人物自己用對話處理，不因此否決整個提案。把物品交給另一人需要對方先前的 consent；沒有時不代對方同意，核准到取得物品並放在當前區域（transfer toHolder=null）為止。只有物理部分全部無法表達或前提不成立時才回 denied、unsupported；explanation.summary 寫明核准了哪些、哪些沒有落實。';
 export function adjudicationRules(routinePrograms:boolean):string[]{
  return [
-      ...(routinePrograms?[...routineProgramRules,...routineWorldRules]:[]),
+      ...(routinePrograms?[...routineProgramRules,...routineWorldRules,dailyScopeRule]:[]),
+      multiPartRule,
       `只裁定當前提案，不產生背景事件。日常核准與一般效果互斥：routineOffer 非空且普通活動符合時，可依 version=2 舊程序或優先 version=3 通用程序確認本次 operation、subject、完整timings與programs；v3新方法在明示genericMethods受限範圍內一次確認。version=1空效果核准僅供舊候選相容，不用於新確認。日常封套皆accepted、check=null、effects=[]、stages=[]、completionMinutes=null、branches=null。核准不是已執行效果，程式依當前合法物件及背景承接。完整 routine.timings 是唯一耗時來源；v1/v2與v3使用原operation時必須恰好涵蓋 routineOffer.operations 各一次，v3 generic新方法則只列自己的operation一次，每項 {operation,minutes} 為正數且至多${adjudicationLimits.maxMinutes}；依方法及場所確認，不固定茶或咖啡時間。NPC durationMinutes 只是估時，程式向上對齊${adjudicationLimits.minuteStep}分鐘。v1/v2 subject 選模板 subjects；v3 subject 明示本次有界主題，餐點須指明種類、飲用須區分茶／咖啡／泛指飲品，其他可 null。按語義解讀單份普通活動，不要求範例原句。物資留白可依場所確認普通背景，但明確缺貨、損壞、權限優先。未確認的特殊方法、大量規模、代他人授權與強制交付不屬日常核准；不適用則 routine=null，沿一般受限效果契約。禁止額外規則、背景或 world patch。`,
       '不得擲骰、指定骰值、最終級別或他人意願；程式驗證、判定並提交。',
  ];

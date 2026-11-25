@@ -413,7 +413,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 - **`operationScope` 各 route 期待不同**：`/api/world` 要 `storageOwner`；存檔、開局草稿、預算要帳號 owner；人物與模型設定要帳號工作區，欄位名有的叫 `accountScope`。
 - **`mode: 'ai'` 指 OpenRouter**，`'openai'` 才是 OpenAI 直連。
 - **`CityDraft.characters[].templateId` 放的是人物卡 ID**，是歷史命名。
-- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。
+- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。住家等自訂場所的 `routineOffer` 也是這個值，且 `operations` 為空；給裁定模型的說明在 `adjudication-contract.ts` 的 `dailyScopeRule`（#384）。
 - **`lib/world-response.ts` 是瀏覽器端程式**；`model-settings.ts` 是純邏輯，`model-settings-store.ts` 才做 I/O。
 - **`entry-rules.ts` 只有型別**，實際的許可判斷在 `city-access.ts`。
 - **同名的 lib 與元件**：`decision-traces`、`operation-evidence`、`acceptance-scene`、`character-attributes` 在 `lib/` 與 `components/` 各有一個。
