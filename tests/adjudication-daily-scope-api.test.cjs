@@ -90,3 +90,14 @@ test('只確認身體後果的活動可以沒有效果：規則文字與解析�
  const rule=effectRules.find(item=>item.includes('accepted 必須包含至少一個可執行效果'));
  assert.ok(rule);assert.match(rule,/bodyActivity/,'規則須列出解析器已接受的例外');
 });
+
+test('效果 schema 的每個變體都以 kind 開頭：strict 結構化輸出照欄位順序產生，否則選不到該效果',()=>{
+ const {routineCandidateSchema}=load('adjudication-contract');
+ const variants=[];
+ const walk=value=>{if(Array.isArray(value)){value.forEach(walk);return;}if(!value||typeof value!=='object')return;if(value.type==='object'&&value.properties?.kind&&(Object.hasOwn(value.properties.kind,'const')||Array.isArray(value.properties.kind.enum)))variants.push(value);Object.values(value).forEach(walk);};
+ // 只看效果變體；bodyActivity 的各變體都以 version 開頭，彼此沒有這個問題。
+ for(const [name,definition] of Object.entries(routineCandidateSchema.$defs))if(/effect/i.test(name))walk(definition);
+ const kindOf=variant=>variant.properties.kind.const??variant.properties.kind.enum?.join('|');
+ assert.ok(variants.some(variant=>kindOf(variant)==='change-state'),'schema 內應找得到 change-state');
+ assert.deepEqual(variants.filter(variant=>Object.keys(variant.properties)[0]!=='kind').map(kindOf),[]);
+});

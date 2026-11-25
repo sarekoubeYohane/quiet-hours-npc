@@ -3,6 +3,7 @@
 // 比較「原輸入」與「換成目前程式的規則文字」兩種契約下，核准／拒絕／不合法各幾次。
 // 只重放裁定這一次派送：不推進回合、不經 NPC 決策、不寫任何世界。
 // 回覆只做純格式解析（parseAdjudicationCandidate）。沒有完整世界，所以**不驗證效果在當前世界能否執行**。
+// 「原輸入」只保留當時的規則文字；回覆格式的 schema 一律來自目前程式，所以要比較 schema 修改前後，須在修改前的提交上各跑一次。
 // **REPLAY_DRY=1 以外會呼叫付費的模型 API。** 不在 pnpm test 內。輸入含私有實錄，放在 repo 以外的目錄。
 //
 //   乾跑（不連網，核對重建的請求與保存的請求逐位元相同，並列出規則差異）：
@@ -68,7 +69,7 @@ function classify(raw, input) {
 }
 const summaryOf = raw => { try { return JSON.parse(raw).explanation?.summary; } catch { return undefined; } };
 
-test('重放 #384 的裁定輸入', { timeout: 0 }, async () => {
+test('重放 #384 的裁定輸入', async () => {
   assert.ok(inputs && fs.statSync(inputs).isDirectory(), 'REPLAY_INPUTS 必須是內含 *.request.json 的目錄');
   assert.ok(out && fs.statSync(out).isDirectory(), 'REPLAY_DIR 必須是已存在的目錄');
   const key = dry ? 'dry-run-key-000000000000000000' : process.env[keyEnv[provider]] || (process.env.TRIAL_KEY_FILE ? fs.readFileSync(process.env.TRIAL_KEY_FILE, 'utf8').trim() : '');
