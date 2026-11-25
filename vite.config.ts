@@ -31,6 +31,8 @@ export default defineConfig(async () => {
         : ""),
       // 只有測試站建置對 DeepSeek 開啟 thinking（reasoning_effort low）；其他環境維持關閉。
       __DEEPSEEK_THINKING__: JSON.stringify(process.env.CLOUDFLARE_ENV === "test" ? "low" : ""),
+      // 只有測試站建置開啟「格式驗證失敗時重試一次」；其他環境維持單次派送即失敗。
+      __FORMAT_REPAIR__: JSON.stringify(process.env.CLOUDFLARE_ENV === "test" ? "1" : ""),
     },
     // Only server environments emit maps; keep them out of public client assets.
     environments: {

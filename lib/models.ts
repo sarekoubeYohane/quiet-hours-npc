@@ -12,7 +12,7 @@ import { phonePrompt, validatePhoneActionReferences } from './phones';
 import { arrangementPrompt, updateArrangements } from './arrangements';
 import { preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
-import { requestModel, type ModelObserver } from './model-adapter';
+import { requestModel, formatRepairEnabled, type ModelObserver } from './model-adapter';
 export { npcContractVersion } from './npc-decision-schema';
 import { npcContractVersion, actionTypes, methodChoices, methodChanges, methodAssessmentSchema, actionSchema } from './npc-decision-schema';
 import { updateCognition, type CognitiveDecisionContext } from './cognition';
@@ -146,6 +146,9 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw new DecisionFieldError('methodAssessment.intentIds',methodAssessment?.intentIds,JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]));
   return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:readDecisionField('habitCandidates', data.habitCandidates, () => updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[])), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
+// A decision is at most 8 KiB; a longer reply is echoed only up to this many characters.
+const repairEchoLimit=16000;
+const npcRepairInstruction='你上一份回覆沒有通過格式驗證，尚未被採用，世界沒有任何改變。validationError 說明哪個欄位、收到什麼、預期什麼。請保留原本的決定與意圖，只修正指出的問題，重新回傳一份完整的最終決策 JSON。';
 export async function aiDecision(w:World,c:Character,key:string,model:string,provider:ModelProvider,fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
 const mode=modelMode(provider);
 const resumable=canResumeActivity(w,c,`${mode}:${model}`);
@@ -174,6 +177,8 @@ messages[0].content+=methodAssessmentPrompt+phonePrompt+(w.configuration?phoneMa
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
 messages[0].content+='\n\n'+decisionFieldLayoutPrompt;
 let recalled = false;
+// A candidate that fails parsing or validation gets one repair turn in the same decision.
+let repaired = false;
 for (;;) {
 const requestId = crypto.randomUUID();
 // The request promise closes over this exact transcript, character and decision
@@ -224,6 +229,15 @@ catch(error) {
   try {
     await recall?.observer?.({kind:'failure', failure:parseFailure?'candidate-format':'candidate-validation', stage:candidateStage, reason, detail});
   } catch { /* Trace capture must preserve the validation result. */ }
+  // The failed dispatch stays recorded above. The repair turn is a new, separately budgeted
+  // dispatch that shows the model its own reply and the validation result; a second failure
+  // ends the decision exactly as before.
+  if (recall && !repaired && formatRepairEnabled()) {
+    repaired = true;
+    await recall.beforeContinuation();
+    messages.push({role:'assistant',content:raw.slice(0,repairEchoLimit)},{role:'user',content:JSON.stringify({validationFailed:true,validationError:detail,instruction:npcRepairInstruction})});
+    continue;
+  }
   throw new Error(detail);
 }
 }
