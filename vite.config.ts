@@ -29,6 +29,8 @@ export default defineConfig(async () => {
       __TEST_NPC_PROMPT__: JSON.stringify(process.env.CLOUDFLARE_ENV === "test"
         ? readFileSync(new URL("./docs/design/npc-prompt-rewrite-draft.md", import.meta.url), "utf8")
         : ""),
+      // 只有測試站建置對 DeepSeek 開啟 thinking（reasoning_effort low）；其他環境維持關閉。
+      __DEEPSEEK_THINKING__: JSON.stringify(process.env.CLOUDFLARE_ENV === "test" ? "low" : ""),
     },
     // Only server environments emit maps; keep them out of public client assets.
     environments: {
