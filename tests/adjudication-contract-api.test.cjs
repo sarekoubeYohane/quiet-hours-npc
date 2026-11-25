@@ -124,18 +124,39 @@ test('ordinary consumption of held food remains possible when sight is obstructe
 });
 
 for (const status of ['denied', 'unsupported']) {
- test(`cafe water adjudication: the captured ${status} reply is legal only after its activity identity is cleared`, () => {
+ test(`cafe water adjudication: the captured ${status} reply is accepted and its unconfirmed activity identity is discarded`, () => {
   const {parseAdjudicationCandidate} = load('adjudication-contract');
   const raw = cafeWaterReplies[status];
-  assert.throws(() => parseAdjudicationCandidate(raw), /未核准活動不能確認活動身份/);
-  const corrected = {...JSON.parse(raw), activityIdentity:null};
-  const result = parseAdjudicationCandidate(JSON.stringify(corrected));
+  assert.notEqual(JSON.parse(raw).activityIdentity, null);
+  const result = parseAdjudicationCandidate(raw);
   assert.equal(result.kind, 'effects');
   assert.equal(result.candidate.status, status);
   assert.equal(result.candidate.activityIdentity, undefined);
-  assert.deepEqual(result.explanation, corrected.explanation);
+  assert.deepEqual(result.explanation, JSON.parse(raw).explanation);
+  assert.deepEqual(result, parseAdjudicationCandidate(JSON.stringify({...JSON.parse(raw), activityIdentity:null})));
  });
 }
+
+test('a routine approval that also names an activity identity keeps the routine and discards the identity', () => {
+ const {parseAdjudicationCandidate} = load('adjudication-contract'), {approval} = require('./routine-program-fixture.cjs');
+ const identity = {version:1,key:'cafe.front-station-tidy',label:'整理前台與杯具'};
+ const result = parseAdjudicationCandidate(JSON.stringify({...approval(), activityIdentity:identity}));
+ assert.equal(result.kind, 'routine');
+ assert.equal(Object.hasOwn(result.approval, 'activityIdentity'), false);
+ assert.deepEqual(result, parseAdjudicationCandidate(JSON.stringify({...approval(), activityIdentity:null})));
+});
+
+test('cafe front tidy adjudication: the captured routine reply is no longer refused for its activity identity but still for its routine roles', () => {
+ const {parseAdjudicationCandidate} = load('adjudication-contract');
+ const raw = require('./fixtures/cafe-front-tidy-adjudication.json').routineWithIdentity;
+ assert.notEqual(JSON.parse(raw).activityIdentity, null);
+ assert.throws(() => parseAdjudicationCandidate(raw, {allowGenericMethods:true}), /通用日常角色格式無效/);
+});
+
+test('a malformed activity identity is still rejected on an accepted ordinary candidate', () => {
+ assert.throws(() => parseEffectCandidate(JSON.stringify({...accepted, activityIdentity:{version:1,key:'Bad Key',label:'x'}})), /活動語義身份格式無效/);
+ assert.deepEqual(parseEffectCandidate(JSON.stringify({...accepted, activityIdentity:{version:1,key:'meal.take',label:'拿餐點'}})).activityIdentity, {version:1,key:'meal.take',label:'拿餐點'});
+});
 
 test('the adjudicator receives explicit null identity examples for both non-accepted statuses', async () => {
  const {buildAdjudicationInput, requestAdjudication} = load('adjudication');
