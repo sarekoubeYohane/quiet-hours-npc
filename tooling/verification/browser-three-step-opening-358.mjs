@@ -58,7 +58,7 @@ const choose=(name,option)=>label(name).selectOption({label:option});
 const screenshot=(name,surface=page)=>surface.screenshot({path:join(output,name+'.png')});
 const checks=[];
 async function api(path,body){
- const response=await context.request.fetch(app.url+path,{method:body?'POST':'GET',data:body,headers:{Origin:app.url,'X-World-Time-Policy':'round-v1'}});
+ const response=await context.request.fetch(app.url+path,{method:body?'POST':'GET',data:body,headers:{Origin:app.url,'X-World-Time-Policy':'round-v2'}});
  const result=await response.json();assert.ok(response.ok(),JSON.stringify(result));return result;
 }
 try{

@@ -60,7 +60,7 @@ try {
   const post = async (body, expected = 200) => {
     const operationId = (await tick()) + ':' + crypto.randomUUID();
     const response = await page.request.post(url + '/api/world', {
-      headers: { 'X-World-Time-Policy': 'round-v1' },
+      headers: { 'X-World-Time-Policy': 'round-v2' },
       data: { operationId, operationScope: (await read()).operationScope, worldContext: world.contextId,
         mode: 'openai', model: 'gpt-6.1-sol', ...body },
     });

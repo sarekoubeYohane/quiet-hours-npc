@@ -79,6 +79,6 @@ node tooling/verification/browser-life-integration.mjs
 
 舊活動案例須在 transport 回覆的作者位置明示使用 `tests/pursuit-fixture.cjs` 的 `fixtureDecision(input, candidate)`；不在共用 fetch interceptor 自動修復回覆，也不改產品 parser。非空意圖須明示 adopt；空增量保留既有方向。新版 v3 回覆直接維持原樣，錯誤 JSON／非法候選仍須原樣到達相應負向驗證。
 
-直接 POST 付費推進須帶 `X-World-Time-Policy: round-v1`；租約到期反例須超過現行 430 秒。物件斷言應以身份或測試領域選取，不能依整個陣列只有茶杯／餐點的假設忽略正常手機啟用。`nonPhoneObjects` 只用於舊餐具案例的檢視與斷言，不從保存世界刪除手機。
+直接 POST 付費推進須帶 `X-World-Time-Policy: round-v2`；租約到期反例須超過現行 430 秒。物件斷言應以身份或測試領域選取，不能依整個陣列只有茶杯／餐點的假設忽略正常手機啟用。`nonPhoneObjects` 只用於舊餐具案例的檢視與斷言，不從保存世界刪除手機。
 
 所有 browser runner 尊重 `BROWSER_ARTIFACT_DIR`，完整回歸請指定新的隔離目錄，避免覆蓋既有歷史證據。`browser-model-key-retention.mjs` 使用兩個隔離 Chromium context、假 Key 與固定時鐘，驗證兩服務固定14天、替換、跨context讀取、重載、分服務清除與到期，沒有模型派送。它的登入為 fixture，真實驗證登入24小時與重新登入的契約由 auth API／Workers 測試承接，不能用context當成部署後雙瀏覽器驗收。

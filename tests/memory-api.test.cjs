@@ -6,7 +6,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store');
 const read=async()=>(await(await GET()).json()).world;
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
 test('legacy subjective experiences share bounded storage and stable identity without replay or inference',async()=>{

@@ -16,7 +16,7 @@ try{
  browser=await launchBrowser();const context=await browser.newContext({viewport:{width:1360,height:1100},reducedMotion:'reduce'});await context.addCookies([{name:'qh_local_owner',value:'review-account-281',url:app.url}]);page=await context.newPage();page.setDefaultTimeout(30000);
  await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());
  const get=path=>page.evaluate(async path=>{const response=await fetch(path);return {status:response.status,body:await response.json()};},path);
- const post=(path,input)=>page.evaluate(async({path,input})=>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(input)});return {status:response.status,body:await response.json()};},{path,input});
+ const post=(path,input)=>page.evaluate(async({path,input})=>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:JSON.stringify(input)});return {status:response.status,body:await response.json()};},{path,input});
  const check=(value,status=200)=>{assert.equal(value.status,status,JSON.stringify(value.body));return value.body;};
  await page.goto(app.url+'/settings');await page.getByRole('heading',{name:'帳號玩家預算與用量'}).waitFor();
  assert.deepEqual((await get('/api/saves')).body.saves,[]);

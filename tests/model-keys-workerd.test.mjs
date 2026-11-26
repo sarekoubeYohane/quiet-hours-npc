@@ -98,7 +98,7 @@ test('model settings list provider models and the world API encrypts keys and re
     const { operationScope } = await initialRead.json();
     assert.equal(typeof operationScope, 'string');
     assert.ok(operationScope);
-    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operationScope, ...body }) });
+    const post = body => mf.dispatchFetch(origin + '/api/world', { method: 'POST', headers: { origin, cookie: first, 'X-World-Time-Policy':'round-v2' }, body: JSON.stringify({ operationId: `${Date.now()}:${crypto.randomUUID()}`, operationScope, ...body }) });
     const fakeKey = 'worker-fixture-key-never-real';
     const saved = await post({ operation: 'set-model-key', mode: 'openai', key: fakeKey });
     assert.equal(saved.status, 200);

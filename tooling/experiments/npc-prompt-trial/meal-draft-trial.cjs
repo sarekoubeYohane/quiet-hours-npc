@@ -31,7 +31,7 @@ function judge(input) {
 async function advance(snapshot,model,fetcher) {
   store.install(structuredClone(snapshot));
   const post = body => POST(new Request('https://test.invalid/api/world',{method:'POST',
-    headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},
+    headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},
     body:JSON.stringify({operationScope:'test-owner',operationId:Date.now()+':'+randomUUID(),
       worldContext:snapshot.contextId,mode:'openai',model,...body})}));
   assert.equal((await post({operation:'set-model-key',key:'local-transport-placeholder-000000'})).status,200);

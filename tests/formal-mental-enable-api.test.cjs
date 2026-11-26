@@ -5,7 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world'),{env}=load('cloudflare-workers');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-function scenario(prepare=()=>{}){const w=seedWorld();w.contextId='formal-enable-263';w.characters=w.characters.filter(c=>c.id==='owner');w.characters[0].control={mode:'taken-over',experiences:[]};prepare(w);store.install(w);delete env.MENTAL_ENERGY_TEST_POLICY;env.APP_ENV='local';return {post:b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:w.contextId,mode:'demo',...b}, 'test-owner'))})),read:async()=>(await(await GET()).json()).world};}
+function scenario(prepare=()=>{}){const w=seedWorld();w.contextId='formal-enable-263';w.characters=w.characters.filter(c=>c.id==='owner');w.characters[0].control={mode:'taken-over',experiences:[]};prepare(w);store.install(w);delete env.MENTAL_ENERGY_TEST_POLICY;env.APP_ENV='local';return {post:b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:id(),worldContext:w.contextId,mode:'demo',...b}, 'test-owner'))})),read:async()=>(await(await GET()).json()).world};}
 const enable=(opening={capacity:65,current:3,stage:'見底'})=>({operation:'enable-mental-energy',mentalOpenings:[{id:'owner',opening}]});
 test('owner explicitly enables the formal policy once; GET, SQLite reload and original ID preserve exact capacity and current state',async()=>{
  const s=scenario();assert.equal((await s.read()).characters[0].mentalEnergy,undefined);const op={...enable(),operationId:id()};const r=await s.post(op);assert.equal(r.status,200,await r.clone().text());const c=(await s.read()).characters[0];assert.equal(c.mentalEnergy.policy.kind,'formal');assert.equal(c.mentalEnergy.policy.maximum,65);assert.equal(c.mentalEnergy.value,3);assert.equal(c.mentalEnergy.activatedAt,c.mentalEnergy.updatedAt);
@@ -74,7 +74,7 @@ test('formal income, mood, payment, activity and sources roll back together acro
   try{
    await s.post({operation:'intervene',target:'owner',text:'這是剛剛真正收到的鼓勵'});const before=await s.read();s.normal(input=>{
     if(input.self.id!=='owner')return{malformed:'later actor'};
-    const source=input.self.shortTerm.findLast(m=>m.feelingSources?.length).feelingSources[0];if(fault==='lease'){const then=clock();Date.now=()=>then+500000;}
+    const source=input.self.shortTerm.findLast(m=>m.feelingSources?.length).feelingSources[0];if(fault==='lease'){const then=clock();Date.now=()=>then+710000;}
     return{type:fault==='stale-object'?'propose':'rest',target:fault==='stale-object'?'workpiece':'',content:fault==='stale-object'?'加工這件作品':'選擇安靜休息',purpose:'照顧自己',durationMinutes:60,timeIntent:{kind:fault==='stale-object'?'completion':'open-ended',maxMinutes:null},feelingUpdates:[{source:fault==='source'?'not-offered':source,direction:'positive',level:3,reason:'獨立的新鼓勵讓我補回餘裕',mood:'稍微安心'}],emotionRegulation:{effort:'慢慢呼吸',reason:'讓自己能承受',mood:'稍微穩住'}};
    });
    // A stale object is changed through a committed fixture boundary, then its

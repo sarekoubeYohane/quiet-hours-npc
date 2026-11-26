@@ -7,7 +7,7 @@ try{
  const world=load('world').seedWorld();world.contextId='browser-life-habits';world.adjudication={provider:'openai',model:'fixture-judge'};
  for(const c of world.characters)if(c.id!=='owner')c.control={mode:'taken-over'};
  store.install(world);const POST=load('route').POST;
- const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',worldContext:world.contextId,...body})}));
+ const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',worldContext:world.contextId,...body})}));
  await post({operation:'set-model-key',key:'fixture-key'});
  let choice;
  setModelResponder(async(fixtureRequest)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(fixtureRequest.messages[1].content),choice))}}]}));

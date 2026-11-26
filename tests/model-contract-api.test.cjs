@@ -5,7 +5,7 @@ const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'), assert=require('node:assert/strict'), path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
 const read=async()=>(await(await GET()).json()).world;
 const candidate={type:'rest',target:'',content:'',mood:'平靜',durationMinutes:15,intents:[],attentionConditions:[],memorySelections:[],memoryOperations:[],cognitiveUpdates:[],interpretation:''};
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
@@ -29,7 +29,7 @@ test('a response explicitly associated with another request cannot change the wo
 });
 test('a response after the absolute deadline is discarded and cannot change settled usage or submit an action',async()=>{
  store.install(worldWithAdjudication());const original=global.fetch,clock=Date.now;let instant=clock(),calls=0;Date.now=()=>instant;
- global.fetch=async(_url,init)=>{if(++calls===4)instant+=401000;return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),candidate))}}]});};
+ global.fetch=async(_url,init)=>{if(++calls===4)instant+=611000;return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),candidate))}}]});};
  try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));const before=await read(); const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).characters,before.characters);assert.equal((await read()).aiUsage.totalInputTokens,27);assert.equal((await read()).aiUsage.totalUnknownCalls,1);
  }finally{global.fetch=original;Date.now=clock;}
 });

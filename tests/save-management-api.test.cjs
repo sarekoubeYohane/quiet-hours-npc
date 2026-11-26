@@ -7,7 +7,7 @@ const saves=load('saves-route'),world=load('route'),people=load('character-templ
 const {seedWorld}=load('world');
 const originalSaveScopes=new Map();
 const origin='https://test.invalid';
-const req=(value,save)=>new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(value, save?originalSaveScopes.get(save):'test-owner'))});
+const req=(value,save)=>new Request(origin+'/api/world'+(save?'?save='+save:''),{method:'POST',headers:{origin,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput(value, save?originalSaveScopes.get(save):'test-owner'))});
 const body=async(response,status=200)=>{const value=await response.json();assert.equal(response.status,status,JSON.stringify(value));return value;};
 const id=()=>Date.now()+':'+crypto.randomUUID();
 const read=save=>world.GET(new Request(origin+'/api/world?save='+save)).then(r=>body(r)).then(value=>{if(!originalSaveScopes.has(save))originalSaveScopes.set(save,value.operationScope);return value;});

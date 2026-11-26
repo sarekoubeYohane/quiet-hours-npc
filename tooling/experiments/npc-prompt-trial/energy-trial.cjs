@@ -76,7 +76,7 @@ async function trial(world, condition, repetition, key, fingerprints, sleepCase)
   const actor = world.characters[0];
   store.install(structuredClone(world));
   const post = body => POST(new Request('https://test.invalid/api/world', {method:'POST',
-    headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},
+    headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},
     body:JSON.stringify({operationScope:'test-owner',worldContext:world.contextId,
       operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model,...body})}));
   const fixtureKey = 'local-transport-placeholder-000000';

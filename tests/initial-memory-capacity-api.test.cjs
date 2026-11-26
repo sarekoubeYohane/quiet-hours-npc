@@ -15,7 +15,7 @@ const store = load('store');
 const {fixtureDecision} = require('./pursuit-fixture.cjs');
 const id = () => Date.now()+':'+crypto.randomUUID();
 const send = (api, body) => api.POST(new Request('https://test.invalid', {
-  method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(body, 'test-owner') : originalAccountInput(body, 'account-operations:test-owner')),
+  method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(api === route ? originalWorldInput(body, 'test-owner') : originalAccountInput(body, 'account-operations:test-owner')),
 }));
 const json = async (response,status) => { const body=await response.json(); assert.equal(response.status,status,JSON.stringify(body)); return body; };
 const read = async () => json(await route.GET(),200);

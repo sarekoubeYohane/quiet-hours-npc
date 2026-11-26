@@ -5,7 +5,7 @@ const output=process.env.BROWSER_ARTIFACT_DIR||'/tmp/opening-recovery-288';await
 import {startApp} from './real-route-runtime.mjs';
 import {launchBrowser} from './browser-runtime.mjs';
 const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:()=>({bonuses:[]})});let browser;
-const req=async(owner,path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
+const req=async(owner,path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
 const ok=async(owner,path,body)=>{const r=await req(owner,path,body);assert.ok(r.status>=200&&r.status<300,JSON.stringify(r));return r.body;};
 const boundUrl=(value,pathname,params={})=>{const url=new URL(String(value),app.url);return url.origin===app.url&&url.pathname===pathname&&url.searchParams.get('owner')==='a'&&Object.entries(params).every(([key,expected])=>url.searchParams.get(key)===expected);};
 try{

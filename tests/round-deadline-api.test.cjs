@@ -55,10 +55,10 @@ for(const config of [
   for(const key of ['version','leaseCreatedAt','workDeadline','leaseDeadline','clientMs'])assert.equal(timing[key],trace.timePolicy[key],'timing evidence remains consistent after bounded transcript omission');
   assert.ok(Buffer.byteLength(JSON.stringify(trace))<=1024*1024,'timing evidence respects the existing archive cap');
   if(config.recall)console.log('TRACE_BUDGET '+JSON.stringify({case:config.name,gap:trace.gap,omittedOriginalBytes:trace.omittedOriginalBytes,retainedBytes:Buffer.byteLength(JSON.stringify(trace))}));
-  assert.equal(timing.workDeadline-timing.leaseCreatedAt,400000);assert.equal(timing.leaseDeadline-timing.leaseCreatedAt,430000);assert.equal(timing.clientMs,445000);
+  assert.equal(timing.workDeadline-timing.leaseCreatedAt,610000);assert.equal(timing.leaseDeadline-timing.leaseCreatedAt,640000);assert.equal(timing.clientMs,655000);
   for(const d of trace.dispatches){assert.ok(d.fetchStartedAt>=d.startedAt);assert.ok(d.signal.deadline>d.fetchStartedAt);assert.equal(d.signal.source,'round-work','a call has no fixed total; it may use the rest of the work window');assert.equal(d.signal.deadline,timing.workDeadline);assert.ok(d.headersReceivedAt<=d.receivedAt);assert.ok(d.usageKnownAt);}
   assert.ok(trace.checkpoints.some(x=>x.completedAt>x.startedAt)||!config.checkpoint);
-  assert.ok(Date.now()-started<400000);assert.equal(JSON.stringify(wire).includes('time-policy'),false,'diagnostics never enter NPC inputs');
+  assert.ok(Date.now()-started<610000);assert.equal(JSON.stringify(wire).includes('time-policy'),false,'diagnostics never enter NPC inputs');
   console.log('ROUND_BUDGET '+JSON.stringify({case:config.name,elapsedMs:Date.now()-started,sent,embedding,searches,writes}));
  }finally{store.onNextTraceWrite(()=>{});store.onStorage(undefined);s?.restore();c.restore();for(const key of ['RECALL_ENABLED','RECALL_USAGE_DB','OWNER_EMBEDDING_KEY','MEMORY_VECTOR_INDEX'])delete env[key];}
 });
@@ -104,7 +104,7 @@ for(const newer of [false,true])test('uncancellable CAS after lease expiry canno
  const c=clock();let s,delayed=false;
  try{
   s=await scenario();const before=await s.read();
-  store.onStorage(async sql=>{if(!delayed&&sql.startsWith('UPDATE worlds SET state = ?')){delayed=true;await c.sleep(431000);if(newer){const replacement=structuredClone(before);replacement.turn=19;store.replaceCommittedWorld(replacement);}}});
+  store.onStorage(async sql=>{if(!delayed&&sql.startsWith('UPDATE worlds SET state = ?')){delayed=true;await c.sleep(641000);if(newer){const replacement=structuredClone(before);replacement.turn=19;store.replaceCommittedWorld(replacement);}}});
   const operation=op(),response=await c.run(s.post(operation));assert.equal(response.status,502);store.onStorage(undefined);
   // Let the original non-cancellable SQL complete; only the original trace queue
   // may update old evidence. No deferred story commit is permitted.
@@ -126,7 +126,7 @@ test('uncancellable trace beyond lease retains measured usage once and never res
  const c=clock();let s,sent=0,delayed=false;
  try{
   s=await scenario();global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
-  store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(500000);}}});
+  store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(710000);}}});
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);store.onStorage(undefined);
   let saved=await query(operation.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,30);assert.equal(saved.world.aiUsage.totalOutputTokens,10);assert.equal(saved.world.aiUsage.totalUnknownCalls,0);assert.equal(sent,1);
   const again=await s.post(operation);assert.deepEqual(await again.json(),body);assert.equal(sent,1);
@@ -143,7 +143,7 @@ for(const kind of ['recall','request-disconnect'])test(kind+' stops before any c
   if(kind==='recall'){env.RECALL_ENABLED='true';env.RECALL_USAGE_DB=store.database();env.OWNER_EMBEDDING_KEY='synthetic-owner-key';env.MEMORY_VECTOR_INDEX={query:async()=>({matches:[]})};}
   global.fetch=async(url,_fixtureInit)=>{if(String(url).includes('embeddings')){await c.sleep(11000);return Response.json({usage:{total_tokens:7},data:[{index:0,embedding:Array(1536).fill(.1)}]});}sent++;if(kind==='request-disconnect'){controller.abort();await c.sleep(1000);}return new Response(envelope(kind==='recall'?{type:'recall',questions:['Earlier?']}:proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
   const operation=op(),payload={worldContext:'program-fixture',mode:'openai',model:'gpt-6-luna',...operation};
-  const response=await c.run(POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput(payload, 'test-owner')),signal:controller.signal}))),body=await response.json();
+  const response=await c.run(POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput(payload, 'test-owner')),signal:controller.signal}))),body=await response.json();
   assert.equal(response.status,502);assert.equal(sent,1);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);
  }finally{s?.restore();c.restore();for(const key of ['RECALL_ENABLED','RECALL_USAGE_DB','OWNER_EMBEDDING_KEY','MEMORY_VECTOR_INDEX'])delete env[key];}
 });
@@ -152,7 +152,7 @@ test('the total work cutoff stops a slow guard and its uncancellable tail never 
  const c=clock();let s,sent=0,delayed=false;
  try{
   s=await scenario();const old=global.fetch;global.fetch=async(...args)=>{sent++;return old(...args);};
-  store.onStorage(async sql=>{if(!delayed&&sql.startsWith('SELECT locked_until, version')){delayed=true;await c.sleep(401000);}});
+  store.onStorage(async sql=>{if(!delayed&&sql.startsWith('SELECT locked_until, version')){delayed=true;await c.sleep(611000);}});
   const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,0);store.onStorage(undefined);
   const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,0);await c.run(c.sleep(5000));assert.equal(sent,0);assert.equal((await query(operation.operationId)).world.turn,0);
  }finally{store.onStorage(undefined);s?.restore();c.restore();}
@@ -196,7 +196,7 @@ test('another page settling expired pending as uncertain cannot discard the orig
  const ready=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);let running;
  global.fetch=async()=>{sent++;entered();await gate;throw Error('disconnected provider');};
  try{
-  const operation=op();running=s.post(operation);await ready;now+=440000;const expired=await s.post(operation),body=await expired.json();assert.equal(expired.status,502);assert.equal(body.operationUncertain,true);
+  const operation=op();running=s.post(operation);await ready;now+=650000;const expired=await s.post(operation),body=await expired.json();assert.equal(expired.status,502);assert.equal(body.operationUncertain,true);
   release();await running;const saved=await query(operation.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalUnknownCalls,1);assert.equal(sent,1);
   assert.deepEqual(await(await s.post(operation)).json(),body);assert.equal((await query(operation.operationId)).world.aiUsage.totalCalls,1);assert.equal(sent,1);
  }finally{release();await running;Date.now=clock;s.restore();}
@@ -204,7 +204,7 @@ test('another page settling expired pending as uncertain cannot discard the orig
 
 test('synchronous activity work crossing the work cutoff rolls back before the finalization window',async()=>{
  const {uncertain,raw}=require('./routine-results-fixture.cjs'),clock=Date.now;let now=clock();Date.now=()=>now;
- const s=await scenario({reply:uncertain(),supplies:raw(),random:()=>{now+=401000;return .99;}});
+ const s=await scenario({reply:uncertain(),supplies:raw(),random:()=>{now+=611000;return .99;}});
  try{
   const before=await s.read(),operation=op(),response=await s.post(operation),body=await response.json();assert.equal(response.status,502,'work must stop at400s even when synchronous D20/effects prevent the abort timer from running');
   const saved=await replay(s,operation,response,body,()=>s.counts().npc+s.counts().judgments);assert.equal(saved.world.turn,before.turn);assert.deepEqual(saved.world.objects,before.objects);assert.deepEqual(saved.world.supplies,before.supplies);assert.equal(saved.world.routineRules,undefined);assert.equal(saved.world.aiUsage.totalCalls,2);assert.equal(saved.world.aiUsage.totalInputTokens,60);assert.equal(s.counts().dice,1);

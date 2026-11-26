@@ -201,7 +201,7 @@ async function acceptanceMeal(minutes,modify){
  const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
  const world=seedWorld();world.adjudication={provider:'openai',model:'fixture-adjudicator'};world.playerBudget={calls:2000,tokens:50000000};store.install(world);
  const read=async()=>(await (await GET()).json()).world;
- const post=async body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:'test-owner',operationId:Date.now()+':'+crypto.randomUUID(),worldContext:(await read()).contextId,mode:'openai',model:'gpt-6-luna',...body})}));
+ const post=async body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:'test-owner',operationId:Date.now()+':'+crypto.randomUUID(),worldContext:(await read()).contextId,mode:'openai',model:'gpt-6-luna',...body})}));
  assert.equal((await post({operation:'set-model-key',key:'fixture-key'})).status,200);
  assert.equal((await post({operation:'enter-acceptance'})).status,200);
  if(modify){const entered=await read();modify(entered);store.replaceCommittedWorld(entered);}

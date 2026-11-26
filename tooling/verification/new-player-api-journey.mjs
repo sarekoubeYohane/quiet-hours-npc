@@ -20,7 +20,7 @@ async function request(path, body) {
       Cookie: 'qh_local_owner=journey-player',
       Origin: app.url,
       'Content-Type': 'application/json',
-      'X-World-Time-Policy': 'round-v1',
+      'X-World-Time-Policy': 'round-v2',
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

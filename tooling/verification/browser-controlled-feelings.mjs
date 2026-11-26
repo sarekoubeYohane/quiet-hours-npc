@@ -41,7 +41,7 @@ try{
   const saved=await operation('advance',()=>page.getByRole('button',{name:'下一回合',exact:true}).click());await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');return saved;
  };
  const intervene=async text=>{await page.getByRole('textbox',{name:'你想說的話或發生的事'}).fill(text);await operation('intervene',()=>page.getByRole('button',{name:'加入事件',exact:true}).click());await page.waitForFunction(()=>document.getElementById('intervention')?.value==='');};
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
  await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
  let saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,5);
  await intervene('我願意陪你面對這次挫折。');saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,3);assert.equal(saved.characters[0].mentalEnergy.history.filter(e=>e.kind==='regulation').length,1);
@@ -53,7 +53,7 @@ try{
  saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,4.5);assert.equal(feelings,1);
  await intervene('接管期間，我仍在這裡陪你。');saved=await advance();actor=saved.characters[0];assert.equal(actor.mentalEnergy.value,8);assert.equal(actor.plan.mentalProcess.id,activityId);assert.equal(actor.plan.action.type,'rest');assert.equal(actor.mentalEnergy.history.filter(e=>e.kind==='regulation').length,1);assert.deepEqual(actor.habitEvidence||[],habitsBefore);assert.equal(feelings,2);assert.equal(npc,2);
  const snapshot=structuredClone(actor),lastOperation=requests.filter(r=>r.operation==='advance').at(-1);
- const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:lastOperation});assert.equal(replay.status(),200);assert.deepEqual((await replay.json()).world.characters[0],snapshot);assert.equal(feelings,2);
+ const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:lastOperation});assert.equal(replay.status(),200);assert.deepEqual((await replay.json()).world.characters[0],snapshot);assert.equal(feelings,2);
  await nav('分析');const panel=page.getByRole('heading',{name:'精神電量',exact:true}).locator('..');await panel.getByText('觀察者數值：8/20',{exact:true}).waitFor();await panel.getByText('最近的精神電量變化',{exact:true}).click();await panel.screenshot({path:outputPath('controlled-energy-panel.png')});
  await page.getByText('已發生用量與當時價格依據',{exact:true}).click();const costs=page.getByRole('region',{name:'已發生費用估算'});await costs.getByText('接管感受評估',{exact:false}).waitFor();await costs.screenshot({path:outputPath('controlled-usage-panel.png')});
  await page.reload();await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await nav('分析');await page.getByText('觀察者數值：8/20',{exact:true}).waitFor();assert.deepEqual((await read()).characters[0],snapshot);assert.equal(feelings,2);

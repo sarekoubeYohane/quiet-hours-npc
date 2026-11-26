@@ -26,7 +26,7 @@ try{
  await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
  await page.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
- const api=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
+ const api=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{mode:'openai',operationId:Date.now()+':'+crypto.randomUUID(),...body}});assert.equal(response.status(),200,await response.text());};
  await api({operation:'set-model-key',mode:'openai',key:'fixture-key'});
  for(let round=0;round<6;round++){
   await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');

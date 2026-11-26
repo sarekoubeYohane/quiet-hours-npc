@@ -6,7 +6,7 @@ const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const route=load('route'),store=load('store'),{seedWorld}=load('world');
 const op=()=>Date.now()+':'+crypto.randomUUID();
 const read=async()=> (await route.GET()).json();
-const send=async body=>{const r=await route.POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({mode:'demo',operationId:op(),...body}, 'test-owner'))}));return {status:r.status,body:await r.json()};};
+const send=async body=>{const r=await route.POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({mode:'demo',operationId:op(),...body}, 'test-owner'))}));return {status:r.status,body:await r.json()};};
 const setup={attributes:{strength:{min:1,max:2},endurance:{value:4},dexterity:{value:3},perception:{value:2}},expertise:[{scope:'髮飾設計',modifier:10}],senses:[{scope:'hearing',modifier:-10}]};
 test('owner explicitly forms stable background-bounded attributes through world API, SQLite read and original-operation replay',async()=>{
  store.install(seedWorld());const before=await read();assert.equal(before.world.characters[0].attributes,undefined);

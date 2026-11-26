@@ -69,7 +69,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 預算、用量、費用 | `lib/player-account-budget.ts`（帳號帳本）、`lib/usage-recovery.ts`、`lib/costs.ts` |
 | 模型 Key 與模型設定 | `lib/model-keys.ts`、`lib/model-settings-store.ts` |
 | 登入 | `lib/auth.ts` |
-| 回合時間預算（400／430／445 秒；模型首段 30 秒、閒置 15 秒） | `lib/round-time-policy.ts` |
+| 回合時間預算（610／640／655 秒，`round-v2`；模型首段 30 秒、閒置 15 秒） | `lib/round-time-policy.ts` |
 | 操作的受理、收據、重送、租約、提交與失敗回復 | `lib/host-runtime.ts` 的 `runOperation`（主持執行層） |
 | 新增或修改一項操作（驗證與執行） | `lib/host-operations.ts` 的 `hostOperations`，每項操作一個 handler |
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
@@ -407,7 +407,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉（2026-11-25 量測時裁定開 thinking 兩次超過當時 25 秒的固定期限；改串流後尚未重測）。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
 | 建置常數 `__FORMAT_REPAIR__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `1`，其他環境為空字串。開啟時，格式驗證失敗的候選多一次修正機會：NPC 決策在 `models.ts` 的 `aiDecision` 迴圈（沿用回想接續的 `beforeContinuation` 計費與追溯），世界裁定在 `host-operations.ts` 以 `routine-rules.ts` 的 `adjudicationFormatError` 做純格式檢查後重問一次。每次重問都是獨立計費、計次、留實錄的派送；第二次仍失敗則照舊整回合回復。關閉時維持單次派送即失敗 |
 
-NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v1`、`controlled-feelings.v1`。
+NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v2`（回合時間政策）、`controlled-feelings.v1`。
 
 ## 檔名陷阱
 

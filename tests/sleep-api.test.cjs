@@ -12,7 +12,7 @@ const reply=(v,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion
 async function scenario(prepare=()=>{},judge){
  const world=seedWorld();world.contextId='sleep-v1';world.characters=world.characters.filter(c=>c.id==='owner');world.adjudication={provider:'openai',model:'fixture-judge'};
  const c=world.characters[0];c.needs={version:1,activatedAt:world.minute,updatedAt:world.minute,values:{hunger:39,thirst:39,fatigue:70,sleep:80},assessed:{hunger:0,thirst:0,fatigue:2,sleep:2},history:[],dropped:0};prepare(world);store.install(world);
- const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...b}, 'test-owner'))}));
+ const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:opid(),worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',...b}, 'test-owner'))}));
  await post({operation:'set-model-key',key:'fixture-key'});let npc=0,judgments=0,choose;const inputs=[],npcPrompts=[],old=global.fetch;
  global.fetch=async(_url,init)=>{
   const {messages}=JSON.parse(init.body);

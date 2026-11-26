@@ -32,7 +32,7 @@ async function signIn(id = 123) {
 async function post(cookie, body) {
   headers.set(new Headers({ cookie }));
   const payload={mode:'demo',operationId:operationId(),...body},scope=originalScopes.get(cookie);
-  const response = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(scope?originalWorldInput(payload,scope):payload) }));
+  const response = await world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin, 'X-World-Time-Policy':'round-v2' }, body: JSON.stringify(scope?originalWorldInput(payload,scope):payload) }));
   if (body.operation === 'set-model-key' && response.ok) {
     await post(cookie, { operation: 'set-adjudication', adjudication: { provider: 'openai', model: 'gpt-6-luna' } });
   }
@@ -84,7 +84,7 @@ test('a legacy world with older missing optional fields stays readable and canno
  await fixture.env.DB.prepare('UPDATE worlds SET state=?,version=7 WHERE owner=?').bind(JSON.stringify(legacy),'github:123').run();const before=await read(cookie);assert.equal(before.version,7);assert.equal((await resetWorld(cookie)).status,409);await unchanged(cookie,before);
 });
 test('retired reset still validates operation identity and original account scope',async()=>{
- freshDatabase();const cookie=await signIn();headers.set(new Headers({cookie}));const missing=await world.POST(request('/api/world',cookie,{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:originalScopes.get(cookie),mode:'demo',operation:'reset'})}));assert.equal(missing.status,400);
+ freshDatabase();const cookie=await signIn();headers.set(new Headers({cookie}));const missing=await world.POST(request('/api/world',cookie,{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:originalScopes.get(cookie),mode:'demo',operation:'reset'})}));assert.equal(missing.status,400);
  const foreign=await resetWorld(cookie,{operationScope:'github:999'});assert.equal(foreign.status,409);assert.equal((await foreign.json()).scopeMismatch,true);assert.equal((await read(cookie)).version,0);
 });
 test('rejected new reset does not expire old unsubmitted intentions or invalidate already settled results',async()=>{

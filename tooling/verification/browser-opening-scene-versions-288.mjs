@@ -5,7 +5,7 @@ import {launchBrowser} from './browser-runtime.mjs';
 import {formCharacterCard} from './opening-journey.mjs';
 const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:()=>({bonuses:[]})});let browser;
 const output=process.env.BROWSER_ARTIFACT_DIR||'/tmp/opening-scene-versions-288';await mkdir(output,{recursive:true});
-const request=async(path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner=a',Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
+const request=async(path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner=a',Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
 const ok=async(path,body)=>{const r=await request(path,body);assert.ok(r.status<300,JSON.stringify(r));return r.body;};
 try{
  const accountScope=(await ok('/api/model-settings')).accountScope;await ok('/api/model-settings',{accountScope,version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}});const ws=await ok('/api/world?workspace=account');await ok('/api/world?workspace=account',{operationScope:ws.operationScope,operation:'set-model-key',mode:'openai',key:'controlled-only'});

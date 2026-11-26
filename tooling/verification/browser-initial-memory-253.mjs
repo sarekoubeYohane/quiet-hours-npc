@@ -23,7 +23,7 @@ try {
   const button=name=>page.getByRole('button',{name,exact:true});
   const read=async(path='/api/world')=>{const r=await page.request.get(url+path);assert.equal(r.status(),200,await r.text());return r.json();};
   const send=async(path,data,status=200)=>{
-    const r=await page.request.post(url+path,{headers:{origin:url,'X-World-Time-Policy':'round-v1'},data});
+    const r=await page.request.post(url+path,{headers:{origin:url,'X-World-Time-Policy':'round-v2'},data});
     const body=await r.json();assert.equal(r.status(),status,JSON.stringify(body));return body;
   };
   const submit=async(name,path,operation)=>{

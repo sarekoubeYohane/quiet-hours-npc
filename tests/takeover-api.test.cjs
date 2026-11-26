@@ -9,7 +9,7 @@ const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${n
 const { seedWorld } = build('world');
 const { GET, POST } = build('route');
 const store = build('store');
-const request = body => new Request('https://test.invalid/api/world', { method:'POST', headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'}, body:JSON.stringify(originalWorldInput({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo', ...body}, 'test-owner')) });
+const request = body => new Request('https://test.invalid/api/world', { method:'POST', headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'}, body:JSON.stringify(originalWorldInput({ operationId: `${Date.now()}:${crypto.randomUUID()}`,mode:'demo', ...body}, 'test-owner')) });
 const read = async () => (await (await GET()).json()).world;
 const owner = world => world.characters.find(c => c.id === 'owner');
 const queue = [{id:'care',content:'照顧咖啡館',intensity:'high',importance:'medium',urgency:'low',context:'晚點整理'}].map(item=>savedPursuit('owner',item));

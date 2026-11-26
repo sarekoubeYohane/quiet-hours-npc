@@ -79,7 +79,7 @@ try {
     assert.deepEqual({npc,adjudication},counts);
     await selectAI();return after;
   };
-  await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+  await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
   await page.goto(url);await nav('設定');
   await page.getByRole('button',{name:'進入最小驗收場景',exact:true}).click();
   await act(page.getByRole('button',{name:'確認進入驗收',exact:true}),'enter-acceptance');

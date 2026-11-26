@@ -99,7 +99,7 @@ try {
     return result.json();
   };
   const send = async (data,status = 200) => {
-    const result = await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data});
+    const result = await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data});
     assert.equal(result.status(),status,await result.text());
     return result.json();
   };

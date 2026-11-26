@@ -6,7 +6,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,name+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world');
 const id=()=>Date.now()+':'+crypto.randomUUID();
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:id(),mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:id(),mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const read=async()=> (await (await GET()).json()).world;
 const reply=(value,_fixtureInput)=>Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(_fixtureInput,value))}}]});
 function fixture({allowed=true,holder='cass'}={}){

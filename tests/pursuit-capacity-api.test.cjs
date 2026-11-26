@@ -26,7 +26,7 @@ test('four maximal shared graphs, full candidates and simultaneous cues commit o
 });
 
 for(const fault of ['later','conflict','before-save','lease'])test(`maximal graph, order and simultaneous cue receipts roll back on ${fault} and original ID replay does not redispatch`,async()=>{
- const clock=Date.now,instant=clock();const s=await scenario(input=>{if(fault==='lease')Date.now=()=>instant+431000;if(fault==='later'&&input.self.id==='vera'){const v=decision(input);v.focusIntentId='vera:missing';return v;}return maintenance(input);},w=>maximumWorld(w,2));
+ const clock=Date.now,instant=clock();const s=await scenario(input=>{if(fault==='lease')Date.now=()=>instant+641000;if(fault==='later'&&input.self.id==='vera'){const v=decision(input);v.focusIntentId='vera:missing';return v;}return maintenance(input);},w=>maximumWorld(w,2));
  try{const before=await s.read();if(fault==='conflict')s.store.conflictOnNextSave();if(fault==='before-save')s.store.throwBeforeNextSave();const op={operation:'advance',minutes:15,operationId:instant+':'+crypto.randomUUID()},response=await s.post(op);assert.equal(response.status,502,await response.clone().text());const after=await s.read();assert.deepEqual(after.characters,before.characters);assert.deepEqual(after.events,before.events);assert.deepEqual(after.objects,before.objects);assert.equal(after.turn,before.turn);assert.ok(after.aiUsage.totalCalls>0);const calls=s.frames.length;await s.post(op);assert.equal(s.frames.length,calls);assert.deepEqual((await s.read()).characters,after.characters);}finally{Date.now=clock;s.restore();}
 });
 

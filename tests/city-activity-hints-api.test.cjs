@@ -17,7 +17,7 @@ const {installHistoricalCity}=require('./historical-city-fixture.cjs');
 const origin = 'https://test.invalid';
 const operationId = () => Date.now()+':'+crypto.randomUUID();
 const post = (api,body) => api.POST(new Request(origin+'/api/world',{
-  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v1'},body:JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
+  method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify(api === route ? originalWorldInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'test-owner') : originalAccountInput(api === scenes ? {id:crypto.randomUUID(),version:0,...body} : body, 'account-operations:test-owner')),
 }));
 async function response(result,status) {
   const data=await result.json();

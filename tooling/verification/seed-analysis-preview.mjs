@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {formCharacterCard,confirmOpening} from './opening-journey.mjs';
 const base='http://127.0.0.1:5194',owner='analysis-qa';
 async function request(path,body){
- const response=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:base,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});
+ const response=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:base,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});
  const value=await response.json();assert.ok(response.ok,JSON.stringify(value));return {status:response.status,body:value};
 }
 const read=async(path,body)=>(await request(path,body)).body;

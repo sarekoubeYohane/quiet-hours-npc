@@ -4,7 +4,7 @@ import {startApp} from './real-route-runtime.mjs';
 import {launchBrowser} from './browser-runtime.mjs';
 import {formCharacterCard,confirmOpening} from './opening-journey.mjs';
 const app=await startApp({diceFaces:Array(20).fill(4),modelResponder:()=>({bonuses:[]})});let browser;const output=process.env.BROWSER_ARTIFACT_DIR||'/tmp/world-recovery-scope-281';await mkdir(output,{recursive:true});
-const req=async(path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner=a',Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
+const req=async(path,body)=>{const r=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner=a',Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
 const ok=async(path,body)=>{const r=await req(path,body);assert.ok(r.status<300,JSON.stringify(r));return r.body;};
 try{
  await ok('/api/model-settings',{accountScope:'account-operations:a',version:0,mode:'custom',models:{npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}}});

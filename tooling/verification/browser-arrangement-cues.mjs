@@ -16,7 +16,7 @@ setModelResponder(body=>{
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
- const send=async body=>{const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
+ const send=async body=>{const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
  await send({operation:'set-model-key',key:'fixture-key'});await send({operation:'advance'});await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();
  const nav=async()=>{await page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name:'分析',exact:true}).click();await page.getByRole('button',{name:initial.characters[0].name,exact:true}).last().click();};await nav();const details=page.locator('details').filter({has:page.locator(':scope > summary').getByText('柔性安排',{exact:true})});
  await details.locator(':scope > summary').click();assert.match(await details.innerText(),/稍後與 Vera 討論茶的香氣/);assert.match(await details.innerText(),/尚未越過時間/);const before=store.snapshot();await details.screenshot({path:outputPath('saved.png')});

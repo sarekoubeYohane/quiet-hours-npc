@@ -105,7 +105,7 @@ test('an expired lease discards the received candidate and preserves trace ident
  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;entered();await gate;return Response.json({usage:{prompt_tokens:6,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content),{...proposal,type:'rest',target:'',content:'休息',purpose:'',timeIntent:{kind:'open-ended',maxMinutes:null}}))}}]});};
  let running;
  try{
-  running=s.post(op);await ready;now+=440000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);
+  running=s.post(op);await ready;now+=650000;const expired=await s.post(op);assert.equal(expired.status,502);assert.equal((await expired.json()).operationUncertain,true);
   release();await running;for(let i=0;i<30;i++){if((await lookup(op.operationId)).decisionTrace.dispatches[0].responseBody)break;await new Promise(r=>setTimeout(r,5));}const saved=await lookup(op.operationId);assert.equal(saved.world.turn,0);assert.equal(saved.decisionTrace.outcome,'unknown');assert.ok(saved.decisionTrace.dispatches[0].responseBody);assert.equal(saved.decisionTrace.dispatches[0].discarded,true);assert.ok(saved.decisionTrace.steps.some(step=>step.kind==='round-failure'));
   assert.equal(saved.decisionTrace.requestId,saved.decisionTraces.records.find(item=>item.operationId===op.operationId).requestId);
   const before=structuredClone(saved.world);await s.post(op);assert.equal(sent,1);assert.deepEqual((await lookup(op.operationId)).world,before);
@@ -117,7 +117,7 @@ test('an evicted or cleared in-flight trace is not reinserted by a late worker',
  const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let sent=0;
  global.fetch=async()=>{sent++;entered();await gate;throw Error('late provider failure');};let running;
  try{
-  running=s.post(op);await ready;now+=440000;await running;
+  running=s.post(op);await ready;now+=650000;await running;
   for(let i=0;i<66;i++){now++;const response=await s.post({operation:'takeover'});assert.equal(response.status,200,await response.clone().text());}
   assert.equal((await lookup(op.operationId)).decisionTrace,null);
   const before=(await lookup(op.operationId)).world;release();await running;const after=await lookup(op.operationId);
@@ -163,7 +163,7 @@ for(const status of [200,429])test(`HTTP ${status} body-read failure preserves k
 test('an abort during the prepared checkpoint does not invent a provider dispatch',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let sent=0;
  // A call is bounded by the round's work window; end that window while the prepared checkpoint is saving.
- AbortSignal.timeout=ms=>{if(ms>400000)return originalTimeout(ms);const controller=new AbortController();store.onStorage(async(sql,values)=>{if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&JSON.parse(values[sql.startsWith('INSERT')?5:0]).dispatches[0]?.stage==='dispatch-prepared')controller.abort();});return controller.signal;};
+ AbortSignal.timeout=ms=>{if(ms>610000)return originalTimeout(ms);const controller=new AbortController();store.onStorage(async(sql,values)=>{if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&JSON.parse(values[sql.startsWith('INSERT')?5:0]).dispatches[0]?.stage==='dispatch-prepared')controller.abort();});return controller.signal;};
  global.fetch=async()=>{sent++;throw Error('must not dispatch');};
  try{
   const r=await s.post(op);assert.equal(r.status,502);const data=await lookup(op.operationId),d=data.decisionTrace.dispatches[0];assert.equal(sent,0);assert.equal(d.stage,'dispatch-prepared');assert.equal(d.responseBody,undefined);assert.equal(data.operation.evidence.counts.npc,0);assert.equal(data.world.turn,0);

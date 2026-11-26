@@ -12,7 +12,7 @@ setModelResponder(body=>{const input=JSON.parse(body.messages[1].content);let v;
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
- const send=async body=>{const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
+ const send=async body=>{const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
  await send({operation:'set-model-key',key:'fixture-key'});await send({operation:'advance'});for(let i=0;i<3;i++)await send({operation:'advance',minutes:30});
  await page.goto(url);const nav=page.getByRole('navigation',{name:'觀察室分頁'});await nav.getByRole('button',{name:'設定',exact:true}).click();await page.getByRole('combobox',{name:'決策方式'}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav.getByRole('button',{name:'分析',exact:true}).click();
  const forecast=page.getByText('下一回合預計詢問',{exact:true}).locator('..');await forecast.waitFor();const shown=await forecast.innerText();assert.match(shown,/1\s*名角色/,'natural waking must count its next real decision');assert.equal(npc,1);assert.equal(judge,1);

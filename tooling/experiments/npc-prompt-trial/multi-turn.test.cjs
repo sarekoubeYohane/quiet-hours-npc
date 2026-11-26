@@ -30,7 +30,7 @@ test('multi-turn trial', { timeout: 60 * 60 * 1000 }, async () => {
   const read = async () => (await (await GET()).json()).world;
   const world = seedWorld(); world.adjudication = { provider: 'openai', model: adjModel }; world.playerBudget = { calls: 2000, tokens: 50000000 };
   store.install(world);
-  const post = async body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' }, body: JSON.stringify({ operationScope: 'test-owner', operationId: Date.now() + ':' + crypto.randomUUID(), worldContext: (await read()).contextId, mode: 'openai', model, ...body }) }));
+  const post = async body => POST(new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v2' }, body: JSON.stringify({ operationScope: 'test-owner', operationId: Date.now() + ':' + crypto.randomUUID(), worldContext: (await read()).contextId, mode: 'openai', model, ...body }) }));
   const must = async (label, body) => { const r = await post(body); if (r.status !== 200) throw new Error(`${label} 失敗：${r.status} ${(await r.text()).slice(0, 300)}`); };
   await must('set-model-key', { operation: 'set-model-key', key });
   await must('enter-acceptance', { operation: 'enter-acceptance' });
