@@ -135,14 +135,14 @@ else {
  });
  test('evicting an unresolved receipt retains a bounded unknown-range warning',async()=>{
   const f=await interrupted();
-  try{await recover(f);for(let n=0;n<9;n++){f.setNow(instant+440000+n);const response=await f.s.post({operation:'set-budget',limits:{calls:null,tokens:null},operationId:(instant+440000+n)+':'+crypto.randomUUID()});assert.equal(response.status,200);}
+  try{await recover(f);for(let n=0;n<9;n++){f.setNow(instant+650000+n);const response=await f.s.post({operation:'set-budget',limits:{calls:null,tokens:null},operationId:(instant+650000+n)+':'+crypto.randomUUID()});assert.equal(response.status,200);}
    const saved=await f.read();assert.equal(saved.operation.state,'expired');assert.equal(saved.unresolvedUsageRecovery,true);assert.equal(saved.world.aiUsage.totalCalls,1);await f.s.post(operation);assert.equal((await f.read()).world.aiUsage.totalCalls,1);
   }finally{f.restore();}
  });
  test('another operation loaded before recovery cannot overwrite recovered accounting with a stale world',async()=>{
   const f=await interrupted();let paused=false,entered,release;const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let running;
   store.onStorage(async sql=>{if(!paused&&sql.startsWith('SELECT operations, locked_until')){paused=true;entered();await gate;}});
-  try{running=f.s.post({operation:'set-budget',limits:{calls:null,tokens:null},operationId:(instant+440000)+':'+crypto.randomUUID()});await ready;await recover(f);assert.equal((await f.read()).world.aiUsage.totalCalls,1);release();const response=await running;assert.equal(response.status,409);const saved=await f.read();assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,30);}finally{release();await running;store.onStorage(undefined);f.restore();}
+  try{running=f.s.post({operation:'set-budget',limits:{calls:null,tokens:null},operationId:(instant+650000)+':'+crypto.randomUUID()});await ready;await recover(f);assert.equal((await f.read()).world.aiUsage.totalCalls,1);release();const response=await running;assert.equal(response.status,409);const saved=await f.read();assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,30);}finally{release();await running;store.onStorage(undefined);f.restore();}
  });
  test('original worker replaces only provisional unknown price cohorts when closing the same known dispatch',async()=>{
   for(const baseline of [0,3]){

@@ -72,7 +72,7 @@ test('安排、手機、通知、閱讀與意圖在較後invalid／逾時、保�
    s.transport.choose(input=>{
     if(input.self.id!=='owner'){
      if(stage===3&&fault==='later-invalid')return{type:'not-a-valid-action'};
-     if(stage===3&&fault==='later-timeout')instant+=401000;
+     if(stage===3&&fault==='later-timeout')instant+=611000;
      return fixture.action('reflect');
     }
     if(stage===0)return fixture.action('reflect',{arrangementUpdates:[{operation:'upsert',id:'atomic-plan',version:0,text:'稍後再看手機安排',condition:{kind:'time',minute:540},references:[{kind:'short',id:input.self.shortTerm[0].id,version:1}],reason:'自己的未來期待'}]});

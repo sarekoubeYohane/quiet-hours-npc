@@ -29,7 +29,7 @@ test('a response explicitly associated with another request cannot change the wo
 });
 test('a response after the absolute deadline is discarded and cannot change settled usage or submit an action',async()=>{
  store.install(worldWithAdjudication());const original=global.fetch,clock=Date.now;let instant=clock(),calls=0;Date.now=()=>instant;
- global.fetch=async(_url,init)=>{if(++calls===4)instant+=401000;return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),candidate))}}]});};
+ global.fetch=async(_url,init)=>{if(++calls===4)instant+=611000;return Response.json({usage:{prompt_tokens:9,completion_tokens:2},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),candidate))}}]});};
  try{await POST(request({operation:'set-model-key',mode:'openai',key:'fixture-key'}));const before=await read(); const response=await POST(request({operation:'advance',mode:'openai',model:'gpt-6-luna',minutes:15}));assert.equal(response.status,502);assert.deepEqual((await read()).characters,before.characters);assert.equal((await read()).aiUsage.totalInputTokens,27);assert.equal((await read()).aiUsage.totalUnknownCalls,1);
  }finally{global.fetch=original;Date.now=clock;}
 });
