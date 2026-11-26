@@ -74,7 +74,7 @@ test('formal income, mood, payment, activity and sources roll back together acro
   try{
    await s.post({operation:'intervene',target:'owner',text:'這是剛剛真正收到的鼓勵'});const before=await s.read();s.normal(input=>{
     if(input.self.id!=='owner')return{malformed:'later actor'};
-    const source=input.self.shortTerm.findLast(m=>m.feelingSources?.length).feelingSources[0];if(fault==='lease'){const then=clock();Date.now=()=>then+500000;}
+    const source=input.self.shortTerm.findLast(m=>m.feelingSources?.length).feelingSources[0];if(fault==='lease'){const then=clock();Date.now=()=>then+710000;}
     return{type:fault==='stale-object'?'propose':'rest',target:fault==='stale-object'?'workpiece':'',content:fault==='stale-object'?'加工這件作品':'選擇安靜休息',purpose:'照顧自己',durationMinutes:60,timeIntent:{kind:fault==='stale-object'?'completion':'open-ended',maxMinutes:null},feelingUpdates:[{source:fault==='source'?'not-offered':source,direction:'positive',level:3,reason:'獨立的新鼓勵讓我補回餘裕',mood:'稍微安心'}],emotionRegulation:{effort:'慢慢呼吸',reason:'讓自己能承受',mood:'稍微穩住'}};
    });
    // A stale object is changed through a committed fixture boundary, then its
