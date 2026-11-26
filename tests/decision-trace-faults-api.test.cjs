@@ -83,7 +83,7 @@ for(const task of ['npc','adjudication'])test(`${task} timeout records no answer
  // AbortSignal.timeout uses an unref timer; this deliberately unresolved
  // transport gate must keep the test event loop alive until timeout wins.
  const keepAlive=setInterval(()=>{},1000);
- AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
+ AbortSignal.timeout=ms=>originalTimeout(ms<=30000?Math.min(ms,100):ms);
  global.fetch=async(url,init)=>{
   calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);if((input.contractVersion==='world-adjudication.v1')!==(task==='adjudication'))return original(url,init);
   entered();await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:JSON.stringify(fixtureDecision(JSON.parse(JSON.parse(init.body).messages[1].content),proposal))}}]});
@@ -162,12 +162,13 @@ for(const status of [200,429])test(`HTTP ${status} body-read failure preserves k
 
 test('an abort during the prepared checkpoint does not invent a provider dispatch',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let sent=0;
- AbortSignal.timeout=ms=>{if(ms>25000)return originalTimeout(ms);const controller=new AbortController();store.onNextTraceWrite(()=>controller.abort());return controller.signal;};
+ // A call is bounded by the round's work window; end that window while the prepared checkpoint is saving.
+ AbortSignal.timeout=ms=>{if(ms>400000)return originalTimeout(ms);const controller=new AbortController();store.onStorage(async(sql,values)=>{if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&JSON.parse(values[sql.startsWith('INSERT')?5:0]).dispatches[0]?.stage==='dispatch-prepared')controller.abort();});return controller.signal;};
  global.fetch=async()=>{sent++;throw Error('must not dispatch');};
  try{
   const r=await s.post(op);assert.equal(r.status,502);const data=await lookup(op.operationId),d=data.decisionTrace.dispatches[0];assert.equal(sent,0);assert.equal(d.stage,'dispatch-prepared');assert.equal(d.responseBody,undefined);assert.equal(data.operation.evidence.counts.npc,0);assert.equal(data.world.turn,0);
   await s.post(op);assert.equal(sent,0);
- }finally{AbortSignal.timeout=originalTimeout;s.restore();}
+ }finally{store.onStorage(undefined);AbortSignal.timeout=originalTimeout;s.restore();}
 });
 
 test('unavailable prior-acceptance lookup stops before dispatch and the same ID can recover after reads return',async()=>{
@@ -201,7 +202,7 @@ test('an oversized late reply keeps known usage, discard classification and gaps
  // AbortSignal.timeout uses an unref timer; this deliberately unresolved
  // transport gate must keep the test event loop alive until timeout wins.
  const keepAlive=setInterval(()=>{},1000);
- AbortSignal.timeout=ms=>originalTimeout(ms<=25000?Math.min(ms,100):ms);
+ AbortSignal.timeout=ms=>originalTimeout(ms<=30000?Math.min(ms,100):ms);
  global.fetch=async()=>{entered();store.onNextTraceWrite(()=>{throw Error('fixture one checkpoint failure');});await gate;return Response.json({usage:{prompt_tokens:12,completion_tokens:4},choices:[{message:{content:'x'.repeat(1100000)}}]});};let running;
  try{
   running=s.post(op);await ready;assert.equal((await running).status,502);const before=await lookup(op.operationId);release();

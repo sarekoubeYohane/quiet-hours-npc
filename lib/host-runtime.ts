@@ -2,7 +2,7 @@ import { isModelProvider, modelMode, modelProviders, providerForMode, type Model
 import { playerAccount, playerBilling, reconcileOperationUsage, type PlayerAccountView } from './player-account-budget';
 import { readEffectiveModels } from './model-settings-store';
 import { ensureAccountOperationLedger } from './world-saves';
-import { type ModelObserver } from './model-adapter';
+import { type ModelObserver, ModelResponseTimeout } from './model-adapter';
 import { recoverPaidUsage, paidDelta, emptyUsageReceipt, boundUsageReceipts, type UsageReceipt } from './usage-recovery';
 import { roundTimePolicy, roundLeaseMs, roundClientMs, deadlineSignal, awaitSignal, checkSignal } from './round-time-policy';
 import { createDecisionTrace } from './decision-trace-capture';
@@ -205,7 +205,9 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
   let workSignal:AbortSignal|undefined,finishSignal:AbortSignal|undefined;
   const workWait=<T,>(promise:Promise<T>)=>workSignal?awaitSignal(promise,workSignal):promise;
   const finishWait=<T,>(promise:Promise<T>)=>finishSignal?awaitSignal(promise,finishSignal):promise;
-  const modelSignal=()=>deadlineSignal(Math.min(Date.now()+roundTimePolicy.modelMs,workDeadline),workDeadline-Date.now()<roundTimePolicy.modelMs?'round-work':'model',workSignal);
+  // A call has no fixed total of its own: the transport enforces the first-response and idle waits,
+  // and the call may use what is left of the round's work window.
+  const modelSignal=()=>deadlineSignal(workDeadline,'round-work',workSignal);
   let decisionTrace:ReturnType<typeof createDecisionTrace>|undefined;
   let traceSaved=false,traceWriteFailed=false;
   let traceStatus:{status:string;gap?:string;lastKnownStage?:string}={status:'pending',gap:'world-and-trace-are-separate-transactions'};
@@ -400,7 +402,7 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     const settledAccount=await playerAccount(accountId);
     if(generatingSetup||paidAdvance)await reconcileOperationUsage(accountId,id,operationId,initialUsage,world);
     const result: OperationResult = failure
-      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, accountPlayer:settledAccount, error: failure.name === 'TimeoutError' ? '模型回應逾時，本回合沒有推進。呼叫次數已記錄。' : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
+      ? { status: failure instanceof BudgetExceeded ? 429 : 502, body: { world:worldForClient(world), version: version + 1, accountPlayer:settledAccount, error: failure.name === 'TimeoutError' ? `模型回應逾時，本回合沒有推進。${failure instanceof ModelResponseTimeout ? failure.message : ''}呼叫次數已記錄。` : failure.message, limitReached: failure instanceof BudgetExceeded, stopReason: stopReason(failure), ...(adjudicationFailure?{adjudicationFailure}:{}) } }
       : { status: 200, body: { world:worldForClient(world), version: version + 1, accountPlayer:settledAccount, limitReached: (b.mode !== 'demo' || generatingSetup) && budgetReached(settledAccount.usage, settledAccount.limits), ...extras } };
     decisionTrace?.step('world-candidate',undefined,{outcome:failure?'rolled-back':'candidate',failure:failure?.message});
     candidateWorld=world;

@@ -43,6 +43,8 @@ async function sample(variant,provider='openai'){
 // continuation and the caller-visible result.
 function beforeRecallContract(samples) {
  const prior=structuredClone(samples);
+ // Streaming adds only transport flags to the request; every message byte stays the same.
+ for(const sample of Object.values(prior))for(const body of sample.bodies){assert.equal(body.stream,true);delete body.stream;delete body.stream_options;}
  for(const [variant,sample] of Object.entries(prior)){
   if(!variant.split(':')[0].endsWith('recall') || !sample.bodies.length)continue;
   const message=sample.bodies[0].messages[0];

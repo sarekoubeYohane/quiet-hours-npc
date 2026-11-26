@@ -1,7 +1,9 @@
 import { type ModelProvider } from './model-providers';
 import { directModels } from './direct-models';
 import { chatEndpoint, providerHeaders } from './provider-api';
-import { awaitSignal, signalTiming, signalExpired, checkSignal } from './round-time-policy';
+import { awaitSignal, signalTiming, signalExpired, checkSignal, roundTimePolicy } from './round-time-policy';
+import { receiveModelReply, ModelResponseTimeout, ModelStreamFailure, type StreamTiming, type WaitLimits } from './model-stream';
+export { ModelResponseTimeout } from './model-stream';
 import type { TokenUsage } from './activities';
 export const candidateFailureReasons = ['json-parse', 'memory-selection-reference', 'field-format', 'memory-constraint'] as const;
 export type CandidateFailureReason = typeof candidateFailureReasons[number];
@@ -9,7 +11,7 @@ export function isCandidateFailureReason(value: unknown): value is CandidateFail
   return candidateFailureReasons.includes(value as CandidateFailureReason);
 }
 export type ModelFailureKind = 'candidate-format' | 'candidate-validation' | 'transport' | 'timeout' | 'response-body' | 'provider-body' | 'http' | 'request-mismatch' | 'refusal' | 'output-limit' | 'sensitive-response';
-export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string;timing?:unknown}|{kind:'fetch-start';at:number}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number;at?:number;usage?:TokenUsage}|{kind:'failure';failure:ModelFailureKind;stage:string;reason?:CandidateFailureReason;detail?:string}|{kind:'usage';usage:TokenUsage;at?:number}|{kind:'candidate';raw:string};
+export type ModelObservation = {kind:'prepared'|'dispatch';requestId?:string;requestBody?:string;timing?:unknown}|{kind:'fetch-start';at:number}|{kind:'headers';httpStatus:number}|{kind:'response'|'late-response';responseBody:string;httpStatus:number;at?:number;usage?:TokenUsage;stream?:StreamTiming}|{kind:'failure';failure:ModelFailureKind;stage:string;reason?:CandidateFailureReason;detail?:string;stream?:StreamTiming}|{kind:'usage';usage:TokenUsage;at?:number}|{kind:'candidate';raw:string};
 export type ModelObserver = (event:ModelObservation)=>void|Promise<void>;
 export type ModelService = { key: string; model: string; provider: ModelProvider };
 export type ModelMessage = { role: string; content: string };
@@ -51,17 +53,20 @@ export function formatRepairEnabled(): boolean {
 // Transport sees only the already filtered transcript and task schema, never World.
 export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean;allowThinking?:boolean}={}){
  const {model,provider}=service;
- if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048});
+ // Every reply is streamed; OpenAI-compatible services report usage only when asked, in the last chunk.
+ const stream={stream:true,stream_options:{include_usage:true}};
+ // OpenRouter always ends with a usage chunk; its stream_options is deprecated and has no effect.
+ if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048,stream:true});
  if (provider === 'openai') {
    return JSON.stringify({model,messages,store:false,max_completion_tokens:options.maxOutputTokens??(model==='gpt-6-luna'?2048:4096),
      ...(directModels.includes(model) ? {reasoning_effort:model==='gpt-6-luna'?'none':'low'} : {}),
-     response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}}});
+     response_format:options.allowRecall?{type:'json_object'}:{type:'json_schema',json_schema:{name:'npc_action',strict:true,schema}},...stream});
  }
  const instructions = options.allowRecall ? '僅回傳 JSON 物件。' : '僅回傳符合以下 JSON Schema 的物件：' + JSON.stringify(schema);
  const system = [...messages.filter(message => message.role === 'system').map(message => message.content), instructions].join('\n');
  const conversation = messages.filter(message => message.role !== 'system');
  const limit = options.maxOutputTokens ?? 4096;
- if (provider === 'anthropic') return JSON.stringify({model,system,messages:conversation,max_tokens:limit});
+ if (provider === 'anthropic') return JSON.stringify({model,system,messages:conversation,max_tokens:limit,stream:true});
  // DeepSeek does not document whether max_tokens covers reasoning tokens, so an opted-in
  // request reserves separate room for them; the decision itself keeps its usual limit.
  // Only callers that opt in think. Measured on the test site (2026-11-25): an NPC decision with
@@ -70,9 +75,9 @@ export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,m
  const effort = provider === 'deepseek' && options.allowThinking ? deepseekReasoningEffort() : undefined;
  return JSON.stringify({model, messages:[{role:'system',content:system}, ...conversation], response_format:{type:'json_object'},
    max_tokens:effort ? limit + deepseekReasoningTokens : limit,
-   ...(provider === 'deepseek' ? effort ? {thinking:{type:'enabled'},reasoning_effort:effort} : {thinking:{type:'disabled'}} : {})});
+   ...(provider === 'deepseek' ? effort ? {thinking:{type:'enabled'},reasoning_effort:effort} : {thinking:{type:'disabled'}} : {}),...stream});
 }
-export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; allowThinking?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
+export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; allowThinking?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string; /** Who or what this call serves, shown in timeout messages (e.g. 白芷的 NPC 決策). */ label?: string; waitLimits?: WaitLimits } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
 export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: ModelRequestOptions): Promise<string> {
   try { return await executeRequestModel(service,messages,schema,options); } finally { await options.onSettled?.(); }
 }
@@ -92,18 +97,23 @@ await checkpoint({kind:'prepared',requestId:options.requestId,requestBody,timing
 if(options.beforeDispatch)await awaitSignal(options.beforeDispatch(options.requestId,requestSignal),requestSignal);
 checkSignal(requestSignal);
 let receivedHeaders:Response|undefined;
-let knownUsage:TokenUsage|undefined,bodyReceivedAt:number|undefined;
+let knownUsage:TokenUsage|undefined,bodyReceivedAt:number|undefined,streamTiming:StreamTiming|undefined;
 let parsedBody:CompletionBody|undefined,bodyParseFailed=false;
+const label=options.label||'模型呼叫';
+const mask=(text:string)=>key?text.split(key).join('<REDACTED>'):text;
 const work=(async()=>{
   // The event is synchronous up to the observer's first await; this is the
   // actual invocation boundary, distinct from durable prepared.
   void observe({kind:'fetch-start',at:Date.now()});
   checkSignal(requestSignal);
-  const response=await fetcher(chatEndpoint(provider),{
-    method:'POST',redirect:'manual',headers:{...providerHeaders(provider,key),'Content-Type':'application/json',...(options.requestId?{'X-Decision-Request-Id':options.requestId}:{})},signal:requestSignal,body:requestBody});
-  receivedHeaders=response;
-  await observe({kind:'headers',httpStatus:response.status});
-  const body=await response.text();
+  const reply=await receiveModelReply(provider,signal=>fetcher(chatEndpoint(provider),{
+    method:'POST',redirect:'manual',headers:{...providerHeaders(provider,key),'Content-Type':'application/json',...(options.requestId?{'X-Decision-Request-Id':options.requestId}:{})},signal,body:requestBody}),
+    {signal:requestSignal,label,limits:options.waitLimits??{firstByteMs:roundTimePolicy.modelFirstByteMs,idleMs:roundTimePolicy.modelIdleMs},
+     onHeaders:async response=>{receivedHeaders=response;await observe({kind:'headers',httpStatus:response.status});},
+     // Evidence only: a late reply never resumes parsing, accounting, dice or world effects.
+     onLate:late=>{void observe({kind:'late-response',responseBody:late.body,httpStatus:late.response.status,at:Date.now(),stream:late.timing});}});
+  const {response,body}=reply;
+  streamTiming=reply.timing;
   // A provider ignoring abort may arrive after the round has stopped. Capture
   // evidence only; it never resumes parsing, accounting, dice or world effects.
   bodyReceivedAt=Date.now();
@@ -111,7 +121,7 @@ const work=(async()=>{
     try{parsedBody=JSON.parse(body);}catch{bodyParseFailed=true;}
     knownUsage=providerTokenUsage(provider, parsedBody ?? null);
   }
-  const observed=observe({kind:signalExpired(requestSignal)?'late-response':'response',responseBody:body,httpStatus:response.status,at:bodyReceivedAt,usage:knownUsage});
+  const observed=observe({kind:signalExpired(requestSignal)?'late-response':'response',responseBody:body,httpStatus:response.status,at:bodyReceivedAt,usage:knownUsage,stream:streamTiming});
   // Received usage is accounting evidence even when the trace storage hangs.
   // Start settlement now; still await trace durability before surfacing a
   // settlement failure, so original-request recovery can read known evidence.
@@ -129,11 +139,17 @@ await checkpoint({kind:'dispatch',requestId:options.requestId,requestBody});
 try { const received=await bounded;r=received.response; }
 catch(e) {
   if(e instanceof Error&&['player_budget','account_budget_busy'].includes(String((e as Error&{code?:string}).code)))throw e;
-  const timeout=signalExpired(requestSignal)||e instanceof Error&&e.name==='TimeoutError';
-  await fail(timeout?'timeout':receivedHeaders?'response-body':'transport',receivedHeaders?'response-body':'dispatch');
+  // The waits inside the stream are named; an expired round window is reported the same way.
+  const streamError=e instanceof ModelResponseTimeout||e instanceof ModelStreamFailure?e:undefined;
+  const timeout=streamError instanceof ModelResponseTimeout||signalExpired(requestSignal)||e instanceof Error&&e.name==='TimeoutError';
+  const kind:ModelFailureKind=timeout?'timeout':streamError?.failure==='provider-error'||streamError?.failure==='format'?'provider-body':receivedHeaders?'response-body':'transport';
+  const stream=streamError?.timing??streamTiming;
+  try{await awaitSignal(observe({kind:'failure',failure:kind,stage:receivedHeaders?'response-body':'dispatch',...(streamError?{detail:mask(streamError.message)}:{}),...(stream?{stream}:{})}),requestSignal);}catch{if(!requestSignal.aborted)throw Error('實錄保存失敗。');}
   const knownFailure=receivedHeaders&&providerFailure(receivedHeaders.status);
   if(knownFailure)throw knownFailure;
-  if(timeout)throw new DOMException('模型回應逾時。','TimeoutError');
+  if(streamError instanceof ModelResponseTimeout){streamError.message=mask(streamError.message);throw streamError;}
+  if(streamError)throw Error(mask(streamError.message));
+  if(timeout)throw new ModelResponseTimeout('work-window',label,stream??{assembled:false,fetchStartedAt:Date.now(),chunks:0,contentChars:0,reasoningChars:0},0);
   throw Error('無法連線至模型服務，本回合沒有推進。');
 }
 const providerError=providerFailure(r.status);

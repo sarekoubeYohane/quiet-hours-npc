@@ -6,6 +6,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {GET,POST}=load('route'),store=load('store'),{env}=load('cloudflare-workers');
 const {scenario,proposal}=require('./routine-program-fixture.cjs');
+const {roundTimePolicy}=load('round-time-policy');
 const query=async id=>(await(await GET(new Request('https://test.invalid/api/world?operationScope=test-owner&operationId='+encodeURIComponent(id)))).json());
 const op=()=>({operation:'advance',minutes:15,operationId:Date.now()+':'+crypto.randomUUID()});
 function clock(){
@@ -55,22 +56,38 @@ for(const config of [
   assert.ok(Buffer.byteLength(JSON.stringify(trace))<=1024*1024,'timing evidence respects the existing archive cap');
   if(config.recall)console.log('TRACE_BUDGET '+JSON.stringify({case:config.name,gap:trace.gap,omittedOriginalBytes:trace.omittedOriginalBytes,retainedBytes:Buffer.byteLength(JSON.stringify(trace))}));
   assert.equal(timing.workDeadline-timing.leaseCreatedAt,400000);assert.equal(timing.leaseDeadline-timing.leaseCreatedAt,430000);assert.equal(timing.clientMs,445000);
-  for(const d of trace.dispatches){assert.ok(d.fetchStartedAt>=d.startedAt);assert.ok(d.signal.deadline>d.fetchStartedAt);assert.ok(d.signal.deadline-d.signal.createdAt<=25000);assert.ok(d.headersReceivedAt<=d.receivedAt);assert.ok(d.usageKnownAt);}
+  for(const d of trace.dispatches){assert.ok(d.fetchStartedAt>=d.startedAt);assert.ok(d.signal.deadline>d.fetchStartedAt);assert.equal(d.signal.source,'round-work','a call has no fixed total; it may use the rest of the work window');assert.equal(d.signal.deadline,timing.workDeadline);assert.ok(d.headersReceivedAt<=d.receivedAt);assert.ok(d.usageKnownAt);}
   assert.ok(trace.checkpoints.some(x=>x.completedAt>x.startedAt)||!config.checkpoint);
   assert.ok(Date.now()-started<400000);assert.equal(JSON.stringify(wire).includes('time-policy'),false,'diagnostics never enter NPC inputs');
   console.log('ROUND_BUDGET '+JSON.stringify({case:config.name,elapsedMs:Date.now()-started,sent,embedding,searches,writes}));
  }finally{store.onNextTraceWrite(()=>{});store.onStorage(undefined);s?.restore();c.restore();for(const key of ['RECALL_ENABLED','RECALL_USAGE_DB','OWNER_EMBEDDING_KEY','MEMORY_VECTOR_INDEX'])delete env[key];}
 });
 
-for(const stage of ['no-headers','body','response-save','prepared-save'])test(stage+' deadline rolls back, stops dispatch and preserves measured usage',async()=>{
+// No headers and a silent body are bounded by the first-response wait. Slow evidence saves are not:
+// they are part of the round's work window, not of the provider's wait (see the test below).
+const silent=roundTimePolicy.modelFirstByteMs+1000;
+for(const stage of ['no-headers','body'])test(stage+' first-response timeout rolls back, stops dispatch and preserves measured usage',async()=>{
  const c=clock();let s,sent=0,delayed=false;
  try{
   s=await scenario({modify:w=>actors(w)});const before=await s.read();
   if(stage.endsWith('save'))store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const trace=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(stage==='prepared-save'?trace.dispatches[0]?.stage==='dispatch-prepared':trace.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(26000);}}});
-  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;if(stage==='no-headers'){await c.sleep(26000);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(26000);controller.enqueue(new TextEncoder().encode(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content))));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
-  const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,stage==='prepared-save'?0:1);
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;if(stage==='no-headers'){await c.sleep(silent);throw Error('late network');}if(stage==='body')return new Response(new ReadableStream({async pull(controller){await c.sleep(silent);controller.enqueue(new TextEncoder().encode(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content))));controller.close();}},{highWaterMark:0}));return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
+  const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,502);assert.equal(sent,1);assert.match(body.error,/首段回應逾時/);
   store.onStorage(undefined);const saved=await replay(s,operation,response,body,()=>sent);assert.equal(saved.world.turn,before.turn);assert.deepEqual(saved.world.events,before.events);
-  assert.equal(saved.world.aiUsage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.accountPlayer.usage.totalCalls,stage==='prepared-save'?0:1);assert.equal(saved.world.aiUsage.totalInputTokens,stage==='response-save'?30:0);assert.equal(saved.world.aiUsage.totalUnknownCalls,stage==='response-save'||stage==='prepared-save'?0:1);
+  assert.equal(saved.world.aiUsage.totalCalls,1);assert.equal(saved.accountPlayer.usage.totalCalls,1);assert.equal(saved.world.aiUsage.totalInputTokens,0);assert.equal(saved.world.aiUsage.totalUnknownCalls,1);
+ }finally{store.onStorage(undefined);s?.restore();c.restore();}
+});
+
+// Field case (2026-11-26, 石室的湯): the reply had fully arrived, then saving its evidence and usage
+// pushed the call past the old fixed 25-second total and the whole round was rolled back.
+for(const stage of ['response-save','prepared-save'])test(stage+' that is slow no longer stops a call whose provider answered in time',async()=>{
+ const c=clock();let s,sent=0,delayed=false;
+ try{
+  s=await scenario({modify:w=>actors(w,1)});const before=await s.read();
+  store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const trace=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(stage==='prepared-save'?trace.dispatches[0]?.stage==='dispatch-prepared':trace.dispatches[0]?.stage==='received'){delayed=true;await c.sleep(26000);}}});
+  global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;await c.sleep(18800);const input=JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content);return new Response(envelope(input.contractVersion==='world-adjudication.v1'?{status:'denied',effects:[],stages:[],check:null,routine:null}:proposal,input));};
+  const operation=op(),response=await c.run(s.post(operation)),body=await response.json();assert.equal(response.status,200,body.error);assert.ok(sent>=1);assert.ok(delayed);
+  store.onStorage(undefined);const saved=await query(operation.operationId);assert.equal(saved.world.turn,before.turn+1);assert.equal(saved.world.aiUsage.totalUnknownCalls,0);assert.equal(saved.world.aiUsage.totalInputTokens,sent*30);
  }finally{store.onStorage(undefined);s?.restore();c.restore();}
 });
 
@@ -165,11 +182,11 @@ test('legacy pending markers use their stored absolute deadline without changing
  }finally{Date.now=now;s.restore();}
 });
 
-test('a prepared save crossing the absolute model cutoff stops before fetch even when the timer callback has not run',async()=>{
+test('a prepared save crossing the round work deadline stops before fetch even when the timer callback has not run',async()=>{
  const s=await scenario(),clock=Date.now;let instant=clock(),sent=0,delayed=false;Date.now=()=>instant;
  try{
   global.fetch=async(_fixtureUrl,_fixtureInit)=>{sent++;return new Response(envelope(proposal,JSON.parse(JSON.parse(_fixtureInit.body).messages[1].content)));};
-  store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='dispatch-prepared'){delayed=true;instant+=26000;}}});
+  store.onStorage(async(sql,values)=>{if(!delayed&&(sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))){const t=JSON.parse(values[sql.startsWith('INSERT')?5:0]);if(t.dispatches[0]?.stage==='dispatch-prepared'){delayed=true;instant+=roundTimePolicy.workMs+1000;}}});
   const operation=op(),response=await s.post(operation);assert.equal(response.status,502);assert.equal(sent,0);assert.equal((await query(operation.operationId)).world.turn,0);
  }finally{store.onStorage(undefined);Date.now=clock;s.restore();}
 });
