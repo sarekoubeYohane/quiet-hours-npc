@@ -49,7 +49,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | NPC 輸出的 JSON schema 與契約版本 | `lib/npc-decision-schema.ts`（`npc-decision.v3`） |
 | NPC 輸出的驗證 | `lib/models.ts` 內部的 `parseDecision`，再委派各子系統的 parser |
 | 測試站的 NPC 自主決策提示 | `vite.config.ts` 將 v0.2.4 Markdown 放進測試站建置；`lib/npc-decision-preparation.ts` 依人物實際輸入呼叫 `lib/npc-prompt-rewrite.ts` 組裝，每次派送與回想續答都以完整 request 計算大小。測試站 `/api/environment` 顯示 `npcDecisionPrompt`。 |
-| 實際打模型 API | `lib/model-adapter.ts` 的 `requestModel`，全專案唯一的 LLM HTTP 出口 |
+| 實際打模型 API | `lib/model-adapter.ts` 的 `requestModel`，全專案唯一的 LLM HTTP 出口；回覆一律串流，接收與兩段等待在 `lib/model-stream.ts`，兩種格式的解析在 `lib/model-stream-parse.ts` |
 | 骰子與檢定（D20 與 d100） | `lib/action-checks.ts` 的 `resolveActionCheck`；`lib/d20.ts` 只有 D20 與共用的 `Resolution` 型別 |
 | 天上意志的裁定 | `lib/adjudication.ts`（呼叫）、`lib/adjudication-contract.ts`（schema 與 parser）、`lib/adjudication-limits.ts`（上限） |
 | 物件效果的檢查與提交 | `lib/world-effects.ts` 的 `commitFreeAction`、`commitActivityPhase`；狀態讀寫在 `lib/world-state.ts` |
@@ -69,7 +69,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 預算、用量、費用 | `lib/player-account-budget.ts`（帳號帳本）、`lib/usage-recovery.ts`、`lib/costs.ts` |
 | 模型 Key 與模型設定 | `lib/model-keys.ts`、`lib/model-settings-store.ts` |
 | 登入 | `lib/auth.ts` |
-| 回合時間預算（400／430／445 秒） | `lib/round-time-policy.ts` |
+| 回合時間預算（400／430／445 秒；模型首段 30 秒、閒置 15 秒） | `lib/round-time-policy.ts` |
 | 操作的受理、收據、重送、租約、提交與失敗回復 | `lib/host-runtime.ts` 的 `runOperation`（主持執行層） |
 | 新增或修改一項操作（驗證與執行） | `lib/host-operations.ts` 的 `hostOperations`，每項操作一個 handler |
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
@@ -125,7 +125,9 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `paused-activities.ts` | 暫停、復工、放棄 |
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
 | `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
-| `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter）與 observer 事件 |
+| `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter、DeepSeek、Gemini、Anthropic）、請求本文與 observer 事件；收完串流後沿用原本的解析與驗證 |
+| `model-stream.ts` | 串流接收：首段回應與閒置兩段等待（以 `AbortSignal.timeout` 計時）、`ModelResponseTimeout` 與串流中斷的錯誤訊息、晚到回覆的證據 |
+| `model-stream-parse.ts` | 純解析：SSE 分段、OpenAI 相容 chunk 與 Anthropic 事件組回非串流的回覆本文、串流內的供應商錯誤 |
 | `model-providers.ts`、`provider-api.ts` | 模型服務名稱、執行模式對應與供應商端點。模型設定透過同源 POST 傳入帳號範圍，以新輸入或已保存的 Key 即時讀取各服務清單。只回傳模型 ID 與名稱。 |
 | `direct-models.ts` | 保留既有 OpenAI 模型的嚴格輸出與推理參數 |
 | `npc-input.ts` | 組 NPC user message，88 KiB 上限 |
@@ -140,7 +142,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `world-effects.ts` | 效果執行引擎：在副本上驗證、擲骰、提交、產生行動回饋 |
 | `world-formation.ts`、`world-formation-contract.ts` | 執行期物件的切分、轉換、分離效果（與建立世界無關） |
 | `natural-changes.ts` | 延遲後自動發生的狀態變化 |
-| `round-time-policy.ts` | 回合時間預算常數與 AbortSignal 工具 |
+| `round-time-policy.ts` | 回合時間預算常數（含模型首段與閒置時限）與 AbortSignal 工具 |
 | `host-runtime.ts` | 主持執行層（#338）：`runOperation` 受理一次操作（重送回放、租約、候選世界、條件提交、失敗回復、已付用量保留、操作證據與決策追溯收尾）；`dispatchModel` 是派送模型的共同接線；另有操作 journal 的型別與裁切、`journalView`，以及不經 HTTP 的入口 `acceptOperation`。不知道任何一項操作的內容 |
 | `host-operations.ts` | 各項操作的 handler 表 `hostOperations`：受理前各時點的檢查與取得租約後的 `run`（推進、介入、直接控制、設定類、需要派送模型的準備工作）。`runHostOperation`、`acceptHostOperation` 是帶上這張表的入口 |
 | `acceptance-scene.ts` | 最小驗收場景的進出（原世界 gzip 備份）與給 client 的投影 `worldForClient` |
@@ -402,7 +404,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | `world.pursuitVersion === 1` | 分層追求已啟用 |
 | `character.memories` 等舊欄位 | 是 `shortTerm` 的相容投影，不要直接寫入；`relationships` 同理，來源是 `cognition.relationshipTags` |
 | `acceptance.original` 與 `acceptance.snapshot` | 驗收場景的舊版未壓縮備份與現行 gzip 備份 |
-| 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉，因為裁定開 thinking 會超過 25 秒的模型期限。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
+| 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉（2026-11-25 量測時裁定開 thinking 兩次超過當時 25 秒的固定期限；改串流後尚未重測）。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
 | 建置常數 `__FORMAT_REPAIR__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `1`，其他環境為空字串。開啟時，格式驗證失敗的候選多一次修正機會：NPC 決策在 `models.ts` 的 `aiDecision` 迴圈（沿用回想接續的 `beforeContinuation` 計費與追溯），世界裁定在 `host-operations.ts` 以 `routine-rules.ts` 的 `adjudicationFormatError` 做純格式檢查後重問一次。每次重問都是獨立計費、計次、留實錄的派送；第二次仍失敗則照舊整回合回復。關閉時維持單次派送即失敗 |
 
 NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v1`、`controlled-feelings.v1`。

@@ -13,6 +13,7 @@ import { arrangementPrompt, updateArrangements } from './arrangements';
 import { preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
 import { requestModel, formatRepairEnabled, type ModelObserver } from './model-adapter';
+import { roundTimePolicy } from './round-time-policy';
 export { npcContractVersion } from './npc-decision-schema';
 import { npcContractVersion, actionTypes, methodChoices, methodChanges, methodAssessmentSchema, actionSchema } from './npc-decision-schema';
 import { updateCognition, type CognitiveDecisionContext } from './cognition';
@@ -185,7 +186,7 @@ const requestId = crypto.randomUUID();
 // context. The route rechecks operation version/lease after completion.
 const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${mode}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
 const {schema,context:decisionContext}=prepared;
-const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(25000),allowRecall:recall?.enabled&&!recalled,allowThinking:true,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
+const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(roundTimePolicy.workMs),label:`${c.name}的${repaired?' NPC 決策格式修正':recalled?'回想續答':' NPC 決策'}`,allowRecall:recall?.enabled&&!recalled,allowThinking:true,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
 await recall?.verifyCurrent?.();
 let candidateStage='npc-candidate-parse';
 try {

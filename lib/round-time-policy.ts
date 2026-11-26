@@ -1,8 +1,12 @@
 // One fixed policy for new operations. Absolute deadlines stored in old journals
 // remain authoritative; publishing this module never extends an accepted lease.
+// Model calls stream: a call is not cut for its total length. It must show
+// activity within modelFirstByteMs of being sent, and again within modelIdleMs of each piece;
+// otherwise it is bounded only by the round's remaining work window. The capacity derivation is in
+// docs/design/round-time-budget.md.
 export const roundTimePolicy = Object.freeze({
-  version: 'round-v1', modelMs: 25_000, recallMs: 10_000,
-  workMs: 12 * 25_000 + 4 * 10_000 + 60_000,
+  version: 'round-v1', modelFirstByteMs: 30_000, modelIdleMs: 15_000, recallMs: 10_000,
+  workMs: 400_000,
   finishMs: 30_000, deliveryMs: 15_000,
 });
 export const roundLeaseMs = roundTimePolicy.workMs + roundTimePolicy.finishMs;

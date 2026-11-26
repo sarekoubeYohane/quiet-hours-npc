@@ -114,7 +114,7 @@ const advanceOperation = (): OperationHandler => ({
             const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
             traceWorld(trace,'controlled-feelings-dispatch');
             const dispatch=dispatchModel('feelings',w,c,provider,model,dispatchKey,{evidence:true,withinWorkDeadline:true});
-            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:dispatch.observer,fetcher:dispatch.fetcher,beforeDispatch:dispatch.beforeDispatch,onSettled:dispatch.onSettled,onUsage:dispatch.reportUsage(onUsage,cost),verifyCurrent:verifyLease});
+            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),label:`${c.name}的感受評估`,requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:dispatch.observer,fetcher:dispatch.fetcher,beforeDispatch:dispatch.beforeDispatch,onSettled:dispatch.onSettled,onUsage:dispatch.reportUsage(onUsage,cost),verifyCurrent:verifyLease});
           },
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
@@ -174,7 +174,7 @@ const advanceOperation = (): OperationHandler => ({
                 const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
                 const cost=beginCost(usage,config.provider,config.model,accountPlayer.prices.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
                 const adjudicationDispatch=dispatchModel('adjudication',w,c,config.provider,config.model,key,{evidence:true,withinWorkDeadline:false});
-                const reply=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:adjudicationDispatch.observer,fetcher:adjudicationDispatch.fetcher,beforeDispatch:adjudicationDispatch.beforeDispatch,onSettled:adjudicationDispatch.onSettled,onUsage:adjudicationDispatch.reportUsage(onUsage,cost)},repair);
+                const reply=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),label:`世界裁定（${c.name}的行動）`,requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:adjudicationDispatch.observer,fetcher:adjudicationDispatch.fetcher,beforeDispatch:adjudicationDispatch.beforeDispatch,onSettled:adjudicationDispatch.onSettled,onUsage:adjudicationDispatch.reportUsage(onUsage,cost)},repair);
                 await verifyLease();
                 return reply;
               };
@@ -316,6 +316,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           } });
           const result = await invoke({ ...config, key }, {
             signal: modelSignal(),
+            label: setupTaskLabels[task] ?? `製作工作（${task}）`,
             onSettled: dispatch.onSettled,
             requestId: operationId + ':' + task,
             observer: dispatch.observer,
@@ -535,6 +536,8 @@ const interveneOperation = (): OperationHandler => ({
   },
 });
 
+// Shown in timeout messages so the player can tell which setup call went quiet.
+const setupTaskLabels: Record<string, string> = { 'opening-resources': '開局備料', 'opening-road-repair': '補路建議', 'opening-arrangement': 'AI 開局整理', 'card-assessment': '人物卡判讀', 'character-generation': '人物欄位補寫', 'opening-relationships': '開局關係整理' };
 export const hostOperations: OperationTable = {
   'set-model-key': modelKeyOperation,
   'clear-model-key': modelKeyOperation,
