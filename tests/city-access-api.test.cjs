@@ -103,8 +103,9 @@ test('historical city compatibility: entry permission uses the actual place and 
     return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(action)}}]});
   };
   try {
-    // New choices begin forward; complete the fifteen-minute movement before judging a new room proposal.
-    for(let step=0;step<5;step++){
+    // New choices begin forward; the room move takes one five-minute step, then the new room proposal is judged.
+    // Three steps stay inside the default twelve-call budget now that a denied proposal is retried every step.
+    for(let step=0;step<3;step++){
     await response(await send(route, { operation:'advance', worldContext:world.contextId, operationId:operationId(), mode:'openai', model:'gpt-6.1-sol', minutes:5,timeContract:'five-minute-v1' }), 200);
     }
   } finally {
