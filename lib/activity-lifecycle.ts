@@ -16,6 +16,8 @@ import { activityEndState, activityForPlan, newObservedActivity, observeActivity
 // choices, usage accounting and the whole-round persistence remain outside.
 export const activityDurations = [...adjudicationLimits.phaseMinutes];
 export const sustainedActions = new Set(['propose', 'rest', 'work', 'reflect', 'observe']);
+// 說話、喊話與開關門在選定的那一步就發生，不佔十五分鐘單位：同場的人當步察覺，下一步就能回應。
+export const immediateActions = new Set(['say', 'shout', 'door']);
 export function canResumeActivity(world: World, character: Character, modelKey: string): boolean {
   const plan = character.plan;
   return !!plan && plan.modelKey === modelKey && (plan.deferredAction===true ||
@@ -151,6 +153,8 @@ export function startActivity(world:World,character:Character,decision:ActivityD
  const {modelKey,attention,ai}=options;
  // New choices use information available now, never the elapsed interval.
  const minutes=world.timeContract==='five-minute-v1'?0:options.minutes;
+ // 不經裁定的單次短行動（移動、訊息、說服、觀察）在五分鐘契約下佔一步；舊契約維持十五分鐘單位。
+ const shortMinutes=world.timeContract==='five-minute-v1'?5:15;
  let confirmedProfile:BodyActivity|undefined;
  const notStarted=(summary:string,kind:'blocked'|'unsupported')=>{
   const event=recordActionResult(world,character,decision.action,summary,kind);
@@ -233,16 +237,16 @@ export function startActivity(world:World,character:Character,decision:ActivityD
       if(decision.action.type==='rest'||decision.action.type==='reflect'){
         return notStarted('目前不支援以這個方法確認完成目標，可改用明確方法或自行選定活動時段。','unsupported');
       }
-      if(decision.timeIntent.maxMinutes!==null&&decision.timeIntent.maxMinutes<15){
+      if(decision.timeIntent.maxMinutes!==null&&decision.timeIntent.maxMinutes<shortMinutes&&!(world.timeContract==='five-minute-v1'&&immediateActions.has(decision.action.type))){
         const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
         resolve(validation,actor,decision.action,{dryRun:true});
-        return notStarted(`這項活動需要 15 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`,'blocked');
+        return notStarted(`這項活動需要 ${shortMinutes} 分鐘，超過自己設定的投入上限 ${decision.timeIntent.maxMinutes} 分鐘；尚未開始，可自行重新安排。`,'blocked');
       }
     }
-    if(world.timeContract==='five-minute-v1'){
+    if(world.timeContract==='five-minute-v1'&&!immediateActions.has(decision.action.type)){
       const validation=structuredClone(world),actor=validation.characters.find(c=>c.id===character.id)!;
       resolve(validation,actor,decision.action,{dryRun:true});
-      const duration=decision.timeIntent?.kind==='open-ended'||!decision.timeIntent&&sustainedActions.has(decision.action.type)?decision.durationMinutes:15;
+      const duration=decision.timeIntent?.kind==='open-ended'||!decision.timeIntent&&sustainedActions.has(decision.action.type)?decision.durationMinutes:shortMinutes;
       character.plan={deferredAction:true,checkSystem:newCheckSystem(character),...(character.attributes?{attributeVersion:character.attributes.version}:{}),action:decision.action,startedAt:world.minute,until:world.minute+duration,attention,modelKey,...(decision.timeIntent?{timeIntent:decision.timeIntent}:{})};
       character.activity='正在進行已選活動，尚未完成。';
       record(world,character.id,`${character.name} 開始進行已選活動，完整結果尚未發生。`,'activity-start',[character.id],{from:character.location,to:character.location,fromRegion:regionOf(character),toRegion:regionOf(character)});
