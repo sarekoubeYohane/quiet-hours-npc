@@ -31,7 +31,7 @@ async function signIn(id = 123) {
 async function post(cookie, body, originHeader = fixture.env.AUTH_ORIGIN) {
   headers.set(new Headers({ cookie }));
   const payload={operationId: `${Date.now()}:${crypto.randomUUID()}`, ...body},scope=originalScopes.get(cookie);
-  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader, 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(scope?originalWorldInput(payload,scope):payload) }));
+  return world.POST(request('/api/world', cookie, { method: 'POST', headers: { origin: originHeader, 'X-World-Time-Policy':'round-v2' }, body: JSON.stringify(scope?originalWorldInput(payload,scope):payload) }));
 }
 async function status(cookie) {
   headers.set(new Headers({ cookie }));

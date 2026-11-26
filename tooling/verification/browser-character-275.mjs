@@ -34,7 +34,7 @@ try {
  // Start a fresh city through the existing editor, with confirmed fixed and bounded values.
  const context=await read();
  const templateId=crypto.randomUUID(),sceneId=crypto.randomUUID();
- const make=async(path,data)=>{if(path==='/api/world')await tick();const r=await page.request.post(url+path,{headers:{'X-World-Time-Policy':'round-v1'},data});assert.ok(r.status()<300,await r.text());return r.json();};
+ const make=async(path,data)=>{if(path==='/api/world')await tick();const r=await page.request.post(url+path,{headers:{'X-World-Time-Policy':'round-v2'},data});assert.ok(r.status()<300,await r.text());return r.json();};
  await make('/api/character-templates',{id:templateId,version:0,fields:{...load('character-templates').blankCharacterTemplateFields(),name:'定衡',background:'力量偏弱，手部靈巧'}});
  await make('/api/scene-templates',{id:sceneId,version:0,name:'驗收小屋',note:'',rooms:[{id:'front',name:'客廳'}],objects:[],connections:[]});
  await click('返回觀察');await click('建立城市');await page.getByLabel('驗收小屋數量',{exact:true}).selectOption('1');await page.getByLabel('選用定衡',{exact:true}).check();

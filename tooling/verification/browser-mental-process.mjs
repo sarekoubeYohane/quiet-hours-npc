@@ -40,7 +40,7 @@ try{
   assert.equal(response.status(),200,await response.text());
   await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');return read();
  };
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
  await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await openAI();
  let saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,10);assert.equal(saved.characters[0].plan.mentalProcess.activeMinutes,0);
  saved=await advance();assert.equal(saved.characters[0].mentalEnergy.value,11.5);assert.equal(npc,1);
@@ -56,7 +56,7 @@ try{
  await panel.getByText('觀察者數值：10/30',{exact:true}).waitFor();await panel.getByText('新評估於',{exact:false}).waitFor();await panel.getByText('最近的精神電量變化',{exact:true}).click();
  await panel.screenshot({path:outputPath('process-panel.png')});
  const state=structuredClone(actor),operation=requests.filter(r=>r.operation==='advance').at(-1);
- const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:operation});assert.equal(replay.status(),200);assert.deepEqual((await replay.json()).world.characters[0],state);assert.equal(npc,2);
+ const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:operation});assert.equal(replay.status(),200);assert.deepEqual((await replay.json()).world.characters[0],state);assert.equal(npc,2);
  assert.equal(saved.aiUsage.totalCalls,2);assert.equal(saved.aiUsage.totalInputTokens,60);assert.equal(saved.aiUsage.totalOutputTokens,20);assert.ok(!JSON.stringify(inputs).includes(policy.id));assert.ok(!JSON.stringify(inputs).includes('multipliers'));assert.deepEqual(errors,[]);
  await writeFile(outputPath('evidence.json'),JSON.stringify({fixture:true,realPaidCalls:0,counts:{npc},checks:{actualUI:true,noPrepayment:true,persistedPartialSlot:true,forwardReappraisal:true,earlierHistoryPreserved:true,sqliteReload:true,sameOperationReplay:true,noPerSlotModelCall:true},actor,inputs},null,2));
  console.log('PASS #260 Chromium: actual-time process 10→11.5→13, forward negative assessment then 10, saved samples, reload/replay; 2 controlled NPC calls, 0 paid.');

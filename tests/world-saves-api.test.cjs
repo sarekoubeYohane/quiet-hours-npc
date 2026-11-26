@@ -100,7 +100,7 @@ test('a slow accepted operation and recovery remain attached to the source world
   const fetcher=global.fetch;let calls=0;
   global.fetch=async(_url,request)=>{calls++;started();await gate;const input=JSON.parse(JSON.parse(request.body).messages[1].content);return Response.json({usage:{prompt_tokens:10,completion_tokens:5},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:''}))}}]});};
   const sent={operation:'advance',operationId:operationId(),operationScope:original.operationScope,worldContext:original.world.contextId,mode:'openai',model:'gpt-6.1-sol',minutes:5,timeContract:'five-minute-v1'};
-  const request=req(sent,a.saved.save.id);request.headers.set('X-World-Time-Policy','round-v1');
+  const request=req(sent,a.saved.save.id);request.headers.set('X-World-Time-Policy','round-v2');
   const accepted=world.POST(request);
   try {
     await dispatched;
@@ -114,7 +114,7 @@ test('a slow accepted operation and recovery remain attached to the source world
     const other=await body(await world.GET(new Request(origin+'/api/world?save='+b.saved.save.id+'&operationScope='+encodeURIComponent(originalSaveScopes.get(b.saved.save.id))+'&operationId='+sent.operationId)));
     assert.equal(other.operation.state,'unknown');
     await body(await world.POST(req(sent,b.saved.save.id)),409);
-    const replay=req(sent,a.saved.save.id);replay.headers.set('X-World-Time-Policy','round-v1');
+    const replay=req(sent,a.saved.save.id);replay.headers.set('X-World-Time-Policy','round-v2');
     await body(await world.POST(replay));
     assert.equal(calls,1);
   }finally{release();global.fetch=fetcher;await accepted;}
@@ -172,7 +172,7 @@ test('model keys and actual dispatch usage stay account-scoped while journals an
       const current=await read(saved.saved.save.id);
       await body(await world.POST(req({operation:'set-adjudication',mode:'demo',adjudication:{provider:'openai',model:'gpt-6.1-sol'},operationScope:current.operationScope,worldContext:current.world.contextId,operationId:operationId()},saved.saved.save.id)));
       const request=req({operation:'advance',mode:'openai',model:'gpt-6.1-sol',operationId:sameId,operationScope:current.operationScope,worldContext:current.world.contextId,minutes:5,timeContract:'five-minute-v1'},saved.saved.save.id);
-      request.headers.set('X-World-Time-Policy','round-v1');await body(await world.POST(request));
+      request.headers.set('X-World-Time-Policy','round-v2');await body(await world.POST(request));
     }
     assert.equal(calls,2);
     assert.equal((await read(a.saved.save.id)).recallUsage.playerPaidChatCalls,2);

@@ -19,7 +19,7 @@ try{
  const read=async()=>(await(await page.request.get(url+'/api/world')).json()).world;
  const choose=async()=>{await navigate(page,'設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await navigate(page,'觀察');};
  const advance=async()=>{const response=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const result=await response;assert.equal(result.status(),200,await result.text());await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');return read();};
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await choose();
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await choose();
  let w=await advance();assert.equal(w.routineAudit.at(-1).result,'blocked');assert.match(w.characters[0].activity,/器具已損壞/);
  await page.reload();await choose();w=await advance();assert.equal(npc,2);assert.equal(adjudication,0);assert.equal(w.aiUsage.totalCalls,2);assert.equal(nonPhoneObjects(w)[0].state.contents,'empty');
  await navigate(page,'分析');const panel=page.getByRole('region',{name:'日常規則與成果',exact:true});await panel.getByText('規則受阻，無新增裁定',{exact:false}).first().waitFor();
@@ -28,7 +28,7 @@ try{
  // Authoritative scene fixture update changes only relevant actual conditions;
  // the user-facing intervention separately enters the real API/memory path.
  nonPhoneObjects(w)[0].state.condition='sound';nonPhoneObjects(w)[0].revision++;store.replaceCommittedWorld(w);
- const intervention=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'intervene',mode:'demo',operationId:`${Date.now()}:${crypto.randomUUID()}`,worldContext:w.contextId,target:'owner',text:'剛才的器具已經修好了。'}});assert.equal(intervention.status(),200);
+ const intervention=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'intervene',mode:'demo',operationId:`${Date.now()}:${crypto.randomUUID()}`,worldContext:w.contextId,target:'owner',text:'剛才的器具已經修好了。'}});assert.equal(intervention.status(),200);
  await page.reload();await choose();w=await advance();assert.equal(nonPhoneObjects(w)[0].state.contents,'water');w=await advance();assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(nonPhoneObjects(w).filter(o=>o.kind==='utensil').length,1);assert.equal(adjudication,0);assert.equal(npc,3);
  newMethod=true;w=await advance();assert.equal(npc,4);assert.equal(adjudication,1);assert.equal(w.aiUsage.totalCalls,5);assert.match(w.characters[0].activity,/無法落實/);assert.equal(modelRequests.length,5);
  await navigate(page,'分析');await page.screenshot({path:outputPath(`browser111-recovered-${width}.png`),fullPage:true});assert.deepEqual(errors,[]);

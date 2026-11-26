@@ -63,7 +63,7 @@ try {
   };
   const setEffects = effects => { candidate = { status: 'accepted', completionMinutes: 15, effects, check: null }; };
   try {
-    await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v1'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
+    await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v2'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
     await page.goto(url); await nav('設定');
     await page.getByRole('button', { name: '進入最小驗收場景', exact: true }).click();
     await page.getByRole('button', { name: '取消', exact: true }).click();

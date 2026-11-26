@@ -14,7 +14,7 @@ const { seedWorld } = load('world');
 const { configuration, configuredWorld } = require('./fixtures/world-configuration.cjs');
 
 const send = body => POST(new Request('https://test.invalid/api/world', {
-  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
+  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v2' },
   body: JSON.stringify(originalWorldInput({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }, 'test-owner')),
 }));
 const read = async () => {

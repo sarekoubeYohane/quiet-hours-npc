@@ -5,7 +5,7 @@ const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
 const {GET,POST}=build('route'),store=build('store'),{seedWorld}=build('world');
-const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
+const req=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))});
 const read=async()=>(await(await GET()).json()).world;
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
@@ -14,7 +14,7 @@ test('player applies explicit unlimited budget and retired reset preserves the w
  const request=req({operation:'set-budget',limits:{calls:null,tokens:null}});
  const body=await request.clone().text();assert.equal((await POST(request)).status,200);
  assert.deepEqual((await read()).playerBudget,{calls:null,tokens:null});
- assert.equal((await POST(new Request(request.url,{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body}))).status,200);
+ assert.equal((await POST(new Request(request.url,{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body}))).status,200);
  const beforeReset=await(await GET()).json();assert.equal((await POST(req({operation:'reset'}))).status,409);const afterReset=await(await GET()).json();assert.deepEqual(afterReset.world,beforeReset.world);assert.deepEqual(afterReset.accountPlayer,beforeReset.accountPlayer);
  const saved=await read();assert.deepEqual(saved.playerBudget,{calls:null,tokens:null});assert.equal(saved.aiUsage.totalCalls,151);
 });

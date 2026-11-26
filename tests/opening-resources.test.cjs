@@ -37,7 +37,7 @@ test('API preparation persists only in the selected save, replays without anothe
  const url=id=>'https://test.invalid/api/world?save='+id+'&owner=test-owner';
  const read=async id=>(await(await GET(new Request(url(id)))).json());
  const untouched=(await read(original.input.id)).world;let current=await read(target.input.id);const before=structuredClone(current.world);
- const post=b=>POST(new Request(url(target.input.id),{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:current.operationScope,worldContext:before.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b})}));
+ const post=b=>POST(new Request(url(target.input.id),{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:current.operationScope,worldContext:before.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',...b})}));
  assert.equal((await post({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}})).status,200);current=await read(target.input.id);
  const operation={operation:'prepare-opening-resources',resourceRequest:'飲水和簡餐',expectedVersion:current.version,operationId:Date.now()+':'+crypto.randomUUID()};
  const prior=global.fetch;let calls=0;global.fetch=async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);assert.equal(input.contractVersion,'opening-resources.v1');const actor=input.actors[0];const value={supplies:['water','food'].map(kind=>({...provision(kind,actor.region,[actor.id]),responsible:actor.id})),furnishingGrants:[],unavailable:[]};return Response.json({usage:{prompt_tokens:20,completion_tokens:10},choices:[{message:{content:JSON.stringify(value)}}]});};
@@ -51,7 +51,7 @@ test('API preparation persists only in the selected save, replays without anothe
 test('prepared food and water pass real AI action adjudication, consume stock, and reduce needs after a saved round',async()=>{
  const {POST,GET}=load('route'),store=load('store'),{fixtureDecision}=require('./pursuit-fixture.cjs');
  const w=world();w.characters=w.characters.slice(0,1);w.contextId='ingestion-fixture';load('world').normalizeWorld(w);await prepare(w);store.install(w);
- const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationScope:'test-owner',worldContext:w.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',...b})}));
+ const post=b=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:'test-owner',worldContext:w.contextId,operationId:Date.now()+':'+crypto.randomUUID(),mode:'openai',model:'gpt-6-luna',...b})}));
  await post({operation:'set-model-key',key:'fixture-key'});const prior=global.fetch;
  try{for(const supply of w.supplies){
   const key=supply.kind==='drink'?'thirst':'hunger',before=(await(await GET()).json()).world.characters[0].needs.values[key];

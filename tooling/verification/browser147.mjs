@@ -37,7 +37,7 @@ try{
  const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
  const read=async id=>{const response=await page.request.get(url+'/api/world'+(id?'?operationId='+encodeURIComponent(id):''));assert.equal(response.status(),200);return response.json();};
  const selectAI=async()=>{await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');};
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await selectAI();
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await selectAI();
  const advance=async()=>{
   const clock=await(await page.request.post(url+'/__fixture',{data:{advanceMs:1000}})).json();await page.evaluate(now=>{Date.now=()=>now;},clock.now);
   const pending=page.waitForResponse(response=>response.url().endsWith('/api/world')&&response.request().method()==='POST'&&JSON.parse(response.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,(await response.json()).error);await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');const id=requests.filter(request=>request.operation==='advance').at(-1).operationId;return read(id);

@@ -20,7 +20,7 @@ try{
  await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();await navigate(page,'設定');
  await page.getByRole('button',{name:'保存裁定配置',exact:true}).waitFor();
  console.log('PASS #93 adjudication configuration is available inside existing settings');
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-only-secret'}});
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-only-secret'}});
  await page.reload();await navigate(page,'設定');
  await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();
  assert.equal(await page.getByRole('button',{name:'下一回合',exact:true}).isDisabled(),true);
@@ -45,7 +45,7 @@ try{
  console.log('PASS #93 real app acquires and consumes one persistent meal, two NPC plus two adjudication dispatches and separate cost tasks');
  await page.reload();await navigate(page,'分析');const reloaded=(await (await page.request.get(url+'/api/world')).json()).world;assert.equal(nonPhoneObjects(reloaded)[0].lifecycle,'consumed');assert.equal(modelRequests.length,4);
  await navigate(page,'設定');
- const replayBody=requests.filter(request=>request.operation==='advance').at(-1);const beforeReplay=modelRequests.length;const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:replayBody});assert.equal(replay.status(),200);assert.equal(modelRequests.length,beforeReplay);assert.equal((await replay.json()).world.objects.find(object=>object.id==='meal:1').lifecycle,'consumed');
+ const replayBody=requests.filter(request=>request.operation==='advance').at(-1);const beforeReplay=modelRequests.length;const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:replayBody});assert.equal(replay.status(),200);assert.equal(modelRequests.length,beforeReplay);assert.equal((await replay.json()).world.objects.find(object=>object.id==='meal:1').lifecycle,'consumed');
  console.log('PASS #93 settled operation replay preserves consumed identity without further paid requests');
  await page.getByRole('button',{name:'清除裁定服務 Key',exact:true}).click();await page.getByLabel('裁定服務 API Key',{exact:true}).fill('replacement-fixture-secret');
  const keySave=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='set-model-key');await page.getByRole('button',{name:'保存裁定服務 Key（14 天）',exact:true}).click();assert.equal((await keySave).status(),200);await page.waitForFunction(()=>document.querySelector('input[aria-label="裁定服務 API Key"]')?.value==='');
@@ -58,7 +58,7 @@ try{
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:outputPath('browser93-settings-narrow.png'),fullPage:true});
  const runVariant=async(kind)=>{
   const fixture=structuredClone(world);fixture.adjudication={provider:'openai',model:'fixture-adjudicator'};if(kind==='budget')fixture.playerBudget={calls:1,tokens:30000};store.install(fixture);
-  await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'variant-fixture-key'}});
+  await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'variant-fixture-key'}});
   const context=await browser.newContext({reducedMotion:'reduce'});const view=await context.newPage();await view.addInitScript(instant=>{Date.now=()=>instant;},Date.parse('2026-10-15T16:00:00Z'));
   setModelResponder(request=>{const input=JSON.parse(request.messages[1].content);if(input.contractVersion==='world-adjudication.v1'){if(kind==='save')store.conflictOnNextSave();if(kind==='stale')store.replaceCommittedWorld(structuredClone(fixture));return completion(fixtureDecision(JSON.parse(request.messages[1].content),kind==='denied'?{status:'denied',effects:[],check:null}:kind==='invalid'?{status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:'missing',expectedRemaining:1}],check:null}:{status:'accepted',completionMinutes:15,effects:[{kind:'materialize',supplyId:'meal',expectedRemaining:1}],check:null}));}return completion(fixtureDecision(JSON.parse(request.messages[1].content),{type:'propose',target:'meal',content:'拿取餐點',purpose:'吃飯',mood:'平靜',durationMinutes:15,intents:[]}));});
   try{

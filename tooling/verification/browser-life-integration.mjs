@@ -22,11 +22,11 @@ try{
    if(minuteChoice!==minutes){await nav('設定');await page.getByRole('combobox',{name:'推進時間間隔',exact:true}).click();await page.getByRole('option',{name:`${minutes} 分鐘`,exact:true}).click();await nav('觀察');minuteChoice=minutes;}
    const waiting=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const result=await waiting;assert.equal(result.status(),200,await result.text());await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');uiAdvances++;
   }else{
-   const result=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'advance',operationId:`${clock.now}:${crypto.randomUUID()}`,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',minutes}});assert.equal(result.status(),200,await result.text());apiAdvances++;
+   const result=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'advance',operationId:`${clock.now}:${crypto.randomUUID()}`,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',minutes}});assert.equal(result.status(),200,await result.text());apiAdvances++;
   }
   return read();
  };
- await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await configure();
+ await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await page.getByRole('region',{name:'角色近況'}).getByRole('button',{name:'店主',exact:true}).click();await configure();
  const seen=[];
  const checkpoint=async(name,saved)=>{
   seen.push({name,minute:saved.minute,turn:saved.turn});
@@ -44,7 +44,7 @@ try{
   await nav('觀察');
  };
  const result=await run({read,advance,transport},load('habits'),checkpoint);
- const last=requests.filter(r=>r.operation==='advance').at(-1),beforeReplay=transport.counts();const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:last});assert.equal(replay.status(),200,await replay.text());assert.deepEqual(transport.counts(),beforeReplay);assert.deepEqual((await read()).characters,result.world.characters);assert.deepEqual(errors,[]);
+ const last=requests.filter(r=>r.operation==='advance').at(-1),beforeReplay=transport.counts();const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:last});assert.equal(replay.status(),200,await replay.text());assert.deepEqual(transport.counts(),beforeReplay);assert.deepEqual((await read()).characters,result.world.characters);assert.deepEqual(errors,[]);
  await writeFile(outputPath('evidence.json'),JSON.stringify({fixture:true,realPaidCalls:0,uiAdvances,apiAdvances,elapsedMinutes:result.elapsedMinutes,counts:result.counts,resolutions:result.world.freeTrials,seen,owner:{needs:result.world.characters[0].needs,preferences:result.world.characters[0].preferences,habits:result.world.characters[0].habits,eventHabits:result.world.characters[0].eventHabits},objects:result.world.objects},null,2));
  console.log(`PASS #181 real Chromium/API/SQLite: ${uiAdvances} existing UI advances, ${apiAdvances} public API advances, ${result.elapsedMinutes} real advanced world minutes, 3 days of habits/preferences; no fixture time/state replacement, no paid calls.`);
 }finally{Math.random=oldRandom;await browser?.close();server.close();}

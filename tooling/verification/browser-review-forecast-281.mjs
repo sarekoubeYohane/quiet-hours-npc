@@ -13,7 +13,7 @@ let browser,page;
 try{
  browser=await launchBrowser();const context=await browser.newContext({viewport:{width:1360,height:1100},reducedMotion:'reduce'});await context.addCookies([{name:'qh_local_owner',value:'forecast-281',url:app.url}]);page=await context.newPage();page.setDefaultTimeout(30000);await page.route('**/*',route=>new URL(route.request().url()).origin===app.url?route.continue():route.abort());await page.goto(app.url+'/character-templates');
  const get=path=>page.evaluate(async path=>{const r=await fetch(path);return {status:r.status,body:await r.json()};},path);
- const post=(path,input)=>page.evaluate(async({path,input})=>{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify(input)});return {status:r.status,body:await r.json()};},{path,input});
+ const post=(path,input)=>page.evaluate(async({path,input})=>{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:JSON.stringify(input)});return {status:r.status,body:await r.json()};},{path,input});
  const check=(r,status=200)=>{assert.equal(r.status,status,JSON.stringify(r.body));return r.body;};
  const accountScope=check(await get('/api/model-settings')).accountScope;assert.ok(accountScope);
  const accountBinding=check(await get('/api/world?workspace=account'));assert.equal(accountBinding.operationScope,accountScope);

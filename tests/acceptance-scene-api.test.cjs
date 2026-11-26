@@ -11,7 +11,7 @@ const store = load('store');
 const { seedWorld, record } = load('world');
 const read = async () => (await (await GET()).json()).world;
 const request = body => new Request('https://test.invalid/api/world', {
-  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' },
+  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v2' },
   body: JSON.stringify(originalWorldInput({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', ...body }, 'test-owner')),
 });
 

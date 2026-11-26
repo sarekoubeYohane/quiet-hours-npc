@@ -5,7 +5,7 @@ const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${n}.cjs`));
 const {GET,POST}=load('route'),{seedWorld}=load('world'),store=load('store'),{env}=load('cloudflare-workers'),auth=load('auth'),fixture=require('./fixtures/flexible-life-loop.cjs');
-const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
+const request=body=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))});
 const read=async()=>{const r=await GET();assert.equal(r.status,200);return(await r.json()).world;};
 async function setup(initial=fixture.initialWorld(seedWorld)){
  store.install(initial);const transport=fixture.transport(),oldFetch=global.fetch,oldRandom=Math.random;global.fetch=async(_url,init)=>transport.respond(JSON.parse(init.body));Math.random=()=>0.8;

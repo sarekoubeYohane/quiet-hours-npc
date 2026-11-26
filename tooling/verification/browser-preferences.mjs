@@ -20,7 +20,7 @@ let browser;
 try {
  browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'}),errors=[];
  page.on('pageerror',error=>errors.push(String(error)));
- const send=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(response.status(),200,await response.text());return response.json();};
+ const send=async body=>{const response=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(response.status(),200,await response.text());return response.json();};
  await send({operation:'set-model-key',key:'fixture-key'});await send({operation:'advance'});
  await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();
  const nav=()=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name:'分析',exact:true}).click();

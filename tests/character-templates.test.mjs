@@ -80,7 +80,7 @@ async function fixture({ withWorld = false } = {}) {
     const scope = await current.json();
     assert.equal(current.status,200,JSON.stringify(scope));
     return worldRoute.POST(new Request(url, {
-      method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v1' },
+      method: 'POST', headers: { Origin: 'https://test.invalid', 'X-World-Time-Policy': 'round-v2' },
       body: JSON.stringify({ operationId: Date.now() + ':' + crypto.randomUUID(), mode: 'demo', operationScope: scope.operationScope, worldContext: scope.world.contextId, ...payload }),
     }));
   }

@@ -59,7 +59,7 @@ try {
     snapshots.push({ name, world: { minute: saved.world.minute, objects: saved.world.objects, naturalChanges: saved.world.naturalChanges }, evidence: saved.operation.evidence });
     return saved;
   };
-  await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v1'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
+  await page.request.post(url + '/api/world', {headers:{'X-World-Time-Policy':'round-v2'}, data: { operation: 'set-model-key', mode: 'openai', key: 'fixture-key' } });
   await page.goto(url);
   await nav('設定');
   await page.getByRole('combobox', { name: '決策方式', exact: true }).click();

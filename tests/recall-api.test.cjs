@@ -5,7 +5,7 @@ const {fixtureDecision}=require('./pursuit-fixture.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const build=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=build('world'),{GET,POST}=build('route'),store=build('store'),{env}=build('cloudflare-workers');
-const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...b}, 'test-owner'))});
+const req=b=>new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',...b}, 'test-owner'))});
 const auth=build('auth');
 const read=async()=>(await(await GET()).json()).world;
 function fixture(){const w=worldWithAdjudication();for(const c of w.characters){c.control={mode:'taken-over'};}const c=w.characters[0];c.control={mode:'autonomous'};c.longTerm=[{id:'recall-me',characterId:c.id,version:2,time:0,text:'據說她喜歡紅茶，尚未確認。',source:{kind:'experience'},origin:{id:'past',version:1},reason:'在意'}];store.install(w);return w;}

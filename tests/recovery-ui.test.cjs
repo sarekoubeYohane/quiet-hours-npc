@@ -26,7 +26,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
  const {POST,GET}=build('route'),store=build('store');
  store.install(require('./fixtures/ai-world.cjs')(build('world').seedWorld)());
  const historyTurns=Number(process.env.RECOVERY_HISTORY_TURNS || 0);
- const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))}));
+ const send=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'demo',...body}, 'test-owner'))}));
  for(let turn=0;turn<historyTurns;turn++){
   if(turn===17)assert.equal((await send({operation:'intervene',target:'all',text:'所有人收到咖啡館通知：下午兩點有自由參加的手作交流，沒有任何人必須出席。'})).status,200);
   assert.equal((await send({operation:'advance',minutes:15})).status,200);
@@ -42,7 +42,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
  global.fetch=async(_url,options)=>{
   if(fault){instant+=1000;return new Response(fault.body,{status:fault.status,headers:{'Content-Type':fault.type}});}
   if(!options?.method)return GET(new Request(new URL(_url,'https://test.invalid')));
-  assert.equal(options.headers['X-World-Time-Policy'],'round-v1');
+  assert.equal(options.headers['X-World-Time-Policy'],'round-v2');
   payloads.push(options.body);
   if(waiting){instant+=1000;return Response.json({retryable:true,error:'世界正處理另一個回合，正在等待後重試。'},{status:409});}
   const response=await POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{...options.headers,origin:'https://test.invalid'},body:options.body}));
@@ -85,7 +85,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   assert.equal(!!button('重試未完成操作'),false,'reload must reconcile the saved operation');
   assert.equal(button('下一回合').disabled,false);
   assert.equal(new Set(payloads).size,1);
-  assert.ok(requestedTimeouts.includes(445000),'new client waits for the complete bounded round');assert.equal(requestedTimeouts.includes(125000),false);
+  assert.ok(requestedTimeouts.includes(655000),'new client waits for the complete bounded round');assert.equal(requestedTimeouts.includes(125000),false);
   assert.equal((await (await GET()).json()).world.turn,historyTurns+1);
   // A reload/foreground read must not submit a saved request the server never accepted.
   // The current UI already adopted five-minute-v1; an unaccepted new request
@@ -134,7 +134,7 @@ test('reload recovers after lease timeout, committed lost response and HTML outa
   };
   const running=send(uncertain);
   try{
-   await ready;instant+=440000;
+   await ready;instant+=650000;
    const expired=await send(uncertain);
    assert.equal((await expired.json()).operationUncertain,true);
    const saved=JSON.stringify(uncertain);sessionStorage.setItem('quiet-hours:pending:test-owner',saved);

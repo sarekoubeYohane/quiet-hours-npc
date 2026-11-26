@@ -8,7 +8,7 @@ import {startApp} from '../tooling/verification/real-route-runtime.mjs';
 import {formCharacterCard} from '../tooling/verification/opening-journey.mjs';
 const operationId=()=>Date.now()+':'+crypto.randomUUID();
 function requester(app,owner='a'){
- return async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});const text=await response.text();let value;try{value=JSON.parse(text);}catch{value={error:text.slice(0,200)}}return {status:response.status,body:value};};
+ return async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});const text=await response.text();let value;try{value=JSON.parse(text);}catch{value={error:text.slice(0,200)}}return {status:response.status,body:value};};
 }
 async function journey(app,owner='a'){
  const request=requester(app,owner);

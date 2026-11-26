@@ -15,7 +15,7 @@ setModelResponder(body=>{
 let browser;
 try{
  browser=await launchBrowser();const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
- const send=async body=>{await page.request.post(url+'/__fixture',{data:{advanceMs:1000}});const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
+ const send=async body=>{await page.request.post(url+'/__fixture',{data:{advanceMs:1000}});const r=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',minutes:15,...body}});assert.equal(r.status(),200,await r.text());return r.json();};
  await send({operation:'set-model-key',key:'fixture-key'});for(stage=0;stage<4;stage++)await send({operation:'advance'});
  await page.goto(url);await page.getByRole('button',{name:'下一回合',exact:true}).waitFor();
  const show=async()=>{await page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name:'分析',exact:true}).click();await page.getByText('手機與私人外部紀錄（觀察者）',{exact:true}).click();await page.getByText('行事曆與提醒（1/32）',{exact:true}).click();};await show();

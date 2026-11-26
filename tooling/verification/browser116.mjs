@@ -32,12 +32,12 @@ try{
   const choose=async()=>{await navigate('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await navigate('觀察');};
   const advance=async()=>{const response=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const result=await response;assert.equal(result.status(),200,await result.text());await page.waitForFunction(()=>document.querySelector('.advance-button')?.textContent.trim()==='下一回合');return read();};
   try{
-   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await choose();
+   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});await page.goto(url);await choose();
    let w=await advance();const tea=w.routineRules[0].templates.find(t=>t.operation==='tea');assert.equal(tea.result.minutes,teaMinutes===5?15:30);assert.equal(w.routineRules[0].templates.length,6);
    if(teaMinutes===30){
     assert.equal(nonPhoneObjects(w)[0].state.contents,'water');assert.equal(nonPhoneObjects(w).some(o=>o.state.beverage==='tea'),false);const plan=w.characters[0].plan;assert.equal(plan.until-plan.startedAt,30);
     await navigate('分析');await page.getByRole('region',{name:'日常規則與成果'}).getByText('完成目標安排 30 分鐘',{exact:false}).waitFor();await page.screenshot({path:outputPath('browser116-confirmed30-pending.png'),fullPage:true});await navigate('觀察');
-    const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:requests.filter(r=>r.operation==='advance').at(-1)});assert.equal(replay.status(),200);assert.equal(modelRequests.length-initial,2);assert.deepEqual((await replay.json()).world.objects,w.objects);
+    const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:requests.filter(r=>r.operation==='advance').at(-1)});assert.equal(replay.status(),200);assert.equal(modelRequests.length-initial,2);assert.deepEqual((await replay.json()).world.objects,w.objects);
     w=await advance();
    }
    assert.equal(nonPhoneObjects(w)[0].state.contents,'tea');assert.equal(nonPhoneObjects(w).filter(o=>o.state.beverage==='tea').length,1);assert.equal(w.characters[0].plan,undefined);assert.equal(npc,1);assert.equal(adjudication,1);

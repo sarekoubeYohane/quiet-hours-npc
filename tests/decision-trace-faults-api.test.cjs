@@ -163,7 +163,7 @@ for(const status of [200,429])test(`HTTP ${status} body-read failure preserves k
 test('an abort during the prepared checkpoint does not invent a provider dispatch',async()=>{
  const s=await scenario(),op=operation(),originalTimeout=AbortSignal.timeout;let sent=0;
  // A call is bounded by the round's work window; end that window while the prepared checkpoint is saving.
- AbortSignal.timeout=ms=>{if(ms>400000)return originalTimeout(ms);const controller=new AbortController();store.onStorage(async(sql,values)=>{if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&JSON.parse(values[sql.startsWith('INSERT')?5:0]).dispatches[0]?.stage==='dispatch-prepared')controller.abort();});return controller.signal;};
+ AbortSignal.timeout=ms=>{if(ms>610000)return originalTimeout(ms);const controller=new AbortController();store.onStorage(async(sql,values)=>{if((sql.startsWith('INSERT INTO decision_traces')||sql.startsWith('UPDATE decision_traces'))&&JSON.parse(values[sql.startsWith('INSERT')?5:0]).dispatches[0]?.stage==='dispatch-prepared')controller.abort();});return controller.signal;};
  global.fetch=async()=>{sent++;throw Error('must not dispatch');};
  try{
   const r=await s.post(op);assert.equal(r.status,502);const data=await lookup(op.operationId),d=data.decisionTrace.dispatches[0];assert.equal(sent,0);assert.equal(d.stage,'dispatch-prepared');assert.equal(d.responseBody,undefined);assert.equal(data.operation.evidence.counts.npc,0);assert.equal(data.world.turn,0);

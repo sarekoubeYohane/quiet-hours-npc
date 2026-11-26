@@ -5,8 +5,10 @@
 // otherwise it is bounded only by the round's remaining work window. The capacity derivation is in
 // docs/design/round-time-budget.md.
 export const roundTimePolicy = Object.freeze({
-  version: 'round-v1', modelFirstByteMs: 30_000, modelIdleMs: 15_000, recallMs: 10_000,
-  workMs: 400_000,
+  // round-v2 (2026-11-26): the work window grew from 400 to 610 seconds, so a page still waiting
+  // 445 seconds is asked to reload before it can start a paid round.
+  version: 'round-v2', modelFirstByteMs: 30_000, modelIdleMs: 15_000, recallMs: 10_000,
+  workMs: 610_000,
   finishMs: 30_000, deliveryMs: 15_000,
 });
 export const roundLeaseMs = roundTimePolicy.workMs + roundTimePolicy.finishMs;

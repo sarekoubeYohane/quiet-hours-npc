@@ -23,7 +23,7 @@ try{
   const nav=name=>page.getByRole('navigation',{name:'觀察室分頁'}).getByRole('button',{name,exact:true}).click();
   const read=async id=>(await(await page.request.get(url+'/api/world'+(id?'?operationId='+encodeURIComponent(id):''))).json());
   try{
-   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
+   await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:{operation:'set-model-key',mode:'openai',key:'fixture-key'}});
    await page.goto(url);await nav('設定');await page.getByRole('combobox',{name:'決策方式',exact:true}).click();await page.getByRole('option',{name:'OpenAI 直連',exact:true}).click();await nav('觀察');
    const wireStart=transportFrames.length;
    const pending=page.waitForResponse(r=>r.url().endsWith('/api/world')&&r.request().method()==='POST'&&JSON.parse(r.request().postData()).operation==='advance');await page.getByRole('button',{name:'下一回合',exact:true}).click();const response=await pending;assert.equal(response.status(),200,await response.text());
@@ -42,7 +42,7 @@ try{
    await page.reload();await nav('分析');const panel=page.getByRole('region',{name:'決策追溯',exact:true});await panel.waitFor();await panel.getByText('實際模型派送',{exact:true}).waitFor();
    assert.ok((await panel.innerText()).includes('世界已提交'));assert.ok((await panel.innerText()).includes('最後已知階段'));
    await panel.getByText('實際送出的請求本文',{exact:true}).first().click();assert.ok((await panel.innerText()).includes('gpt-6-luna'));
-   const beforeCalls={npc,judgments};const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v1'},data:operation});assert.equal(replay.status(),200);assert.deepEqual({npc,judgments},beforeCalls);assert.deepEqual((await read(operation.operationId)).decisionTrace,trace);assert.deepEqual(errors,[]);
+   const beforeCalls={npc,judgments};const replay=await page.request.post(url+'/api/world',{headers:{'X-World-Time-Policy':'round-v2'},data:operation});assert.equal(replay.status(),200);assert.deepEqual({npc,judgments},beforeCalls);assert.deepEqual((await read(operation.operationId)).decisionTrace,trace);assert.deepEqual(errors,[]);
    await panel.scrollIntoViewIfNeeded();await page.screenshot({path:outputPath(scenario+'.png'),fullPage:false});
    await writeFile(outputPath(scenario+'.json'),JSON.stringify({fixture:true,scenario,trace,reuseTrace,checks:{wireBytes:true,reload:true,private:true,sameIdZeroDispatch:true,reuseWireBytes:!!reuseTrace},reuseTraceBytes:reuseTrace?Buffer.byteLength(JSON.stringify(reuseTrace)):null,traceBytes:Buffer.byteLength(JSON.stringify(trace))},null,2)+'\n');
    console.log(`PASS decision trace Chromium ${scenario}; actual bytes, SQLite reload, UI, same-ID no new dispatch; fixture only`);

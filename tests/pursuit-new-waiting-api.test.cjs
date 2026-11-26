@@ -5,7 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const load=n=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,n+'.cjs'));
 const {seedWorld}=load('world'),{GET,POST}=load('route'),store=load('store');
 const {decision,candidate,adoption,choose}=require('./pursuit-selection-fixture.cjs');
-const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
+const post=body=>POST(new Request('https://test.invalid/api/world',{method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({operationId:`${Date.now()}:${crypto.randomUUID()}`,mode:'openai',model:'gpt-6-luna',...body}, 'test-owner'))}));
 for(const reverse of [false,true])test(`new autonomous pursuit can be explicitly waiting and linked in one decision, ${reverse?'assess before upsert':'upsert before assess'}`,async()=>{
  const w=seedWorld();w.characters=w.characters.filter(c=>c.id==='owner');w.adjudication={provider:'openai',model:'fixture-judge'};store.install(w);await post({operation:'set-model-key',key:'fixture-key'});
  const original=global.fetch;let calls=0;

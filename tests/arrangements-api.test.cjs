@@ -6,7 +6,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), path 
 const build = name => require(path.join(process.env.QUIET_HOURS_TEST_BUILD, `${name}.cjs`));
 const { seedWorld } = build('world'), { GET, POST } = build('route'), store = build('store');
 const world = require('./fixtures/ai-world.cjs')(seedWorld);
-const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin:'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body:JSON.stringify(originalWorldInput({ operationId:`${Date.now()}:${crypto.randomUUID()}`, mode:'demo', ...body }, 'test-owner')) });
+const request = body => new Request('https://test.invalid/api/world', { method: 'POST', headers: { origin:'https://test.invalid', 'X-World-Time-Policy':'round-v2' }, body:JSON.stringify(originalWorldInput({ operationId:`${Date.now()}:${crypto.randomUUID()}`, mode:'demo', ...body }, 'test-owner')) });
 const read = async () => (await (await GET()).json()).world;
 const reference = input => ({kind:'short',id:input.self.shortTerm[0].id,version:input.self.shortTerm[0].version});
 async function withModel(choose, run) {

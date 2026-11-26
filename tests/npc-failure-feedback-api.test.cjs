@@ -14,7 +14,7 @@ const report = require('../docs/verification/assets/pr131-live-acceptance/eviden
 const read = async () => (await (await GET()).json()).world;
 const id = () => Date.now() + ':' + crypto.randomUUID();
 const request = body => new Request('https://test.invalid/api/world', {
-  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v1' }, body: JSON.stringify(originalWorldInput({ operationId: id(), mode: 'demo', ...body }, 'test-owner')),
+  method: 'POST', headers: { origin: 'https://test.invalid', 'X-World-Time-Policy':'round-v2' }, body: JSON.stringify(originalWorldInput({ operationId: id(), mode: 'demo', ...body }, 'test-owner')),
 });
 const completion = (value,_fixtureInput)=> Response.json({ usage: { prompt_tokens: 30, completion_tokens: 10 }, choices: [{ message: { content: JSON.stringify(fixtureDecision(_fixtureInput,value)) } }] });
 async function scenario({ hiddenTarget = false } = {}) {

@@ -4,7 +4,7 @@ const fields={name:'時雨',appearance:'35歲，身高175公分',personality:'�
 const models={npc:{provider:'openai',model:'gpt-6-luna'},adjudication:{provider:'openai',model:'gpt-6.1-sol'}};
 export const operationId=()=>Date.now()+':'+crypto.randomUUID();
 export async function journey(app,owner='d100-a',{configure=true}={}){
- const request=async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
+ const request=async(path,body)=>{const response=await fetch(app.url+path,{method:body===undefined?'GET':'POST',headers:{Cookie:'qh_local_owner='+owner,Origin:app.url,'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
  const ok=async(path,body)=>{const r=await request(path,body);assert.ok(r.status>=200&&r.status<300,JSON.stringify(r));return r.body;};
  const world=save=>ok('/api/world'+(save?'?save='+save:'?workspace=account'));
  const send=async(save,body)=>{const scope=await world(save);return ok('/api/world'+(save?'?save='+save:'?workspace=account'),{operationId:operationId(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...body});};

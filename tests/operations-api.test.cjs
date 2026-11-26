@@ -10,7 +10,7 @@ const { POST, GET } = build('route');
 const store = build('store');
 const { seedWorld } = build('world');
 const operationId = () => `${Date.now()}:${crypto.randomUUID()}`;
-const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v1'},body:JSON.stringify(originalWorldInput({mode:'demo',...body}, 'test-owner'))});
+const request = body => new Request('https://test.invalid/api/world', {method:'POST',headers:{origin:'https://test.invalid','X-World-Time-Policy':'round-v2'},body:JSON.stringify(originalWorldInput({mode:'demo',...body}, 'test-owner'))});
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 
 test('reloaded API replays the exact result for an operation instead of advancing twice', async () => {

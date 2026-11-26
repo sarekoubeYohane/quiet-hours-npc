@@ -31,7 +31,7 @@ try {
   evidence.push({phase:'manual draft',url:page.url(),title:await page.title()});
   const configured=await page.evaluate(async()=>{
     const scope=await (await fetch('/api/world?workspace=account')).json();
-    const post=async data=>{const r=await fetch('/api/world?workspace=account',{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v1'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...data})});return {status:r.status,body:await r.json()};};
+    const post=async data=>{const r=await fetch('/api/world?workspace=account',{method:'POST',headers:{'Content-Type':'application/json','X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationId:Date.now()+':'+crypto.randomUUID(),mode:'demo',operationScope:scope.operationScope,worldContext:scope.world.contextId,...data})});return {status:r.status,body:await r.json()};};
     const key=await post({operation:'set-model-key',mode:'openai',key:'controlled-local-key'});
     const settings=await post({operation:'set-adjudication',adjudication:{provider:'openai',model:'gpt-6.1-sol'}});
     return {key:key.status,settings:settings.status};
