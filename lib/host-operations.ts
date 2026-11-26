@@ -1,6 +1,7 @@
 import { isModelProvider, providerForMode } from './model-providers';
-import { prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import { readArrangement, storeArrangementResult } from './opening-arrangement-store';
+import { suggestOpeningResources, mapResourceActors, prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
+import {repairOpeningRoads,openingRepairSource} from './opening-road-repair';
+import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
 import { playerAccount, setPlayerAccount } from './player-account-budget';
@@ -331,8 +332,33 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
-          const city=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(JSON.parse(arrangement.snapshot) as OpeningDraft,service,options));
-          await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city));
+          const requested=JSON.parse(arrangement.request) as ArrangementRequest;
+          const snapshot=JSON.parse(arrangement.snapshot) as OpeningDraft;
+          let city=snapshot.body.city;
+          if(requested.purpose==='resources'){
+            const {world:candidate}=await prepareCity(accountId,city,world,snapshot.sources);
+            if(!candidate)throw Error('請先完成起點與物資配置。');
+            delete candidate.openingResources;
+            const addition=await runSetup('opening-resources',(service,options)=>suggestOpeningResources(candidate,requested.resourceRequest??'',service,options));
+            const plan=mapResourceActors(addition,id=>{
+              const source=candidate.characters.find(actor=>actor.id===id)?.profileSource?.id;
+              if(!source)throw Error('物資指定了未選人物。');
+              return source;
+            });
+            city={...city,resourcePlan:{supplies:[...city.resourcePlan?.supplies??[],...plan.supplies],
+              furnishingGrants:[...city.resourcePlan?.furnishingGrants??[],...plan.furnishingGrants.filter(row=>!city.resourcePlan?.furnishingGrants.some(old=>old.objectId===row.objectId))],unavailable:plan.unavailable}};
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,cityDraftSchema.parse(city)));
+          }else if(requested.repairOf){
+            const source=await workWait(readArrangement(accountId,arrangement.draft_id,requested.repairOf.operationId));
+            if(!source?.result||source.revision!==requested.repairOf.version)throw Error('補路依據已變更。');
+            const proposal=storedArrangementResult(source);
+            const frozen=openingRepairSource(JSON.parse(source.snapshot),snapshot,proposal.city);
+            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(frozen,service,options));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
+          }else{
+            const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(snapshot,service,options,requested));
+            await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,result.city,{roomItems:result.roomItems}));
+          }
         } else if (assessingCard && assessingDraft) {
           const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));

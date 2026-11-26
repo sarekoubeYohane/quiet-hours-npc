@@ -1,3 +1,4 @@
+import { applyOpeningResources,mapResourceActors,resourcePlanSchema } from './opening-resources';
 import { customRoutinePlaces } from './daily-place-context';
 import { listCharacterCards } from './character-card-store';
 import { applyCharacterCard } from './character-card-world';
@@ -26,9 +27,11 @@ const version = z.number().int().positive().safe();
 export const cardMentalOpeningSchema=z.object({current:z.number().int().nonnegative().safe().optional(),stage:z.enum(['充沛','有餘','尚可','吃緊','見底']).optional()}).strict();
 const openingNeedsSchema=z.object({hunger:z.number().min(0).max(100).multipleOf(.01),thirst:z.number().min(0).max(100).multipleOf(.01),fatigue:z.number().min(0).max(100).multipleOf(.01),sleep:z.number().min(0).max(100).multipleOf(.01)}).strict();
 export const cityDraftSchema = z.object({
+  isolatedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
   places: z.array(z.object({ id: instanceId, templateId, version, name: z.string().trim().max(80) }).strict()).max(cityLimits.places),
   characters: z.array(z.object({
     templateId, version, placeId: z.union([instanceId, z.literal('')]), roomId: z.union([templateId, z.literal('')]),
+    placeOrigin: z.enum(['system','player']).optional(), roomOrigin: z.enum(['system','player']).optional(),
     mentalOpening: z.union([mentalOpeningSchema,cardMentalOpeningSchema]).optional(), openingNeeds:openingNeedsSchema.optional(), openingFeelings:z.object({hunger:z.number().int().min(0).max(3).optional(),thirst:z.number().int().min(0).max(3).optional(),fatigue:z.number().int().min(0).max(3).optional(),sleep:z.number().int().min(0).max(3).optional()}).strict().optional(), characterSetup: characterSetupSchema.optional(), homeId: instanceId.optional(), homeRoomId: templateId.optional(),
     ownedPlaceIds: z.array(instanceId).max(cityLimits.places).optional(),
     workplaceIds: z.array(instanceId).max(cityLimits.places).optional(),
@@ -43,6 +46,7 @@ export const cityDraftSchema = z.object({
     description: z.string().trim().min(1).max(256).refine(value => new TextEncoder().encode(value).length <= 256),
   }).strict()).max(cityLimits.relationships).optional(),
   finalization: cityFinalizationSchema.optional(),
+  resourcePlan:resourcePlanSchema.optional(),
 }).strict();
 
 const palette = ['#eb9e79', '#a2bdf0', '#d4c485', '#a5c9b3'];
@@ -245,5 +249,14 @@ export async function prepareCity(owner: string, draft: z.infer<typeof cityDraft
   for(const actor of world.characters){const card=cards.find(value=>value.id===actor.profileSource?.id);if(card){const selection=draft.characters.find(value=>value.templateId===card.id)!;try{if(selection.characterSetup&&Object.keys(selection.characterSetup).length)throw Error('完成卡的能力已形成，不能在開局覆寫。');applyCharacterCard(actor,card,minute,selection.mentalOpening??{},selection.openingNeeds,selection.openingFeelings);}catch(error){preview.issues.push(error instanceof Error?error.message:'完成卡開局無效。');}}}
   if(preview.issues.length)return {preview};
   world.routinePlaces=customRoutinePlaces(world);
+  if(draft.resourcePlan){
+    try {
+      applyOpeningResources(world,mapResourceActors(draft.resourcePlan,id=>{
+        const actor=byTemplate.get(id);
+        if(!actor)throw Error('請重新核對開局物資的負責者與取用人物。');
+        return actor.id;
+      }));
+    } catch(error){preview.issues.push(error instanceof Error?error.message:'請核對開局物資。');return {preview};}
+  }
   return { preview, world };
 }

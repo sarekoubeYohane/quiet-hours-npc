@@ -75,7 +75,10 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
-| 開局精靈介面 | `components/opening-wizard.tsx` |
+| 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
+| 開局起點的來源與採納 | `lib/opening-starts.ts` 按人物及場所實例保留玩家選定的場所、房間；`lib/opening-authoring.ts` 標記自動預填。 |
+| 核對開局與返回編輯 | `components/opening-review.tsx` 依本局人物、房間與道路顯示核對結果，記下原項的展開、焦點和捲動位置。 |
+| 開局精靈介面 | `components/opening-wizard.tsx`；按場所、房間編輯本局物件與門在 `components/opening-room-editor.tsx` |
 | 樣式 | `app/globals.css`，以手寫語意 class 為主（`.panel`、`.opening-*`、`.analysis-*`） |
 | 新增資料表或欄位 | `db/schema.ts`、`drizzle/`，並依 [docs/testing.md](docs/testing.md) 手動登記到測試 |
 
@@ -248,7 +251,11 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `city-access.ts` | 進入許可的建立與執行期查詢（`entryPermission`） |
 | `city-initialization.ts` | 用模型產生 finalization |
 | `opening-drafts.ts` | 開局草稿的版本化儲存與 `confirmOpening` |
-| `opening-arrangement-model.ts` | AI 整理開局：只補留白 |
+| `opening-arrangement-model.ts` | 依玩家勾選的工作整理 AI 開局建議 |
+| `opening-road-repair.ts` | 只向模型傳入當前路網與缺口，接回可編輯的補路建議 |
+| `opening-room-items.ts`、`components/opening-room-item-suggestions.tsx` | 依場所實例及房間核對既有物品、勾選本輪新增物品並單獨採納 |
+| `opening-proposal-adoption.ts` | 採納前核對原草稿、最新手動變更、物品選擇及各組採納收據 |
+| `opening-road-network.ts`、`components/opening-roads.tsx` | 開局步行路段、隔離與分段連通檢查，以及手動／預覽的道路編輯 |
 | `opening-relationship-generation.ts` | 用模型從開局描述抽出住處、工作、關係 |
 | `opening-authoring.ts` | 瀏覽器端 helper：自動預填、把成品帶回開局草稿 |
 | `pixel-scene.ts` | 舊版固定地圖的座標與走位 |
@@ -413,7 +420,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 - **`operationScope` 各 route 期待不同**：`/api/world` 要 `storageOwner`；存檔、開局草稿、預算要帳號 owner；人物與模型設定要帳號工作區，欄位名有的叫 `accountScope`。
 - **`mode: 'ai'` 指 OpenRouter**，`'openai'` 才是 OpenAI 直連。
 - **`CityDraft.characters[].templateId` 放的是人物卡 ID**，是歷史命名。
-- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。
+- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。住家等自訂場所的 `routineOffer` 也是這個值，且 `operations` 為空；給裁定模型的說明在 `adjudication-contract.ts` 的 `dailyScopeRule`（#384）。
 - **`lib/world-response.ts` 是瀏覽器端程式**；`model-settings.ts` 是純邏輯，`model-settings-store.ts` 才做 I/O。
 - **`entry-rules.ts` 只有型別**，實際的許可判斷在 `city-access.ts`。
 - **同名的 lib 與元件**：`decision-traces`、`operation-evidence`、`acceptance-scene`、`character-attributes` 在 `lib/` 與 `components/` 各有一個。

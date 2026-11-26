@@ -1,10 +1,10 @@
 name: Deploy test site
 
-# main 合併後自動部署測試站（#28）。檢查全部通過才部署；任何一步失敗都不會動到測試站。
+# test 合併後自動部署測試站（#28）。檢查全部通過才部署；任何一步失敗都不會動到測試站。
 # 正式站不在此流程：沒有 production 的建置、migration 或部署步驟（正式發布見 #31）。
 on:
   push:
-    branches: [main]
+    branches: [test]
   workflow_dispatch:
 
 permissions:
@@ -19,28 +19,28 @@ env:
   TEST_SITE_URL: https://quiet-hours-npc-test.houmengkou.workers.dev
 
 jobs:
-  # 沒有綁 GitHub Environment：被較新提交超越、或從非 main 分支手動觸發時，這裡結束，不留下部署紀錄。
+  # 沒有綁 GitHub Environment：被較新提交超越、或從非 test 分支手動觸發時，這裡結束，不留下部署紀錄。
   check-head:
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.head.outputs.deploy }}
     steps:
       - uses: actions/checkout@v4
-      - name: 確認本提交是 main 的最新提交
+      - name: 確認本提交是 test 的最新提交
         id: head
         run: |
-          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+          if [ "$GITHUB_REF" != "refs/heads/test" ]; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::只部署 main；本次從 $GITHUB_REF 觸發，不部署。"
-            echo "### 未部署：只部署 main（本次為 \`$GITHUB_REF\`）" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::只部署 test；本次從 $GITHUB_REF 觸發，不部署。"
+            echo "### 未部署：只部署 test（本次為 \`$GITHUB_REF\`）" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          latest=$(git ls-remote origin refs/heads/main | cut -f1)
-          if [ -z "$latest" ]; then echo "::error::無法讀取 origin 的 main 目前提交。"; exit 1; fi
+          latest=$(git ls-remote origin refs/heads/test | cut -f1)
+          if [ -z "$latest" ]; then echo "::error::無法讀取 origin 的 test 目前提交。"; exit 1; fi
           if [ "$latest" != "$GITHUB_SHA" ]; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::main 已有更新的提交 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，交由較新的工作處理。"
-            echo "### 未部署：main 已前進到 \`${latest:0:7}\`，本次 \`${GITHUB_SHA:0:7}\` 不部署" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::test 已有更新的提交 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，交由較新的工作處理。"
+            echo "### 未部署：test 已前進到 \`${latest:0:7}\`，本次 \`${GITHUB_SHA:0:7}\` 不部署" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           echo "deploy=true" >> "$GITHUB_OUTPUT"
@@ -108,11 +108,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec wrangler d1 migrations apply DB --remote --env test
 
-      # 檢查期間若 main 又前進，這裡以失敗結束：較新的工作會接手，本次不覆蓋它。
-      - name: 部署前再次確認 main 沒有更新
+      # 檢查期間若 test 又前進，這裡以失敗結束：較新的工作會接手，本次不覆蓋它。
+      - name: 部署前再次確認 test 沒有更新
         run: |
-          latest=$(git ls-remote origin refs/heads/main | cut -f1)
-          if [ "$latest" != "$GITHUB_SHA" ]; then echo "::error::main 在檢查期間前進到 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，請等較新的工作完成。"; exit 1; fi
+          latest=$(git ls-remote origin refs/heads/test | cut -f1)
+          if [ "$latest" != "$GITHUB_SHA" ]; then echo "::error::test 在檢查期間前進到 ${latest:0:7}，本次 ${GITHUB_SHA:0:7} 不部署，請等較新的工作完成。"; exit 1; fi
       - name: 部署測試站 Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

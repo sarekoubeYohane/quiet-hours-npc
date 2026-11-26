@@ -3,14 +3,33 @@ import type {CityDraft} from '@/lib/city-draft';
 import type {CharacterCard} from '@/lib/character-cards';
 import type {SceneTemplate} from '@/lib/scene-templates';
 type OpeningCity=CityDraft;
-export function OpeningRelations({city,cards,update}:{city:OpeningCity;cards:CharacterCard[];update:(city:OpeningCity)=>void}){
- const name=(id:string)=>cards.find(card=>card.id===id)?.fields.name??city.backgroundPeople?.find(person=>person.id===id)?.name??id;
- return <details><summary>可選：人物關係與背景人物</summary><button onClick={()=>update({...city,backgroundPeople:[...(city.backgroundPeople??[]),{id:'background-'+crypto.randomUUID().slice(0,8),name:'背景人物'}]})}>新增背景人物</button>{city.backgroundPeople?.map((person,index)=><div key={person.id}><label>背景人物名稱<input value={person.name} onChange={event=>update({...city,backgroundPeople:city.backgroundPeople?.map((value,i)=>i===index?{...value,name:event.target.value}:value)})}/></label><button onClick={()=>update({...city,backgroundPeople:city.backgroundPeople?.filter(value=>value.id!==person.id),relationships:city.relationships?.filter(relation=>!(relation.targetType==='background'&&relation.to===person.id))})}>移除背景人物 {person.name}</button></div>)}<button disabled={!city.characters.length} onClick={()=>update({...city,relationships:[...(city.relationships??[]),{from:city.characters[0].templateId,to:'',targetType:'character',description:''}]})}>新增關係</button>{city.relationships?.map((relation,index)=><fieldset key={index}><legend>關係 {index+1}</legend><label>人物<select value={relation.from} onChange={event=>update({...city,relationships:city.relationships?.map((value,i)=>i===index?{...value,from:event.target.value}:value)})}>{city.characters.map(actor=><option key={actor.templateId} value={actor.templateId}>{name(actor.templateId)}</option>)}</select></label><label>關係對象<select value={relation.to} onChange={event=>update({...city,relationships:city.relationships?.map((value,i)=>i===index?{...value,to:event.target.value,targetType:city.backgroundPeople?.some(person=>person.id===event.target.value)?'background':'character'}:value)})}><option value="">請選擇</option>{city.characters.filter(actor=>actor.templateId!==relation.from).map(actor=><option key={actor.templateId} value={actor.templateId}>{name(actor.templateId)}</option>)}{city.backgroundPeople?.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</select></label><label>關係描述<input value={relation.description} maxLength={256} onChange={event=>update({...city,relationships:city.relationships?.map((value,i)=>i===index?{...value,description:event.target.value}:value)})}/></label><button onClick={()=>update({...city,relationships:city.relationships?.filter((_,i)=>i!==index)})}>移除關係</button></fieldset>)}</details>;
+export function OpeningRelations({city,cards,update,expanded=false}:{city:OpeningCity;cards:CharacterCard[];update:(city:OpeningCity)=>void;expanded?:boolean}){
+ const people=city.backgroundPeople??[], relations=city.relationships??[];
+ const name=(id:string)=>cards.find(card=>card.id===id)?.fields.name??people.find(person=>person.id===id)?.name??id;
+ const addRelation=(to='')=>update({...city,relationships:[...relations,{from:city.characters[0].templateId,to,targetType:to?'background':'character',description:''}]});
+ const changeRelation=(index:number,patch:Partial<typeof relations[number]>)=>update({...city,relationships:relations.map((r,i)=>i===index?{...r,...patch}:r)});
+ const form=<>
+  <button disabled={people.length>=8} onClick={()=>update({...city,backgroundPeople:[...people,{id:'background-'+crypto.randomUUID().slice(0,8),name:'背景人物'}]})}>新增背景人物</button>
+  {people.map(person=><div key={person.id}>
+   <label>背景人物名稱<input aria-label="背景人物名稱" value={person.name} onChange={e=>update({...city,backgroundPeople:people.map(p=>p.id===person.id?{...p,name:e.target.value}:p)})}/></label>
+   <button disabled={!city.characters.length||relations.length>=32} onClick={()=>addRelation(person.id)}>從{person.name}建立關係</button>
+   <button onClick={()=>update({...city,backgroundPeople:people.filter(p=>p.id!==person.id),relationships:relations.filter(r=>!(r.targetType==='background'&&r.to===person.id))})}>移除背景人物 {person.name}</button>
+  </div>)}
+  <button disabled={!city.characters.length||relations.length>=32} onClick={()=>addRelation()}>新增關係</button>
+  {relations.map((r,index)=><fieldset key={index} id={'opening-relation-'+index}><legend>關係 {index+1}</legend>
+   {r.from&&r.to&&<p>{name(r.from)} → {name(r.to)}：{r.description}</p>}
+   <label>來源人物<select aria-label={'關係 '+(index+1)+' 來源'} value={r.from} onChange={e=>changeRelation(index,{from:e.target.value})}>{city.characters.map(a=><option key={a.templateId} value={a.templateId}>{name(a.templateId)}</option>)}</select></label>
+   <label>關係對象<select aria-label={'關係 '+(index+1)+' 對象'} value={r.to} onChange={e=>changeRelation(index,{to:e.target.value,targetType:people.some(p=>p.id===e.target.value)?'background':'character'})}>
+    <option value="">請選擇</option>{city.characters.filter(a=>a.templateId!==r.from).map(a=><option key={a.templateId} value={a.templateId}>{name(a.templateId)}</option>)}
+    {people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+   </select></label>
+   <label>關係描述<input value={r.description} maxLength={256} onChange={e=>changeRelation(index,{description:e.target.value})}/></label>
+   <button onClick={()=>update({...city,relationships:relations.filter((_,i)=>i!==index)})}>移除關係</button>
+  </fieldset>)}
+ </>;
+ return expanded?<section aria-label="人物關係">{form}</section>:<details><summary>可選：人物關係與背景人物</summary>{form}</details>;
 }
-export function OpeningRoads({city,update}:{city:OpeningCity;update:(city:OpeningCity)=>void}){
- const walks=city.finalization?.walks??[];const set=(value:NonNullable<CityDraft['finalization']>['walks'])=>update({...city,finalization:{spaces:city.finalization?.spaces??[],walks:value}});
- return <details><summary>可選：跨場所道路</summary><p>未建立道路的場所不互通；不會自動補路。</p><button disabled={city.places.length<2} onClick={()=>set([...walks,{places:[city.places[0].id,city.places[1].id],minutes:5}])}>新增道路</button>{walks.map((walk,index)=><fieldset key={index}><legend>道路 {index+1}</legend>{([0,1] as const).map(side=><label key={side}>{side===0?'起點':'終點'}<select value={walk.places[side]} onChange={event=>set(walks.map((value,i)=>i===index?{...value,places:side===0?[event.target.value,value.places[1]]:[value.places[0],event.target.value]}:value))}>{city.places.map(place=><option key={place.id} value={place.id}>{place.name}</option>)}</select></label>)}<label>步行分鐘（留空表示不能步行）<input type="number" min={1} max={1440} step={1} value={walk.minutes??''} onChange={event=>set(walks.map((value,i)=>i===index?{...value,minutes:event.target.value===''?null:Number(event.target.value)}:value))}/></label><button onClick={()=>set(walks.filter((_,i)=>i!==index))}>移除道路</button></fieldset>)}</details>;
-}
+export {OpeningRoads} from './opening-roads';
 
 /** Shared manual controls: edits only this opening's additional space, never its scene source. */
 export function OpeningExtrasEditor({city,cards,scenes,update}:{city:CityDraft;cards:CharacterCard[];scenes:SceneTemplate[];update:(city:CityDraft)=>void}){
