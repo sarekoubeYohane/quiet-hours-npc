@@ -34,11 +34,12 @@ export function omitDecisionTraceContent(trace: DecisionTrace, reason: string, u
     if (!value || typeof value !== 'object') return { gap: 'dispatch-details-omitted' };
     const dispatch = value as Record<string, unknown>;
     const receipt: Record<string, unknown> = { gap: 'dispatch-content-omitted' };
-    for (const key of ['sequence', 'task', 'actorId', 'requestId', 'provider', 'model', 'startedAt', 'receivedAt', 'httpStatus', 'stage', 'receivedAt', 'headersReceivedAt', 'fetchStartedAt', 'usageKnownAt']) {
+    for (const key of ['sequence', 'task', 'actorId', 'requestId', 'provider', 'model', 'startedAt', 'receivedAt', 'httpStatus', 'stage', 'receivedAt', 'headersReceivedAt', 'fetchStartedAt', 'usageKnownAt', 'firstChunkAt', 'firstContentAt', 'lastChunkAt', 'streamChunks']) {
       if(unknownCredentials&&['actorId','requestId','provider','model'].includes(key))continue;
       const item = dispatch[key];
       if (typeof item === 'number' || typeof item === 'string' && item.length <= 256) receipt[key] = item;
     }
+    if(typeof dispatch.responseAssembledFromStream==='boolean')receipt.responseAssembledFromStream=dispatch.responseAssembledFromStream;
     if(dispatch.signal&&typeof dispatch.signal==='object')receipt.signal=dispatch.signal;
     if(!unknownCredentials&&dispatch.price&&typeof dispatch.price==='object')receipt.price=dispatch.price;
     for(const usageKind of ['usage','lateUsage'] as const)if (dispatch[usageKind] && typeof dispatch[usageKind] === 'object') {

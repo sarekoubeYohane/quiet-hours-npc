@@ -228,6 +228,16 @@ test('the default limits come from the round time policy, and a call is otherwis
   assert.equal(Object.hasOwn(roundTimePolicy, 'modelMs'), false, 'no fixed total per call');
 });
 
+test('stream arrival times survive when an oversized trace keeps receipts only', () => {
+  const { omitDecisionTraceContent } = load('decision-traces');
+  const trace = { operationId: 'op', requestId: 'r', operation: 'advance', baseVersion: 1, contextId: 'c', outcome: 'committed', schemaVersion: 1, acceptedAt: 1, lastKnownStage: 'x', steps: [], gaps: [], redacted: false,
+    dispatches: [{ sequence: 1, task: 'npc', fetchStartedAt: 10, headersReceivedAt: 12, firstChunkAt: 13, firstContentAt: 14, lastChunkAt: 30, streamChunks: 900, responseAssembledFromStream: true, responseBody: 'x'.repeat(100) }] };
+  const kept = omitDecisionTraceContent(trace, 'single-record-limit').dispatches[0];
+  assert.equal(kept.responseBody, undefined);
+  for (const key of ['firstChunkAt', 'firstContentAt', 'lastChunkAt', 'streamChunks']) assert.equal(kept[key], trace.dispatches[0][key], key);
+  assert.equal(kept.responseAssembledFromStream, true);
+});
+
 // ---- The round: a stalled stream rolls back with a readable reason, and its usage stays unknown.
 const { scenario } = require('./routine-program-fixture.cjs');
 const store = load('store');
