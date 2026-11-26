@@ -32,8 +32,24 @@ export function providerTokenUsage(provider: string, body: CompletionBody | null
 function providerFailure(status:number){
   return status<200||status>=300?Object.assign(Error(status===401?'API Key 無效，請確認它屬於所選服務。':status===402?'模型服務額度不足，請先儲值。':status===429?'模型服務暫時限流或 API 額度不足，請檢查帳號額度後再試。':status===404?'帳號無法使用此模型，請更換模型再試。':`模型服務回應 ${status}，本回合沒有儲存。`), { code: status === 429 || status === 402 ? 'provider_limit' : 'technical_failure' }):undefined;
 }
+// Injected by the Vite config at build time, like the test-site NPC prompt: 'low', 'high' or 'max'
+// enables DeepSeek thinking at that reasoning effort. Absent or any other value keeps it disabled.
+// A build-time constant keeps this module free of Worker-only imports; the client bundle reaches it.
+declare const __DEEPSEEK_THINKING__: string | undefined;
+function deepseekReasoningEffort(): 'low' | 'high' | 'max' | undefined {
+  const value = typeof __DEEPSEEK_THINKING__ === 'string' ? __DEEPSEEK_THINKING__ : undefined;
+  return value === 'low' || value === 'high' || value === 'max' ? value : undefined;
+}
+const deepseekReasoningTokens = 4096;
+// Also injected at build time. '1' lets a candidate that fails format validation get one repair
+// turn (NPC decision and world adjudication); absent or any other value keeps the original
+// contract: an invalid candidate fails the round after a single dispatch.
+declare const __FORMAT_REPAIR__: string | undefined;
+export function formatRepairEnabled(): boolean {
+  return typeof __FORMAT_REPAIR__ === 'string' && __FORMAT_REPAIR__ === '1';
+}
 // Transport sees only the already filtered transcript and task schema, never World.
-export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean}={}){
+export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,messages:ModelMessage[],schema:object,options:{maxOutputTokens?:number;allowRecall?:boolean;allowThinking?:boolean}={}){
  const {model,provider}=service;
  if (provider === 'openrouter') return JSON.stringify({model,messages,temperature:.8,max_tokens:options.maxOutputTokens??2048});
  if (provider === 'openai') {
@@ -46,11 +62,17 @@ export function modelRequestBody(service:Pick<ModelService,'model'|'provider'>,m
  const conversation = messages.filter(message => message.role !== 'system');
  const limit = options.maxOutputTokens ?? 4096;
  if (provider === 'anthropic') return JSON.stringify({model,system,messages:conversation,max_tokens:limit});
+ // DeepSeek does not document whether max_tokens covers reasoning tokens, so an opted-in
+ // request reserves separate room for them; the decision itself keeps its usual limit.
+ // Only callers that opt in think. Measured on the test site (2026-11-25): an NPC decision with
+ // thinking returned in about 8 seconds, while world adjudication exceeded the 25-second model
+ // deadline twice, so adjudication and authoring tasks keep thinking disabled.
+ const effort = provider === 'deepseek' && options.allowThinking ? deepseekReasoningEffort() : undefined;
  return JSON.stringify({model, messages:[{role:'system',content:system}, ...conversation], response_format:{type:'json_object'},
-   max_tokens:limit,
-   ...(provider === 'deepseek' ? {thinking:{type:'disabled'}} : {})});
+   max_tokens:effort ? limit + deepseekReasoningTokens : limit,
+   ...(provider === 'deepseek' ? effort ? {thinking:{type:'enabled'},reasoning_effort:effort} : {thinking:{type:'disabled'}} : {})});
 }
-export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
+export type ModelRequestOptions = { signal: AbortSignal; observer?: ModelObserver; maxOutputTokens?: number; allowRecall?: boolean; allowThinking?: boolean; onUsage?: (tokens: TokenUsage) => void | Promise<void>; fetcher?: typeof fetch; requestId?: string } & { onSettled?: () => Promise<void>; beforeDispatch?: (requestId:string|undefined,signal:AbortSignal)=>Promise<void> };
 export async function requestModel(service: ModelService, messages: ModelMessage[], schema: object, options: ModelRequestOptions): Promise<string> {
   try { return await executeRequestModel(service,messages,schema,options); } finally { await options.onSettled?.(); }
 }

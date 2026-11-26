@@ -93,7 +93,7 @@ try {
   // Pass test file paths as arguments to run a subset; the default runs everything.
   allTests.push('tests/personal-needs-api.test.cjs');
   allTests.push('tests/activity-lifecycle-api.test.cjs', 'tests/activity-semantics-api.test.cjs', 'tests/activity-time-api.test.cjs', 'tests/activity-time-limit-api.test.cjs', 'tests/routine-first-approval-api.test.cjs', 'tests/routine-sharing-api.test.cjs', 'tests/routine-obstacles-api.test.cjs', 'tests/routine-api.test.cjs', 'tests/tea-api.test.cjs', 'tests/free-actions-api.test.cjs', 'tests/acceptance-scene-api.test.cjs', 'tests/adjudication-failure-api.test.cjs');
-  allTests.push('tests/live-acceptance-cup-api.test.cjs', 'tests/operation-evidence-api.test.cjs', 'tests/routine-results-api.test.cjs', 'tests/routine-program-api.test.cjs', 'tests/activity-results-api.test.cjs', 'tests/activity-time-review-api.test.cjs', 'tests/routine-objects-api.test.cjs', 'tests/routine-contract-api.test.cjs');
+  allTests.push('tests/live-acceptance-cup-api.test.cjs', 'tests/operation-evidence-api.test.cjs', 'tests/routine-results-api.test.cjs', 'tests/routine-program-api.test.cjs', 'tests/activity-results-api.test.cjs', 'tests/activity-time-review-api.test.cjs', 'tests/routine-objects-api.test.cjs', 'tests/routine-contract-api.test.cjs', 'tests/adjudication-daily-scope-api.test.cjs');
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
@@ -128,7 +128,7 @@ try {
   allTests.push('tests/world-saves-api.test.cjs','tests/save-management-api.test.cjs');
   allTests.push('tests/formal-mental-policy-api.test.cjs','tests/formal-mental-enable-api.test.cjs');
   const selected = process.argv.slice(2);
-  allTests.push('tests/cass-recall-contract.test.cjs');
+  allTests.push('tests/cass-recall-contract.test.cjs', 'tests/cafe-round-nine-contract.test.cjs', 'tests/deepseek-thinking-api.test.cjs', 'tests/format-repair-api.test.cjs');
   const result = spawnSync(process.execPath, ['--test', ...(selected.length ? selected : allTests)], { stdio: 'inherit', env: { ...process.env, QUIET_HOURS_TEST_BUILD: directory } });
   process.exitCode = result.status ?? 1;
 } finally { await rm(directory, { recursive: true, force: true }); }

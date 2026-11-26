@@ -15,17 +15,17 @@ import { requestControlledFeelings } from './controlled-feelings';
 import { readMentalEnergyTestPolicy } from './mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from './character-templates';
 import { initializeCity } from './city-initialization';
-import { requestModel, type ModelService } from './model-adapter';
+import { requestModel, formatRepairEnabled, type ModelService } from './model-adapter';
 import { readOpeningDescription, suggestOpeningRelationships } from './opening-relationship-generation';
 import { cityDraftSchema, prepareCity } from './city-creation';
 import { generateCharacterFields, readCharacterGeneration } from './character-generation';
 import { confirmsBodyConsequences } from './needs';
 import { traceActorSnapshot } from './decision-trace-capture';
 import { cancelActivity } from './activity-lifecycle';
-import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, routineOffer, routineCandidateSchema, resolveRoutineCandidate } from './routine-rules';
+import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, routineOffer, routineCandidateSchema, resolveRoutineCandidate, adjudicationFormatError } from './routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene } from './acceptance-scene';
 import { requiresWorldEffects, authorityForProposal, EffectValidationError } from './world-effects';
-import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure } from './adjudication';
+import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type AdjudicationRepair } from './adjudication';
 import { validPrice, beginCost } from './costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories } from './recall';
@@ -164,17 +164,28 @@ const advanceOperation = (): OperationHandler => ({
               decisionTrace?.step('rule-selection',c.id,{branch:reused?'program-result':'adjudication-required',candidate:reused||null});
               if(reused){decision.freeCandidate=reused;}else{
               const config=w.adjudication!;
-              await guard('chat',1);
               const key=await workWait(readModelKey(accountId,config.provider));
-              await verifyLease();
-              const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
-              const cost=beginCost(usage,config.provider,config.model,accountPlayer.prices.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
               const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c,decision.action),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              const adjudicationDispatch=dispatchModel('adjudication',w,c,config.provider,config.model,key,{evidence:true,withinWorkDeadline:false});
-              const raw=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:adjudicationDispatch.observer,fetcher:adjudicationDispatch.fetcher,beforeDispatch:adjudicationDispatch.beforeDispatch,onSettled:adjudicationDispatch.onSettled,onUsage:adjudicationDispatch.reportUsage(onUsage,cost)});
-              await verifyLease();
+              // Each ask is its own budgeted, counted and traced dispatch.
+              const askAdjudication=async(repair?:AdjudicationRepair)=>{
+                await guard('chat',1);
+                const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
+                const cost=beginCost(usage,config.provider,config.model,accountPlayer.prices.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
+                const adjudicationDispatch=dispatchModel('adjudication',w,c,config.provider,config.model,key,{evidence:true,withinWorkDeadline:false});
+                const reply=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:adjudicationDispatch.observer,fetcher:adjudicationDispatch.fetcher,beforeDispatch:adjudicationDispatch.beforeDispatch,onSettled:adjudicationDispatch.onSettled,onUsage:adjudicationDispatch.reportUsage(onUsage,cost)},repair);
+                await verifyLease();
+                return reply;
+              };
+              let raw=await askAdjudication();
+              // One repair turn for a candidate the pure format check refuses. Nothing has been
+              // bound or changed yet; a second refusal fails the round as before.
+              const formatError=formatRepairEnabled()?adjudicationFormatError(raw,w,c,decision.action):undefined;
+              if(formatError){
+                decisionTrace?.step('adjudication-format-retry',c.id,{message:formatError});
+                raw=await askAdjudication({raw,error:formatError});
+              }
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}

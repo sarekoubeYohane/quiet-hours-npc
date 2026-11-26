@@ -6,6 +6,7 @@ import type { UsageRecoveryView } from '@/lib/usage-recovery';
 import type { CandidateFailureReason } from '@/lib/model-adapter';
 import { Button } from '@/components/ui/button';
 import { readWorldResponse } from '@/lib/world-response';
+import { providerReasoning } from '@/lib/provider-api';
 
 // Read-only observer view. These records never become part of World or NPC input.
 type Trace = {
@@ -101,6 +102,7 @@ export default function DecisionTraces({worldEndpoint='/api/world',operationId,l
         {dispatch.discarded&&<p>此回覆遲到或已失效，未交給世界執行；不代表候選或效果已提交。</p>}
         {dispatch.requestBody===undefined?<p>當次請求本文未保存。</p>:<JsonDetails label={dispatch.stage==='dispatch-prepared'?'已準備的請求本文（派送狀態未知）':'實際送出的請求本文'} value={dispatch.requestBody}/>}
         {dispatch.responseBody===undefined?<p>當次回覆本文缺失；不推定模型沒有回覆。</p>:<JsonDetails label="實際收到的回覆本文" value={dispatch.responseBody}/>}
+        {providerReasoning(dispatch.responseBody)!==undefined&&<JsonDetails label="模型思考過程（供應商回傳的模型自述；只給觀察者看，不進入角色記憶或世界）" value={providerReasoning(dispatch.responseBody)}/>}
         {dispatch.worldSnapshot!==undefined&&<JsonDetails label="當次權威世界快照（包含相關未變狀態；不代表 NPC 可知）" value={dispatch.worldSnapshot}/>}
         {dispatch.rawCandidate!==undefined&&<JsonDetails label="模型候選原文" value={dispatch.rawCandidate}/>}
         {dispatch.parsedCandidate!==undefined&&<JsonDetails label="解析候選（尚非提交證據）" value={dispatch.parsedCandidate}/>}

@@ -402,6 +402,8 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | `world.pursuitVersion === 1` | 分層追求已啟用 |
 | `character.memories` 等舊欄位 | 是 `shortTerm` 的相容投影，不要直接寫入；`relationships` 同理，來源是 `cognition.relationshipTags` |
 | `acceptance.original` 與 `acceptance.snapshot` | 驗收場景的舊版未壓縮備份與現行 gzip 備份 |
+| 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉，因為裁定開 thinking 會超過 25 秒的模型期限。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
+| 建置常數 `__FORMAT_REPAIR__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `1`，其他環境為空字串。開啟時，格式驗證失敗的候選多一次修正機會：NPC 決策在 `models.ts` 的 `aiDecision` 迴圈（沿用回想接續的 `beforeContinuation` 計費與追溯），世界裁定在 `host-operations.ts` 以 `routine-rules.ts` 的 `adjudicationFormatError` 做純格式檢查後重問一次。每次重問都是獨立計費、計次、留實錄的派送；第二次仍失敗則照舊整回合回復。關閉時維持單次派送即失敗 |
 
 NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v1`、`controlled-feelings.v1`。
 
@@ -418,7 +420,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 - **`operationScope` 各 route 期待不同**：`/api/world` 要 `storageOwner`；存檔、開局草稿、預算要帳號 owner；人物與模型設定要帳號工作區，欄位名有的叫 `accountScope`。
 - **`mode: 'ai'` 指 OpenRouter**，`'openai'` 才是 OpenAI 直連。
 - **`CityDraft.characters[].templateId` 放的是人物卡 ID**，是歷史命名。
-- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。
+- **`RoutineRule.family` 一律是 `'cafe-service'`**，真正的分流看 `version`。住家等自訂場所的 `routineOffer` 也是這個值，且 `operations` 為空；給裁定模型的說明在 `adjudication-contract.ts` 的 `dailyScopeRule`（#384）。
 - **`lib/world-response.ts` 是瀏覽器端程式**；`model-settings.ts` 是純邏輯，`model-settings-store.ts` 才做 I/O。
 - **`entry-rules.ts` 只有型別**，實際的許可判斷在 `city-access.ts`。
 - **同名的 lib 與元件**：`decision-traces`、`operation-evidence`、`acceptance-scene`、`character-attributes` 在 `lib/` 與 `components/` 各有一個。

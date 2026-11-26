@@ -42,7 +42,10 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
   }else{
    messages[1].content=JSON.stringify(input);
   }
-  let systemPrompt=messages[0].content;
+  let systemPrompt=messages[0].content+'\n最終決策的每一層都只輸出本次 schema 定義的欄名，拼寫須完全相同。未定義的欄位一律省略，即使值是 null 也要省略整個鍵。';
+  if(Object.hasOwn(schema.properties,'processFeeling')){
+   systemPrompt+=' processFeeling 可為 null；填物件時只留 direction、level、reason 三欄。processFeeling.mood 即使是 null 也必須省略，決策頂層的 mood 照常填寫。processFeeling.direction 為 "neutral" 時，processFeeling.level 必須填數字 0。例如 {"direction":"neutral","level":0,"reason":"這件事讓我感覺平常。"}。';
+  }
   if(options.allowRecall){
    const feelings = ['feelingUpdates','processFeeling'].filter(field => Object.hasOwn(schema.properties,field));
    const contract = [
@@ -58,12 +61,19 @@ export function prepareNpcDecision(w:World,c:Character,options:PreparationOption
    const identity=JSON.stringify({contractVersion:input.contractVersion,pursuitContext:input.pursuitContext});
    systemPrompt+='\n\n最終行動回覆請先逐字複製以下固定欄位和值，再於同一個 JSON 物件內填完本次決策：\n'+identity;
    systemPrompt+='\n提交前逐一核對頂層必填欄位：'+schema.required.join('、')+'。';
-   if(Object.hasOwn(schema.properties,'processFeeling')){
-    systemPrompt+=' processFeeling 可為 null；有活動感受時，物件只含 direction、level、reason 三欄。';
+   const form:Record<string,unknown>={contractVersion:input.contractVersion,pursuitContext:input.pursuitContext,focusIntentId:'〈正式追求 ID 或 null〉'};
+   for(const field of schema.required){
+    if(Object.hasOwn(form,field))continue;
+    const property=schema.properties[field as keyof typeof schema.properties];
+    form[field]=property && 'type' in property && property.type==='array'?[]:'〈依本次決策填寫〉';
    }
+   systemPrompt+='\n最終決策從這份格式填起。保留每個鍵，依人物這次的選擇填值並替換所有〈〉，陣列有項目就填入。';
+   systemPrompt+='\n本次最終決策填寫格式：'+JSON.stringify(form);
+   systemPrompt+='\n依 pursuitSelection.focus 填頂層 focusIntentId：existing 時 focusIntentId 填 focus.id；candidate 時填相應 adoption.pursuitId；無焦點時明填 null。methodAssessment.intentIds 依序填 [focusIntentId] 或 []。';
+   systemPrompt+='\naction.type 與 methodAssessment.choice 必須同時是 continue 才算續做既有活動。即使沿用同一個追求，重新 propose 也須依實際選擇填 new、retry、switch、wait 或 drop。';
   }
-  if(systemPrompt!==messages[0].content)outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
-  return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall})).length<164000;
+  outgoingMessages=[{...messages[0],content:systemPrompt},...messages.slice(1)];
+  return new TextEncoder().encode(modelRequestBody(options,outgoingMessages,schema,{allowRecall:options.allowRecall,allowThinking:true})).length<164000;
  },pinned);
  const visible:Character={...c,intents:input.self.intents,arrangements:{schemaVersion:1,items:input.self.arrangements.items},shortTerm:(c.shortTerm||[]).filter(m=>input.self.shortTerm.some(r=>r.id===m.id&&r.version===m.version)),longTerm:(c.longTerm||[]).filter(m=>input.self.longTerm.some(r=>r.id===m.id&&r.version===m.version)),preferences:{schemaVersion:1,items:input.self.preferences.items,trace:[],droppedTrace:0},cognition:{...input.self.cognition,trace:[]}};
  const context:NpcDecisionContext={visible,feelingSources:c.mentalEnergy?.policy.experience?visibleFeelingSources([...input.self.shortTerm,...input.self.longTerm]):[],phoneReferences:input.phones,knownPeople:knownPeopleForDecision(visible,input.contacts.map(p=>p.id)),memoryReview:input.self.memoryReview,historyCandidates:input.self.cognition.historyCandidates||[]};
