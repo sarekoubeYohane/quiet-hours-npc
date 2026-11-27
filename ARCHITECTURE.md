@@ -107,7 +107,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 1. 先推進世界時間、自然變化、身體需求、精神電量區間與旅程。
 2. 逐角色判斷：旅途中跳過；有玩家指定行動就用它；被接管就不問模型；`canContinue` 成立就由程式續做。其餘才需要決策。
 3. 規則模式走 `lib/world.ts` 的 `demoDecision`；AI 模式由 advance handler 把 `lib/models.ts` 的 `npcDecisionTask`（訊息、回覆契約與判定）交給模型任務 module 派送；回想續答與格式修正的重問都由 module 的迴圈負責。
-4. `lib/npc-decision-preparation.ts` 的 `prepareNpcDecision` 組輸入並壓到上限，`requestModel` 送出，`parseDecision` 驗證。模型要求回想時多走一輪。
+4. `lib/npc-decision-preparation.ts` 的 `prepareNpcDecision` 組輸入並壓到上限（每次派送前都重新收斂），module 經模型傳輸送出，`npcDecisionTask` 的判定以 `parseDecision` 驗證。模型要求回想時，判定先取得回想結果再回報「要求續答」，module 多派送一次。
 5. 行動是 `propose` 或泡茶時需要裁定：先以 `lib/routine-rules.ts` 的 `selectRoutineForDecision` 找既有規則，沒有才以 `adjudicationTask` 經模型任務 module 問世界裁定，回來的候選再由 handler 綁定當前世界（綁定失敗不重問）。
 6. 回到 `advanceActivities` 寫回記憶、認知、追求，再由 `startActivity` 開始活動：有效果走 `commitFreeAction`，沒有走 `resolve()`。
 
