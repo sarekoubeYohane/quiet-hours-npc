@@ -141,6 +141,7 @@ test('沒有送出的請求不計入用量：世界裁定在送出前因派送�
   r.store.onStorage((sql,values)=>{if(sql.startsWith('INSERT OR IGNORE INTO player_dispatches')&&String(values[2]).includes(':adjudication:'))throw Error('fixture reservation unavailable');});
   const result=await r.run();
   assert.equal(result.status,502,JSON.stringify(result.body));
+  assert.equal(result.body.error,'fixture reservation unavailable');
   assert.equal(r.model.dispatches.length,0,'世界裁定沒有送出');
   r.store.onStorage(undefined);
   const after=await r.read();

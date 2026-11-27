@@ -61,7 +61,9 @@ export const setupTaskLabel = (name: string) => setupTaskLabels[name] ?? `製作
 export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
   const { accountId, id, operationId, world, accountPlayer, trace, services, verifyLease, workWait, modelSignal, dispatchModel } = ctx;
   const transport = services?.modelTransport ?? streamingTransport;
-  const usageNow = roundUsage ?? (current => () => current)(world.aiUsage = currentUsage(world));
+  // 製作工作在這裡取得當前用量；推進回合由呼叫端給。
+  const current = roundUsage ? undefined : world.aiUsage = currentUsage(world);
+  const usageNow = roundUsage ?? (() => current!);
   return async function runModelTask<T>(task: ModelTask<T> | DeferredModelTask<T>): Promise<T> {
     const { name, actor } = task;
     let content: ModelTaskContent<T> | undefined, messages: ModelMessage[] = [];
@@ -100,6 +102,8 @@ export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
       if (verdict.valid) { await verifyLease(); return verdict.value; }
       // 可修正的失敗只重問一次；其餘照舊拋出（判定附了錯誤物件就原樣拋出）。
       if (attempt > 1 || !content.repair || !formatRepairEnabled()) throw verdict.error ?? new ReplyRefused(verdict.reason, reply.text);
+      // 重問前先確認租約：租約已失效時不留下修正的紀錄。
+      await verifyLease();
       messages = [...content.messages, { role: 'assistant', content: reply.text.slice(0, content.repair.echoLimit) }, { role: 'user', content: content.repair.instruct(verdict.reason) }];
     }
   };
