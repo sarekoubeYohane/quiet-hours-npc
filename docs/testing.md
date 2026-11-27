@@ -73,7 +73,7 @@ node --import ./tooling/verification/no-network.mjs --test tests/<name>.test.mjs
 
 **模型與亂數**：測試把 `global.fetch` 換成固定回應，`Math.random` 也會被換掉以控制骰值。`tooling/verification/no-network.mjs` 會讓任何非 loopback 的請求直接失敗並印出 `[test-network-denied]`。測試不會發出付費請求。
 
-已改走模型任務 module 的派送點（目前是全部製作工作）可以改用腳本模型：`load('scripted-model').scriptedModel(script)` 經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入，腳本直接回傳「這項模型任務回覆什麼」，不必寫供應商的回應格式。範例見 `tests/model-task-opening-resources-api.test.cjs`。人物卡判讀與開局整理要先有草稿 route 建立的待恢復紀錄：`tests/model-task-setup-work-api.test.cjs` 以 `store.failNextOperationRead()` 讓草稿 route 第一次在受理前失敗，再以同一操作身分經 world route `?workspace=account` 帶腳本模型送出，最後重打草稿 route 回放結果。
+已改走模型任務 module 的派送點（目前是全部製作工作與世界裁定）可以改用腳本模型：`load('scripted-model').scriptedModel(script)` 經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入，腳本直接回傳「這項模型任務回覆什麼」，不必寫供應商的回應格式。範例見 `tests/model-task-opening-resources-api.test.cjs`。人物卡判讀與開局整理要先有草稿 route 建立的待恢復紀錄：`tests/model-task-setup-work-api.test.cjs` 以 `store.failNextOperationRead()` 讓草稿 route 第一次在受理前失敗，再以同一操作身分經 world route `?workspace=account` 帶腳本模型送出，最後重打草稿 route 回放結果。推進回合裡只有世界裁定經腳本模型，NPC 自主決策與接管後感受仍要替換 `fetch`（#416、#417 之後才改）；兩者並用的範例見 `tests/model-task-adjudication-api.test.cjs`。
 
 ## 檔名慣例
 

@@ -9,7 +9,7 @@ export type ScriptedDispatch = {
   messages: ModelMessage[];
   /** 最後一則 user 訊息解析後的 JSON；不是 JSON 時為 undefined。 */
   input: unknown;
-  contract: object; maxOutputTokens: number; attempt: number;
+  contract: object; maxOutputTokens?: number; attempt: number;
 };
 /** `reply` 是物件時以 JSON 送回，是字串時原樣當回覆文字；沒給 `usage` 代表供應商沒回報用量。 */
 export type ScriptedReply = { reply: unknown; usage?: TokenUsage };
