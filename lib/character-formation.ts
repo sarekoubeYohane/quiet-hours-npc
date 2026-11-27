@@ -1,5 +1,7 @@
 import { meaningfulText } from './text-equivalence';
 import { requestModel, type ModelService } from './model-adapter';
+import type { ModelTaskContent } from './model-task';
+import { askDirectly, judgeBy } from './model-task-replies';
 import { characterDraftFieldNames, missingCharacterText, type CharacterDraft } from './character-drafts';
 import { cardAttributeNames, type CardAttribute, type CardFormation, type CardValues } from './character-cards';
 export type BonusCandidate={target:CardAttribute|'capacity';source:string;quote:string;substantive:boolean};
@@ -28,12 +30,13 @@ export function characterFormationIssue(draft:CharacterDraft):string|undefined {
    return '人物文字不能直接指定遊戲屬性或精神容量的數字／範圍；年齡、身高等背景數字可以保留。';
  }
 }
-export async function assessCharacterCard(draft:CharacterDraft,service:ModelService,options:Parameters<typeof requestModel>[3]):Promise<CardAssessment> {
+/** 「人物卡判讀」這項模型任務的內容：訊息、回覆契約、輸出上限與對回覆的判定。 */
+export function cardAssessmentTask(draft:CharacterDraft):ModelTaskContent<CardAssessment> {
  const schema={type:'object',properties:{bonuses:{type:'array',maxItems:18,items:{type:'object',properties:{target:{type:'string',enum:targets},source:{type:'string',enum:sources},quote:{type:'string',maxLength:2400},substantive:{type:'boolean'}},required:['target','source','quote','substantive'],additionalProperties:false}}},required:['bonuses'],additionalProperties:false};
- const raw=await requestModel(service,[
+ return {messages:[
   {role:'system',content:'你只判讀人物已確認文字的有界背景候選。不得決定骰式、骰點、數值、配點或新增規則。可提出 strength/endurance/dexterity/perception/appearance/capacity 的正向背景候選，每項至多一項；沒有充分依據就留空。每項必須引用一個 source 的原文 quote。使用者概念也是使用者來源。AI 自行補入、未知來源的原文不因採納而獲得獎勵；AI／未知原文只有使用者實質新增或改變該項意義，且引文承接實際新增意義才可標 substantive=true。只改標點、格式、同義字、錯字、名字或無關背景數字不算實質修改。不要從AI未改片段取得候選，也不要因其他欄位有修改就替未改內容加權。容量指穩定心理餘裕，與當前心情／需求分開。不提出負向或需求特性獎勵。只回JSON。'},
   {role:'user',content:JSON.stringify({task:'character-card-assessment-v1',concept:draft.concept,fields:draft.fields,provenance:draft.provenance})},
- ],schema,{...options,maxOutputTokens:2048});
+ ],contract:schema,maxOutputTokens:2048,judge:judgeBy(raw=>{
  let parsed:unknown;try{if(raw.length>24000)throw Error();parsed=JSON.parse(raw);}catch{throw Error('人物背景判讀未回傳有效候選，原輸入已保留。');}
  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||Object.keys(parsed).join(',')!=='bonuses'||!Array.isArray((parsed as CardAssessment).bonuses)||(parsed as CardAssessment).bonuses.length>18)throw Error('人物背景判讀未回傳有效候選，原輸入已保留。');
  const bonuses:BonusCandidate[]=[];
@@ -52,7 +55,10 @@ export async function assessCharacterCard(draft:CharacterDraft,service:ModelServ
   if(!bonuses.some(item=>item.target===value.target))bonuses.push({...value});
  }
  return {bonuses};
+ })};
 }
+/** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩量測腳本使用（#411 第 5 段收尾）。 */
+export const assessCharacterCard=(draft:CharacterDraft,service:ModelService,options:Parameters<typeof requestModel>[3])=>askDirectly(cardAssessmentTask(draft),service,options);
 function die():number {const sample=Math.random();if(!Number.isFinite(sample)||sample<0||sample>=1)throw Error('人物骰源無效。');return Math.floor(sample*6)+1;}
 export function formCardValues(assessment:CardAssessment):CardFormation {
  const bonus=new Set(assessment.bonuses.map(value=>value.target));

@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const directory = await mkdtemp(join(tmpdir(), 'quiet-hours-tests-'));
 try {
   const sources = (await readdir('lib')).filter(file => file.endsWith('.ts')).map(file => ['lib/' + file, file.slice(0, -3)]);
-  sources.push(['app/api/opening-drafts/route.ts','opening-drafts-route'], ['app/api/character-drafts/route.ts','character-drafts-route'], ['app/api/character-drafts/form/route.ts','character-form-route'], ['app/api/character-cards/route.ts','character-cards-route'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route'],
+  sources.push(['app/api/opening-drafts/route.ts','opening-drafts-route'], ['app/api/character-drafts/route.ts','character-drafts-route'], ['app/api/character-drafts/form/route.ts','character-form-route'], ['app/api/opening-drafts/arrange/route.ts','opening-arrange-route'], ['app/api/character-cards/route.ts','character-cards-route'], ['app/api/world/route.ts', 'route'], ['app/api/environment/route.ts', 'environment-route'],
     ['app/api/model-settings/route.ts', 'model-settings-route'], ['app/api/saves/route.ts', 'saves-route'], ['app/api/character-templates/route.ts', 'character-templates-route'], ['app/api/scene-templates/route.ts', 'scene-templates-route']);
   for (const [source, output] of sources) {
     const result = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } });
@@ -96,7 +96,7 @@ try {
   allTests.push('tests/live-acceptance-cup-api.test.cjs', 'tests/operation-evidence-api.test.cjs', 'tests/routine-results-api.test.cjs', 'tests/routine-program-api.test.cjs', 'tests/activity-results-api.test.cjs', 'tests/activity-time-review-api.test.cjs', 'tests/routine-objects-api.test.cjs', 'tests/routine-contract-api.test.cjs', 'tests/adjudication-daily-scope-api.test.cjs');
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
-  allTests.push('tests/model-task-opening-resources-api.test.cjs');
+  allTests.push('tests/model-task-opening-resources-api.test.cjs', 'tests/model-task-setup-work-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
   allTests.push('tests/verified-obstacles-api.test.cjs');
   allTests.push('tests/action-feedback-api.test.cjs', 'tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs', 'tests/candidate-diagnostics-api.test.cjs');
