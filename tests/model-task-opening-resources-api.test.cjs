@@ -96,6 +96,7 @@ test('回覆合乎契約時保存結果並計一次用量，私有決策實錄�
  const sent=JSON.parse(dispatch.requestBody);
  assert.equal(JSON.parse(sent.messages.at(-1).content).request,'飲水和簡餐');
  assert.deepEqual(JSON.parse(dispatch.rawCandidate),validPlan(seen));
+ assert.deepEqual(JSON.parse(JSON.parse(dispatch.responseBody).content),validPlan(seen));
 });
 
 test('同一操作身分重送時回應與第一次相同，不再派送',async()=>{

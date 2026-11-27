@@ -107,7 +107,7 @@ export function openingResourcesTask(world:World,request:string):Omit<ModelTask<
     judge:raw=>{
       if(new TextEncoder().encode(raw).length>48000)return {valid:false,reason:'開局物資裁定超出容量。'};
       try{return {valid:true,value:resourcePlanSchema.parse(JSON.parse(raw))};}
-      catch(error){return {valid:false,reason:'開局物資裁定不合契約：'+(error instanceof Error?error.message:String(error))};}
+      catch(error){return {valid:false,reason:error instanceof Error?error.message:String(error)};}
     }};
 }
 

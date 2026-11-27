@@ -34,9 +34,9 @@ export const setupTaskLabel = (name: string) => setupTaskLabels[name] ?? `製作
 export function modelTasks(ctx: OperationContext) {
   const { accountId, id, operationId, world, accountPlayer, trace, services, verifyLease, workWait, modelSignal, dispatchModel } = ctx;
   const transport = services?.modelTransport ?? streamingTransport;
+  const config = world.adjudication!;
+  const usage = world.aiUsage = currentUsage(world);
   return async function runModelTask<T>(task: ModelTask<T> | DeferredModelTask<T>): Promise<T> {
-    const config = world.adjudication!;
-    const usage = world.aiUsage = currentUsage(world);
     if (budgetReached((await playerAccount(accountId)).usage, (await playerAccount(accountId)).limits)) throw new BudgetExceeded();
     await verifyLease();
     const { name } = task;
@@ -65,9 +65,9 @@ export function modelTasks(ctx: OperationContext) {
         onSettled: dispatch.onSettled,
       },
     );
-    await verifyLease();
     const verdict = judge(reply.text);
     if (!verdict.valid) throw Error(verdict.reason);
+    await verifyLease();
     return verdict.value;
   };
 }
