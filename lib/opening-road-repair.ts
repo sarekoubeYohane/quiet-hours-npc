@@ -1,5 +1,7 @@
 import {z} from 'zod';
 import {requestModel,type ModelService} from './model-adapter';
+import type {ModelTaskContent} from './model-task';
+import {askDirectly,judgeBy} from './model-task-replies';
 import type {CityDraft} from './city-draft';
 import {cityWalkSchema} from './city-finalization';
 import type {OpeningDraft} from './opening-drafts';
@@ -27,16 +29,18 @@ export function openingRepairSource(original:OpeningDraft,latest:OpeningDraft,pr
  return {...withOpeningRoads(proposal,roads),places:roads.places};
 }
 
-export async function repairOpeningRoads(city:CityDraft,service:ModelService,options:Parameters<typeof requestModel>[3]){
+/** 「補路建議」這項模型任務的內容：訊息、回覆契約、輸出上限與對回覆的判定。 */
+export function openingRoadRepairTask(city:CityDraft):ModelTaskContent<CityDraft> {
  const {groups}=openingRoadNetwork(city);
- const walks=[...(city.finalization?.walks??[])];
- const input={task:'opening-road-repair-v1',places:city.places.map(({id,name})=>({id,name})),walks,
+ const existing=city.finalization?.walks??[];
+ const input={task:'opening-road-repair-v1',places:city.places.map(({id,name})=>({id,name})),walks:[...existing],
   isolatedPlaceIds:city.isolatedPlaceIds??[],groups};
- const raw=await requestModel(service,[
+ return {messages:[
   {role:'system',content:'只建議讓不同分組之間可分段互達的最少跨場所步行道路。保留既有每一路段，不連往明示隔離的場所。使用提供的場所實例 ID 及 1 至 180 的步行分鐘，只回覆新增道路。'},
   {role:'user',content:JSON.stringify(input)},
- ],outputSchema,{...options,maxOutputTokens:2048});
+ ],contract:outputSchema,maxOutputTokens:2048,judge:judgeBy(raw=>{
  const proposed=repairSchema.parse(JSON.parse(raw));
+ const walks=[...existing];
  // Recheck after each accepted bridge: two suggestions can close the same gap.
  const occupied=new Set(walks.map(walk=>walkPairKey(walk.places)));
  const components=groups.map(group=>new Set(group));
@@ -50,4 +54,7 @@ export async function repairOpeningRoads(city:CityDraft,service:ModelService,opt
   components.splice(components.indexOf(second),1);
  }
  return {...city,finalization:{spaces:city.finalization?.spaces??[],walks}};
+ })};
 }
+/** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩量測腳本使用（#411 第 5 段收尾）。 */
+export const repairOpeningRoads=(city:CityDraft,service:ModelService,options:Parameters<typeof requestModel>[3])=>askDirectly(openingRoadRepairTask(city),service,options);

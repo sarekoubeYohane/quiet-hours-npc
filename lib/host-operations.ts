@@ -1,12 +1,12 @@
 import { isModelProvider, providerForMode } from './model-providers';
 import { openingResourcesTask, mapResourceActors, applyOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import { modelTasks, setupTaskLabel } from './model-task';
-import {repairOpeningRoads,openingRepairSource} from './opening-road-repair';
+import { modelTasks } from './model-task';
+import {openingRoadRepairTask,openingRepairSource} from './opening-road-repair';
 import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
-import { arrangeOpening } from './opening-arrangement-model';
+import { openingArrangementTask } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
 import { playerAccount, setPlayerAccount } from './player-account-budget';
-import { assessCharacterCard, characterFormationIssue } from './character-formation';
+import { cardAssessmentTask, characterFormationIssue } from './character-formation';
 import { saveCardAssessment } from './character-card-store';
 import { loadCharacterDraft } from './character-draft-store';
 import { adoptFormalMentalEnergy, validateMentalAdoption } from './formal-mental-enablement';
@@ -16,10 +16,10 @@ import { requestControlledFeelings } from './controlled-feelings';
 import { readMentalEnergyTestPolicy } from './mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from './character-templates';
 import { initializeCity } from './city-initialization';
-import { requestModel, formatRepairEnabled, type ModelService } from './model-adapter';
-import { readOpeningDescription, suggestOpeningRelationships } from './opening-relationship-generation';
+import { formatRepairEnabled } from './model-adapter';
+import { readOpeningDescription, openingRelationshipsTask } from './opening-relationship-generation';
 import { cityDraftSchema, prepareCity } from './city-creation';
-import { generateCharacterFields, readCharacterGeneration } from './character-generation';
+import { characterGenerationTask, readCharacterGeneration } from './character-generation';
 import { confirmsBodyConsequences } from './needs';
 import { traceActorSnapshot } from './decision-trace-capture';
 import { cancelActivity } from './activity-lifecycle';
@@ -33,7 +33,7 @@ import { recallMemories } from './recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallBudgetDatabase } from './recall-services';
 import { record, resolve } from './world';
 import { aiDecision } from './models';
-import { accountUsage, advanceActivities, BudgetExceeded, currentUsage, validBudgetLimits, budgetReached } from './activities';
+import { advanceActivities, BudgetExceeded, validBudgetLimits, budgetReached } from './activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable } from './model-keys';
 import { acceptOperation, respond, restoreWorld, runOperation, traceWorld, type OperationInput, type OperationChecks, type WorldChecks, type OperationHandler, type OperationOutcome, type OperationTable } from './host-runtime';
 
@@ -218,7 +218,7 @@ const advanceOperation = (): OperationHandler => ({
   },
 });
 
-/** 需要派送模型的準備工作（第 0 回合備料、AI 整理開局、人物數值判讀、AI 補人物欄位，以及舊的城市導入）。 */
+/** 製作工作（開局備料、AI 開局整理、補路建議、人物卡判讀、人物欄位補寫，以及舊的場所初始化與開局關係整理）：都經模型任務 module 派送。 */
 const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'largeBody' | 'privateEvidence'> = {}) => (): OperationHandler => {
   // 這次操作在各檢查時點之間保留的狀態。
   const state: {
@@ -289,45 +289,14 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
     }
     },
     async run(ctx): Promise<OperationOutcome> {
-      const { b, accountId, id, operationId, world, accountPlayer, trace, verifyLease, workWait, modelSignal, dispatchModel } = ctx, runModelTask = modelTasks(ctx);
+      const { b, accountId, operationId, world, workWait } = ctx, runModelTask = modelTasks(ctx);
       let failure: Error | undefined;
-      let generatedCharacter: Awaited<ReturnType<typeof generateCharacterFields>> | undefined;
-      let suggestedOpening: Awaited<ReturnType<typeof suggestOpeningRelationships>> | undefined;
+      let generatedCharacter: NonNullable<typeof state.characterGeneration>['fields'] | undefined;
+      let suggestedOpening: Awaited<ReturnType<typeof initializeCity>> | undefined;
       let finalizedCity: Awaited<ReturnType<typeof initializeCity>> | undefined;
       const { arrangingOpening, assessingCard, preparingResources, initializingCity, arrangement, assessingDraft, openingDescription, characterGeneration, city, openingPreview } = state;
       let finalizationPreview: typeof openingPreview;
       try {
-        const config = world.adjudication!;
-        const usage = world.aiUsage = currentUsage(world);
-        const price = accountPlayer.prices.find(value => value.provider === config.provider && value.model === config.model);
-        const runSetup = async <T,>(task:string, invoke:(service:ModelService,options:Parameters<typeof requestModel>[3])=>Promise<T>) => {
-          if (budgetReached((await playerAccount(accountId)).usage, (await playerAccount(accountId)).limits)) throw new BudgetExceeded();
-          await verifyLease();
-          if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
-            recallBudgetDatabase(), accountId, 'chat', id + ':' + operationId + ':' + task, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
-          ))).replayed) throw Error('付費請求結果不明，禁止重送。');
-          const key = await workWait(readModelKey(accountId, config.provider));
-          await verifyLease();
-          let reportCost: ReturnType<typeof beginCost> | undefined;
-          const dispatch = dispatchModel('adjudication', world, undefined, config.provider, config.model, key, { evidence: false, withinWorkDeadline: false, forward: (url, init) => {
-            traceWorld(trace, 'model-dispatch');
-            usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-            reportCost = beginCost(usage, config.provider, config.model, price, 'adjudication');
-            return fetch(url, init);
-          } });
-          const result = await invoke({ ...config, key }, {
-            signal: modelSignal(),
-            label: setupTaskLabel(task),
-            onSettled: dispatch.onSettled,
-            requestId: operationId + ':' + task,
-            observer: dispatch.observer,
-            beforeDispatch: dispatch.beforeDispatch,
-            fetcher: dispatch.fetcher,
-            onUsage: dispatch.reportUsage(tokens => accountUsage(usage, tokens), tokens => reportCost?.(tokens)),
-          });
-          await verifyLease();
-          return result;
-        };
         if(preparingResources){
           const prepared=structuredClone(world);
           applyOpeningResources(prepared,await runModelTask({name:'opening-resources',build:()=>openingResourcesTask(prepared,b.resourceRequest as string)}));
@@ -355,22 +324,24 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             if(!source?.result||source.revision!==requested.repairOf.version)throw Error('補路依據已變更。');
             const proposal=storedArrangementResult(source);
             const frozen=openingRepairSource(JSON.parse(source.snapshot),snapshot,proposal.city);
-            const city=await runSetup('opening-road-repair',(service,options)=>repairOpeningRoads(frozen,service,options));
+            const city=await runModelTask({name:'opening-road-repair',build:()=>openingRoadRepairTask(frozen)});
             await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,city,proposal));
           }else{
-            const result=await runSetup('opening-arrangement',(service,options)=>arrangeOpening(snapshot,service,options,requested));
+            const result=await runModelTask({name:'opening-arrangement',build:()=>openingArrangementTask(snapshot,requested)});
             await workWait(storeArrangementResult(accountId,arrangement.draft_id,operationId,result.city,{roomItems:result.roomItems}));
           }
         } else if (assessingCard && assessingDraft) {
-          const assessment = await runSetup('card-assessment',(service,options)=>assessCharacterCard(assessingDraft,service,options));
+          // 判讀結果刻意不給使用者看：私有決策實錄只留收據。
+          const assessment = await runModelTask({name:'card-assessment',receiptOnly:true,build:()=>cardAssessmentTask(assessingDraft)});
           await workWait(saveCardAssessment(accountId,assessingDraft.id,operationId,assessment));
         } else if (characterGeneration) {
-          generatedCharacter = await runSetup('character-generation',(service,options)=>generateCharacterFields(characterGeneration,service,options));
+          generatedCharacter = await runModelTask({name:'character-generation',build:()=>characterGenerationTask(characterGeneration)});
         } else if (openingPreview && city?.success) {
           const draft = city.data;
           if (initializingCity) {
+            // 回覆的檢查在 initializeCity 內逐步進行；這裡只負責派送。
             finalizedCity = await initializeCity(draft,openingPreview,(task,messages,schema)=>
-              runSetup(task,(service,options)=>requestModel(service,messages,schema,{...options,maxOutputTokens:4096})));
+              runModelTask({name:task,messages,contract:schema,maxOutputTokens:4096,judge:text=>({valid:true,value:text})}));
             const validated = cityDraftSchema.safeParse(finalizedCity);
             if (!validated.success) throw Error('場所定稿超出城市容量。');
             const {preview} = await workWait(prepareCity(accountId,validated.data,world));
@@ -378,7 +349,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             finalizationPreview = preview;
           } else if (openingDescription !== undefined) {
             const preview = openingPreview;
-            suggestedOpening = await runSetup('opening-relationships',(service,options)=>suggestOpeningRelationships(draft,preview,openingDescription,service,options));
+            suggestedOpening = await runModelTask({name:'opening-relationships',build:()=>openingRelationshipsTask(draft,preview,openingDescription)});
           }
         }
       } catch (error) {
