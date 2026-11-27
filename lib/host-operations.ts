@@ -95,6 +95,8 @@ const advanceOperation = (): OperationHandler => ({
     let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
     // 沿用回合開始時取得的世界內用量：整點換窗只影響下一回合。
     const runModelTask = modelTasks(ctx, () => world.aiUsage!);
+    // NPC 自主決策的第一次派送與接管後感受共用的派送預留 key：回合內的第幾次派送。
+    const roundReservation = () => `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`;
       const before = structuredClone(world);
       try {
         if(b.mode!=='demo'){const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();}
@@ -108,14 +110,14 @@ const advanceOperation = (): OperationHandler => ({
           beforeDecision: async () => {
             const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
             await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', roundReservation(), 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
             dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
-          // 經模型任務 module 派送；派送預留的 key 與 NPC 自主決策共用回合內的派送計數。
+          // 經模型任務 module 派送。
           evaluateControlledFeelings: (w,c,prepared)=>runModelTask({
             name:'feelings', kind:'feelings', actor:c, label:`${c.name}的感受評估`, service:{provider:providerForMode(b.mode),model:b.model!.trim()},
-            reservation:()=>`${id}:${operationId}:chat:${w.aiUsage?.totalCalls || 0}`, ...controlledFeelingsTask(c,w.minute,prepared),
+            reservation:roundReservation, ...controlledFeelingsTask(c,w.minute,prepared),
           }),
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
