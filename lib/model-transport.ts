@@ -8,8 +8,8 @@ import type { TokenUsage } from './activities';
  */
 export type ModelTransportRequest = {
   service: ModelService; messages: ModelMessage[];
-  /** 回覆契約（JSON schema）。 */
-  contract: object; maxOutputTokens: number;
+  /** 回覆契約（JSON schema）。輸出 token 上限沒給時用供應商各自的預設。 */
+  contract: object; maxOutputTokens?: number;
   /** 任務名稱與顯示名稱；顯示名稱用在逾時等錯誤訊息。 */
   task: string; label: string; actorId?: string;
   /** 這項模型任務的第幾次派送，從 1 起算。 */
