@@ -53,24 +53,26 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
   const step=(kind:string,actorId:string|undefined,data:unknown,source='program')=>{
     steps.push({kind,actorId,source,data:omitContent()?{gap:'trace-content-omitted'}:structuredClone(data),at:Date.now()});trace.lastKnownStage=kind;
   };
-  const observer=(task:'npc'|'adjudication'|'feelings',actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver):ModelObserver=>{
+  const observer=(task:'npc'|'adjudication'|'feelings',actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver,retainContent=false):ModelObserver=>{
+    // 沒有對象人物的派送預設只留收據；經模型任務 module 派送的製作工作明示保存送出內容與回覆（#413）。
+    const keep=!!actor||retainContent;
     secrets.add(key);let active:Record<string,unknown>|undefined;
     return async(event:ModelObservation)=>{
       await legacy?.(event);
       if(event.kind==='prepared'){
         active={sequence:trace.dispatches.length+1,task,actorId:actor?.id,requestId:event.requestId,provider,model,startedAt:Date.now(),
           price:world.modelPrices?.find(p=>p.provider===provider&&p.model===model)??null,
-          ...(omitContent()||!actor?{}:{requestBody:event.requestBody,worldSnapshot:traceWorldSnapshot(world)}),stage:'dispatch-prepared',signal:event.timing??null};
+          ...(omitContent()||!keep?{}:{requestBody:event.requestBody,...(actor?{worldSnapshot:traceWorldSnapshot(world)}:{})}),stage:'dispatch-prepared',signal:event.timing??null};
         trace.dispatches.push(active);trace.lastKnownStage='dispatch-prepared';
       }else if(active&&event.kind==='fetch-start'){active.fetchStartedAt=event.at;return;}
       else if(active&&event.kind==='dispatch'){if(active.stage==='dispatch-prepared')active.stage='dispatched';trace.lastKnownStage=String(active.stage);}
       else if(active&&event.kind==='headers'){active.httpStatus=event.httpStatus;active.headersReceivedAt=Date.now();active.stage='response-headers';trace.lastKnownStage='response-headers';}
-      else if(active&&(event.kind==='response'||event.kind==='late-response')){if(actor&&!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=event.at??Date.now();if(event.kind==='response'&&event.usage){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}if(event.stream)Object.assign(active,streamEvidence(event.stream));active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
+      else if(active&&(event.kind==='response'||event.kind==='late-response')){if(keep&&!omitContent())active.responseBody=event.responseBody;active.httpStatus=event.httpStatus;active.receivedAt=event.at??Date.now();if(event.kind==='response'&&event.usage){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}if(event.stream)Object.assign(active,streamEvidence(event.stream));active.stage=event.kind==='late-response'?'late-discarded':'received';trace.lastKnownStage=String(active.stage);if(event.kind==='late-response'){
         active.discarded=true;
         try{const usage=providerTokenUsage(provider,JSON.parse(event.responseBody));if(usage)active.lateUsage=usage;}catch{/* Malformed late bodies remain raw evidence. */}
       }}
       else if(active&&event.kind==='usage'){active.usage=event.usage;active.usageKnownAt=event.at??Date.now();}
-      else if(active&&event.kind==='candidate'){if(actor&&!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
+      else if(active&&event.kind==='candidate'){if(keep&&!omitContent())active.rawCandidate=event.raw;active.stage='candidate-received';trace.lastKnownStage='candidate-received';}
       else if(active&&event.kind==='failure'){if(event.stream)Object.assign(active,streamEvidence(event.stream));active.failure={kind:event.failure,stage:event.stage,...(event.detail&&!omitContent()?{detail:scrub(event.detail)}:{}),...(isCandidateFailureReason(event.reason)?{reason:event.reason}:{})};active.stage=event.failure;trace.lastKnownStage=event.failure;}
       await persist();
     };

@@ -165,10 +165,12 @@ export function playerBilling(owner:string,storageOwner:string,operationId:strin
     }
     throw Object.assign(Error('帳號正在處理另一個模型請求；本次未派送，請等待原操作完成後核對。'),{code:'account_budget_busy'});
   };
-  const fetcher=(forward:typeof fetch=fetch):typeof fetch=>(url,init)=>{init?.signal?.throwIfAborted();sent=true;return forward(url,init);};
+  /** 請求實際送出時呼叫：之後這筆派送結束而沒有用量回報時，視為結果不明而不是取消。 */
+  const markSent=()=>{sent=true;};
+  const fetcher=(forward:typeof fetch=fetch):typeof fetch=>(url,init)=>{init?.signal?.throwIfAborted();markSent();return forward(url,init);};
   async function settle(desiredFor:(previous:AIUsage)=>AIUsage,phase:'known'|'cancelled'){if(!pending)throw Error('找不到原帳號模型派送。');await settleAccountDispatch(owner,storageOwner,pending,desiredFor,phase);pending=undefined;}
   const report=(tokens:TokenUsage)=>{operationUsage.inputTokens+=tokens.inputTokens;operationUsage.outputTokens+=tokens.outputTokens;return settle(previous=>knownDispatchUsage(previous,tokens),'known');};
-  return {beforeDispatch,fetcher,report,finish};
+  return {beforeDispatch,fetcher,markSent,report,finish};
 }
 
 /** Keep world-local diagnostics faithful without making them the account authority. */

@@ -104,7 +104,7 @@ export type WorldChecks = OperationChecks & { world: World; version: number };
 type Checked = OperationReply | void | undefined;
 type Billing = ReturnType<typeof playerBilling>;
 export type ModelDispatch = {
-  observer: ModelObserver | undefined; fetcher: ReturnType<Billing['fetcher']>; beforeDispatch: ReturnType<Billing['beforeDispatch']>; onSettled: Billing['finish'];
+  observer: ModelObserver | undefined; fetcher: ReturnType<Billing['fetcher']>; sent: Billing['markSent']; beforeDispatch: ReturnType<Billing['beforeDispatch']>; onSettled: Billing['finish'];
   reportUsage: (...after: ((tokens: TokenUsage) => void)[]) => (tokens: TokenUsage) => Promise<void>;
 };
 /** 取得租約後交給 handler 的能力。派送模型只能經 `dispatchModel` 取得接線。 */
@@ -112,7 +112,7 @@ export type OperationContext = WorldChecks & {
   operationId: string; issuedAt: number; accountPlayer: PlayerAccountView; services?: WorldTaskServices; trace: WorldTrace;
   decisionTrace: ReturnType<typeof createDecisionTrace> | undefined; workDeadline: number;
   verifyLease: () => Promise<void>; workWait: <T>(promise: Promise<T>) => Promise<T>; modelSignal: () => AbortSignal;
-  dispatchModel: (task: 'npc' | 'adjudication' | 'feelings', world: World, actor: Character | undefined, provider: ModelProvider, model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch }) => ModelDispatch;
+  dispatchModel: (task: 'npc' | 'adjudication' | 'feelings', world: World, actor: Character | undefined, provider: ModelProvider, model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch; /** 沒有對象人物時，決策實錄仍保存送出內容與回覆。 */ traceContent?: boolean }) => ModelDispatch;
   /** 切換故事後，讓較早的操作身分全部視為已過期。 */
   forgetEarlierOperations: () => void;
 };
@@ -366,11 +366,11 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     };
     // 派送模型的共同接線：帳號預算預留與結算、決策追溯與操作證據的 observer 都在這裡接上。
     // 各派送點的差異以參數明示（#338 對照表），這裡不改變任何一處的既有行為。
-    const dispatchModel=(task:'npc'|'adjudication'|'feelings',w:World,actor:Character|undefined,provider:ModelProvider,model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch})=>{
-      const observer:ModelObserver|undefined=decisionTrace?.observer(task,actor,{...w,modelPrices:accountPlayer.prices},provider,model,key,options.evidence&&actor?evidence?.observer(task,actor.id,provider,model,key):undefined);
+    const dispatchModel=(task:'npc'|'adjudication'|'feelings',w:World,actor:Character|undefined,provider:ModelProvider,model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch;traceContent?:boolean})=>{
+      const observer:ModelObserver|undefined=decisionTrace?.observer(task,actor,{...w,modelPrices:accountPlayer.prices},provider,model,key,options.evidence&&actor?evidence?.observer(task,actor.id,provider,model,key):undefined,options.traceContent);
       return {
         observer:options.withinWorkDeadline&&observer?((event:Parameters<ModelObserver>[0])=>workWait(Promise.resolve(observer(event)))) as ModelObserver:observer,
-        fetcher:billing!.fetcher(options.forward),
+        fetcher:billing!.fetcher(options.forward),sent:billing!.markSent,
         beforeDispatch:billing!.beforeDispatch(provider,model,task),
         onSettled:billing!.finish,
         /** 先結算帳號帳本，再依序回報世界內用量與費用。 */
