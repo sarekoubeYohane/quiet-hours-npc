@@ -73,8 +73,8 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 操作的受理、收據、重送、租約、提交與失敗回復 | `lib/host-runtime.ts` 的 `runOperation`（主持執行層） |
 | 新增或修改一項操作（驗證與執行） | `lib/host-operations.ts` 的 `hostOperations`，每項操作一個 handler |
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
-| 新增一項模型任務，或把既有派送點改走模型任務 module | `lib/model-task.ts` 的 `modelTasks`；呼叫端只給任務名稱、訊息、回覆契約、輸出 token 上限與對回覆的判定。製作工作的內容寫成 `xxxTask(...)`（例：`openingResourcesTask`、`characterGenerationTask`），拋錯式的檢查用 `lib/model-task-replies.ts` 的 `judgeBy` 包成判定。目前全部製作工作經它派送（#413、#414）；世界裁定、接管後感受與 NPC 自主決策仍各自接 `dispatchModel`（#415–#417） |
-| 測試裡安排「這項模型任務回覆什麼」 | `lib/scripted-model.ts` 的 `scriptedModel`，經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入；範例見 `tests/model-task-opening-resources-api.test.cjs`、`tests/model-task-setup-work-api.test.cjs`（後者示範經草稿 route 建立待恢復紀錄，再經 world route 帶腳本模型） |
+| 新增一項模型任務，或把既有派送點改走模型任務 module | `lib/model-task.ts` 的 `modelTasks`；呼叫端只給任務名稱、訊息、回覆契約、輸出 token 上限與對回覆的判定。製作工作的內容寫成 `xxxTask(...)`（例：`openingResourcesTask`、`characterGenerationTask`），拋錯式的檢查用 `lib/model-task-replies.ts` 的 `judgeBy` 包成判定。有對象人物的任務另給 `actor`、`label` 與派送預留的 key；要有格式修正就給 `repair`（回送上限與修正說明）；不是用世界的裁定模型、帳本分類不是裁定類的任務另給 `service` 與 `kind`；判定失敗要留在決策實錄的，在判定結果附 `failure`。目前全部製作工作（#413、#414）、世界裁定（#415，內容在 `lib/adjudication.ts` 的 `adjudicationTask`）與接管後感受（#416，內容在 `lib/controlled-feelings.ts` 的 `controlledFeelingsTask`）經它派送；NPC 自主決策仍自己接 `dispatchModel`（#417） |
+| 測試裡安排「這項模型任務回覆什麼」 | `lib/scripted-model.ts` 的 `scriptedModel`，經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入；範例見 `tests/model-task-opening-resources-api.test.cjs`、`tests/model-task-setup-work-api.test.cjs`（後者示範經草稿 route 建立待恢復紀錄，再經 world route 帶腳本模型）、`tests/model-task-adjudication-api.test.cjs`（推進回合：世界裁定由腳本模型回覆，NPC 自主決策仍由替換的 `fetch` 回覆） |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
 | 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
@@ -94,7 +94,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 4. **解析模型設定**：`lib/model-settings-store.ts` 的 `readEffectiveModels`（存檔 → 帳號 → 舊世界設定）與 `lib/model-keys.ts`。
 5. **取得租約**：對 `worlds` 做一次帶 `version`、`operations`、`state` 條件的 UPDATE，寫入 `locked_until`。
 6. **建立證據與追溯**：`createOperationEvidence`、`createDecisionTrace`。
-7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由推進的 handler 以 callback 注入，派送接線來自主持執行層的 `dispatchModel`。製作工作全部由 `lib/model-task.ts` 派送，往下經模型傳輸 interface（`lib/model-transport.ts`）。
+7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由推進的 handler 以 callback 注入：NPC 自主決策的派送接線來自主持執行層的 `dispatchModel`，世界裁定與接管後感受經 `lib/model-task.ts` 派送（接管後感受的派送前確認與計次都在 module，`advanceActivities` 只呼叫 callback）。製作工作全部由 `lib/model-task.ts` 派送，往下經模型傳輸 interface（`lib/model-transport.ts`）。
 8. **每次派送前檢查預算**：`lib/player-account-budget.ts` 的 `playerBilling`，並重新確認租約。
 9. **失敗**：整個回合回復（`restoreWorld`），已發生的用量保留；回 429（預算）或 502。
 10. **提交**：對 `worlds` 做一次條件 UPDATE，`version + 1`、釋放租約、寫入收據。衝突時只保留已付用量。
@@ -108,7 +108,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 2. 逐角色判斷：旅途中跳過；有玩家指定行動就用它；被接管就不問模型；`canContinue` 成立就由程式續做。其餘才需要決策。
 3. 規則模式走 `lib/world.ts` 的 `demoDecision`；AI 模式走 `lib/models.ts` 的 `aiDecision`。
 4. `lib/npc-decision-preparation.ts` 的 `prepareNpcDecision` 組輸入並壓到上限，`requestModel` 送出，`parseDecision` 驗證。模型要求回想時多走一輪。
-5. 行動是 `propose` 或泡茶時需要裁定：先以 `lib/routine-rules.ts` 的 `selectRoutineForDecision` 找既有規則，沒有才呼叫 `requestAdjudication`。
+5. 行動是 `propose` 或泡茶時需要裁定：先以 `lib/routine-rules.ts` 的 `selectRoutineForDecision` 找既有規則，沒有才以 `adjudicationTask` 經模型任務 module 問世界裁定，回來的候選再由 handler 綁定當前世界（綁定失敗不重問）。
 6. 回到 `advanceActivities` 寫回記憶、認知、追求，再由 `startActivity` 開始活動：有效果走 `commitFreeAction`，沒有走 `resolve()`。
 
 ## lib 模組分組
@@ -127,7 +127,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `paused-activities.ts` | 暫停、復工、放棄 |
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
 | `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
-| `model-task.ts` | 模型任務 module（#411）：`modelTasks(ctx)` 回傳 `runModelTask`。每次派送前確認預算與租約、取得派送預留，送出時世界內用量加一並開始計費，用量結算到帳號帳本與世界內用量，回覆交給呼叫端的判定；不合契約時拋出原因（判定附了錯誤物件就原樣拋出）。決策實錄的寫入受工作期限約束；預設保存送出內容與回覆，任務標 `receiptOnly` 時只留收據（人物卡判讀）。目前承接全部製作工作：開局備料、AI 開局整理（含逐房配物）、補路建議、人物卡判讀、人物欄位補寫、場所初始化、開局關係整理。帳本分類為裁定類，每項任務只派送一次（格式修正與回想續答尚未搬進來） |
+| `model-task.ts` | 模型任務 module（#411）：`modelTasks(ctx)` 回傳 `runModelTask`。每次派送前確認預算與租約、取得派送預留，送出時世界內用量加一並開始計費，用量結算到帳號帳本與世界內用量，回覆交給呼叫端的判定；不合契約時拋出原因（判定附了錯誤物件就原樣拋出，否則拋 `ReplyRefused`，帶最後一份回覆原文）。格式修正的迴圈只在這裡：任務給了 `repair` 且建置開啟格式修正時，第一份回覆不合契約會接上原回覆（最多 `echoLimit` 字元）與修正說明重問一次，那次派送同樣確認預算與租約、計次、計費、留實錄。決策實錄的寫入受工作期限約束；預設保存送出內容與回覆，任務標 `receiptOnly` 時只留收據（人物卡判讀）。目前承接世界裁定（有對象人物，另留操作證據；有格式修正）、接管後感受（#416：有對象人物；用推進回合選的模型、帳本分類為感受類；沒有格式修正；判定失敗時先確認租約、把失敗留在決策實錄再拋出）與全部製作工作：開局備料、AI 開局整理（含逐房配物）、補路建議、人物卡判讀、人物欄位補寫、場所初始化、開局關係整理。製作工作與世界裁定的帳本分類為裁定類；製作工作沒有給 `repair`，每項只派送一次（#419）。回想續答尚未搬進來（#417） |
 | `model-task-replies.ts` | 製作工作共用的兩個小工具：`judgeBy` 把「不合契約就拋錯」的解讀函式包成模型任務的判定，錯誤類別與訊息原樣保留；`askDirectly` 給不經 module 的舊入口（`generateCharacterFields`、`assessCharacterCard`、`arrangeOpening`、`repairOpeningRoads`）使用，只剩量測腳本 `tooling/experiments/setup-reply-size/` 呼叫 |
 | `model-transport.ts` | 模型傳輸 interface `ModelTransport`：收服務設定、訊息與回覆契約，回傳回覆文字與用量；請求實際送出時通知一次（`onSent`），得知用量時通知一次（`onUsage`）。正式的 adapter 是 `streamingTransport`（包 `requestModel`） |
 | `scripted-model.ts` | 模型傳輸 interface 的測試用 adapter（腳本模型）：腳本看到任務名稱、訊息、契約等（不含 Key），回傳回覆與用量；不經 `fetch`。正式程式沒有任何地方 import 它 |
@@ -142,7 +142,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `playbook.ts` | NPC 共用原則的 prompt 文字 |
 | `action-checks.ts` | 檢定系統選擇與 d100 實作 |
 | `d20.ts` | D20 擲骰、判定，以及共用的 `Resolution` 型別 |
-| `adjudication.ts` | 天上意志的模型任務：組輸入、派送、失敗收據 |
+| `adjudication.ts` | 天上意志的模型任務：組輸入、交給模型任務 module 的任務內容 `adjudicationTask`（訊息、輸出上限、純格式判定、格式修正的回送上限 48000 字元與修正說明）、失敗收據。`requestAdjudication` 是直接呼叫模型傳輸的舊入口，只剩測試與診斷工具使用 |
 | `adjudication-contract.ts` | 裁定候選的 schema、規則文字、純驗證 parser |
 | `adjudication-limits.ts` | 裁定與世界物件的上限常數 |
 | `world-effects.ts` | 效果執行引擎：在副本上驗證、擲骰、提交、產生行動回饋 |
@@ -207,7 +207,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `mental-experiences.ts` | 經歷帶來的自然感受與收據 |
 | `mental-process.ts` | 活動過程中的感受 |
 | `emotion-regulation.ts` | 付費的主動情緒調節 |
-| `controlled-feelings.ts` | 玩家接管後的獨立模型呼叫 |
+| `controlled-feelings.ts` | 玩家接管後的獨立模型呼叫：`prepareControlledFeelings` 組輸入與回覆契約，`controlledFeelingsTask` 是交給模型任務 module 的任務內容（判定與錯誤訊息），`acknowledgeControlledFeelings` 記下已處理的來源 |
 | `mental-history.ts` | 歷史紀錄的 append 與裁切 |
 
 ### 手機
@@ -411,7 +411,7 @@ migration 編號是 0000–0008、0013–0020，沒有 0009–0012。`drizzle/me
 | `character.memories` 等舊欄位 | 是 `shortTerm` 的相容投影，不要直接寫入；`relationships` 同理，來源是 `cognition.relationshipTags` |
 | `acceptance.original` 與 `acceptance.snapshot` | 驗收場景的舊版未壓縮備份與現行 gzip 備份 |
 | 建置常數 `__DEEPSEEK_THINKING__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `low`，其他環境為空字串。值為 `low`／`high`／`max` 時 `model-adapter.ts` 對 DeepSeek 的 **NPC 決策**開啟 thinking 並用該強度（呼叫端須帶 `allowThinking`，目前只有 `models.ts`）；世界裁定與製作類任務維持關閉（2026-11-25 量測時裁定開 thinking 兩次超過當時 25 秒的固定期限；改串流後尚未重測）。供應商回傳的思考文字留在決策實錄的回覆本文，由 `provider-api.ts` 的 `providerReasoning` 取出，只在分析頁的決策實錄顯示 |
-| 建置常數 `__FORMAT_REPAIR__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `1`，其他環境為空字串。開啟時，格式驗證失敗的候選多一次修正機會：NPC 決策在 `models.ts` 的 `aiDecision` 迴圈（沿用回想接續的 `beforeContinuation` 計費與追溯），世界裁定在 `host-operations.ts` 以 `routine-rules.ts` 的 `adjudicationFormatError` 做純格式檢查後重問一次。每次重問都是獨立計費、計次、留實錄的派送；第二次仍失敗則照舊整回合回復。關閉時維持單次派送即失敗 |
+| 建置常數 `__FORMAT_REPAIR__` | `vite.config.ts` 在 `CLOUDFLARE_ENV=test` 建置時注入 `1`，其他環境為空字串。開啟時，格式驗證失敗的候選多一次修正機會：NPC 決策在 `models.ts` 的 `aiDecision` 迴圈（沿用回想接續的 `beforeContinuation` 計費與追溯），世界裁定由 `model-task.ts` 的迴圈重問一次（判定是 `routine-rules.ts` 的 `adjudicationFormatError` 純格式檢查，#415）。每次重問都是獨立計費、計次、留實錄的派送；第二次仍失敗則照舊整回合回復。關閉時維持單次派送即失敗 |
 
 NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。其他版本字串：`world-adjudication.v1`、`world-effects.v5`、`round-v2`（回合時間政策）、`controlled-feelings.v1`。
 

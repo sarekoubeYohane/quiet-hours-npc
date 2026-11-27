@@ -5,9 +5,10 @@ import { regionOf } from './perception';
 import { routineWorldLimits } from './routine-world-contract';
 import { adjudicationRules } from './adjudication-contract';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
-import { requestModel, type ModelService } from './model-adapter';
+import { requestModel, type ModelMessage, type ModelService } from './model-adapter';
 import type { Action, Character, World } from './world';
 import type { ModelTransport } from './model-transport';
+import type { ModelTaskContent } from './model-task';
 
 export const adjudicationContractVersion = 'world-adjudication.v1';
 export type AdjudicationInput = {
@@ -140,20 +141,40 @@ export function buildAdjudicationInput(world: World, actor: Character, action: A
 // `repair` is the single retry after a candidate failed the pure format check: the model sees its
 // own reply and the parser's message, and answers the same input again.
 export type AdjudicationRepair = { raw: string; error: string };
-const adjudicationRepairEchoLimit = 48000;
+/** 格式修正時回送給模型的原回覆上限：世界裁定輸出 token 上限 12000 × 4 字元（#411）。 */
+const adjudicationRepairEchoLimit = routineWorldLimits.maxOutputTokens * 4;
+const adjudicationMessages = (input: AdjudicationInput): ModelMessage[] => [
+  { role: 'system', content: [
+    '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。',
+    '先決定 status，再填 activityIdentity。凡 status 不等於 "accepted"，頂層 activityIdentity 必須填 JSON 的 null。',
+    '對照這兩個欄位的配對 {"status":"denied","activityIdentity":null}、{"status":"unsupported","activityIdentity":null}，其餘必填欄位依本次契約填齊。',
+  ].join('\n') },
+  { role: 'user', content: JSON.stringify(input) },
+];
+const adjudicationRepairInstruction = (error: string) => JSON.stringify({ validationFailed: true, validationError: error, instruction: '你上一份候選沒有通過格式驗證，尚未被採用，世界沒有任何改變。validationError 是驗證訊息。請維持原本的裁定結論，只修正格式問題，依同一份契約重新回傳完整的候選 JSON。' });
+// 有日常範圍時才指定輸出上限；其餘沿用模型傳輸的預設。
+const adjudicationOutputLimit = (input: AdjudicationInput) => 'routineOffer' in input && input.routineOffer ? { maxOutputTokens: routineWorldLimits.maxOutputTokens } : {};
+/**
+ * 世界裁定交給模型任務 module 的任務內容（#415）。
+ * 判定只做純格式檢查（`formatError`），有效時原樣交回候選文字；綁定當前世界留在 handler，綁定失敗不重問。
+ * `onRepair` 在 module 決定重問時呼叫一次。
+ */
+export function adjudicationTask(input: AdjudicationInput, schema: object, formatError: (raw: string) => string | undefined, onRepair?: (reason: string) => void): ModelTaskContent<string> {
+  return {
+    messages: adjudicationMessages(input), contract: schema, ...adjudicationOutputLimit(input),
+    judge: raw => { const reason = formatError(raw); return reason ? { valid: false, reason } : { valid: true, value: raw }; },
+    repair: { echoLimit: adjudicationRepairEchoLimit, instruct: reason => { onRepair?.(reason); return adjudicationRepairInstruction(reason); } },
+  };
+}
+/** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩測試與診斷工具使用（#411 第 5 段收尾）。 */
 export function requestAdjudication(input: AdjudicationInput, service: ModelService, schema: object, options: Parameters<typeof requestModel>[3], repair?: AdjudicationRepair): Promise<string> {
   return requestModel(service, [
-    { role: 'system', content: [
-      '你負責世界主持的行動解讀。依本次契約提出候選；不直接修改世界，不擲骰、不指定最終結果，只輸出 JSON。',
-      '先決定 status，再填 activityIdentity。凡 status 不等於 "accepted"，頂層 activityIdentity 必須填 JSON 的 null。',
-      '對照這兩個欄位的配對 {"status":"denied","activityIdentity":null}、{"status":"unsupported","activityIdentity":null}，其餘必填欄位依本次契約填齊。',
-    ].join('\n') },
-    { role: 'user', content: JSON.stringify(input) },
+    ...adjudicationMessages(input),
     ...(repair ? [
       { role: 'assistant', content: repair.raw.slice(0, adjudicationRepairEchoLimit) },
-      { role: 'user', content: JSON.stringify({ validationFailed: true, validationError: repair.error, instruction: '你上一份候選沒有通過格式驗證，尚未被採用，世界沒有任何改變。validationError 是驗證訊息。請維持原本的裁定結論，只修正格式問題，依同一份契約重新回傳完整的候選 JSON。' }) },
+      { role: 'user', content: adjudicationRepairInstruction(repair.error) },
     ] : []),
-  ], schema, {...options,...('routineOffer' in input&&input.routineOffer?{maxOutputTokens:routineWorldLimits.maxOutputTokens}:{})});
+  ], schema, {...options,...adjudicationOutputLimit(input)});
 }
 export function validateExistingAdjudication(candidate: unknown): void {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.keys(candidate).length !== 1 || !('status' in candidate) || candidate.status !== 'accepted') {
