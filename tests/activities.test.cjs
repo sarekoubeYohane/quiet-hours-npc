@@ -13,7 +13,10 @@ const { learnHabit, habitViews, habitsForDecision, habitStrength } = fromBuild('
 const { POST } = fromBuild('route');
 const store = fromBuild('store');
 const options = (decide, extras = {}) => ({ minutes: 15, mode: 'openai', modelKey: 'openai:test', limits: { calls: 120, tokens: 500000 }, decide, ...extras });
-const restful = async (w, c, usage) => { usage({ inputTokens: 100, outputTokens: 20 }); return { action: { type: 'rest' }, durationMinutes: 90 }; };
+// #417：decide 不再收到用量回報的 callback；計次與用量回報由 callback 本身（正式路徑是模型任務 module）負責。
+const restful = async () => ({ action: { type: 'rest' }, durationMinutes: 90 });
+// 模擬模型任務 module 在請求送出時的計次。
+const counted = world => { const usage = world.aiUsage; usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++; };
 
 const worldWithAdjudication = require('./fixtures/ai-world.cjs')(seedWorld);
 const learnStartedHabit = (world, character, action, from) => { resolve(world, character, action); learnHabit(world, character, action, from); };
@@ -65,7 +68,7 @@ test('a watched departure interrupts an activity and changing models invalidates
 
 test('budget prevents new requests, survives a reload, and resets its hourly window', async () => {
   const world = worldWithAdjudication(); const now = Date.now(); let calls = 0;
-  const opts = options(async (...args) => { calls++; return restful(...args); }, { now, limits: { calls: 4, tokens: 30000 } });
+  const opts = options(async (...args) => { calls++; counted(args[0]); return restful(...args); }, { now, limits: { calls: 4, tokens: 30000 } });
   await advanceActivities(world, opts);
   const reloaded = JSON.parse(JSON.stringify(world));
   await assert.rejects(advanceActivities(reloaded, opts), BudgetExceeded);

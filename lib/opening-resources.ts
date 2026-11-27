@@ -114,9 +114,10 @@ export function openingResourcesTask(world:World,request:string):Omit<ModelTask<
 /** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩測試與量測腳本使用（#411 第 5 段收尾）。 */
 export async function suggestOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]){
   const task=openingResourcesTask(world,request);
-  const verdict=task.judge(await requestModel(service,task.messages,task.contract,{...options,maxOutputTokens:task.maxOutputTokens}));
-  if(!verdict.valid)throw Error(verdict.reason);
-  return verdict.value;
+  const verdict=await task.judge(await requestModel(service,task.messages,task.contract,{...options,maxOutputTokens:task.maxOutputTokens}));
+  if(verdict.valid)return verdict.value;
+  // 舊入口只問一次；這項任務的判定不會要求續答。
+  throw Error('reason' in verdict?verdict.reason:'舊入口不支援續答。');
 }
 
 export type ResourcePlan=z.infer<typeof resourcePlanSchema>;

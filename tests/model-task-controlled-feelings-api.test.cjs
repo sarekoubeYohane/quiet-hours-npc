@@ -8,7 +8,8 @@ const operationId=()=>Date.now()+':'+crypto.randomUUID();
 const feeling=()=>({contractVersion:'controlled-feelings.v1',feelingUpdates:[],processFeeling:{direction:'positive',level:1,reason:'我覺得這段休息舒服'}});
 const recallKeys=['RECALL_ENABLED','RECALL_USAGE_DB'];
 
-// 使用者指定一位人物休息（暫時接管）；接管後感受由腳本模型回覆，其他人物的 NPC 自主決策仍由替換的 fetch 回覆（#417 才改）。
+// 使用者指定一位人物休息（暫時接管）。#417 之後 NPC 自主決策也經模型任務 module，所以腳本模型同時回覆兩種任務：
+// 其他人物的 NPC 自主決策固定回覆「休息」，輸入記在 `fetches`（沿用改動前的名稱：NPC 自主決策的派送次數）；`model.dispatches` 只算接管後感受。
 async function takeover({recall=false,others=false,spend=false,reply=feeling}={}){
  const {scriptedModel}=load('scripted-model'),{GET,POST}=load('route'),store=load('store'),{seedWorld}=load('world'),{env}=load('cloudflare-workers');
  const world=seedWorld();world.contextId='model-task-controlled-feelings';
@@ -19,9 +20,11 @@ async function takeover({recall=false,others=false,spend=false,reply=feeling}={}
  const fetches=[],original=global.fetch;
  global.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).messages[1].content);fetches.push(input);return Response.json({usage:{prompt_tokens:30,completion_tokens:10},choices:[{message:{content:JSON.stringify(fixtureDecision(input,{type:'rest',target:'',content:'我自己休息'}))}}]});};
  const first=await(await GET(new Request(origin+'/api/world'))).json();
- const model=scriptedModel(dispatch=>({reply:reply(dispatch),usage}));
+ const npc=dispatch=>{const input=JSON.parse(dispatch.messages[1].content);fetches.push(input);return fixtureDecision(input,{type:'rest',target:'',content:'我自己休息'});};
+ const scripted=scriptedModel(dispatch=>({reply:dispatch.task==='npc'?npc(dispatch):reply(dispatch),usage}));
+ const model={get dispatches(){return scripted.dispatches.filter(dispatch=>dispatch.task==='feelings');}};
  const post=async body=>{
-  const response=await POST(new Request(origin+'/api/world',{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:first.operationScope,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',operationId:operationId(),...body})}),{modelTransport:model});
+  const response=await POST(new Request(origin+'/api/world',{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:first.operationScope,worldContext:world.contextId,mode:'openai',model:'gpt-6-luna',operationId:operationId(),...body})}),{modelTransport:scripted});
   return {status:response.status,body:await response.json()};
  };
  const ok=async body=>{const result=await post(body);assert.equal(result.status,200,JSON.stringify(result.body));return result;};

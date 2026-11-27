@@ -12,7 +12,7 @@ import { currentEnvironment } from './environment';
 import { worldForClient } from './acceptance-scene';
 import { EffectValidationError } from './world-effects';
 import { type AdjudicationFailure, type WorldTaskServices } from './adjudication';
-import { type PriceInput } from './costs';
+import { type DispatchKind, type PriceInput } from './costs';
 import { env } from 'cloudflare:workers';
 import { boundRecallStorage } from './recall';
 import { RecallServiceError } from './recall-services';
@@ -112,7 +112,7 @@ export type OperationContext = WorldChecks & {
   operationId: string; issuedAt: number; accountPlayer: PlayerAccountView; services?: WorldTaskServices; trace: WorldTrace;
   decisionTrace: ReturnType<typeof createDecisionTrace> | undefined; workDeadline: number;
   verifyLease: () => Promise<void>; workWait: <T>(promise: Promise<T>) => Promise<T>; modelSignal: () => AbortSignal;
-  dispatchModel: (task: 'npc' | 'adjudication' | 'feelings', world: World, actor: Character | undefined, provider: ModelProvider, model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch; /** 沒有對象人物時，決策實錄仍保存送出內容與回覆。 */ traceContent?: boolean }) => ModelDispatch;
+  dispatchModel: (task: DispatchKind, world: World, actor: Character | undefined, provider: ModelProvider, model: string, key: string, options: { evidence: boolean; withinWorkDeadline: boolean; forward?: typeof fetch; /** 沒有對象人物時，決策實錄仍保存送出內容與回覆。 */ traceContent?: boolean }) => ModelDispatch;
   /** 切換故事後，讓較早的操作身分全部視為已過期。 */
   forgetEarlierOperations: () => void;
 };
@@ -366,7 +366,7 @@ export async function runOperation({accountId,binding,body,bodyLength,timePolicy
     };
     // 派送模型的共同接線：帳號預算預留與結算、決策追溯與操作證據的 observer 都在這裡接上。
     // 各派送點的差異以參數明示（#338 對照表），這裡不改變任何一處的既有行為。
-    const dispatchModel=(task:'npc'|'adjudication'|'feelings',w:World,actor:Character|undefined,provider:ModelProvider,model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch;traceContent?:boolean})=>{
+    const dispatchModel=(task:DispatchKind,w:World,actor:Character|undefined,provider:ModelProvider,model:string,key:string,options:{evidence:boolean;withinWorkDeadline:boolean;forward?:typeof fetch;traceContent?:boolean})=>{
       const observer:ModelObserver|undefined=decisionTrace?.observer(task,actor,{...w,modelPrices:accountPlayer.prices},provider,model,key,options.evidence&&actor?evidence?.observer(task,actor.id,provider,model,key):undefined,options.traceContent);
       return {
         observer:options.withinWorkDeadline&&observer?((event:Parameters<ModelObserver>[0])=>workWait(Promise.resolve(observer(event)))) as ModelObserver:observer,

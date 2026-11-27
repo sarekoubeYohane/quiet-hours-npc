@@ -28,7 +28,7 @@ export function scriptedModel(script: (dispatch: ScriptedDispatch) => ScriptedRe
       // 與正式傳輸相同：實錄失敗不改變模型任務的行為。
       const observe = async (event: ModelObservation) => { try { await hooks.observer?.(event); } catch { /* evidence only */ } };
       try {
-        const requestBody = modelRequestBody(request.service, request.messages, request.contract, { maxOutputTokens: request.maxOutputTokens });
+        const requestBody = modelRequestBody(request.service, request.messages, request.contract, { maxOutputTokens: request.maxOutputTokens, allowRecall: request.allowRecall, allowThinking: request.allowThinking });
         checkSignal(signal);
         await awaitSignal(observe({ kind: 'prepared', requestId, requestBody, timing: signalTiming(signal) }), signal);
         if (hooks.beforeSend) await awaitSignal(hooks.beforeSend(requestId, signal), signal);

@@ -10,6 +10,8 @@ export type ModelTransportRequest = {
   service: ModelService; messages: ModelMessage[];
   /** 回覆契約（JSON schema）。輸出 token 上限沒給時用供應商各自的預設。 */
   contract: object; maxOutputTokens?: number;
+  /** 回想啟用時的寬鬆回覆格式、DeepSeek 的 thinking；只有 NPC 自主決策會給，直接影響送出的請求內容。 */
+  allowRecall?: boolean; allowThinking?: boolean;
   /** 任務名稱與顯示名稱；顯示名稱用在逾時等錯誤訊息。 */
   task: string; label: string; actorId?: string;
   /** 這項模型任務的第幾次派送，從 1 起算。 */
@@ -35,7 +37,7 @@ export const streamingTransport: ModelTransport = {
   async send(request, hooks) {
     let usage: TokenUsage | undefined;
     const text = await requestModel(request.service, request.messages, request.contract, {
-      signal: request.signal, label: request.label, requestId: request.requestId, maxOutputTokens: request.maxOutputTokens,
+      signal: request.signal, label: request.label, requestId: request.requestId, maxOutputTokens: request.maxOutputTokens, allowRecall: request.allowRecall, allowThinking: request.allowThinking,
       observer: hooks.observer, beforeDispatch: hooks.beforeSend ? (id, signal) => hooks.beforeSend!(id ?? request.requestId, signal) : undefined, onSettled: hooks.onSettled,
       fetcher: (url, init) => { init?.signal?.throwIfAborted(); hooks.onSent(); return fetch(url, init); },
       onUsage: async tokens => { usage = tokens; await hooks.onUsage?.(tokens); },

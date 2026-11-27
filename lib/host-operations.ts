@@ -27,15 +27,15 @@ import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, rou
 import { enterAcceptanceScene, exitAcceptanceScene } from './acceptance-scene';
 import { requiresWorldEffects, authorityForProposal, EffectValidationError } from './world-effects';
 import { adjudicationTask, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure } from './adjudication';
-import { validPrice, beginCost } from './costs';
+import { validPrice } from './costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories } from './recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallBudgetDatabase } from './recall-services';
 import { record, resolve } from './world';
-import { aiDecision } from './models';
+import { npcDecisionTask } from './models';
 import { advanceActivities, BudgetExceeded, validBudgetLimits, budgetReached } from './activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable } from './model-keys';
-import { acceptOperation, respond, restoreWorld, runOperation, traceWorld, type OperationInput, type OperationChecks, type WorldChecks, type OperationHandler, type OperationOutcome, type OperationTable } from './host-runtime';
+import { acceptOperation, respond, restoreWorld, runOperation, type OperationInput, type OperationChecks, type WorldChecks, type OperationHandler, type OperationOutcome, type OperationTable } from './host-runtime';
 
 /**
  * 主持執行層受理的各項操作（#338）。每個操作是一個 handler：受理前的檢查分成數個
@@ -89,7 +89,7 @@ const advanceOperation = (): OperationHandler => ({
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return respond({error:'此世界使用舊意圖契約，舊資料仍可讀取；請從新開存檔建立新世界，原存檔與用量保留。',worldResetRequired:true},409);
   },
   async run(ctx): Promise<OperationOutcome> {
-    const { b, accountId, id, operationId, version, world, accountPlayer, services, trace, decisionTrace, workDeadline, verifyLease, workWait, modelSignal, dispatchModel } = ctx;
+    const { b, accountId, id, operationId, version, world, services, trace, decisionTrace, workDeadline, verifyLease, workWait } = ctx;
     let failure: Error | undefined;
     let adjudicationFailure: AdjudicationFailure | undefined;
     let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
@@ -107,50 +107,33 @@ const advanceOperation = (): OperationHandler => ({
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits:{calls:null,tokens:null},
-          beforeDecision: async () => {
-            const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
-            await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', roundReservation(), 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
-            await verifyLease();
-            traceWorld(trace, 'model-dispatch'); },
           // 經模型任務 module 派送。
           evaluateControlledFeelings: (w,c,prepared)=>runModelTask({
             name:'feelings', kind:'feelings', actor:c, label:`${c.name}的感受評估`, service:{provider:providerForMode(b.mode),model:b.model!.trim()},
             reservation:roundReservation, ...controlledFeelingsTask(c,w.minute,prepared),
           }),
-          decide: async (w, c, onUsage) => {
+          decide: async (w, c) => {
             adjudicationAttempt = undefined;
             const provider=providerForMode(b.mode);
-            const price=accountPlayer.prices.find(p=>p.provider===provider && p.model===b.model!.trim());
-            let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
-            let dispatch = 0;
-            const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
+            // 這位人物在本回合的派送序號：回想服務、回想續答、格式修正與世界裁定共用。
+            let dispatch = 0, npcDispatches = 0;
+            const guard = async (kind: 'embedding' | 'index' | 'search', units: number) => {
               await verifyLease();
-              // Keep the same logical-round ledger captured by advanceActivities.
-              // A rolling-hour boundary may reset only the next round, not this guard.
-              if (kind === 'chat' && budgetReached((await playerAccount(accountId)).usage,(await playerAccount(accountId)).limits)) throw new BudgetExceeded();
               const reservationId = `${id}:${operationId}:${c.id}:${dispatch++}`;
-              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+              if ((await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, recallBudgetLimits(kind), 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
-            const npcDispatch=dispatchModel('npc',w,c,provider,b.model!.trim(),dispatchKey,{evidence:true,withinWorkDeadline:true});
-            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), providerForMode(b.mode), npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
-              beforeDispatch:npcDispatch.beforeDispatch,
-              onSettled:npcDispatch.onSettled,
-              observer: npcDispatch.observer,
-              enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
-              verifyCurrent: verifyLease,
-              signal:modelSignal,
-              beforeContinuation: async () => {
-                await guard('chat', 1);
-                traceWorld(trace, 'model-continuation-dispatch');
-                const usage = w.aiUsage!;
-                usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-                reportCost=beginCost(usage,provider,b.model!.trim(),price);
+            // 經模型任務 module 派送；回想續答與格式修正的迴圈都在 module 內，每次派送各自確認預算與租約、計次、計費、留實錄。
+            const decision = await runModelTask({
+              name:'npc', kind:'npc', actor:c, service:{provider,model:b.model!.trim()}, requestId:()=>crypto.randomUUID(),
+              // 第一次派送用回合內的派送序號；回想續答與格式修正用這位人物自己的序號。
+              reservation:()=>npcDispatches++?`${id}:${operationId}:${c.id}:${dispatch++}`:roundReservation(),
+              build:({key})=>{
+                dispatchKey=key;
+                return npcDecisionTask(w,c,key,b.model!.trim(),provider,{enabled:env.RECALL_ENABLED==='true'&&!w.acceptance,
+                  search:questions=>workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard}))});
               },
-              search: questions => workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard})),
             });
             decisionTrace?.step('npc-parsed',c.id,{action:decision.action,durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,continueExisting:decision.continueExisting});
             if(decision.pursuitEvidence)decisionTrace?.step('npc-pursuit-selection',c.id,decision.pursuitEvidence,'model-self-report');

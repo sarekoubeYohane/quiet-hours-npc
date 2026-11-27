@@ -1,23 +1,26 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- #415：世界裁定經模型任務派送；經 route、替身資料庫與腳本模型。 */
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const load=name=>require(path.join(process.env.QUIET_HOURS_TEST_BUILD,`${name}.cjs`));
-const {scenario,approval}=require('./routine-program-fixture.cjs');
+const {scenario,approval,proposal}=require('./routine-program-fixture.cjs');
+const {fixturePursuitDecision}=require('./pursuit-fixture.cjs');
 const origin='https://test.invalid',usage={inputTokens:30,outputTokens:10};
 // 不合契約：日常耗時須由整組規則確認，候選自己填了 completionMinutes。
 const invalidApproval=()=>({...approval(),completionMinutes:15});
 // 合乎契約，但效果指向當前世界沒有的物件，綁定當前世界時才會被拒絕。
 const unbindableCandidate=()=>({status:'accepted',completionMinutes:15,effects:[{kind:'state',objectId:'no-such-object',expectedRevision:1,key:'contents',value:'water'}],stages:[],check:null});
 
-// 一位會提出「泡茶」行動的人物：NPC 自主決策仍由 fixture 替換的 fetch 回覆（#417 才改），世界裁定由腳本模型回覆。
+// 一位會提出「泡茶」行動的人物。#417 之後 NPC 自主決策也經模型任務 module，所以腳本模型同時回覆兩種任務：
+// NPC 自主決策固定回覆 fixture 的泡茶提案；`model.dispatches` 與 `judge` 的次數只算世界裁定。
 async function round({repair=true,judge=()=>approval()}={}){
  const {scriptedModel}=load('scripted-model'),{GET,POST}=load('route'),store=load('store');
  const s=await scenario(),first=await(await GET(new Request(origin+'/api/world'))).json();
- const model=scriptedModel(dispatch=>({reply:judge(model.dispatches.length,dispatch),usage}));
+ const scripted=scriptedModel(dispatch=>({reply:dispatch.task==='npc'?fixturePursuitDecision(JSON.parse(dispatch.messages[1].content),proposal):judge(model.dispatches.length,dispatch),usage}));
+ const model={get dispatches(){return scripted.dispatches.filter(dispatch=>dispatch.task==='adjudication');}};
  const id=Date.now()+':'+crypto.randomUUID();
  // 帶操作身分讀取時另附該操作的私有決策實錄；operationScope 用 GET 回應裡的那一個。
  const read=async()=>(await GET(new Request(origin+'/api/world?operationScope='+encodeURIComponent(first.operationScope)+'&operationId='+encodeURIComponent(id)))).json();
  const advance=async()=>{
-  const response=await POST(new Request(origin+'/api/world',{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:first.operationScope,worldContext:first.world.contextId,mode:'openai',model:'gpt-6-luna',operation:'advance',minutes:15,operationId:id})}),{modelTransport:model});
+  const response=await POST(new Request(origin+'/api/world',{method:'POST',headers:{origin,'X-World-Time-Policy':'round-v2'},body:JSON.stringify({operationScope:first.operationScope,worldContext:first.world.contextId,mode:'openai',model:'gpt-6-luna',operation:'advance',minutes:15,operationId:id})}),{modelTransport:scripted});
   return {status:response.status,body:await response.json()};
  };
  const run=async()=>{

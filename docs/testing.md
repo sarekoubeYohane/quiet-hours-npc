@@ -73,7 +73,7 @@ node --import ./tooling/verification/no-network.mjs --test tests/<name>.test.mjs
 
 **模型與亂數**：測試把 `global.fetch` 換成固定回應，`Math.random` 也會被換掉以控制骰值。`tooling/verification/no-network.mjs` 會讓任何非 loopback 的請求直接失敗並印出 `[test-network-denied]`。測試不會發出付費請求。
 
-已改走模型任務 module 的派送點（目前是全部製作工作、世界裁定與接管後感受）可以改用腳本模型：`load('scripted-model').scriptedModel(script)` 經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入，腳本直接回傳「這項模型任務回覆什麼」，不必寫供應商的回應格式。範例見 `tests/model-task-opening-resources-api.test.cjs`。人物卡判讀與開局整理要先有草稿 route 建立的待恢復紀錄：`tests/model-task-setup-work-api.test.cjs` 以 `store.failNextOperationRead()` 讓草稿 route 第一次在受理前失敗，再以同一操作身分經 world route `?workspace=account` 帶腳本模型送出，最後重打草稿 route 回放結果。推進回合裡世界裁定與接管後感受經腳本模型（接管後感受的範例見 `tests/model-task-controlled-feelings-api.test.cjs`，含啟用回想時預先登記派送預留的做法），NPC 自主決策仍要替換 `fetch`（#417 之後才改）；腳本模型與替換 `fetch` 並用的範例見 `tests/model-task-adjudication-api.test.cjs`。
+已改走模型任務 module 的派送點（全部製作工作、世界裁定、接管後感受與 NPC 自主決策）可以改用腳本模型：`load('scripted-model').scriptedModel(script)` 經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入，腳本直接回傳「這項模型任務回覆什麼」，不必寫供應商的回應格式。範例見 `tests/model-task-opening-resources-api.test.cjs`。人物卡判讀與開局整理要先有草稿 route 建立的待恢復紀錄：`tests/model-task-setup-work-api.test.cjs` 以 `store.failNextOperationRead()` 讓草稿 route 第一次在受理前失敗，再以同一操作身分經 world route `?workspace=account` 帶腳本模型送出，最後重打草稿 route 回放結果。帶了腳本模型的請求，NPC 自主決策、世界裁定與接管後感受都由腳本回覆，腳本以 `dispatch.task`（`npc`、`adjudication`、`feelings`）分辨；沒帶腳本模型的請求照舊經 `fetch`，替換 `global.fetch` 的既有測試不受影響。範例：接管後感受見 `tests/model-task-controlled-feelings-api.test.cjs`（含啟用回想時預先登記派送預留的做法），世界裁定見 `tests/model-task-adjudication-api.test.cjs`，NPC 自主決策的格式修正與回想續答見 `tests/model-task-npc-decision-api.test.cjs`（回想服務的 embedding 不是模型任務，仍要替換 `fetch`）。
 
 ## 檔名慣例
 
