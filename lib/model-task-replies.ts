@@ -12,7 +12,8 @@ export const judgeBy = <T>(read: (reply: string) => T) => (reply: string): Reply
 
 /** 不經模型任務 module、直接呼叫模型傳輸的舊入口共用；只剩量測腳本使用（#411 第 5 段收尾）。 */
 export async function askDirectly<T>(task: ModelTaskContent<T>, service: ModelService, options: Parameters<typeof requestModel>[3]): Promise<T> {
-  const verdict = task.judge(await requestModel(service, task.messages, task.contract, { ...options, maxOutputTokens: task.maxOutputTokens }));
-  if (!verdict.valid) throw verdict.error ?? Error(verdict.reason);
-  return verdict.value;
+  const verdict = await task.judge(await requestModel(service, task.messages, task.contract, { ...options, maxOutputTokens: task.maxOutputTokens }));
+  if (verdict.valid) return verdict.value;
+  // 舊入口只問一次；製作工作的判定不會要求續答。
+  throw 'reason' in verdict ? verdict.error ?? Error(verdict.reason) : Error('舊入口不支援續答。');
 }

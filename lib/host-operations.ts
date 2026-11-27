@@ -1,6 +1,6 @@
 import { isModelProvider, providerForMode } from './model-providers';
 import { openingResourcesTask, mapResourceActors, applyOpeningResources, validateOpeningResourceRequest } from './opening-resources';
-import { modelTasks } from './model-task';
+import { modelTasks, ReplyRefused } from './model-task';
 import {openingRoadRepairTask,openingRepairSource} from './opening-road-repair';
 import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { openingArrangementTask } from './opening-arrangement-model';
@@ -13,11 +13,10 @@ import { loadCharacterDraft } from './character-draft-store';
 import { adoptFormalMentalEnergy, validateMentalAdoption } from './formal-mental-enablement';
 import { enablePersonalNeeds, validateBodyNeedsSetup } from './body-needs-policy';
 import { characterSetupSchema, formCharacterAttributes } from './character-attributes';
-import { requestControlledFeelings } from './controlled-feelings';
+import { controlledFeelingsTask } from './controlled-feelings';
 import { readMentalEnergyTestPolicy } from './mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from './character-templates';
 import { initializeCity } from './city-initialization';
-import { formatRepairEnabled } from './model-adapter';
 import { readOpeningDescription, openingRelationshipsTask } from './opening-relationship-generation';
 import { cityDraftSchema, prepareCity } from './city-creation';
 import { characterGenerationTask, readCharacterGeneration } from './character-generation';
@@ -27,16 +26,16 @@ import { cancelActivity } from './activity-lifecycle';
 import { bindRoutine, selectRoutineForDecision, retainUnconfirmedBodyReview, routineOffer, routineCandidateSchema, resolveRoutineCandidate, adjudicationFormatError } from './routine-rules';
 import { enterAcceptanceScene, exitAcceptanceScene } from './acceptance-scene';
 import { requiresWorldEffects, authorityForProposal, EffectValidationError } from './world-effects';
-import { requestAdjudication, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure, type AdjudicationRepair } from './adjudication';
-import { validPrice, beginCost } from './costs';
+import { adjudicationTask, buildAdjudicationInput, validateExistingAdjudication, captureAdjudicationFailure, type AdjudicationFailure } from './adjudication';
+import { validPrice } from './costs';
 import { env } from 'cloudflare:workers';
 import { recallMemories } from './recall';
 import { reserveRecallDispatch, recallBudgetLimits, recallBudgetDatabase } from './recall-services';
 import { record, resolve } from './world';
-import { aiDecision } from './models';
+import { npcDecisionTask } from './models';
 import { advanceActivities, BudgetExceeded, validBudgetLimits, budgetReached } from './activities';
 import { clearModelKey, saveModelKey, readModelKey, modelKeyStatus, modelKeyStorageAvailable } from './model-keys';
-import { acceptOperation, respond, restoreWorld, runOperation, traceWorld, type OperationInput, type OperationChecks, type WorldChecks, type OperationHandler, type OperationOutcome, type OperationTable } from './host-runtime';
+import { acceptOperation, respond, restoreWorld, runOperation, type OperationInput, type OperationChecks, type WorldChecks, type OperationHandler, type OperationOutcome, type OperationTable } from './host-runtime';
 
 /**
  * 主持執行層受理的各項操作（#338）。每個操作是一個 handler：受理前的檢查分成數個
@@ -90,10 +89,14 @@ const advanceOperation = (): OperationHandler => ({
     if(b.operation==='advance'&&(world.pursuitVersion!==1||typeof world.pursuitContext!=='string'))return respond({error:'此世界使用舊意圖契約，舊資料仍可讀取；請從新開存檔建立新世界，原存檔與用量保留。',worldResetRequired:true},409);
   },
   async run(ctx): Promise<OperationOutcome> {
-    const { b, accountId, id, operationId, version, world, accountPlayer, services, trace, decisionTrace, workDeadline, verifyLease, workWait, modelSignal, dispatchModel } = ctx;
+    const { b, accountId, id, operationId, version, world, services, trace, decisionTrace, workDeadline, verifyLease, workWait } = ctx;
     let failure: Error | undefined;
     let adjudicationFailure: AdjudicationFailure | undefined;
     let adjudicationAttempt: { actorId:string; input:unknown; raw:string; secrets:string[]; stage:'parse'|'effects' } | undefined;
+    // 沿用回合開始時取得的世界內用量：整點換窗只影響下一回合。
+    const runModelTask = modelTasks(ctx, () => world.aiUsage!);
+    // NPC 自主決策的第一次派送與接管後感受共用的派送預留 key：回合內的第幾次派送。
+    const roundReservation = () => `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`;
       const before = structuredClone(world);
       try {
         if(b.mode!=='demo'){const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();}
@@ -104,52 +107,33 @@ const advanceOperation = (): OperationHandler => ({
           onActor:(w,c)=>decisionTrace?.step('npc-feedback',c.id,{...traceActorSnapshot(c),shortTerm:c.shortTerm,memories:c.memories,observations:c.observations,control:c.control,minute:w.minute,turn:w.turn,resolutions:w.events.filter(event=>event.actor===c.id&&event.time===w.minute&&event.resolution).map(event=>({eventId:event.id,resolution:event.resolution})),routineAudit:w.routineAudit?.filter(item=>item.actorId===c.id&&item.turn===w.turn)}),
           minutes: b.minutes!, mode: b.mode!, modelKey: b.mode === 'demo' ? 'demo' : `${b.mode}:${b.model}`,
           limits:{calls:null,tokens:null},
-          beforeDecision: async () => {
-            const account=await playerAccount(accountId);if(budgetReached(account.usage,account.limits))throw new BudgetExceeded();
-            await verifyLease();
-            if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, 'chat', `${id}:${operationId}:chat:${world.aiUsage?.totalCalls || 0}`, 1, {ownerMonthly:0,accountMonthly:0}, 'player'))).replayed) throw Error('付費請求結果不明，禁止重送。');
-            dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
-            await verifyLease();
-            traceWorld(trace, 'model-dispatch'); },
-          evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
-            const provider=providerForMode(b.mode),model=b.model!.trim();
-            const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
-            traceWorld(trace,'controlled-feelings-dispatch');
-            const dispatch=dispatchModel('feelings',w,c,provider,model,dispatchKey,{evidence:true,withinWorkDeadline:true});
-            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),label:`${c.name}的感受評估`,requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:dispatch.observer,fetcher:dispatch.fetcher,beforeDispatch:dispatch.beforeDispatch,onSettled:dispatch.onSettled,onUsage:dispatch.reportUsage(onUsage,cost),verifyCurrent:verifyLease});
-          },
-          decide: async (w, c, onUsage) => {
+          // 經模型任務 module 派送。
+          evaluateControlledFeelings: (w,c,prepared)=>runModelTask({
+            name:'feelings', kind:'feelings', actor:c, label:`${c.name}的感受評估`, service:{provider:providerForMode(b.mode),model:b.model!.trim()},
+            reservation:roundReservation, ...controlledFeelingsTask(c,w.minute,prepared),
+          }),
+          decide: async (w, c) => {
             adjudicationAttempt = undefined;
             const provider=providerForMode(b.mode);
-            const price=accountPlayer.prices.find(p=>p.provider===provider && p.model===b.model!.trim());
-            let reportCost=beginCost(w.aiUsage!,provider,b.model!.trim(),price);
-            let dispatch = 0;
-            const guard = async (kind: 'chat' | 'embedding' | 'index' | 'search', units: number) => {
+            // 這位人物在本回合的派送序號：回想服務、回想續答、格式修正與世界裁定共用。
+            let dispatch = 0, npcDispatches = 0;
+            const guard = async (kind: 'embedding' | 'index' | 'search', units: number) => {
               await verifyLease();
-              // Keep the same logical-round ledger captured by advanceActivities.
-              // A rolling-hour boundary may reset only the next round, not this guard.
-              if (kind === 'chat' && budgetReached((await playerAccount(accountId)).usage,(await playerAccount(accountId)).limits)) throw new BudgetExceeded();
               const reservationId = `${id}:${operationId}:${c.id}:${dispatch++}`;
-              if ((kind!=='chat'||env.RECALL_ENABLED==='true') && (await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, kind === 'chat' ? {ownerMonthly:0,accountMonthly:0} : recallBudgetLimits(kind), kind === 'chat' ? 'player' : 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
+              if ((await workWait(reserveRecallDispatch(recallBudgetDatabase(), accountId, kind, reservationId, units, recallBudgetLimits(kind), 'owner'))).replayed) throw Error('付費請求結果不明，禁止重送。');
               await verifyLease();
               return reservationId;
             };
-            const npcDispatch=dispatchModel('npc',w,c,provider,b.model!.trim(),dispatchKey,{evidence:true,withinWorkDeadline:true});
-            const decision = await aiDecision(w, c, dispatchKey, b.model!.trim(), providerForMode(b.mode), npcDispatch.fetcher, npcDispatch.reportUsage(onUsage,tokens=>reportCost(tokens)), {
-              beforeDispatch:npcDispatch.beforeDispatch,
-              onSettled:npcDispatch.onSettled,
-              observer: npcDispatch.observer,
-              enabled: env.RECALL_ENABLED === 'true' && !w.acceptance,
-              verifyCurrent: verifyLease,
-              signal:modelSignal,
-              beforeContinuation: async () => {
-                await guard('chat', 1);
-                traceWorld(trace, 'model-continuation-dispatch');
-                const usage = w.aiUsage!;
-                usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-                reportCost=beginCost(usage,provider,b.model!.trim(),price);
+            // 經模型任務 module 派送；回想續答與格式修正的迴圈都在 module 內，每次派送各自確認預算與租約、計次、計費、留實錄。
+            const decision = await runModelTask({
+              name:'npc', kind:'npc', actor:c, service:{provider,model:b.model!.trim()}, requestId:()=>crypto.randomUUID(),
+              // 第一次派送用回合內的派送序號；回想續答與格式修正用這位人物自己的序號。
+              reservation:()=>npcDispatches++?`${id}:${operationId}:${c.id}:${dispatch++}`:roundReservation(),
+              build:({key})=>{
+                dispatchKey=key;
+                return npcDecisionTask(w,c,key,b.model!.trim(),provider,{enabled:env.RECALL_ENABLED==='true'&&!w.acceptance,
+                  search:questions=>workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard}))});
               },
-              search: questions => workWait(recallMemories({owner:id, character:c, snapshot:before, version, questions, workDeadline:workDeadline, guard})),
             });
             decisionTrace?.step('npc-parsed',c.id,{action:decision.action,durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,continueExisting:decision.continueExisting});
             if(decision.pursuitEvidence)decisionTrace?.step('npc-pursuit-selection',c.id,decision.pursuitEvidence,'model-self-report');
@@ -170,24 +154,11 @@ const advanceOperation = (): OperationHandler => ({
               const input={...buildAdjudicationInput(w,c,decision.action,!!routineOffer(w,c,decision.action)),...authorityForProposal(w,c,decision.action),durationMinutes:decision.durationMinutes,timeIntent:decision.timeIntent,routineOffer:routineOffer(w,c,decision.action),...(selection.reconfirming?{bodyConsequencesReconfirmation:true}:{})};
               // Freeze the exact input before effects mutate objects or permissions.
               const inputSnapshot=JSON.stringify(input);
-              // Each ask is its own budgeted, counted and traced dispatch.
-              const askAdjudication=async(repair?:AdjudicationRepair)=>{
-                await guard('chat',1);
-                const usage=w.aiUsage!;usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
-                const cost=beginCost(usage,config.provider,config.model,accountPlayer.prices.find(p=>p.provider===config.provider&&p.model===config.model),'adjudication');
-                const adjudicationDispatch=dispatchModel('adjudication',w,c,config.provider,config.model,key,{evidence:true,withinWorkDeadline:false});
-                const reply=await requestAdjudication(input, {key,provider:config.provider,model:config.model}, routineCandidateSchema, {signal:modelSignal(),label:`世界裁定（${c.name}的行動）`,requestId:`${operationId}:${c.id}:adjudication:${crypto.randomUUID()}`,observer:adjudicationDispatch.observer,fetcher:adjudicationDispatch.fetcher,beforeDispatch:adjudicationDispatch.beforeDispatch,onSettled:adjudicationDispatch.onSettled,onUsage:adjudicationDispatch.reportUsage(onUsage,cost)},repair);
-                await verifyLease();
-                return reply;
-              };
-              let raw=await askAdjudication();
-              // One repair turn for a candidate the pure format check refuses. Nothing has been
-              // bound or changed yet; a second refusal fails the round as before.
-              const formatError=formatRepairEnabled()?adjudicationFormatError(raw,w,c,decision.action):undefined;
-              if(formatError){
-                decisionTrace?.step('adjudication-format-retry',c.id,{message:formatError});
-                raw=await askAdjudication({raw,error:formatError});
-              }
+              // 經模型任務 module 派送；格式修正的迴圈在 module 內。判定只做純格式檢查，還沒有綁定或改動任何東西。
+              let raw:string;
+              try{raw=await runModelTask({name:'adjudication',actor:c,label:`世界裁定（${c.name}的行動）`,reservation:()=>`${id}:${operationId}:${c.id}:${dispatch++}`,...adjudicationTask(input,routineCandidateSchema,reply=>adjudicationFormatError(reply,w,c,decision.action),message=>decisionTrace?.step('adjudication-format-retry',c.id,{message}))});}
+              // 到最後仍不合契約的候選照舊交給下面的解讀，由它回報失敗並留下失敗收據。
+              catch(error){if(!(error instanceof ReplyRefused))throw error;await verifyLease();raw=error.reply;}
               adjudicationAttempt={actorId:c.id,input:inputSnapshot,raw,secrets:[key,dispatchKey],stage:'parse'};
               try{decision.freeCandidate=resolveRoutineCandidate(raw,w,c,decision.action,decision.durationMinutes,b.minutes,decision.timeIntent?.maxMinutes,data=>decisionTrace?.step('rule-selection',c.id,data),parsed=>{decisionTrace?.step('parsed-candidate',c.id,{candidate:parsed,explanationRecorded:!!parsed.explanation});if(parsed.explanation)decisionTrace?.step('adjudication-explanation',c.id,parsed.explanation,'model-self-report');});}
               catch(error){throw new EffectValidationError(error instanceof Error?error.message:'裁定候選格式無效。',{reason:'candidate_format'});}

@@ -2,7 +2,7 @@ import { type ModelProvider } from './model-providers';
 import { readDecisionTrace } from './decision-traces';
 import { database } from './store';
 import { accountUsage, budgetReached, BudgetExceeded, currentUsage, defaultLimits, validBudgetLimits, type BudgetLimits, type TokenUsage } from './activities';
-import { beginCost, savePrice, type ModelPrice, type PriceInput } from './costs';
+import { beginCost, savePrice, type DispatchKind, type ModelPrice, type PriceInput } from './costs';
 import { emptyUsageReceipt, mergePaid, paidDelta, type UsageReceipt } from './usage-recovery';
 import type { AIUsage, World } from './world';
 import { roundLeaseMs } from './round-time-policy';
@@ -137,7 +137,7 @@ export function playerBilling(owner:string,storageOwner:string,operationId:strin
   const operationUsage=structuredClone(initialUsage);
   let pending:string|undefined,sent=false;
   async function finish(){if(pending&&!sent){await settle(previous=>empty(previous.windowStartedAt),'cancelled');return;}if(pending){await database().prepare("UPDATE player_dispatches SET phase='unknown',pending_until=0 WHERE owner=? AND storage_owner=? AND request_id=? AND phase='pending'").bind(owner,storageOwner,pending).run();pending=undefined;}}
-  const beforeDispatch=(provider:ModelProvider,model:string,task:'npc'|'adjudication'|'feelings')=>async(requestId:string|undefined,signal:AbortSignal)=>{
+  const beforeDispatch=(provider:ModelProvider,model:string,task:DispatchKind)=>async(requestId:string|undefined,signal:AbortSignal)=>{
     if(!requestId)throw Error('帳號模型派送缺少原請求身分。');
     signal.throwIfAborted();
     sent=false;

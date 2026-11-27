@@ -12,7 +12,8 @@ import { phonePrompt, validatePhoneActionReferences } from './phones';
 import { arrangementPrompt, updateArrangements } from './arrangements';
 import { preferencePrompt, updatePreferences } from './preferences';
 import { adjudicationLimits } from './adjudication-limits';
-import { requestModel, formatRepairEnabled, type ModelObserver } from './model-adapter';
+import { requestModel, type ModelObserver } from './model-adapter';
+import type { ModelTaskContent } from './model-task';
 import { roundTimePolicy } from './round-time-policy';
 export { npcContractVersion } from './npc-decision-schema';
 import { npcContractVersion, actionTypes, methodChoices, methodChanges, methodAssessmentSchema, actionSchema } from './npc-decision-schema';
@@ -147,10 +148,16 @@ function parseDecision(value: unknown, allowedTypes: string[], world: World, cha
   if(!methodAssessment||JSON.stringify(methodAssessment.intentIds)!==JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]))throw new DecisionFieldError('methodAssessment.intentIds',methodAssessment?.intentIds,JSON.stringify(data.focusIntentId?[data.focusIntentId]:[]));
   return { ...(character.mentalEnergy?.policy.process?{processFeeling}:{}), ...(character.mentalEnergy?{feelingUpdates,emotionRegulation}:{}), ...pursuit,pursuitEvidence,focusIntentId:data.focusIntentId as string|null,methodAssessment, ...(data.reconfirmBodyConsequences===true?{reconfirmBodyConsequences:true}:{}),eventHabits:readDecisionField('habitCandidates', data.habitCandidates, () => updateEventHabits(world,character,data.habitCandidates,context.visible.shortTerm||[])), timeIntent, preferences, cognition, interpretation: data.interpretation as string | undefined, ...memoryCandidate, arrangements:arrangement.arrangements, attentionConditions: attention.conditions, attentionDiagnostics: attention.diagnostics, action, durationMinutes: data.durationMinutes as number, intents, continueExisting: data.type === 'continue' };
 }
-// A decision is at most 8 KiB; a longer reply is echoed only up to this many characters.
+// 回送上限（PR #381）：決策最多 8 KiB，更長的回覆只回送這麼多字元；等於 NPC 決策的輸出 token 上限 4096 × 4。
 const repairEchoLimit=16000;
 const npcRepairInstruction='你上一份回覆沒有通過格式驗證，尚未被採用，世界沒有任何改變。validationError 說明哪個欄位、收到什麼、預期什麼。請保留原本的決定與意圖，只修正指出的問題，重新回傳一份完整的最終決策 JSON。';
-export async function aiDecision(w:World,c:Character,key:string,model:string,provider:ModelProvider,fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; enabled: boolean; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; search: (questions: string[]) => Promise<unknown>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
+type NpcRecall={enabled:boolean;search:(questions:string[])=>Promise<unknown>};
+/**
+ * NPC 自主決策的模型任務內容（#417）：訊息、回覆契約與判定。判定只回報三種結果：有效、不合契約（附原因）、
+ * 要求續答（回想後接續的訊息）；派送、預算、租約、計次與實錄都在模型任務 module。每次派送前都重新收斂輸入。
+ * `key` 只用來遮罩診斷訊息、檢查決策有沒有洩漏 Key。
+ */
+export function npcDecisionTask(w:World,c:Character,key:string,model:string,provider:ModelProvider,recall?:NpcRecall):ModelTaskContent<ActivityDecision>{
 const mode=modelMode(provider);
 const resumable=canResumeActivity(w,c,`${mode}:${model}`);
 const allowedTypes=resumable?actionTypes:actionTypes.filter(type=>type!=='continue');
@@ -177,17 +184,14 @@ if(w.configuration)messages[0].content+=' activityHints 是從本人可知環境
 messages[0].content+=methodAssessmentPrompt+phonePrompt+(w.configuration?phoneMapPrompt:'')+habitCandidatePrompt+physicalBoundariesPrompt+' knownMethods是曾確認的可知方法，不保證目前物件、材料、許可或外在條件仍成立；是否嘗試與如何回應仍由你決定。';
 messages[0].content+=' 同次心理工作量總限制：memorySelections、memoryOperations、cognitiveUpdates、preferenceUpdates、habitCandidates、arrangementUpdates、pursuitUpdates 七類陣列合計最多4項，連同 interpretation、methodAssessment、pursuitCandidates、pursuitSelection 的決策 JSON 合計最多8 KiB（UTF-8）；這是共同額度，不是每類各有4項。每類另有的較小上限仍適用；分層追求共用最多12節點，不把喜好或習慣變成命令。';
 messages[0].content+='\n\n'+decisionFieldLayoutPrompt;
-let recalled = false;
-// A candidate that fails parsing or validation gets one repair turn in the same decision.
-let repaired = false;
-for (;;) {
-const requestId = crypto.randomUUID();
-// The request promise closes over this exact transcript, character and decision
-// context. The route rechecks operation version/lease after completion.
-const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${mode}:${model}`,model,provider,allowedTypes,messages,allowRecall:recall?.enabled&&!recalled});
+let recalled = false, repaired = false;
+const turn=():ModelTaskContent<ActivityDecision>=>{
+const allowRecall=!!recall?.enabled&&!recalled;
+// 判定綁定這一次派送的訊息、人物與決策脈絡。
+const prepared=prepareNpcDecision(w,c,{continuation,modelKey:`${mode}:${model}`,model,provider,allowedTypes,messages,allowRecall});
 const {schema,context:decisionContext}=prepared;
-const raw = await requestModel({key,model,provider},prepared.messages,schema,{signal:recall?.signal() || AbortSignal.timeout(roundTimePolicy.workMs),label:`${c.name}的${repaired?' NPC 決策格式修正':recalled?'回想續答':' NPC 決策'}`,allowRecall:recall?.enabled&&!recalled,allowThinking:true,onUsage,fetcher,requestId,observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
-await recall?.verifyCurrent?.();
+return {messages:prepared.messages,contract:schema,allowRecall,allowThinking:true,label:`${c.name}的${repaired?' NPC 決策格式修正':recalled?'回想續答':' NPC 決策'}`,
+judge:async raw=>{
 let candidateStage='npc-candidate-parse';
 try {
   const value = JSON.parse(raw.replace(/^\s*`{3}(?:json)?\s*/, '').replace(/\s*`{3}\s*$/, ''));
@@ -206,17 +210,20 @@ try {
       if (!(c.longTerm || []).some(item => item.id === recalled?.id && item.version === recalled?.version && item.characterId === c.id && (!item.state || item.state === 'active'))) throw Error('回想引用不屬於目前自己的記憶版本。');
     }
     continuation=prepared.prepareRecall(memories);
-    await recall.beforeContinuation();
-    messages.push({role:'assistant',content:raw},{role:'user',content:JSON.stringify({recalledMemories:handles,recallComplete:true,instruction:'回想完整主觀內容已放在 self.longTerm；回想已結束；先重新排列意圖，再完成唯一最終行動。禁止第二輪回想。'})});
-    continue;
+    // 要求續答：接續的訊息在下一次派送送出前才接上。
+    return {valid:false,followUp:()=>{
+      messages.push({role:'assistant',content:raw},{role:'user',content:JSON.stringify({recalledMemories:handles,recallComplete:true,instruction:'回想完整主觀內容已放在 self.longTerm；回想已結束；先重新排列意圖，再完成唯一最終行動。禁止第二輪回想。'})});
+      return turn();
+    }};
   }
   const decision=parseDecision(value,allowedTypes,w,c,decisionContext);
   if(JSON.stringify(decision).includes(key))throw Error();
   decision.arrangementCueReceipts=prepared.arrangementCueReceipts;
   decision.phoneNotificationReceipts=prepared.phoneNotificationReceipts;
-  return decision;
+  return {valid:true,value:decision};
 }
 catch(error) {
+  // 回想服務的錯誤不是回覆不合契約，原樣拋出。
   if(candidateStage==='recall-service') throw error;
   const parseFailure = candidateStage==='npc-candidate-parse';
   const issue = error instanceof DecisionFieldError ? error : parseFailure
@@ -227,20 +234,28 @@ catch(error) {
     : cause instanceof MemorySelectionReferenceError ? 'memory-selection-reference'
     : cause instanceof MemoryValidationError && !(cause instanceof MemorySelectionFormatError) ? 'memory-constraint' : 'field-format';
   const detail = issue.diagnostic([key]);
-  try {
-    await recall?.observer?.({kind:'failure', failure:parseFailure?'candidate-format':'candidate-validation', stage:candidateStage, reason, detail});
-  } catch { /* Trace capture must preserve the validation result. */ }
-  // The failed dispatch stays recorded above. The repair turn is a new, separately budgeted
-  // dispatch that shows the model its own reply and the validation result; a second failure
-  // ends the decision exactly as before.
-  if (recall && !repaired && formatRepairEnabled()) {
-    repaired = true;
-    await recall.beforeContinuation();
-    messages.push({role:'assistant',content:raw.slice(0,repairEchoLimit)},{role:'user',content:JSON.stringify({validationFailed:true,validationError:detail,instruction:npcRepairInstruction})});
-    continue;
-  }
-  throw new Error(detail);
+  return {valid:false,reason:detail,error:new Error(detail),failure:{kind:'failure', failure:parseFailure?'candidate-format':'candidate-validation', stage:candidateStage, reason, detail}};
 }
+},
+// 格式修正：模型看到自己的原回覆與驗證結果；重問的那一次同樣重新收斂輸入。
+repair:{echoLimit:repairEchoLimit,instruct:detail=>JSON.stringify({validationFailed:true,validationError:detail,instruction:npcRepairInstruction}),next:turns=>{repaired=true;messages.push(...turns);return turn();}}};
+};
+return turn();
+}
+/**
+ * 舊入口（#420 移除）：測試與 `tooling/` 直接呼叫，不經模型任務 module，直接呼叫模型傳輸。
+ * 只保留回想續答；格式修正只在 module 內。正式路徑是 `npcDecisionTask` 經 `runModelTask`。
+ */
+export async function aiDecision(w:World,c:Character,key:string,model:string,provider:ModelProvider,fetcher:typeof fetch=fetch,onUsage?:(tokens:TokenUsage)=>void|Promise<void>, recall?: NpcRecall & { observer?: ModelObserver; beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch']; onSettled?:()=>Promise<void>; signal: () => AbortSignal; beforeContinuation: () => Promise<void>; verifyCurrent?: () => Promise<void> }):Promise<ActivityDecision>{
+let content=npcDecisionTask(w,c,key,model,provider,recall);
+for (;;) {
+const raw = await requestModel({key,model,provider},content.messages,content.contract,{signal:recall?.signal() || AbortSignal.timeout(roundTimePolicy.workMs),label:content.label,allowRecall:content.allowRecall,allowThinking:true,onUsage,fetcher,requestId:crypto.randomUUID(),observer:recall?.observer,onSettled:recall?.onSettled,beforeDispatch:recall?.beforeDispatch});
+await recall?.verifyCurrent?.();
+const verdict=await content.judge(raw);
+if(verdict.valid)return verdict.value;
+if('followUp' in verdict){await recall!.beforeContinuation();content=verdict.followUp();continue;}
+try { if(verdict.failure) await recall?.observer?.(verdict.failure); } catch { /* Trace capture must preserve the validation result. */ }
+throw verdict.error ?? Error(verdict.reason);
 }
 }
 

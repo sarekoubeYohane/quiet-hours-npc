@@ -3,6 +3,7 @@ import { providerTokenUsage, isCandidateFailureReason, type ModelObserver, type 
 import type { StreamTiming } from './model-stream';
 import { decisionTraceLimits, omitDecisionTraceContent, type DecisionTrace } from './decision-traces';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
+import type { DispatchKind } from './costs';
 
 export function traceActorSnapshot(actor:Character) {
   return structuredClone({id:actor.id,location:actor.location,region:actor.region,physical:actor.physical,activity:actor.activity,plan:actor.plan,
@@ -53,7 +54,7 @@ export function createDecisionTrace(context: Pick<DecisionTrace,'operationId'|'r
   const step=(kind:string,actorId:string|undefined,data:unknown,source='program')=>{
     steps.push({kind,actorId,source,data:omitContent()?{gap:'trace-content-omitted'}:structuredClone(data),at:Date.now()});trace.lastKnownStage=kind;
   };
-  const observer=(task:'npc'|'adjudication'|'feelings',actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver,retainContent=false):ModelObserver=>{
+  const observer=(task:DispatchKind,actor:Character|undefined,world:World,provider:string,model:string,key:string,legacy?:ModelObserver,retainContent=false):ModelObserver=>{
     // 沒有對象人物的派送預設只留收據；經模型任務 module 派送的製作工作明示保存送出內容與回覆（#413）。
     const keep=!!actor||retainContent;
     secrets.add(key);let active:Record<string,unknown>|undefined;

@@ -103,10 +103,11 @@ export function accountUsage(usage: AIUsage, tokens: TokenUsage): void {
 export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
   mentalEnergyPolicy?:MentalEnergyPolicy;
-  beforeDecision?: () => Promise<void>;
-  evaluateControlledFeelings?: (world:World,character:Character,request:ControlledFeelingRequest,onUsage:(tokens:TokenUsage)=>void)=>Promise<ControlledFeelingCandidate>;
+  /** 接管後感受的派送；派送前的確認、派送預留與計次都由這個 callback（模型任務 module）負責。 */
+  evaluateControlledFeelings?: (world:World,character:Character,request:ControlledFeelingRequest)=>Promise<ControlledFeelingCandidate>;
   onActor?: (world:World,character:Character)=>void;
-  decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
+  /** NPC 自主決策；派送前的確認、派送預留、計次與用量回報都由這個 callback（模型任務 module）負責。 */
+  decide: (world: World, character: Character) => Promise<ActivityDecision>;
 }): Promise<void> {
   const { minutes, mode, modelKey, limits } = options;
   const controlledActors=new Set(world.characters.filter(c=>c.control?.pending||c.control?.active||c.control?.mode==='taken-over').map(c=>c.id));
@@ -179,10 +180,7 @@ export async function advanceActivities(world: World, options: {
     if(controlledDecision)decision=controlledDecision;
     else if (ai) {
       if (budgetReached(usage, limits)) throw new BudgetExceeded();
-      await options.beforeDecision?.();
-      // Count attempts before requesting, including errors whose usage is not returned.
-      usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-      decision = await options.decide(world, character, tokens => accountUsage(usage, tokens));
+      decision = await options.decide(world, character);
       // The route rolls this back with the round on later model/save failure.
       if (control) delete control.experiences;
     } else {
@@ -249,9 +247,7 @@ export async function advanceActivities(world: World, options: {
     const request=prepareControlledFeelings(world,character,modelKey,{provider:providerForMode(mode),model:modelKey.slice(modelKey.indexOf(':')+1)},controlledStarts.get(character.id));
     if(!request)continue;
     if(budgetReached(usage,limits))throw new BudgetExceeded();
-    await options.beforeDecision?.();
-    usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
-    const result=await options.evaluateControlledFeelings(world,character,request,tokens=>accountUsage(usage,tokens));
+    const result=await options.evaluateControlledFeelings(world,character,request);
     applyProcessAssessment(character,result.processFeeling,world.minute);
     applyFeelingUpdates(character,result.feelingUpdates,world.minute);
     acknowledgeControlledFeelings(character,request,world.minute);

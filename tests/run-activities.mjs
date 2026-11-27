@@ -96,7 +96,7 @@ try {
   allTests.push('tests/live-acceptance-cup-api.test.cjs', 'tests/operation-evidence-api.test.cjs', 'tests/routine-results-api.test.cjs', 'tests/routine-program-api.test.cjs', 'tests/activity-results-api.test.cjs', 'tests/activity-time-review-api.test.cjs', 'tests/routine-objects-api.test.cjs', 'tests/routine-contract-api.test.cjs', 'tests/adjudication-daily-scope-api.test.cjs');
   allTests.push('tests/npc-failure-feedback-api.test.cjs', 'tests/adjudication-contract-api.test.cjs', 'tests/world-changes-object-api.test.cjs', 'tests/world-formation-api.test.cjs', 'tests/world-physical-api.test.cjs');
   allTests.push('tests/world-external-api.test.cjs');
-  allTests.push('tests/model-task-opening-resources-api.test.cjs', 'tests/model-task-setup-work-api.test.cjs');
+  allTests.push('tests/model-task-opening-resources-api.test.cjs', 'tests/model-task-setup-work-api.test.cjs', 'tests/model-task-adjudication-api.test.cjs', 'tests/model-task-controlled-feelings-api.test.cjs', 'tests/model-task-npc-decision-api.test.cjs');
   allTests.push('tests/natural-changes-api.test.cjs', 'tests/routine-world-changes-api.test.cjs');
   allTests.push('tests/verified-obstacles-api.test.cjs');
   allTests.push('tests/action-feedback-api.test.cjs', 'tests/decision-traces-api.test.cjs', 'tests/decision-trace-faults-api.test.cjs', 'tests/candidate-diagnostics-api.test.cjs');

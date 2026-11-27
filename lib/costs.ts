@@ -4,7 +4,9 @@ import type { TokenUsage } from './activities';
 
 export type ModelPrice = { id: string; provider: ModelProvider; model: string; input: number; output: number; cachedInput?: number; source: string; date: string; custom: true; savedAt: number };
 export type PriceInput = Omit<ModelPrice, 'id' | 'custom' | 'savedAt'>;
-export type CostCohort = { task?:'npc'|'adjudication'|'feelings'; provider: string; model: string; price: ModelPrice | null; calls: number; input: number; output: number; cachedInput: number; knownUsd: number; unknownCalls: number; lastDispatchAt: number };
+/** 一次派送的帳本分類：NPC 自主決策、裁定類（世界裁定與製作工作）、接管後感受。只在這裡宣告。 */
+export type DispatchKind = 'npc' | 'adjudication' | 'feelings';
+export type CostCohort = { task?:DispatchKind; provider: string; model: string; price: ModelPrice | null; calls: number; input: number; output: number; cachedInput: number; knownUsd: number; unknownCalls: number; lastDispatchAt: number };
 export type CostLedger = { total: Record<string, CostCohort>; hour: Record<string, CostCohort> };
 export type CostEstimate = { knownUsd: number; unknownCalls: number; calls: number; complete: boolean; cohorts: CostCohort[] };
 export function validPrice(value: unknown): value is PriceInput {
@@ -17,7 +19,7 @@ export function savePrice(world: World, input: PriceInput) {
   const price: ModelPrice = { provider: input.provider, model: input.model.trim(), input: input.input, output: input.output, ...(input.cachedInput === undefined ? {} : {cachedInput:input.cachedInput}), source: input.source.trim(), date:input.date, id:crypto.randomUUID(),custom:true,savedAt:Date.now() };
   world.modelPrices = [...(world.modelPrices || []).filter(p => p.provider !== price.provider || p.model !== price.model), price];
 }
-export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined, task:'npc'|'adjudication'|'feelings'='npc',dispatchAt=Date.now()) {
+export function beginCost(usage: AIUsage, provider: string, model: string, price: ModelPrice | undefined, task:DispatchKind='npc',dispatchAt=Date.now()) {
   usage.costs ??= {total:{},hour:{}};
   const key = `${task}:${price?.id || `unknown:${encodeURIComponent(provider)}:${encodeURIComponent(model)}`}`;
   const now = dispatchAt;

@@ -9,7 +9,7 @@ export type ScriptedDispatch = {
   messages: ModelMessage[];
   /** 最後一則 user 訊息解析後的 JSON；不是 JSON 時為 undefined。 */
   input: unknown;
-  contract: object; maxOutputTokens: number; attempt: number;
+  contract: object; maxOutputTokens?: number; attempt: number;
 };
 /** `reply` 是物件時以 JSON 送回，是字串時原樣當回覆文字；沒給 `usage` 代表供應商沒回報用量。 */
 export type ScriptedReply = { reply: unknown; usage?: TokenUsage };
@@ -28,7 +28,7 @@ export function scriptedModel(script: (dispatch: ScriptedDispatch) => ScriptedRe
       // 與正式傳輸相同：實錄失敗不改變模型任務的行為。
       const observe = async (event: ModelObservation) => { try { await hooks.observer?.(event); } catch { /* evidence only */ } };
       try {
-        const requestBody = modelRequestBody(request.service, request.messages, request.contract, { maxOutputTokens: request.maxOutputTokens });
+        const requestBody = modelRequestBody(request.service, request.messages, request.contract, { maxOutputTokens: request.maxOutputTokens, allowRecall: request.allowRecall, allowThinking: request.allowThinking });
         checkSignal(signal);
         await awaitSignal(observe({ kind: 'prepared', requestId, requestBody, timing: signalTiming(signal) }), signal);
         if (hooks.beforeSend) await awaitSignal(hooks.beforeSend(requestId, signal), signal);
