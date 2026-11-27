@@ -4,8 +4,8 @@ import { normalDecisionInput, boundDecisionRequest } from './npc-input';
 import { feelingPromptFor, feelingSourceMinutes, feelingReceiptCapacity, feelingUpdatesSchema, visibleFeelingSources, parseFeelingUpdates, type PreparedFeelingUpdate } from './mental-experiences';
 import { processFeelingSchemaFor, processFeelingPromptFor, parseProcessFeeling, type ProcessFeeling } from './mental-process';
 import { MemoryValidationError, memoryBytes } from './memory';
-import { modelRequestBody, requestModel, type ModelService, type ModelObserver } from './model-adapter';
-import type { TokenUsage } from './activities';
+import { modelRequestBody, type ModelService } from './model-adapter';
+import type { ModelTaskContent } from './model-task';
 
 export type ControlledAssessmentState={sources:{id:string;at:number}[];activities:{id:string;at:number}[];dropped:number};
 export type ControlledFeelingCandidate={feelingUpdates:PreparedFeelingUpdate[];processFeeling:ProcessFeeling|null};
@@ -36,13 +36,18 @@ export function prepareControlledFeelings(world:World,actor:Character,modelKey:s
  return {input,schema,messages,sources:offered,...(activityId?{activityId}:{}),...(opportunityId?{opportunityId}:{})};
 }
 export type ControlledFeelingRequest=NonNullable<ReturnType<typeof prepareControlledFeelings>>;
-export async function requestControlledFeelings(actor:Character,minute:number,prepared:ControlledFeelingRequest,service:ModelService,options:{signal:AbortSignal;label?:string;observer?:ModelObserver;requestId:string;fetcher?:typeof fetch;beforeDispatch?:Parameters<typeof requestModel>[3]['beforeDispatch'];onSettled?:()=>Promise<void>;onUsage:(tokens:TokenUsage)=>void|Promise<void>;verifyCurrent:()=>Promise<void>}):Promise<ControlledFeelingCandidate>{
- const raw=await requestModel(service,prepared.messages,prepared.schema,options);await options.verifyCurrent();
- try{
-  const value=JSON.parse(raw);
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='contractVersion,feelingUpdates,processFeeling'||value.contractVersion!==contractVersion||!Array.isArray(value.feelingUpdates)||value.feelingUpdates.length+(value.processFeeling===null?0:1)>4||memoryBytes(value)>8192||value.processFeeling!==null&&!prepared.activityId)throw new MemoryValidationError('接管感受只允許合法經歷與實際活動感受，不能越權決策或調節');
-  return {feelingUpdates:parseFeelingUpdates(actor,value.feelingUpdates,prepared.sources.map(r=>r.id),minute),processFeeling:parseProcessFeeling(actor,value.processFeeling)};
- }catch(error){try{await options.observer?.({kind:'failure',failure:error instanceof SyntaxError?'candidate-format':'candidate-validation',stage:'controlled-feelings-validation',reason:error instanceof SyntaxError?'json-parse':'field-format'});}catch{/* Preserve original candidate failure. */}if(error instanceof DecisionFieldError && error.cause instanceof MemoryValidationError)throw error.cause;if(error instanceof MemoryValidationError)throw error;throw new MemoryValidationError('接管感受回覆格式無效，本回合已回復');}
+/** 接管後感受的模型任務內容（#416）：訊息與回覆契約來自 `prepareControlledFeelings`；沒有格式修正，回覆不合契約就整回合回復。 */
+export function controlledFeelingsTask(actor:Character,minute:number,prepared:ControlledFeelingRequest):ModelTaskContent<ControlledFeelingCandidate>{
+ return {messages:prepared.messages,contract:prepared.schema,judge:raw=>{
+  try{
+   const value=JSON.parse(raw);
+   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='contractVersion,feelingUpdates,processFeeling'||value.contractVersion!==contractVersion||!Array.isArray(value.feelingUpdates)||value.feelingUpdates.length+(value.processFeeling===null?0:1)>4||memoryBytes(value)>8192||value.processFeeling!==null&&!prepared.activityId)throw new MemoryValidationError('接管感受只允許合法經歷與實際活動感受，不能越權決策或調節');
+   return {valid:true,value:{feelingUpdates:parseFeelingUpdates(actor,value.feelingUpdates,prepared.sources.map(r=>r.id),minute),processFeeling:parseProcessFeeling(actor,value.processFeeling)}};
+  }catch(error){
+   const refused=error instanceof DecisionFieldError&&error.cause instanceof MemoryValidationError?error.cause:error instanceof MemoryValidationError?error:new MemoryValidationError('接管感受回覆格式無效，本回合已回復');
+   return {valid:false,reason:refused.message,error:refused,failure:{kind:'failure',failure:error instanceof SyntaxError?'candidate-format':'candidate-validation',stage:'controlled-feelings-validation',reason:error instanceof SyntaxError?'json-parse':'field-format'}};
+  }
+ }};
 }
 export function acknowledgeControlledFeelings(actor:Character,request:ControlledFeelingRequest,minute:number):void{
  const energy=actor.mentalEnergy!;const old=checkedState(actor),protectedActivities=new Set([actor.plan?.mentalProcess?.id,actor.pausedActivity?.plan.mentalProcess?.id]);

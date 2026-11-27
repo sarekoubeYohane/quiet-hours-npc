@@ -6,14 +6,21 @@ import { playerAccount } from './player-account-budget';
 import { recallBudgetDatabase, reserveRecallDispatch } from './recall-services';
 import { traceWorld, type OperationContext } from './host-runtime';
 import { streamingTransport } from './model-transport';
-import { formatRepairEnabled, type ModelMessage } from './model-adapter';
+import { formatRepairEnabled, type ModelMessage, type ModelObservation } from './model-adapter';
+import type { ModelProvider } from './model-providers';
 import type { AIUsage, Character } from './world';
 
 /**
  * 對回覆的判定：有效（附結果），或不合契約（附原因）。要不要重問由模型任務 module 決定，判定不必知道。
  * 要求續答隨回想續答改走 module 時加入（#411）。
  */
-export type ReplyVerdict<T> = { valid: true; value: T } | { valid: false; reason: string; /** 要原樣拋出的錯誤（保留錯誤類別）；沒給就以 `reason` 拋出。 */ error?: Error };
+export type ReplyVerdict<T> = { valid: true; value: T } | {
+  valid: false; reason: string;
+  /** 要原樣拋出的錯誤（保留錯誤類別）；沒給就以 `reason` 拋出。 */
+  error?: Error;
+  /** 不再重問時要留在決策實錄與操作證據的失敗紀錄；有給時先確認租約、留下紀錄，再拋出。 */
+  failure?: Extract<ModelObservation, { kind: 'failure' }>;
+};
 /** 一項模型任務要問什麼、怎樣的回覆算有效。 */
 export type ModelTaskContent<T> = {
   messages: ModelMessage[];
@@ -38,6 +45,10 @@ type ModelTaskIdentity = {
   receiptOnly?: boolean;
   /** 對象人物；有對象人物的任務另留操作證據，請求身分也帶上人物。 */
   actor?: Character;
+  /** 帳本分類；沒給時是裁定類（製作工作與世界裁定）。 */
+  kind?: 'feelings';
+  /** 這項任務問哪個模型；沒給時用世界的裁定模型。 */
+  service?: { provider: ModelProvider; model: string };
   /** 顯示名稱，用在逾時等錯誤訊息；沒給時用製作工作的名稱。 */
   label?: string;
   /** 每次派送的派送預留 key；沒給時由操作身分與任務名稱組成。 */
@@ -55,7 +66,7 @@ export const setupTaskLabel = (name: string) => setupTaskLabels[name] ?? `製作
  * 模型任務 module（#411）。一項模型任務是一段可能包含多次派送的對話：
  * 每次派送前確認預算與租約、取得派送預留，送出時計次並開始計費，回覆的用量結算到帳號帳本與世界內用量，
  * 並留下決策實錄（寫入受工作期限約束）。格式修正的迴圈只在這裡：每項任務最多重問一次，只在開啟格式修正的建置。
- * 目前承接全部製作工作與世界裁定；帳本分類沿用裁定類。往下只認模型傳輸 interface。
+ * 目前承接全部製作工作、世界裁定與接管後感受；帳本分類沒指定時沿用裁定類。往下只認模型傳輸 interface。
  * `roundUsage`：推進回合沿用回合開始時取得的世界內用量；沒給時在這裡取得當前用量。
  */
 export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
@@ -74,12 +85,12 @@ export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
       if (env.RECALL_ENABLED === 'true' && (await workWait(reserveRecallDispatch(
         recallBudgetDatabase(), accountId, 'chat', reservation, 1, { ownerMonthly: 0, accountMonthly: 0 }, 'player',
       ))).replayed) throw Error('付費請求結果不明，禁止重送。');
-      const config = world.adjudication!, usage = usageNow();
+      const config = task.service ?? world.adjudication!, kind = task.kind ?? 'adjudication', usage = usageNow();
       const key = await workWait(readModelKey(accountId, config.provider));
       await verifyLease();
       const price = accountPlayer.prices.find(value => value.provider === config.provider && value.model === config.model);
       let reportCost: ReturnType<typeof beginCost> | undefined;
-      const dispatch = dispatchModel('adjudication', world, actor, config.provider, config.model, key, { evidence: !!actor, withinWorkDeadline: true, traceContent: !task.receiptOnly });
+      const dispatch = dispatchModel(kind, world, actor, config.provider, config.model, key, { evidence: !!actor, withinWorkDeadline: true, traceContent: !task.receiptOnly });
       if (!content) { content = 'build' in task ? task.build() : task; messages = content.messages; }
       const requestId = actor ? `${operationId}:${actor.id}:${name}:${crypto.randomUUID()}` : operationId + ':' + name + (attempt > 1 ? ':' + attempt : '');
       const reply = await transport.send(
@@ -92,7 +103,7 @@ export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
             dispatch.sent();
             traceWorld(trace, 'model-dispatch');
             usage.calls++; usage.totalCalls++; usage.unknownCalls++; usage.totalUnknownCalls++;
-            reportCost = beginCost(usage, config.provider, config.model, price, 'adjudication');
+            reportCost = beginCost(usage, config.provider, config.model, price, kind);
           },
           onUsage: dispatch.reportUsage(tokens => accountUsage(usage, tokens), tokens => reportCost?.(tokens)),
           onSettled: dispatch.onSettled,
@@ -101,7 +112,11 @@ export function modelTasks(ctx: OperationContext, roundUsage?: () => AIUsage) {
       const verdict = content.judge(reply.text);
       if (verdict.valid) { await verifyLease(); return verdict.value; }
       // 可修正的失敗只重問一次；其餘照舊拋出（判定附了錯誤物件就原樣拋出）。
-      if (attempt > 1 || !content.repair || !formatRepairEnabled()) throw verdict.error ?? new ReplyRefused(verdict.reason, reply.text);
+      if (attempt > 1 || !content.repair || !formatRepairEnabled()) {
+        // 留不成失敗紀錄時，仍拋出原本的判定失敗。
+        if (verdict.failure) { await verifyLease(); try { await dispatch.observer?.(verdict.failure); } catch { /* evidence only */ } }
+        throw verdict.error ?? new ReplyRefused(verdict.reason, reply.text);
+      }
       // 重問前先確認租約：租約已失效時不留下修正的紀錄。
       await verifyLease();
       messages = [...content.messages, { role: 'assistant', content: reply.text.slice(0, content.repair.echoLimit) }, { role: 'user', content: content.repair.instruct(verdict.reason) }];

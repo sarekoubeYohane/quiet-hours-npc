@@ -13,7 +13,7 @@ import { loadCharacterDraft } from './character-draft-store';
 import { adoptFormalMentalEnergy, validateMentalAdoption } from './formal-mental-enablement';
 import { enablePersonalNeeds, validateBodyNeedsSetup } from './body-needs-policy';
 import { characterSetupSchema, formCharacterAttributes } from './character-attributes';
-import { requestControlledFeelings } from './controlled-feelings';
+import { controlledFeelingsTask } from './controlled-feelings';
 import { readMentalEnergyTestPolicy } from './mental-energy';
 import { CharacterTemplateValidationError, initialMemoryCapacityError } from './character-templates';
 import { initializeCity } from './city-initialization';
@@ -112,13 +112,11 @@ const advanceOperation = (): OperationHandler => ({
             dispatchKey = await workWait(readModelKey(accountId, providerForMode(b.mode)));
             await verifyLease();
             traceWorld(trace, 'model-dispatch'); },
-          evaluateControlledFeelings: async(w,c,prepared,onUsage)=>{
-            const provider=providerForMode(b.mode),model=b.model!.trim();
-            const cost=beginCost(w.aiUsage!,provider,model,accountPlayer.prices.find(p=>p.provider===provider&&p.model===model),'feelings');
-            traceWorld(trace,'controlled-feelings-dispatch');
-            const dispatch=dispatchModel('feelings',w,c,provider,model,dispatchKey,{evidence:true,withinWorkDeadline:true});
-            return requestControlledFeelings(c,w.minute,prepared,{key:dispatchKey,provider,model},{signal:modelSignal(),label:`${c.name}的感受評估`,requestId:`${operationId}:${c.id}:feelings:${crypto.randomUUID()}`,observer:dispatch.observer,fetcher:dispatch.fetcher,beforeDispatch:dispatch.beforeDispatch,onSettled:dispatch.onSettled,onUsage:dispatch.reportUsage(onUsage,cost),verifyCurrent:verifyLease});
-          },
+          // 經模型任務 module 派送；派送預留的 key 與 NPC 自主決策共用回合內的派送計數。
+          evaluateControlledFeelings: (w,c,prepared)=>runModelTask({
+            name:'feelings', kind:'feelings', actor:c, label:`${c.name}的感受評估`, service:{provider:providerForMode(b.mode),model:b.model!.trim()},
+            reservation:()=>`${id}:${operationId}:chat:${w.aiUsage?.totalCalls || 0}`, ...controlledFeelingsTask(c,w.minute,prepared),
+          }),
           decide: async (w, c, onUsage) => {
             adjudicationAttempt = undefined;
             const provider=providerForMode(b.mode);

@@ -104,7 +104,8 @@ export async function advanceActivities(world: World, options: {
   minutes: number; mode: string; modelKey: string; limits: BudgetLimits; now?: number;
   mentalEnergyPolicy?:MentalEnergyPolicy;
   beforeDecision?: () => Promise<void>;
-  evaluateControlledFeelings?: (world:World,character:Character,request:ControlledFeelingRequest,onUsage:(tokens:TokenUsage)=>void)=>Promise<ControlledFeelingCandidate>;
+  /** 接管後感受的派送；派送前的確認、派送預留與計次都由這個 callback（模型任務 module）負責。 */
+  evaluateControlledFeelings?: (world:World,character:Character,request:ControlledFeelingRequest)=>Promise<ControlledFeelingCandidate>;
   onActor?: (world:World,character:Character)=>void;
   decide: (world: World, character: Character, onUsage: (tokens: TokenUsage) => void) => Promise<ActivityDecision>;
 }): Promise<void> {
@@ -249,9 +250,7 @@ export async function advanceActivities(world: World, options: {
     const request=prepareControlledFeelings(world,character,modelKey,{provider:providerForMode(mode),model:modelKey.slice(modelKey.indexOf(':')+1)},controlledStarts.get(character.id));
     if(!request)continue;
     if(budgetReached(usage,limits))throw new BudgetExceeded();
-    await options.beforeDecision?.();
-    usage.calls++;usage.totalCalls++;usage.unknownCalls++;usage.totalUnknownCalls++;
-    const result=await options.evaluateControlledFeelings(world,character,request,tokens=>accountUsage(usage,tokens));
+    const result=await options.evaluateControlledFeelings(world,character,request);
     applyProcessAssessment(character,result.processFeeling,world.minute);
     applyFeelingUpdates(character,result.feelingUpdates,world.minute);
     acknowledgeControlledFeelings(character,request,world.minute);
