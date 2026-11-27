@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { cityLimits, openingDescriptionMaxLength, type CityDraft, type CityPreview } from './city-draft';
-import { requestModel, type ModelService } from './model-adapter';
 import type { ModelTaskContent } from './model-task';
-import { askDirectly, judgeBy } from './model-task-replies';
+import { judgeBy } from './model-task-replies';
 
 const kinds = ['home', 'owned', 'work', 'start', 'background', 'relationship'] as const;
 const responseSchema = z.object({ updates: z.array(z.object({
@@ -108,7 +107,3 @@ export function openingRelationshipsTask(draft: CityDraft, preview: CityPreview,
   return result;
   }) };
 }
-
-/** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩量測腳本使用（#411 第 5 段收尾）。 */
-export const suggestOpeningRelationships = (draft: CityDraft, preview: CityPreview, description: string, service: ModelService, options: Parameters<typeof requestModel>[3]) =>
-  askDirectly(openingRelationshipsTask(draft, preview, description), service, options);

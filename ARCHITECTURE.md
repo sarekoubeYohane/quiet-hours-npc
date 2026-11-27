@@ -128,7 +128,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
 | `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
 | `model-task.ts` | 模型任務 module（#411）：`modelTasks(ctx)` 回傳 `runModelTask`。每次派送前確認預算與租約、取得派送預留，送出時世界內用量加一並開始計費，用量結算到帳號帳本與世界內用量，回覆交給呼叫端的判定；不合契約時拋出原因（判定附了錯誤物件就原樣拋出）。決策實錄的寫入受工作期限約束；預設保存送出內容與回覆，任務標 `receiptOnly` 時只留收據（人物卡判讀）。目前承接全部製作工作：開局備料、AI 開局整理（含逐房配物）、補路建議、人物卡判讀、人物欄位補寫、場所初始化、開局關係整理。帳本分類為裁定類，每項任務只派送一次（格式修正與回想續答尚未搬進來） |
-| `model-task-replies.ts` | 製作工作共用的兩個小工具：`judgeBy` 把「不合契約就拋錯」的解讀函式包成模型任務的判定，錯誤類別與訊息原樣保留；`askDirectly` 給不經 module 的舊入口（`generateCharacterFields`、`assessCharacterCard`、`arrangeOpening`、`repairOpeningRoads`、`suggestOpeningRelationships`）使用，只剩量測腳本 `tooling/experiments/setup-reply-size/` 呼叫 |
+| `model-task-replies.ts` | 製作工作共用的兩個小工具：`judgeBy` 把「不合契約就拋錯」的解讀函式包成模型任務的判定，錯誤類別與訊息原樣保留；`askDirectly` 給不經 module 的舊入口（`generateCharacterFields`、`assessCharacterCard`、`arrangeOpening`、`repairOpeningRoads`）使用，只剩量測腳本 `tooling/experiments/setup-reply-size/` 呼叫 |
 | `model-transport.ts` | 模型傳輸 interface `ModelTransport`：收服務設定、訊息與回覆契約，回傳回覆文字與用量；請求實際送出時通知一次（`onSent`），得知用量時通知一次（`onUsage`）。正式的 adapter 是 `streamingTransport`（包 `requestModel`） |
 | `scripted-model.ts` | 模型傳輸 interface 的測試用 adapter（腳本模型）：腳本看到任務名稱、訊息、契約等（不含 Key），回傳回覆與用量；不經 `fetch`。正式程式沒有任何地方 import 它 |
 | `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter、DeepSeek、Gemini、Anthropic）、請求本文與 observer 事件；收完串流後沿用原本的解析與驗證 |

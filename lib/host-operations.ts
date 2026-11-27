@@ -5,6 +5,7 @@ import {openingRoadRepairTask,openingRepairSource} from './opening-road-repair';
 import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { openingArrangementTask } from './opening-arrangement-model';
 import type {OpeningDraft} from './opening-drafts';
+import type {CityDraft} from './city-draft';
 import { playerAccount, setPlayerAccount } from './player-account-budget';
 import { cardAssessmentTask, characterFormationIssue } from './character-formation';
 import { saveCardAssessment } from './character-card-store';
@@ -292,8 +293,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
       const { b, accountId, operationId, world, workWait } = ctx, runModelTask = modelTasks(ctx);
       let failure: Error | undefined;
       let generatedCharacter: NonNullable<typeof state.characterGeneration>['fields'] | undefined;
-      let suggestedOpening: Awaited<ReturnType<typeof initializeCity>> | undefined;
-      let finalizedCity: Awaited<ReturnType<typeof initializeCity>> | undefined;
+      let suggestedOpening: CityDraft | undefined, finalizedCity: CityDraft | undefined;
       const { arrangingOpening, assessingCard, preparingResources, initializingCity, arrangement, assessingDraft, openingDescription, characterGeneration, city, openingPreview } = state;
       let finalizationPreview: typeof openingPreview;
       try {
