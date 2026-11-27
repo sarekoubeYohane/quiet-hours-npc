@@ -7,6 +7,7 @@ import { adjudicationRules } from './adjudication-contract';
 import { redactDiagnosticText, sensitiveDiagnosticKey } from './diagnostic-redaction';
 import { requestModel, type ModelService } from './model-adapter';
 import type { Action, Character, World } from './world';
+import type { ModelTransport } from './model-transport';
 
 export const adjudicationContractVersion = 'world-adjudication.v1';
 export type AdjudicationInput = {
@@ -22,6 +23,8 @@ export type AdjudicationInput = {
 export type WorldTaskServices = {
   // Dependency injection at the server handler, never selectable by a JSON request.
   adjudicateExistingAction?: (input: AdjudicationInput) => Promise<unknown>;
+  /** 模型任務往下的模型傳輸（#411）；沒帶時使用正式的串流傳輸。測試以腳本模型帶入。 */
+  modelTransport?: ModelTransport;
 };
 export type AdjudicationFailure = {
   operationId: string;

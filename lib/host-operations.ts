@@ -1,5 +1,6 @@
 import { isModelProvider, providerForMode } from './model-providers';
-import { suggestOpeningResources, mapResourceActors, prepareOpeningResources, validateOpeningResourceRequest } from './opening-resources';
+import { openingResourcesTask, mapResourceActors, applyOpeningResources, validateOpeningResourceRequest } from './opening-resources';
+import { modelTasks, setupTaskLabel } from './model-task';
 import {repairOpeningRoads,openingRepairSource} from './opening-road-repair';
 import { readArrangement, storeArrangementResult,storedArrangementResult,type ArrangementRequest } from './opening-arrangement-store';
 import { arrangeOpening } from './opening-arrangement-model';
@@ -288,7 +289,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
     }
     },
     async run(ctx): Promise<OperationOutcome> {
-      const { b, accountId, id, operationId, world, accountPlayer, trace, verifyLease, workWait, modelSignal, dispatchModel } = ctx;
+      const { b, accountId, id, operationId, world, accountPlayer, trace, verifyLease, workWait, modelSignal, dispatchModel } = ctx, runModelTask = modelTasks(ctx);
       let failure: Error | undefined;
       let generatedCharacter: Awaited<ReturnType<typeof generateCharacterFields>> | undefined;
       let suggestedOpening: Awaited<ReturnType<typeof suggestOpeningRelationships>> | undefined;
@@ -316,7 +317,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
           } });
           const result = await invoke({ ...config, key }, {
             signal: modelSignal(),
-            label: setupTaskLabels[task] ?? `製作工作（${task}）`,
+            label: setupTaskLabel(task),
             onSettled: dispatch.onSettled,
             requestId: operationId + ':' + task,
             observer: dispatch.observer,
@@ -329,7 +330,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
         };
         if(preparingResources){
           const prepared=structuredClone(world);
-          await runSetup('opening-resources',(service,options)=>prepareOpeningResources(prepared,b.resourceRequest as string,service,options));
+          applyOpeningResources(prepared,await runModelTask({name:'opening-resources',build:()=>openingResourcesTask(prepared,b.resourceRequest as string)}));
           world.supplies=prepared.supplies;world.objects=prepared.objects;
           world.routinePlaces=prepared.routinePlaces;world.openingResources=prepared.openingResources;
         } else if(arrangingOpening&&arrangement){
@@ -340,7 +341,7 @@ const setupOperation = (flags: Pick<OperationHandler, 'accountWorkspace' | 'larg
             const {world:candidate}=await prepareCity(accountId,city,world,snapshot.sources);
             if(!candidate)throw Error('請先完成起點與物資配置。');
             delete candidate.openingResources;
-            const addition=await runSetup('opening-resources',(service,options)=>suggestOpeningResources(candidate,requested.resourceRequest??'',service,options));
+            const addition=await runModelTask({name:'opening-resources',build:()=>openingResourcesTask(candidate,requested.resourceRequest??'')});
             const plan=mapResourceActors(addition,id=>{
               const source=candidate.characters.find(actor=>actor.id===id)?.profileSource?.id;
               if(!source)throw Error('物資指定了未選人物。');
@@ -537,7 +538,6 @@ const interveneOperation = (): OperationHandler => ({
 });
 
 // Shown in timeout messages so the player can tell which setup call went quiet.
-const setupTaskLabels: Record<string, string> = { 'opening-resources': '開局備料', 'opening-road-repair': '補路建議', 'opening-arrangement': 'AI 開局整理', 'card-assessment': '人物卡判讀', 'character-generation': '人物欄位補寫', 'opening-relationships': '開局關係整理' };
 export const hostOperations: OperationTable = {
   'set-model-key': modelKeyOperation,
   'clear-model-key': modelKeyOperation,

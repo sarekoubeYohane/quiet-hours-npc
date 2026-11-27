@@ -73,6 +73,8 @@ node --import ./tooling/verification/no-network.mjs --test tests/<name>.test.mjs
 
 **模型與亂數**：測試把 `global.fetch` 換成固定回應，`Math.random` 也會被換掉以控制骰值。`tooling/verification/no-network.mjs` 會讓任何非 loopback 的請求直接失敗並印出 `[test-network-denied]`。測試不會發出付費請求。
 
+已改走模型任務 module 的派送點（目前只有開局備料）可以改用腳本模型：`load('scripted-model').scriptedModel(script)` 經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入，腳本直接回傳「這項模型任務回覆什麼」，不必寫供應商的回應格式。範例見 `tests/model-task-opening-resources-api.test.cjs`。
+
 ## 檔名慣例
 
 | 檔名 | 內容 |

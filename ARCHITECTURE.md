@@ -73,6 +73,8 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | 操作的受理、收據、重送、租約、提交與失敗回復 | `lib/host-runtime.ts` 的 `runOperation`（主持執行層） |
 | 新增或修改一項操作（驗證與執行） | `lib/host-operations.ts` 的 `hostOperations`，每項操作一個 handler |
 | 派送模型前後的預算、證據與追溯接線 | `lib/host-runtime.ts` 的 `dispatchModel`，經 `OperationContext` 交給 handler |
+| 新增一項模型任務，或把既有派送點改走模型任務 module | `lib/model-task.ts` 的 `modelTasks`；呼叫端只給任務名稱、訊息、回覆契約、輸出 token 上限與對回覆的判定。目前只有開局備料經它派送（#413），其餘派送點仍各自接 `dispatchModel`（#414–#417） |
+| 測試裡安排「這項模型任務回覆什麼」 | `lib/scripted-model.ts` 的 `scriptedModel`，經 world route `POST` 的第二個參數 `{ modelTransport }` 帶入；範例見 `tests/model-task-opening-resources-api.test.cjs` |
 | 決策追溯與操作證據 | `lib/decision-traces.ts`、`lib/decision-trace-capture.ts`、`lib/operation-evidence.ts` |
 | 觀察頁介面 | `components/world-app.tsx`；人物狀態卡在 `components/character-status-board.tsx`，回合紀錄在 `components/round-log.tsx` 與 `lib/observation-log.ts` |
 | 開局人物卡 | `components/opening-character-cards.tsx` 提供選人、頭像與能力／身體需求比較。 |
@@ -92,7 +94,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 4. **解析模型設定**：`lib/model-settings-store.ts` 的 `readEffectiveModels`（存檔 → 帳號 → 舊世界設定）與 `lib/model-keys.ts`。
 5. **取得租約**：對 `worlds` 做一次帶 `version`、`operations`、`state` 條件的 UPDATE，寫入 `locked_until`。
 6. **建立證據與追溯**：`createOperationEvidence`、`createDecisionTrace`。
-7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由推進的 handler 以 callback 注入，派送接線來自主持執行層的 `dispatchModel`。
+7. **推進**：`lib/activities.ts` 的 `advanceActivities`。它本身不做 I/O，模型呼叫由推進的 handler 以 callback 注入，派送接線來自主持執行層的 `dispatchModel`。製作工作中的開局備料改由 `lib/model-task.ts` 派送，往下經模型傳輸 interface（`lib/model-transport.ts`）。
 8. **每次派送前檢查預算**：`lib/player-account-budget.ts` 的 `playerBilling`，並重新確認租約。
 9. **失敗**：整個回合回復（`restoreWorld`），已發生的用量保留；回 429（預算）或 502。
 10. **提交**：對 `worlds` 做一次條件 UPDATE，`version + 1`、釋放租約、寫入收據。衝突時只保留已付用量。
@@ -125,6 +127,9 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `paused-activities.ts` | 暫停、復工、放棄 |
 | `models.ts` | NPC 決策主流程：組 system prompt、呼叫模型、回想迴圈、`parseDecision` |
 | `decision-field-error.ts` | NPC 欄位驗證診斷，將欄位路徑、收到值與預期格式送到操作結果與私有實錄 |
+| `model-task.ts` | 模型任務 module（#411）：`modelTasks(ctx)` 回傳 `runModelTask`。每次派送前確認預算與租約、取得派送預留，送出時世界內用量加一並開始計費，用量結算到帳號帳本與世界內用量，回覆交給呼叫端的判定；不合契約時拋出原因。經它派送的製作工作，決策實錄保存送出內容與回覆。目前只承接開局備料，帳本分類為裁定類，每項任務只派送一次（格式修正與回想續答尚未搬進來） |
+| `model-transport.ts` | 模型傳輸 interface `ModelTransport`：收服務設定、訊息與回覆契約，回傳回覆文字與用量；請求實際送出時通知一次（`onSent`），得知用量時通知一次（`onUsage`）。正式的 adapter 是 `streamingTransport`（包 `requestModel`） |
+| `scripted-model.ts` | 模型傳輸 interface 的測試用 adapter（腳本模型）：腳本看到任務名稱、訊息、契約等（不含 Key），回傳回覆與用量；不經 `fetch`。正式程式沒有任何地方 import 它 |
 | `model-adapter.ts` | 唯一的 LLM HTTP transport（OpenAI、OpenRouter、DeepSeek、Gemini、Anthropic）、請求本文與 observer 事件；收完串流後沿用原本的解析與驗證 |
 | `model-stream.ts` | 串流接收：首段回應與閒置兩段等待（以 `AbortSignal.timeout` 計時）、`ModelResponseTimeout` 與串流中斷的錯誤訊息、晚到回覆的證據 |
 | `model-stream-parse.ts` | 純解析：SSE 分段、OpenAI 相容 chunk 與 Anthropic 事件組回非串流的回覆本文、串流內的供應商錯誤 |
@@ -143,12 +148,12 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `world-formation.ts`、`world-formation-contract.ts` | 執行期物件的切分、轉換、分離效果（與建立世界無關） |
 | `natural-changes.ts` | 延遲後自動發生的狀態變化 |
 | `round-time-policy.ts` | 回合時間預算常數（含模型首段與閒置時限）與 AbortSignal 工具 |
-| `host-runtime.ts` | 主持執行層（#338）：`runOperation` 受理一次操作（重送回放、租約、候選世界、條件提交、失敗回復、已付用量保留、操作證據與決策追溯收尾）；`dispatchModel` 是派送模型的共同接線；另有操作 journal 的型別與裁切、`journalView`，以及不經 HTTP 的入口 `acceptOperation`。不知道任何一項操作的內容 |
+| `host-runtime.ts` | 主持執行層（#338）：`runOperation` 受理一次操作（重送回放、租約、候選世界、條件提交、失敗回復、已付用量保留、操作證據與決策追溯收尾）；`dispatchModel` 是派送模型的共同接線（模型任務 module 也經它取得帳號帳本與決策實錄的接線）；另有操作 journal 的型別與裁切、`journalView`，以及不經 HTTP 的入口 `acceptOperation`。不知道任何一項操作的內容 |
 | `host-operations.ts` | 各項操作的 handler 表 `hostOperations`：受理前各時點的檢查與取得租約後的 `run`（推進、介入、直接控制、設定類、需要派送模型的準備工作）。`runHostOperation`、`acceptHostOperation` 是帶上這張表的入口 |
 | `acceptance-scene.ts` | 最小驗收場景的進出（原世界 gzip 備份）與給 client 的投影 `worldForClient` |
 | `entry-rules.ts` | 進出規則的型別與常數，沒有邏輯 |
 | `decision-traces.ts` | 私密決策追溯的 D1 存取 |
-| `decision-trace-capture.ts` | 記憶體內的 trace builder |
+| `decision-trace-capture.ts` | 記憶體內的 trace builder。沒有對象人物的派送預設只留收據（不存送出內容與回覆）；經模型任務 module 派送的才保存內容 |
 | `operation-evidence.ts` | 給觀察者的操作證據，64 KiB allowlist |
 | `diagnostic-redaction.ts` | 診斷文字中的秘密遮罩 |
 | `observation-log.ts` | 觀察頁回合紀錄的純投影：把事件、檢定與感知擲骰、精神電量與需求歷史整理成依時間分組的紀錄；只讀，不進 NPC 輸入 |
@@ -248,7 +253,7 @@ Worker bindings：D1 `DB`、靜態資源 `ASSETS`。`wrangler.jsonc` 頂層是�
 | `city-creation.ts` | `prepareCity`：把開局配置與來源轉成預覽與世界 |
 | `city-finalization.ts` | 疊在場景範本上的額外房間、物件、連接與步行時間 |
 | `daily-place-context.ts` | 自訂場所住戶／主人／工作者的日常資格，以及入口到房間的許可與通路 |
-| `opening-resources.ts` | 第 0 回合天上意志備料契約、完整綁定驗證、有限供應與陳設使用權；經 world operation 計費及保存 |
+| `opening-resources.ts` | 第 0 回合天上意志備料契約、完整綁定驗證、有限供應與陳設使用權；經 world operation 計費及保存。`openingResourcesTask` 是交給模型任務 module 的任務內容；`suggestOpeningResources`、`prepareOpeningResources` 是直接呼叫模型傳輸的舊入口，只剩測試與量測腳本使用 |
 | `opening-resource-knowledge.ts` | 僅投射本人開局知道的物資位置與許可，不揭露遠端即時庫存 |
 | `city-access.ts` | 進入許可的建立與執行期查詢（`entryPermission`） |
 | `city-initialization.ts` | 用模型產生 finalization |
@@ -412,6 +417,7 @@ NPC 決策契約只接受 `npc-decision.v3`，沒有 v1／v2 的相容分支。�
 ## 檔名陷阱
 
 - **`host-runtime.ts` 與 `host-operations.ts` 的分工**：前者是協定（不認識任何操作），後者是各操作的規則。`OperationHandler` 的檢查時點順序是對外行為（決定先回哪個錯誤），調整前先看該型別的註解。
+- **`lib/scripted-model.ts` 放在 `lib/` 但只給測試用**：放這裡是因為 `tests/run-activities.mjs` 只轉譯 `lib/` 頂層的檔案。world route 的第二個參數只能由伺服器端程式帶入，JSON 請求選不到。
 - **`lib/models.ts` 不是資料模型**，是 NPC 的 LLM 決策流程。核心型別在 `lib/world.ts`。
 - **沒有 `lib/d100.ts`**。d100 在 `lib/action-checks.ts`；但 d100 結果用的 `Resolution` 型別定義在 `lib/d20.ts`。
 - **`world.ts` 的 `perception()` 與 `lib/perception.ts` 不同**：前者組 NPC 視角，後者是感官引擎。

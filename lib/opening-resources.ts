@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { canSee } from './perception';
 import { requestModel, type ModelService } from './model-adapter';
+import type { ModelTask } from './model-task';
 import { customRoutinePlaces, dailyRoomAccessible, placeRoles, placeResponsibilities } from './daily-place-context';
 import { finiteSourceScope, routineFiniteScopeMatches } from './routine-materials';
 import { worldRegions } from './world-configuration';
@@ -95,15 +96,27 @@ function bindResources(world:World,reply:z.infer<typeof resourcePlanSchema>){
   return {additions,receipts};
 }
 
-export async function suggestOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]){
+/** 「開局備料」這項模型任務的內容：訊息、回覆契約、輸出上限與對回覆的判定。世界前提不成立或依據超出容量時拋錯。 */
+export function openingResourcesTask(world:World,request:string):Omit<ModelTask<ResourcePlan>,'name'> {
   validateOpeningResourceRequest(world,request);
   const input=resourceInput(world,request);
   if(new TextEncoder().encode(JSON.stringify(input)).length>96000)throw Error('開局物資依據超出容量，未進行裁定。');
-  const raw=await requestModel(service,[{role:'system',content:
+  return {messages:[{role:'system',content:
     '你是開局天上意志，確認自訂場所為維持日常生活與工作已備妥的普通物資。這是第 0 回合的世界設定，不是 NPC 行動。依場所用途、住戶、工作者、主人、房間通行權和既有事實判斷；不要推進時間、分配行動或修改身體。只可新增真實的有限即食食物與可直接飲用的水，每處每類至多一個來源、1–100 份，總共至多 32 來源。水必須可直接飲用，不需要找杯子；食物必須即食且可直接取用。label 要清楚說明。allowedTo 是主人明確允許自行取用且知道位置的人；進得了商店不等於有權拿商品。可以確認店主提供的免費試吃或工作餐，不可假定未支援的購買流程。responsible 用場所實際負責者 id；無在場 NPC 主人時可用 world，reason 必須具體說明背景負責者及允許理由。不可新增任何已經有同類物資的房間，不可繞過缺貨、有限來源、隱藏或私人限制。冰箱、飲水機、桌面等陳設名字並非已有食物水的證據。furnishingGrants 只能確認住戶、工作者或主人對 world 擁有、非隱藏、無人持有的既有 furnishings 的使用權，例如自己的床與休息椅，不改物件或房間。supplies 與 grants 可以為空；無法配置的需求必須在 unavailable 列明原因。只輸出契約 JSON。'},
-    {role:'user',content:JSON.stringify(input)}],responseSchema,{...options,maxOutputTokens:6000});
-  if(new TextEncoder().encode(raw).length>48000)throw Error('開局物資裁定超出容量。');
-  return resourcePlanSchema.parse(JSON.parse(raw));
+    {role:'user',content:JSON.stringify(input)}],contract:responseSchema,maxOutputTokens:6000,
+    judge:raw=>{
+      if(new TextEncoder().encode(raw).length>48000)return {valid:false,reason:'開局物資裁定超出容量。'};
+      try{return {valid:true,value:resourcePlanSchema.parse(JSON.parse(raw))};}
+      catch(error){return {valid:false,reason:error instanceof Error?error.message:String(error)};}
+    }};
+}
+
+/** 不經模型任務 module、直接呼叫模型傳輸的舊入口；只剩測試與量測腳本使用（#411 第 5 段收尾）。 */
+export async function suggestOpeningResources(world:World,request:string,service:ModelService,options:Parameters<typeof requestModel>[3]){
+  const task=openingResourcesTask(world,request);
+  const verdict=task.judge(await requestModel(service,task.messages,task.contract,{...options,maxOutputTokens:task.maxOutputTokens}));
+  if(!verdict.valid)throw Error(verdict.reason);
+  return verdict.value;
 }
 
 export type ResourcePlan=z.infer<typeof resourcePlanSchema>;
